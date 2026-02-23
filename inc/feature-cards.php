@@ -42,16 +42,16 @@ function gs_get_feature_definitions()
             'link' => 'https://gend.me/store-management/'
         ),
         'sales' => array(
-            'name' => __('Sales Team', 'gend-society'),
+            'name' => __('Sales Management', 'gend-society'),
             'description' => __('Empower your sales team with real-time tracking, lead management, and performance analytics.', 'gend-society'),
-            'plugin' => 'sales-team/sales-team.php',
+            'plugin' => 'sales-team/advanced-affiliate-system.php',
             'image' => 'https://gend.me/wp-content/uploads/2026/02/Sales-Team.png',
             'link' => 'https://gend.me/sales-team/'
         ),
         'projects' => array(
             'name' => __('Remote Projects', 'gend-society'),
             'description' => __('Coordinate global teams and track deliverables with integrated project management for store owners.', 'gend-society'),
-            'plugin' => 'projects/projects.php',
+            'plugin' => 'projects/project-service-orders.php',
             'image' => 'https://gend.me/wp-content/uploads/2026/02/Remote-Projects.png',
             'link' => 'https://gend.me/remote-projects/'
         ),
@@ -65,9 +65,7 @@ function gs_get_feature_definitions()
         'membership' => array(
             'name' => __('Membership Management', 'gend-society'),
             'description' => __('Total control over tiers, permissions, and access for your exclusive community.', 'gend-society'),
-            // WP Ultimo manages this; using a fallback if plugin path isn't standard
-            'plugin' => 'wp-ultimo/wp-ultimo.php',
-            'is_ultimo' => true, // flag to use function_exists check
+            'plugin' => 'Member Management/member-management.php',
             'image' => 'https://gend.me/wp-content/uploads/2026/02/Membership-Management.png',
             'link' => 'https://gend.me/membership-management/'
         ),
