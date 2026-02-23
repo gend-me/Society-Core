@@ -1,0 +1,435 @@
+/* ============================================================
+   GenD Society — Frontend Bar  |  v1.0.0
+   ============================================================ */
+
+:root {
+    --gs-bar-w-collapsed: 60px;
+    --gs-bar-w-expanded: 230px;
+    --gs-bar-bg: rgba(11, 14, 20, 0.88);
+    --gs-bar-border: rgba(255, 255, 255, 0.10);
+    --gs-bar-magenta: #b608c9;
+    --gs-bar-blue: #6ec1e4;
+    --gs-bar-accent: #97e46e;
+    --gs-bar-text: #e8edf5;
+    --gs-bar-muted: #7a8599;
+}
+
+/* ---- SIDEBAR CONTAINER ------------------------------------ */
+.gs-front-sidebar {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: var(--gs-bar-w-collapsed);
+    height: 100vh;
+    z-index: 999999;
+    background: var(--gs-bar-bg);
+    backdrop-filter: blur(20px) saturate(160%);
+    -webkit-backdrop-filter: blur(20px) saturate(160%);
+    border-right: 1px solid var(--gs-bar-border);
+    border-radius: 0 14px 14px 0;
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    padding-top: 12px;
+    box-shadow: 0 0 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
+    transition: width .2s cubic-bezier(.4, 0, .2, 1);
+    overflow: hidden;
+}
+
+.gs-front-sidebar:hover,
+.gs-front-sidebar.gs-expanded {
+    width: var(--gs-bar-w-expanded);
+}
+
+/* ---- GRADIENT STRIPE TOP ---------------------------------- */
+.gs-front-sidebar::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gs-bar-magenta), #cc0000, var(--gs-bar-blue));
+    border-radius: 0 0 0 0;
+}
+
+/* ---- LOGO / BRAND PILL ------------------------------------ */
+.gs-sidebar-brand {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 14px 16px;
+    width: 100%;
+    text-decoration: none;
+    overflow: hidden;
+    white-space: nowrap;
+    flex-shrink: 0;
+}
+
+.gs-sidebar-brand-icon {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: linear-gradient(135deg, var(--gs-bar-magenta), #cc0000);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+    font-size: 16px;
+    color: #fff;
+    font-weight: 900;
+}
+
+.gs-sidebar-brand-label {
+    font-size: .82rem;
+    font-weight: 800;
+    color: var(--gs-bar-text);
+    opacity: 0;
+    transition: opacity .18s ease;
+    letter-spacing: .3px;
+}
+
+.gs-front-sidebar:hover .gs-sidebar-brand-label,
+.gs-front-sidebar.gs-expanded .gs-sidebar-brand-label {
+    opacity: 1;
+}
+
+/* ---- DIVIDER --------------------------------------------- */
+.gs-sidebar-divider {
+    width: calc(100% - 20px);
+    height: 1px;
+    background: var(--gs-bar-border);
+    margin: 4px 10px 8px;
+    flex-shrink: 0;
+}
+
+/* ---- MENU LIST ------------------------------------------- */
+.gs-sidebar-nav {
+    flex: 1;
+    width: 100%;
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding: 0 8px;
+    box-sizing: border-box;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
+}
+
+/* ---- MENU ITEM ------------------------------------------- */
+.gs-sidebar-item {
+    position: relative;
+    margin-bottom: 3px;
+}
+
+.gs-sidebar-link {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 10px 10px;
+    border-radius: 10px;
+    text-decoration: none;
+    color: var(--gs-bar-text);
+    white-space: nowrap;
+    overflow: hidden;
+    border: 1px solid transparent;
+    transition: all .18s ease;
+}
+
+.gs-sidebar-link:hover,
+.gs-sidebar-link:focus {
+    background: rgba(182, 8, 201, 0.12);
+    border-color: rgba(182, 8, 201, 0.25);
+    color: #fff;
+}
+
+.gs-sidebar-link.gs-active {
+    background: rgba(182, 8, 201, 0.18);
+    border-color: rgba(182, 8, 201, 0.45);
+    box-shadow: 0 0 10px rgba(182, 8, 201, 0.15);
+}
+
+.gs-sidebar-icon {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    flex-shrink: 0;
+    font-size: 16px;
+    color: var(--gs-bar-muted);
+    transition: color .18s;
+}
+
+.gs-sidebar-link:hover .gs-sidebar-icon,
+.gs-sidebar-link.gs-active .gs-sidebar-icon {
+    color: var(--gs-bar-magenta);
+}
+
+.gs-sidebar-label {
+    font-size: .8rem;
+    font-weight: 600;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .15s ease;
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.gs-front-sidebar:hover .gs-sidebar-label,
+.gs-front-sidebar.gs-expanded .gs-sidebar-label {
+    opacity: 1;
+    pointer-events: auto;
+}
+
+/* ---- EDIT / BUILD ACTIONS --------------------------------- */
+.gs-sidebar-actions {
+    width: 100%;
+    padding: 0 8px;
+    box-sizing: border-box;
+    flex-shrink: 0;
+    margin-bottom: 4px;
+}
+
+.gs-sidebar-action-btn {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    padding: 9px 10px;
+    border-radius: 10px;
+    border: 1px solid var(--gs-bar-border);
+    background: rgba(255, 255, 255, 0.04);
+    color: var(--gs-bar-text);
+    font-size: .78rem;
+    font-weight: 600;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .18s ease;
+    white-space: nowrap;
+    overflow: hidden;
+    margin-bottom: 4px;
+}
+
+.gs-sidebar-action-btn:hover {
+    background: rgba(151, 228, 110, 0.12);
+    border-color: rgba(151, 228, 110, 0.35);
+    color: var(--gs-bar-accent);
+}
+
+.gs-sidebar-action-btn .gs-sidebar-icon {
+    color: var(--gs-bar-accent);
+}
+
+/* ---- FOOTER / USER --------------------------------------- */
+.gs-sidebar-footer {
+    width: 100%;
+    padding: 8px;
+    border-top: 1px solid var(--gs-bar-border);
+    flex-shrink: 0;
+    box-sizing: border-box;
+}
+
+.gs-sidebar-user {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    border-radius: 10px;
+    overflow: hidden;
+    text-decoration: none;
+}
+
+.gs-sidebar-avatar {
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    flex-shrink: 0;
+    background: linear-gradient(135deg, var(--gs-bar-magenta), var(--gs-bar-blue));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 13px;
+    font-weight: 800;
+    color: #fff;
+    overflow: hidden;
+}
+
+.gs-sidebar-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gs-sidebar-user-info {
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    opacity: 0;
+    transition: opacity .15s;
+}
+
+.gs-front-sidebar:hover .gs-sidebar-user-info,
+.gs-front-sidebar.gs-expanded .gs-sidebar-user-info {
+    opacity: 1;
+}
+
+.gs-sidebar-username {
+    font-size: .78rem;
+    font-weight: 700;
+    color: var(--gs-bar-text);
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gs-sidebar-role {
+    font-size: .68rem;
+    color: var(--gs-bar-muted);
+}
+
+/* ---- FLYOUT SUBMENU -------------------------------------- */
+.gs-sidebar-flyout {
+    position: fixed;
+    left: var(--gs-bar-w-collapsed);
+    top: 0;
+    min-width: 190px;
+    background: rgba(10, 14, 22, 0.97);
+    border: 1px solid var(--gs-bar-border);
+    border-radius: 0 12px 12px 0;
+    padding: 6px;
+    display: none;
+    z-index: 1000001;
+    box-shadow: 8px 0 32px rgba(0, 0, 0, .5);
+}
+
+.gs-sidebar-flyout a {
+    display: block;
+    padding: 9px 14px;
+    border-radius: 8px;
+    color: var(--gs-bar-text);
+    text-decoration: none;
+    font-size: .78rem;
+    font-weight: 500;
+    transition: all .15s;
+}
+
+.gs-sidebar-flyout a:hover {
+    background: rgba(255, 255, 255, .07);
+    color: #fff;
+}
+
+.gs-sidebar-flyout-title {
+    font-size: .68rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    color: var(--gs-bar-muted);
+    padding: 8px 14px 4px;
+}
+
+/* ---- PAGE PUSH ------------------------------------------- */
+body.gs-bar-active {
+    margin-left: var(--gs-bar-w-collapsed) !important;
+    transition: margin-left .2s cubic-bezier(.4, 0, .2, 1);
+}
+
+body.gs-bar-expanded {
+    margin-left: var(--gs-bar-w-expanded) !important;
+}
+
+/* Push Frontend Sticky/Fixed Headers */
+body.gs-bar-active header,
+body.gs-bar-active .elementor-location-header,
+body.gs-bar-active [data-elementor-type="header"] {
+    left: var(--gs-bar-w-collapsed) !important;
+    width: calc(100% - var(--gs-bar-w-collapsed)) !important;
+    transition: left .2s cubic-bezier(.4, 0, .2, 1), width .2s cubic-bezier(.4, 0, .2, 1) !important;
+}
+
+body.gs-bar-expanded header,
+body.gs-bar-expanded .elementor-location-header,
+body.gs-bar-expanded [data-elementor-type="header"] {
+    left: var(--gs-bar-w-expanded) !important;
+    width: calc(100% - var(--gs-bar-w-expanded)) !important;
+}
+
+/* ---- EDIT MODAL ------------------------------------------ */
+.gs-edit-modal {
+    display: none;
+    position: fixed;
+    inset: 0;
+    z-index: 1000002;
+}
+
+.gs-edit-modal.gs-open {
+    display: block;
+}
+
+.gs-edit-modal__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, .65);
+    backdrop-filter: blur(4px);
+}
+
+.gs-edit-modal__dialog {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    width: 100vw;
+    height: 100vh;
+    margin: 0;
+    padding: 0;
+    background: #0d1119;
+    border: none;
+    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    box-shadow: none;
+    animation: gsModalIn .2s ease;
+}
+
+@keyframes gsModalIn {
+    from {
+        opacity: 0;
+        transform: scale(.97);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.gs-edit-modal__close {
+    position: absolute;
+    top: 12px;
+    right: 14px;
+    z-index: 1;
+    background: rgba(255, 255, 255, .08);
+    border: none;
+    color: #fff;
+    width: 30px;
+    height: 30px;
+    border-radius: 50%;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.gs-edit-modal__close:hover {
+    background: rgba(204, 0, 0, .5);
+}
+
+.gs-edit-modal__frame {
+    flex: 1;
+    border: none;
+    width: 100%;
+}

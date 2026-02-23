@@ -1,0 +1,1181 @@
+/* ============================================================
+   GenD Society — Admin Style  |  v1.0.0
+   Brand: #b608c9  #cc0000  #6ec1e4  accent #97e46e
+   ============================================================ */
+
+/* ------ DESIGN TOKENS -------------------------------------- */
+:root {
+    --gs-magenta: #b608c9;
+    --gs-red: #cc0000;
+    --gs-blue: #6ec1e4;
+    --gs-accent: #97e46e;
+    --gs-bg: #0b0e14;
+    --gs-surface: rgba(15, 20, 32, 0.95);
+    --gs-glass: rgba(255, 255, 255, 0.05);
+    --gs-border: rgba(255, 255, 255, 0.10);
+    --gs-text: #e8edf5;
+    --gs-muted: #8b98b0;
+    --gs-radius: 14px;
+    --gs-header-h: 56px;
+}
+
+/* ------ BASE RESET ----------------------------------------- */
+html.wp-toolbar {
+    padding-top: 0 !important;
+}
+
+body.wp-admin {
+    background: var(--gs-bg) !important;
+    color: var(--gs-text) !important;
+    font-family: "Inter", "Segoe UI", system-ui, sans-serif !important;
+    margin-top: 0 !important;
+}
+
+a {
+    color: var(--gs-blue);
+}
+
+a:hover {
+    color: var(--gs-accent);
+}
+
+#wpadminbar {
+    display: none !important;
+}
+
+/* ------ FAKE HEADER ---------------------------------------- */
+#gs-admin-header {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: var(--gs-header-h);
+    z-index: 100001;
+    background: rgba(11, 14, 20, 0.92);
+    backdrop-filter: blur(25px) saturate(180%);
+    -webkit-backdrop-filter: blur(25px) saturate(180%);
+    border-bottom: 1px solid var(--gs-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 0 24px 0 0;
+    box-shadow: 0 2px 40px rgba(0, 0, 0, .45);
+}
+
+#gs-admin-header::after {
+    content: '';
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, var(--gs-magenta), var(--gs-red), var(--gs-blue));
+    opacity: .7;
+}
+
+/* ------ LOGO CONTAINER & TITLE ----------------------------- */
+.logo-container {
+    display: flex;
+    align-items: center;
+    padding: 0 16px;
+    height: 100%;
+    gap: 12px;
+}
+
+.logo-container a {
+    display: flex;
+    align-items: center;
+    text-decoration: none;
+}
+
+.logo-container img {
+    height: 38px;
+    border-radius: 6px;
+}
+
+.gs-site-title {
+    font-size: 1.1rem;
+    font-weight: 800;
+    letter-spacing: .5px;
+    background: linear-gradient(90deg, var(--gs-magenta), var(--gs-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    white-space: nowrap;
+}
+
+/* ------ CENTRAL NAV PILLS ---------------------------------- */
+.nav-central {
+    flex: 1;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+}
+
+.nav-pill {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px 6px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: var(--gs-text) !important;
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 600;
+    transition: all .2s ease;
+    white-space: nowrap;
+}
+
+.nav-pill:hover {
+    background: rgba(182, 8, 201, 0.15) !important;
+    border-color: var(--gs-magenta) !important;
+    color: #fff !important;
+    transform: translateY(-1px);
+}
+
+.pill-icon {
+    width: 28px;
+    height: 28px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: #000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.pill-icon img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+.gs-header-right {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+}
+
+.gs-btn-site {
+    padding: 8px 18px;
+    border-radius: 9px;
+    background: var(--gs-red);
+    color: #fff !important;
+    font-weight: 800;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-decoration: none;
+    transition: .2s;
+    border: none;
+    cursor: pointer;
+}
+
+.gs-btn-site:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 16px var(--gs-red);
+}
+
+.gs-header-user {
+    color: var(--gs-muted);
+    font-size: .8rem;
+}
+
+.gs-header-user a {
+    color: var(--gs-text);
+    text-decoration: none;
+    font-weight: 700;
+}
+
+.gs-header-user a:hover {
+    color: var(--gs-blue);
+}
+
+/* ------ LEFT SIDEBAR --------------------------------------- */
+#adminmenuback,
+#adminmenuwrap {
+    background: transparent !important;
+}
+
+#adminmenu {
+    background: rgba(11, 14, 20, 0.95) !important;
+    border-right: 1px solid var(--gs-border) !important;
+    padding-top: var(--gs-header-h) !important;
+}
+
+#adminmenu li a,
+#adminmenu li a.menu-top {
+    color: var(--gs-text) !important;
+    font-size: .82rem !important;
+    font-weight: 600 !important;
+    border-radius: 10px !important;
+    margin: 1px 8px !important;
+    padding: 9px 10px !important;
+    transition: all .18s ease !important;
+    background: transparent !important;
+    border: 1px solid transparent !important;
+}
+
+#adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
+#adminmenu li.current a.menu-top {
+    background: rgba(182, 8, 201, 0.14) !important;
+    border-color: rgba(182, 8, 201, 0.4) !important;
+    box-shadow: 0 0 12px rgba(182, 8, 201, 0.15) !important;
+    color: #fff !important;
+}
+
+#adminmenu li a:hover {
+    background: rgba(255, 255, 255, 0.07) !important;
+    border-color: var(--gs-border) !important;
+    color: #fff !important;
+    transform: translateX(2px);
+}
+
+/* Add a visual breaker below the Features menu item */
+#adminmenu #toplevel_page_gs-features {
+    border-bottom: 1px solid rgba(255, 255, 255, 0.15) !important;
+    margin-bottom: 12px !important;
+    padding-bottom: 8px !important;
+}
+
+/* Hide the default dashicons column (we use our own) */
+#adminmenu .wp-menu-image {
+    display: none !important;
+}
+
+/* Show our custom icon span */
+.gs-menu-icon {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    margin-right: 8px;
+    font-size: 16px;
+    vertical-align: middle;
+}
+
+/* Submenu */
+#adminmenu .wp-submenu {
+    background: rgba(5, 8, 14, 0.85) !important;
+    border: 1px solid var(--gs-border) !important;
+    border-radius: var(--gs-radius) !important;
+    margin: 0 8px !important;
+    padding: 6px !important;
+    animation: gsFadeIn .15s ease;
+}
+
+/* =========================================================================
+   GEN-D CORE DASHBOARD STYLES (PORTED)
+   ========================================================================= */
+.gdc-dashboard {
+    padding: 24px 0;
+    display: flex;
+    flex-direction: column;
+    gap: 32px;
+    color: var(--gs-text);
+}
+
+.gdc-dashboard__header {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: flex-end;
+    justify-content: space-between;
+    gap: 18px;
+}
+
+.gdc-dashboard__header h1 {
+    margin: 0;
+    font-size: 36px;
+    font-weight: 700;
+    letter-spacing: -0.02em;
+    background: var(--gs-gradient);
+    -webkit-background-clip: text;
+    background-clip: text;
+    -webkit-text-fill-color: transparent;
+}
+
+.gdc-dashboard__intro {
+    margin: 10px 0 0;
+    font-size: 16px;
+    max-width: 680px;
+    color: var(--gs-text-muted);
+}
+
+.gdc-dashboard__badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 12px;
+    background: rgba(151, 228, 110, 0.1);
+    border: 1px solid rgba(151, 228, 110, 0.2);
+    border-radius: 999px;
+    font-size: 11px;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: var(--gs-accent);
+    margin-bottom: 8px;
+}
+
+.gdc-dashboard__surface {
+    position: relative;
+    border-radius: 16px;
+    padding: 24px;
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-border);
+    backdrop-filter: blur(12px);
+}
+
+.gdc-dashboard__surface>* {
+    position: relative;
+    z-index: 2;
+}
+
+.gdc-dashboard__account .notice {
+    margin-bottom: 20px;
+}
+
+.gdc-dashboard__account .gdc-acc {
+    background: transparent;
+}
+
+.gdc-acc-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(300px, 1fr));
+    gap: 24px;
+}
+
+.gdc-card {
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid var(--gs-border);
+    border-radius: 12px;
+    padding: 24px;
+}
+
+.gdc-card h2 {
+    color: var(--gs-text);
+    font-size: 18px;
+    font-weight: 600;
+    margin-bottom: 8px;
+}
+
+.gdc-subtitle {
+    color: var(--gs-text-muted);
+    font-size: 14px;
+    margin-bottom: 20px;
+}
+
+.gdc-admins-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+.gdc-admin-entry {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 12px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.gdc-admin-entry:last-child {
+    border-bottom: none;
+}
+
+.gdc-admin-avatar img {
+    border-radius: 50%;
+    width: 40px;
+    height: 40px;
+}
+
+.gdc-admin-meta {
+    flex: 1;
+}
+
+.gdc-admin-name a {
+    color: var(--gs-text);
+    text-decoration: none;
+    font-weight: 500;
+}
+
+.gdc-admin-roles,
+.gdc-admin-email {
+    font-size: 12px;
+    color: var(--gs-text-muted);
+    margin-top: 2px;
+}
+
+.gdc-admin-tips {
+    margin: 16px 0;
+    padding-left: 18px;
+    color: var(--gs-text-muted);
+    font-size: 13px;
+    list-style-type: disc;
+}
+
+.gdc-admin-tips li {
+    margin-bottom: 6px;
+}
+
+/* Feature Cards inside Dashboard */
+.gdc-dashboard__features h2 {
+    color: var(--gs-text);
+}
+
+.gdc-dashboard__features p {
+    color: var(--gs-text-muted);
+}
+
+#adminmenu .wp-submenu a {
+    color: var(--gs-muted) !important;
+    font-size: .78rem !important;
+    font-weight: 500 !important;
+    border-radius: 8px !important;
+    padding: 7px 12px !important;
+    margin: 1px 0 !important;
+}
+
+#adminmenu .wp-submenu a:hover {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.07) !important;
+}
+
+#adminmenu .wp-submenu li.current a {
+    color: var(--gs-accent) !important;
+}
+
+/* Separators */
+#adminmenu li.wp-menu-separator {
+    display: none !important;
+}
+
+/* ------ MAIN CONTENT AREA ---------------------------------- */
+#wpcontent,
+#wpbody-content {
+    background: var(--gs-bg) !important;
+    color: var(--gs-text) !important;
+}
+
+#wpbody {
+    padding-top: var(--gs-header-h) !important;
+}
+
+/* Fix overlap on Block Editor and Site Editor */
+body.block-editor-page .edit-post-header,
+body.site-editor-php .edit-site-header {
+    top: var(--gs-header-h) !important;
+}
+
+body.block-editor-page.is-fullscreen-mode .interface-interface-skeleton,
+body.site-editor-php .interface-interface-skeleton,
+body.site-editor-php .edit-site {
+    top: var(--gs-header-h) !important;
+    height: calc(100vh - var(--gs-header-h)) !important;
+    bottom: 0 !important;
+}
+
+body.block-editor-page .interface-interface-skeleton__sidebar,
+body.site-editor-php .interface-interface-skeleton__sidebar {
+    top: var(--gs-header-h) !important;
+}
+
+/* ------ GS PAGE LAYOUT ------------------------------------ */
+.gs-page {
+    padding: 28px 32px;
+    max-width: 1400px;
+}
+
+.gs-page-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 28px;
+}
+
+.gs-page-title {
+    font-size: 1.75rem;
+    font-weight: 800;
+    color: var(--gs-text) !important;
+    margin: 0;
+    display: flex;
+    align-items: baseline;
+    gap: 12px;
+    border: none;
+}
+
+.gs-page-title-sub {
+    font-size: 1rem;
+    font-weight: 400;
+    color: var(--gs-muted);
+}
+
+.gs-gradient-text {
+    background: linear-gradient(90deg, var(--gs-magenta), var(--gs-red), var(--gs-blue));
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+}
+
+/* ------ CARDS --------------------------------------------- */
+.gs-card {
+    background: var(--gs-surface);
+    border: 1px solid var(--gs-border);
+    border-radius: var(--gs-radius);
+    overflow: hidden;
+    transition: all .2s ease;
+}
+
+.gs-card:hover {
+    border-color: rgba(255, 255, 255, 0.18);
+    box-shadow: 0 8px 32px rgba(0, 0, 0, .35);
+}
+
+.gs-card-link {
+    text-decoration: none;
+    display: block;
+    text-align: center;
+    padding: 28px 16px;
+}
+
+.gs-card-link:hover .gs-card-icon {
+    transform: scale(1.08);
+}
+
+.gs-card-header {
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--gs-border);
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+}
+
+.gs-card-header h3 {
+    margin: 0;
+    font-size: .95rem;
+    font-weight: 700;
+    color: var(--gs-text);
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    border: none;
+    padding: 0;
+}
+
+.gs-card-body {
+    padding: 20px;
+}
+
+.gs-card-stat {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding: 20px;
+}
+
+.gs-card-icon {
+    width: 48px;
+    height: 48px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    flex-shrink: 0;
+}
+
+.gs-card-icon .dashicons {
+    font-size: 24px;
+    width: 24px;
+    height: 24px;
+}
+
+.gs-icon-magenta {
+    background: rgba(182, 8, 201, 0.18);
+    color: var(--gs-magenta);
+}
+
+.gs-icon-red {
+    background: rgba(204, 0, 0, 0.18);
+    color: var(--gs-red);
+}
+
+.gs-icon-blue {
+    background: rgba(110, 193, 228, 0.18);
+    color: var(--gs-blue);
+}
+
+.gs-icon-accent {
+    background: rgba(151, 228, 110, 0.18);
+    color: var(--gs-accent);
+}
+
+.gs-stat-number {
+    font-size: 1.8rem;
+    font-weight: 800;
+    color: var(--gs-text);
+    line-height: 1;
+}
+
+.gs-stat-label {
+    font-size: .78rem;
+    color: var(--gs-muted);
+    margin-top: 4px;
+}
+
+/* ------ GRID ---------------------------------------------- */
+.gs-grid {
+    display: grid;
+    gap: 20px;
+}
+
+.gs-grid-2 {
+    grid-template-columns: repeat(2, 1fr);
+}
+
+.gs-grid-3 {
+    grid-template-columns: repeat(3, 1fr);
+}
+
+@media (max-width: 1100px) {
+    .gs-grid-3 {
+        grid-template-columns: repeat(2, 1fr);
+    }
+}
+
+@media (max-width: 750px) {
+
+    .gs-grid-2,
+    .gs-grid-3 {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ------ BUTTONS ------------------------------------------- */
+.gs-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 18px;
+    border-radius: 10px;
+    border: 1px solid transparent;
+    font-size: .82rem;
+    font-weight: 700;
+    cursor: pointer;
+    text-decoration: none;
+    transition: all .18s ease;
+}
+
+.gs-btn-primary {
+    background: var(--gs-magenta);
+    color: #fff !important;
+}
+
+.gs-btn-primary:hover {
+    filter: brightness(1.1);
+    box-shadow: 0 0 16px rgba(182, 8, 201, .4);
+}
+
+.gs-btn-secondary {
+    background: var(--gs-glass);
+    border-color: var(--gs-border);
+    color: var(--gs-text) !important;
+}
+
+.gs-btn-secondary:hover {
+    border-color: rgba(255, 255, 255, .25);
+}
+
+.gs-btn-xs {
+    padding: 4px 10px;
+    font-size: .72rem;
+    border-radius: 7px;
+}
+
+/* ------ QUICK LINKS --------------------------------------- */
+.gs-quick-links {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px;
+}
+
+.gs-quick-link {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 16px;
+    border-radius: 10px;
+    background: var(--gs-glass);
+    border: 1px solid var(--gs-border);
+    color: var(--gs-text);
+    text-decoration: none;
+    font-size: .82rem;
+    font-weight: 600;
+    transition: all .18s ease;
+}
+
+.gs-quick-link:hover {
+    border-color: var(--gs-magenta);
+    color: #fff;
+    background: rgba(182, 8, 201, .1);
+}
+
+.gs-quick-link .dashicons {
+    font-size: 18px;
+    width: 18px;
+    height: 18px;
+    color: var(--gs-muted);
+}
+
+/* ------ RECENT LIST --------------------------------------- */
+.gs-recent-list {
+    list-style: none;
+    margin: 0;
+    padding: 0;
+}
+
+.gs-recent-list li {
+    padding: 10px 0;
+    border-bottom: 1px solid var(--gs-border);
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.gs-recent-list li:last-child {
+    border: none;
+}
+
+.gs-recent-list a {
+    color: var(--gs-text);
+    font-weight: 600;
+    text-decoration: none;
+}
+
+.gs-recent-list a:hover {
+    color: var(--gs-blue);
+}
+
+.gs-meta {
+    font-size: .75rem;
+    color: var(--gs-muted);
+}
+
+.gs-empty {
+    color: var(--gs-muted);
+    font-size: .85rem;
+}
+
+/* ------ TABLE --------------------------------------------- */
+.gs-table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: .82rem;
+}
+
+.gs-table thead th {
+    padding: 10px 16px;
+    text-align: left;
+    color: var(--gs-muted);
+    font-weight: 600;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: .5px;
+    border-bottom: 1px solid var(--gs-border);
+}
+
+.gs-table tbody tr {
+    border-bottom: 1px solid rgba(255, 255, 255, .05);
+}
+
+.gs-table tbody tr:hover {
+    background: rgba(255, 255, 255, .03);
+}
+
+.gs-table tbody td {
+    padding: 12px 16px;
+    color: var(--gs-text);
+}
+
+.gs-code-pill {
+    background: rgba(182, 8, 201, .12);
+    color: var(--gs-magenta);
+    padding: 2px 8px;
+    border-radius: 6px;
+    font-family: monospace;
+    font-size: .8rem;
+}
+
+.gs-muted code {
+    color: var(--gs-muted);
+    font-size: .75rem;
+}
+
+/* ------ FORM ---------------------------------------------- */
+.gs-form-row {
+    margin-bottom: 16px;
+}
+
+.gs-form-row label {
+    display: block;
+    font-size: .8rem;
+    font-weight: 700;
+    color: var(--gs-muted);
+    margin-bottom: 6px;
+}
+
+.gs-input,
+.gs-textarea {
+    width: 100%;
+    background: rgba(255, 255, 255, .05);
+    border: 1px solid var(--gs-border);
+    border-radius: 10px;
+    color: var(--gs-text);
+    padding: 10px 14px;
+    font-size: .85rem;
+    font-family: inherit;
+    box-sizing: border-box;
+    outline: none;
+    transition: border-color .15s;
+}
+
+.gs-input:focus,
+.gs-textarea:focus {
+    border-color: var(--gs-magenta);
+}
+
+.gs-search-input {
+    width: 220px;
+    font-size: .8rem;
+    padding: 6px 12px;
+}
+
+.gs-code {
+    font-family: "Fira Code", "Courier New", monospace;
+    font-size: .78rem;
+    line-height: 1.5;
+    resize: vertical;
+}
+
+/* ------ HEADER ACTIONS ------------------------------------ */
+.gs-header-actions {
+    display: flex;
+    gap: 10px;
+    align-items: center;
+}
+
+/* ------ UTILS --------------------------------------------- */
+.gs-hidden {
+    display: none !important;
+}
+
+.gs-text-center {
+    text-align: center;
+}
+
+/* ------ ANIMATIONS ---------------------------------------- */
+@keyframes gsFadeIn {
+    from {
+        opacity: 0;
+        transform: translateY(-6px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+/* ------ WP DEFAULT OVERRIDES ------------------------------ */
+/* Remove WP white boxes */
+.postbox,
+.postbox .inside {
+    background: transparent !important;
+    border: none !important;
+    box-shadow: none !important;
+}
+
+.wrap {
+    margin: 0 !important;
+}
+
+.wrap h1 {
+    display: none;
+}
+
+/* We render our own headers */
+#wpfooter {
+    background: var(--gs-bg) !important;
+    border-top: 1px solid var(--gs-border) !important;
+    color: var(--gs-muted) !important;
+}
+
+#wpfooter a {
+    color: var(--gs-muted) !important;
+}
+
+/* ------ MEDIA LIBRARY OVERRIDES --------------------------- */
+.media-frame {
+    background: var(--gs-bg) !important;
+    color: var(--gs-text) !important;
+    border-radius: var(--gs-radius);
+    overflow: hidden;
+}
+
+.media-frame-menu,
+.media-frame-router {
+    background: var(--gs-surface) !important;
+    border-color: var(--gs-border) !important;
+}
+
+.media-frame-content {
+    background: transparent !important;
+}
+
+.media-frame-title {
+    border-bottom: 1px solid var(--gs-border) !important;
+    background: var(--gs-surface) !important;
+}
+
+.media-frame-title h1 {
+    color: var(--gs-text) !important;
+}
+
+.media-router a {
+    color: var(--gs-muted) !important;
+}
+
+.media-router a:hover,
+.media-router a.active {
+    color: var(--gs-blue) !important;
+}
+
+.media-router a.active::after {
+    background: var(--gs-blue) !important;
+}
+
+.media-sidebar {
+    background: var(--gs-surface) !important;
+    border-left: 1px solid var(--gs-border) !important;
+    color: var(--gs-text) !important;
+}
+
+.media-sidebar .setting span {
+    color: var(--gs-muted) !important;
+}
+
+.media-sidebar input[type="text"],
+.media-sidebar textarea {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--gs-border) !important;
+    color: var(--gs-text) !important;
+    border-radius: 8px !important;
+}
+
+/* Attachments Grid (list of images) */
+.attachments-wrapper {
+    background: transparent !important;
+}
+
+.attachment .attachment-preview {
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid var(--gs-border) !important;
+    border-radius: 12px;
+    box-shadow: none !important;
+    transition: all 0.2s ease;
+}
+
+.attachment:hover .attachment-preview {
+    border-color: var(--gs-blue) !important;
+    transform: translateY(-2px);
+    box-shadow: 0 4px 15px rgba(110, 193, 228, 0.15) !important;
+}
+
+.attachment.details .attachment-preview {
+    border-color: var(--gs-magenta) !important;
+    box-shadow: 0 0 0 2px var(--gs-magenta) !important;
+}
+
+/* Modals & Popups within Media Library */
+.media-modal,
+.media-modal-content {
+    background: var(--gs-bg) !important;
+    border-radius: var(--gs-radius) !important;
+}
+
+.media-modal-close {
+    color: var(--gs-text) !important;
+}
+
+.media-modal-close:hover {
+    color: var(--gs-red) !important;
+}
+
+/* Buttons in Media Library */
+.media-frame .button,
+.media-modal .button {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid var(--gs-border) !important;
+    color: var(--gs-text) !important;
+    border-radius: 8px !important;
+    transition: all 0.2s ease;
+}
+
+.media-frame .button-primary,
+.media-modal .button-primary {
+    background: linear-gradient(135deg, var(--gs-magenta), var(--gs-blue)) !important;
+    border: none !important;
+    color: #fff !important;
+}
+
+.media-frame .button:hover:not(.button-primary) {
+    background: rgba(255, 255, 255, 0.12) !important;
+    border-color: rgba(255, 255, 255, 0.2) !important;
+}
+
+/* ─────────────────────────────────────────────────────────
+   MEDIA LIBRARY GRID VIEW (upload.php)
+   ───────────────────────────────────────────────────────── */
+
+/* Top Filter Bar */
+.wp-filter {
+    background: var(--gs-surface) !important;
+    border: 1px solid var(--gs-border) !important;
+    border-radius: var(--gs-radius);
+    color: var(--gs-text) !important;
+    margin-bottom: 20px;
+}
+
+.wp-filter .view-switch a {
+    color: var(--gs-muted) !important;
+}
+
+.wp-filter .view-switch a:hover,
+.wp-filter .view-switch a.current {
+    color: var(--gs-blue) !important;
+}
+
+.wp-filter select,
+.wp-filter input[type="search"] {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border: 1px solid var(--gs-border) !important;
+    color: var(--gs-text) !important;
+    border-radius: 8px !important;
+}
+
+.wp-filter .media-toolbar-secondary,
+.wp-filter .media-toolbar-primary {
+    color: var(--gs-text) !important;
+}
+
+.wp-core-ui .attachment-info .filename {
+    color: var(--gs-text) !important;
+}
+
+.wp-core-ui .attachment-info .settings-save-status {
+    color: var(--gs-muted) !important;
+}
+
+/* Bottom Toolbar */
+.media-toolbar {
+    background: var(--gs-surface) !important;
+    border-top: 1px solid var(--gs-border) !important;
+}
+
+.media-toolbar-primary .media-button {
+    background: linear-gradient(135deg, var(--gs-magenta), var(--gs-blue)) !important;
+    border: none !important;
+    color: #fff !important;
+}
+
+/* Title Area */
+.wrap .page-title-action {
+    background: rgba(255, 255, 255, 0.08) !important;
+    border: 1px solid var(--gs-border) !important;
+    color: var(--gs-text) !important;
+    border-radius: 8px !important;
+    padding: 6px 12px;
+    font-size: 13px;
+    font-weight: 500;
+}
+
+.wrap .page-title-action:hover {
+    background: rgba(255, 255, 255, 0.12) !important;
+    color: #fff !important;
+}
+
+/* Upload Interface & Grid Area */
+.media-frame-content .media-toolbar,
+.media-frame-content .attachments-browser {
+    background: transparent !important;
+}
+
+.upload-ui {
+    background: var(--gs-bg) !important;
+}
+
+.drag-drop-inside {
+    border: 2px dashed var(--gs-border) !important;
+    background: rgba(255, 255, 255, 0.02) !important;
+    border-radius: var(--gs-radius);
+}
+
+.drag-drop-inside p,
+.drag-drop-inside h2 {
+    color: var(--gs-text) !important;
+}
+
+.wp-core-ui .attachment .thumbnail {
+    background: rgba(255, 255, 255, 0.05) !important;
+    box-shadow: inset 0 0 15px rgba(0, 0, 0, 0.5) !important;
+}
+
+.wp-core-ui .attachment .thumbnail img {
+    opacity: 0.9;
+    transition: opacity 0.2s;
+}
+
+.wp-core-ui .attachment:hover .thumbnail img {
+    opacity: 1;
+}
+
+.no-media {
+    color: var(--gs-muted) !important;
+}
+
+/* Subtitles/Headers in Media */
+.media-frame h1,
+.media-frame h2,
+.media-frame h3,
+.media-sidebar h2,
+.media-sidebar h3 {
+    color: var(--gs-text) !important;
+}
+
+/* Base WP Content Area Background Fixes */
+#wpcontent,
+#wpbody-content {
+    background: transparent !important;
+}
+
+#wpbody {
+    background: var(--gs-bg) !important;
+}
+
+/* Fix Media Library Title */
+.upload-php .wrap h1 {
+    display: inline-block !important;
+    color: var(--gs-text) !important;
+    margin-right: 15px;
+}
+
+/* Fix Dropdown Menus */
+select option {
+    background: var(--gs-surface) !important;
+    color: var(--gs-text) !important;
+}
+/* Failsafe to hide any surviving standalone plugin menus from the sidebar */
+#toplevel_page_gdc-social, #toplevel_page_gdc-store, #toplevel_page_gdc-reward { display: none !important; }
