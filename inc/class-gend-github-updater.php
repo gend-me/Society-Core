@@ -22,6 +22,23 @@ if (!class_exists('GenD_GitHub_Updater')) {
 
             add_filter('site_transient_update_plugins', [$this, 'check_update']);
             add_filter('plugins_api', [$this, 'plugin_info'], 10, 3);
+            
+            // Add authorization header for zip downloads
+            add_filter('http_request_args', [$this, 'add_auth_header'], 10, 2);
+        }
+
+        /**
+         * Inject Authorization header for GitHub API requests (especially zip downloads)
+         */
+        public function add_auth_header($args, $url)
+        {
+            // Only add to requests matching our repo on the API domain
+            if (strpos($url, "https://api.github.com/repos/" . $this->github_repo) !== false) {
+                if (defined('GEND_GITHUB_TOKEN') && GEND_GITHUB_TOKEN) {
+                    $args['headers']['Authorization'] = 'token ' . GEND_GITHUB_TOKEN;
+                }
+            }
+            return $args;
         }
 
         public function check_update($transient)
@@ -42,11 +59,9 @@ if (!class_exists('GenD_GitHub_Updater')) {
                 $obj->slug = $this->slug;
                 $obj->new_version = $remote_data['Version'];
                 $obj->url = "https://github.com/" . $this->github_repo;
-                $package_url = "https://github.com/" . $this->github_repo . "/archive/refs/heads/main.zip";
-                if (defined('GEND_GITHUB_TOKEN') && GEND_GITHUB_TOKEN) {
-                    $package_url = add_query_arg('access_token', GEND_GITHUB_TOKEN, $package_url);
-                }
-                $obj->package = $package_url;
+                
+                // Use API zipball endpoint for private/authenticated downloads
+                $obj->package = "https://api.github.com/repos/" . $this->github_repo . "/zipball/main";
                 $obj->plugin = $this->slug;
 
                 $transient->response[$this->slug] = $obj;
@@ -68,11 +83,9 @@ if (!class_exists('GenD_GitHub_Updater')) {
                 $obj->new_version = $remote_data['Version'];
                 $obj->requires = $remote_data['RequiresWP'];
                 $obj->tested = $remote_data['TestedUpTo'];
-                $download_link = "https://github.com/" . $this->github_repo . "/archive/refs/heads/main.zip";
-                if (defined('GEND_GITHUB_TOKEN') && GEND_GITHUB_TOKEN) {
-                    $download_link = add_query_arg('access_token', GEND_GITHUB_TOKEN, $download_link);
-                }
-                $obj->download_link = $download_link;
+                
+                // Use API zipball endpoint
+                $obj->download_link = "https://api.github.com/repos/" . $this->github_repo . "/zipball/main";
                 $obj->sections = [
                     'description' => $remote_data['Description'],
                 ];
@@ -94,14 +107,16 @@ if (!class_exists('GenD_GitHub_Updater')) {
             $cache_key = 'gend_remote_data_' . md5($this->github_repo);
 
             // Allow bypassing cache for testing
-            if (!defined('GEND_UPDATE_BYPASS_CACHE') || !GEND_UPDATE_BYPASS_CACHE) {
+            if (defined('GEND_UPDATE_BYPASS_CACHE') && GEND_UPDATE_BYPASS_CACHE) {
+                delete_transient($cache_key);
+            } else {
                 $remote_data = get_transient($cache_key);
                 if ($remote_data !== false) {
                     return $remote_data;
                 }
             }
 
-            $url = "https://raw.githubusercontent.com/" . $this->github_repo . "/main/" . basename($this->plugin_file);
+            $url = "https://api.github.com/repos/" . $this->github_repo . "/contents/" . basename($this->plugin_file);
 
             $args = [
                 'timeout' => 10,
@@ -122,7 +137,7 @@ if (!class_exists('GenD_GitHub_Updater')) {
             }
 
             $content = wp_remote_retrieve_body($response);
-            if (empty($content)) {
+            if (empty($content) || wp_remote_retrieve_response_code($response) != 200) {
                 return false;
             }
 

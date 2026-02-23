@@ -75,6 +75,20 @@ function gs_get_feature_definitions()
             'plugin' => 'reward-programs/reward-programs.php',
             'image' => 'https://gend.me/wp-content/uploads/2026/02/Member-Rewards.png',
             'link' => 'https://gend.me/member-rewards/'
+        ),
+        'customizer' => array(
+            'name' => __('Product Customizer', 'gend-society'),
+            'description' => __('Sophisticated "Logo-First" Visual CPQ and Web-to-Print solution for WooCommerce.', 'gend-society'),
+            'plugin' => 'product-customizer/product-customizer.php',
+            'image' => 'https://gend.me/wp-content/uploads/2026/02/Product-Customizer.png',
+            'link' => 'https://gend.me/product-customizer/'
+        ),
+        'events' => array(
+            'name' => __('Events Map', 'gend-society'),
+            'description' => __('Interactive map displaying project events with AI-powered weather integration.', 'gend-society'),
+            'plugin' => 'events/sojnocki-events-map.php',
+            'image' => 'https://gend.me/wp-content/uploads/2026/02/Events-Map.png',
+            'link' => 'https://gend.me/events-map/'
         )
     );
 }
