@@ -42,7 +42,11 @@ if (!class_exists('GenD_GitHub_Updater')) {
                 $obj->slug = $this->slug;
                 $obj->new_version = $remote_data['Version'];
                 $obj->url = "https://github.com/" . $this->github_repo;
-                $obj->package = "https://github.com/" . $this->github_repo . "/archive/refs/heads/main.zip";
+                $package_url = "https://github.com/" . $this->github_repo . "/archive/refs/heads/main.zip";
+                if (defined('GEND_GITHUB_TOKEN') && GEND_GITHUB_TOKEN) {
+                    $package_url = add_query_arg('access_token', GEND_GITHUB_TOKEN, $package_url);
+                }
+                $obj->package = $package_url;
                 $obj->plugin = $this->slug;
 
                 $transient->response[$this->slug] = $obj;
@@ -64,7 +68,11 @@ if (!class_exists('GenD_GitHub_Updater')) {
                 $obj->new_version = $remote_data['Version'];
                 $obj->requires = $remote_data['RequiresWP'];
                 $obj->tested = $remote_data['TestedUpTo'];
-                $obj->download_link = "https://github.com/" . $this->github_repo . "/archive/refs/heads/main.zip";
+                $download_link = "https://github.com/" . $this->github_repo . "/archive/refs/heads/main.zip";
+                if (defined('GEND_GITHUB_TOKEN') && GEND_GITHUB_TOKEN) {
+                    $download_link = add_query_arg('access_token', GEND_GITHUB_TOKEN, $download_link);
+                }
+                $obj->download_link = $download_link;
                 $obj->sections = [
                     'description' => $remote_data['Description'],
                 ];
@@ -84,14 +92,30 @@ if (!class_exists('GenD_GitHub_Updater')) {
         private function get_remote_plugin_data()
         {
             $cache_key = 'gend_remote_data_' . md5($this->github_repo);
-            $remote_data = get_transient($cache_key);
 
-            if ($remote_data !== false) {
-                return $remote_data;
+            // Allow bypassing cache for testing
+            if (!defined('GEND_UPDATE_BYPASS_CACHE') || !GEND_UPDATE_BYPASS_CACHE) {
+                $remote_data = get_transient($cache_key);
+                if ($remote_data !== false) {
+                    return $remote_data;
+                }
             }
 
             $url = "https://raw.githubusercontent.com/" . $this->github_repo . "/main/" . basename($this->plugin_file);
-            $response = wp_remote_get($url);
+
+            $args = [
+                'timeout' => 10,
+                'headers' => [
+                    'Accept' => 'application/vnd.github.v3.raw',
+                ]
+            ];
+
+            // Add Authorization header if token is defined
+            if (defined('GEND_GITHUB_TOKEN') && GEND_GITHUB_TOKEN) {
+                $args['headers']['Authorization'] = 'token ' . GEND_GITHUB_TOKEN;
+            }
+
+            $response = wp_remote_get($url, $args);
 
             if (is_wp_error($response)) {
                 return false;
