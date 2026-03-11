@@ -65,7 +65,7 @@ function gs_get_feature_definitions()
         'membership' => array(
             'name' => __('Membership Management', 'gend-society'),
             'description' => __('Total control over tiers, permissions, and access for your exclusive community.', 'gend-society'),
-            'plugin' => 'Member Management/member-management.php',
+            'plugin' => 'member-management/member-management.php',
             'image' => 'https://gend.me/wp-content/uploads/2026/02/Membership-Management.png',
             'link' => 'https://gend.me/membership-management/'
         ),
@@ -75,20 +75,6 @@ function gs_get_feature_definitions()
             'plugin' => 'reward-programs/reward-programs.php',
             'image' => 'https://gend.me/wp-content/uploads/2026/02/Member-Rewards.png',
             'link' => 'https://gend.me/member-rewards/'
-        ),
-        'customizer' => array(
-            'name' => __('Product Customizer', 'gend-society'),
-            'description' => __('Sophisticated "Logo-First" Visual CPQ and Web-to-Print solution for WooCommerce.', 'gend-society'),
-            'plugin' => 'product-customizer/product-customizer.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Product-Customizer.png',
-            'link' => 'https://gend.me/product-customizer/'
-        ),
-        'events' => array(
-            'name' => __('Events Map', 'gend-society'),
-            'description' => __('Interactive map displaying project events with AI-powered weather integration.', 'gend-society'),
-            'plugin' => 'events/sojnocki-events-map.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Events-Map.png',
-            'link' => 'https://gend.me/events-map/'
         )
     );
 }
@@ -163,11 +149,13 @@ function gs_render_feature_cards_widget()
         // Actions
         echo '<div class="gs-fc-actions">';
 
+        $nonce = wp_create_nonce('gs_plugin_actions');
+
         // Main Action Button (Manage or Activate)
         if ($is_active) {
             echo '<a href="' . admin_url('plugins.php') . '" class="gs-btn gs-btn-secondary gs-fc-btn">' . esc_html__('Manage Plugin', 'gend-society') . '</a>';
         } else {
-            echo '<a href="' . admin_url('plugins.php') . '" class="gs-btn gs-fc-btn">' . esc_html__('Activate', 'gend-society') . '</a>';
+            echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';
         }
 
         // Info Button
@@ -176,12 +164,16 @@ function gs_render_feature_cards_widget()
         echo '</a>';
 
         // Update Button
-        echo '<a href="' . admin_url('update-core.php') . '" class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update" title="Check Updates">';
-        echo '<span class="dashicons dashicons-update"></span>';
         if ($has_update) {
+            echo '<button class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update gs-ajax-action" data-action="update" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '" title="Install Update">';
+            echo '<span class="dashicons dashicons-update"></span>';
             echo '<span class="gs-fc-badge">!</span>';
+            echo '</button>';
+        } else {
+            echo '<a href="' . admin_url('update-core.php') . '" class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update" title="Check Updates">';
+            echo '<span class="dashicons dashicons-update"></span>';
+            echo '</a>';
         }
-        echo '</a>';
 
         echo '</div>'; // End Actions
         echo '</div>'; // End Body
@@ -189,4 +181,114 @@ function gs_render_feature_cards_widget()
     }
 
     echo '</div>'; // End Grid
+}
+
+/**
+ * AJAX Handler: Activate Plugin
+ */
+add_action('wp_ajax_gs_activate_plugin', 'gs_ajax_activate_plugin');
+function gs_ajax_activate_plugin() {
+    check_ajax_referer('gs_plugin_actions', 'nonce');
+
+    if (!current_user_can('activate_plugins')) {
+        wp_send_json_error(array('message' => __('You do not have permission to activate plugins.', 'gend-society')));
+    }
+
+    $plugin = isset($_POST['plugin']) ? sanitize_text_field($_POST['plugin']) : '';
+    if (empty($plugin)) {
+        wp_send_json_error(array('message' => __('No plugin specified.', 'gend-society')));
+    }
+
+    $result = activate_plugin($plugin);
+
+    if (is_wp_error($result)) {
+        wp_send_json_error(array('message' => $result->get_error_message()));
+    }
+
+    wp_send_json_success(array('message' => __('Plugin activated successfully.', 'gend-society')));
+}
+
+/**
+ * AJAX Handler: Update Plugin
+ */
+add_action('wp_ajax_gs_update_plugin', 'gs_ajax_update_plugin');
+function gs_ajax_update_plugin() {
+    check_ajax_referer('gs_plugin_actions', 'nonce');
+
+    if (!current_user_can('update_plugins')) {
+        wp_send_json_error(array('message' => __('You do not have permission to update plugins.', 'gend-society')));
+    }
+
+    $plugin = isset($_POST['plugin']) ? sanitize_text_field($_POST['plugin']) : '';
+    if (empty($plugin)) {
+        wp_send_json_error(array('message' => __('No plugin specified.', 'gend-society')));
+    }
+
+    include_once ABSPATH . 'wp-admin/includes/class-wp-upgrader.php';
+    $upgrader = new Plugin_Upgrader(new Automatic_Upgrader_Skin());
+    $result = $upgrader->upgrade($plugin);
+
+    if (is_wp_error($result)) {
+        wp_send_json_error(array('message' => $result->get_error_message()));
+    } elseif ($result === false) {
+        wp_send_json_error(array('message' => __('Update failed.', 'gend-society')));
+    }
+
+    wp_send_json_success(array('message' => __('Plugin updated successfully.', 'gend-society')));
+}
+
+/**
+ * Enqueue JavaScript for AJAX plugin actions
+ */
+add_action('admin_footer', 'gs_feature_cards_ajax_script');
+function gs_feature_cards_ajax_script() {
+    ?>
+    <script>
+    jQuery(document).ready(function($) {
+        $('.gs-ajax-action').on('click', function(e) {
+            e.preventDefault();
+            var $btn = $(this);
+            var action = $btn.data('action'); // 'activate' or 'update'
+            var plugin = $btn.data('plugin');
+            var nonce = $btn.data('nonce');
+            var originalHtml = $btn.html();
+
+            if ($btn.hasClass('updating') || $btn.hasClass('activating')) return;
+
+            if (action === 'activate') {
+                $btn.addClass('activating').html('<?php esc_html_e('Activating...', 'gend-society'); ?>');
+            } else if (action === 'update') {
+                $btn.addClass('updating').html('<span class="dashicons dashicons-update" style="animation: spin 2s linear infinite;"></span>');
+            }
+
+            var ajaxAction = action === 'activate' ? 'gs_activate_plugin' : 'gs_update_plugin';
+
+            $.ajax({
+                url: ajaxurl,
+                type: 'POST',
+                data: {
+                    action: ajaxAction,
+                    plugin: plugin,
+                    nonce: nonce
+                },
+                success: function(response) {
+                    if (response.success) {
+                        location.reload();
+                    } else {
+                        alert(response.data.message || '<?php esc_html_e('An error occurred.', 'gend-society'); ?>');
+                        $btn.removeClass('activating updating').html(originalHtml);
+                    }
+                },
+                error: function() {
+                    alert('<?php esc_html_e('An error occurred during the request.', 'gend-society'); ?>');
+                    $btn.removeClass('activating updating').html(originalHtml);
+                }
+            });
+        });
+    });
+    </script>
+    <style>
+    @keyframes spin { 100% { transform: rotate(360deg); } }
+    </style>
+    <?php
 }

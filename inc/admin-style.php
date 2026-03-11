@@ -8,6 +8,7 @@ function gs_enqueue_admin_assets()
 {
     $ver = GS_VERSION . '.' . filemtime(GS_DIR . 'assets/admin-style.css');
     wp_enqueue_style('gs-admin-style', GS_URL . 'assets/admin-style.css', ['dashicons'], $ver);
+    wp_enqueue_style('gs-animation-utilities', GS_URL . 'assets/animation-utilities.css', [], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/animation-utilities.css'));
     wp_enqueue_script('gs-admin-script', GS_URL . 'assets/admin-script.js', [], $ver, true);
 
     $current_user = wp_get_current_user();
@@ -21,8 +22,8 @@ function gs_enqueue_admin_assets()
 
     global $pagenow;
     if ($pagenow === 'site-editor.php') {
-        wp_enqueue_script('gs-template-modal', GS_URL . 'assets/gs-template-modal.js', ['jquery', 'wp-data', 'wp-blocks'], GS_VERSION, true);
-        wp_enqueue_script('gs-site-editor-init', GS_URL . 'assets/gs-site-editor-init.js', ['gs-template-modal'], GS_VERSION, true);
+        wp_enqueue_script('gs-template-modal', GS_URL . 'assets/gs-template-modal.js', ['jquery', 'wp-data', 'wp-blocks'], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-template-modal.js'), true);
+        wp_enqueue_script('gs-site-editor-init', GS_URL . 'assets/gs-site-editor-init.js', ['gs-template-modal'], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-site-editor-init.js'), true);
 
         wp_localize_script('gs-template-modal', 'GS_TEMPLATE_MODAL', [
             'rest_url' => esc_url_raw(rest_url()),
@@ -49,3 +50,7 @@ add_action('admin_enqueue_scripts', function () {
 add_action('admin_head', function () {
     echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}</style>';
 });
+
+// Hide WP-admin footer text and version
+add_filter('admin_footer_text', '__return_empty_string', 9999);
+add_filter('update_footer', '__return_empty_string', 9999);

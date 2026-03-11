@@ -124,43 +124,13 @@
               </div>
             </div>
           </div>
-          <div class="gdc-ai-panel" style="
-            width:350px; background:linear-gradient(135deg, #1e293b, #0f172a);
-            border-left:1px solid rgba(99,102,241,0.3); display:flex; flex-direction:column;
-          ">
-            <div style="padding:12px; border-bottom:1px solid rgba(99,102,241,0.2);">
-              <div style="display:flex; align-items:center; gap:8px; color:#e5e7eb; font-weight:600;">
-                <span style="font-size:18px;">💬</span><span>AI Assistant</span>
-              </div>
-            </div>
-             <div class="gdc-ai-chat-messages" style="flex:1; padding:12px; overflow-y:auto; display:flex; flex-direction:column;">
-              <div class="bubble-wrap them">
-                <div class="bubble-avatar" style="background: linear-gradient(135deg, #6366f1, #8b5cf6); display: flex; align-items: center; justify-content: center; font-size: 18px;">🤖</div>
-                <div class="bubble them" id="gdc-ai-welcome-msg">
-                  ${this.getWelcomeMessage(workflow)}
-                </div>
-              </div>
-
-            </div>
-            <div style="padding:12px; border-top:1px solid rgba(99,102,241,0.2);">
-              <div style="display:flex; gap:8px;">
-                <input type="text" class="gdc-ai-input" placeholder="Ask AI to help..." style="
-                  flex:1; padding:10px 12px; background:rgba(255,255,255,0.05);
-                  border:1px solid rgba(99,102,241,0.3); border-radius:8px;
-                  color:#e5e7eb; font-size:13px;
-                ">
-                <button class="gdc-ai-send" style="
-                  padding:10px 16px; background:linear-gradient(135deg, #6366f1, #8b5cf6);
-                  border:none; border-radius:8px; color:white; cursor:pointer; font-weight:600;
-                ">Send</button>
-              </div>
-
-            </div>
-          </div>
         </div>
       `;
 
       document.body.appendChild(this.modal);
+
+      // LEO INTEGRATION: Open Leo widget in right-side mode
+      this.openLeoWidget(pageId, workflow);
 
       // Setup event handlers
       this.setupHandlers();
@@ -175,9 +145,6 @@
       const iframe = this.modal.querySelector('iframe');
       const loading = this.modal.querySelector('.gdc-iframe-loading');
       const closeBtn = this.modal.querySelector('.gdc-modal-close');
-      const aiInput = this.modal.querySelector('.gdc-ai-input');
-      const aiSend = this.modal.querySelector('.gdc-ai-send');
-      const aiMessages = this.modal.querySelector('.gdc-ai-chat-messages');
 
       // Hide loading when iframe loads
       iframe.addEventListener('load', () => {
@@ -210,24 +177,64 @@
       };
       document.addEventListener('keydown', escHandler);
 
-      // Chip buttons
-      aiMessages.addEventListener('click', (e) => {
-        if (e.target.matches('.gdc-chat-chip')) {
-          const msg = e.target.getAttribute('data-msg');
-          aiInput.value = msg;
-          this.sendAIMessage(aiInput, aiMessages, iframe);
+      // LEO INTEGRATION: Listen for actions dispatched by the Leo widget
+      this._leoActionHandler = (e) => {
+        const actionData = e.detail;
+        if (actionData && actionData.action) {
+          console.log('[GDC Template Modal] Received Leo action:', actionData.action);
+          this.executeAction(actionData, iframe);
         }
-      });
-
-      // Send button
-      aiSend.addEventListener('click', () => this.sendAIMessage(aiInput, aiMessages, iframe));
+      };
+      window.addEventListener('gdc-leo-action', this._leoActionHandler);
 
       // Enter key in input
-      aiInput.addEventListener('keypress', (e) => {
-        if (e.key === 'Enter') {
-          this.sendAIMessage(aiInput, aiMessages, iframe);
+    }
+
+    /**
+     * LEO INTEGRATION: Float Leo widget above the modal with the correct chatflow
+     */
+    openLeoWidget(pageId, workflow) {
+      console.log('[GDC Template Modal] Bridging to Leo widget:', { pageId, workflow });
+
+      // Determine Leo context
+      let leoContext = 'page';
+      if (workflow === 'header_designer') leoContext = 'header';
+      else if (workflow === 'footer_designer') leoContext = 'footer';
+      else {
+        const btn = document.querySelector(`.gs-open-template-modal[data-page-id="${pageId}"]`);
+        if (btn && btn.dataset.postType) {
+          leoContext = btn.dataset.postType;
+        } else if (workflow === 'content_writer') {
+          leoContext = 'product';
+        } else if (workflow === 'blog_architect') {
+          leoContext = 'page';
         }
-      });
+      }
+
+      // 1. Set global override so Leo loads the correct chatflow
+      window.LEO_OVERRIDE_CONTEXT = leoContext;
+
+      // 2. Float Leo above the modal
+      const leo = document.querySelector('aipa-widget');
+      if (leo) {
+        // Move to end of body so it's painted after the modal
+        document.body.appendChild(leo);
+
+        // Ensure it's visible and above the modal's z-index
+        leo.style.display = '';
+        leo.style.zIndex = '2147483647';
+
+        // Force context refresh
+        if (typeof leo.resetLeoState === 'function') leo.resetLeoState();
+        if (typeof leo.showWelcomeOptions === 'function') {
+          leo.leoState.hasGreeted = false;
+          leo.showWelcomeOptions();
+        }
+
+        console.log('[GDC Template Modal] Leo floating above modal, context:', leoContext);
+      } else {
+        console.warn('[GDC Template Modal] Leo widget (aipa-widget) not found');
+      }
     }
 
     /**
@@ -764,6 +771,22 @@
      * Close the modal
      */
     close() {
+      // Clear Leo override
+      window.LEO_OVERRIDE_CONTEXT = null;
+
+      // Revert Leo widget
+      const leo = document.querySelector('aipa-widget');
+      if (leo) {
+        leo.style.zIndex = '';
+        if (typeof leo.close === 'function') leo.close();
+      }
+
+      // Clean up Leo action listener
+      if (this._leoActionHandler) {
+        window.removeEventListener('gdc-leo-action', this._leoActionHandler);
+        this._leoActionHandler = null;
+      }
+
       if (this.modal) {
         this.modal.remove();
         this.modal = null;

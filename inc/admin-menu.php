@@ -59,7 +59,9 @@ function gs_register_admin_menu()
     );
     add_submenu_page('gs-users', __('All Users', 'gend-society'), __('All Users', 'gend-society'), 'list_users', 'users.php', '');
     add_submenu_page('gs-users', __('Add New', 'gend-society'), __('Add New', 'gend-society'), 'create_users', 'user-new.php', '');
-    add_submenu_page('gs-users', __('Area Assignment', 'gend-society'), __('Area Assignment', 'gend-society'), 'list_users', 'gs-users', '');
+    add_submenu_page('gs-users', __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'list_users', 'gs-feature-access', function () {
+        require GS_DIR . 'inc/pages/feature-access.php';
+    });
 
     // ── APP ───────────────────────────────────────────────────────────────────
     add_menu_page(
@@ -78,6 +80,18 @@ function gs_register_admin_menu()
 
     // Note: Blog Manager and Email Manager register their own submenus under gs-app.
 
+    // ── CONTENT ──────────────────────────────────────────────────────────────
+    add_menu_page(
+        __('Content', 'gend-society'),
+        '<span class="gs-menu-icon dashicons dashicons-edit"></span><span class="gs-menu-label">' . __('Content', 'gend-society') . '</span>',
+        'manage_options',
+        'gs-content',
+        '__return_null',
+        'none',
+        5
+    );
+    add_submenu_page('gs-content', __('Pages', 'gend-society'), __('Pages', 'gend-society'), 'edit_pages', 'edit.php?post_type=page', '');
+
     // ── STORE (conditional) ───────────────────────────────────────────────────
     $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/sales-team.php') || gs_plugin_active('projects/projects.php');
     if ($has_store_apps) {
@@ -90,16 +104,13 @@ function gs_register_admin_menu()
                 require apply_filters('gs_store_dashboard_path', GS_DIR . 'inc/pages/store.php');
             },
             'none',
-            5
+            6
         );
 
         // Mirror online-store submenus if active
         if (gs_plugin_active('online-store/online-store.php')) {
             add_submenu_page('gs-store', __('Store Settings', 'gend-society'), __('Store Settings', 'gend-society'), 'manage_options', 'gdc-store-settings', 'gdc_render_store_settings_page');
-            add_submenu_page('gs-store', __('Products & Funnels', 'gend-society'), __('Products & Funnels', 'gend-society'), 'manage_woocommerce', 'gdc-store-product-sales-funnels', 'gdc_render_product_sales_funnels_page');
-            add_submenu_page('gs-store', __('Order Management', 'gend-society'), __('Order Management', 'gend-society'), 'manage_options', 'gdc-store-order-management', 'gdc_render_order_management_page');
             add_submenu_page(null, __('Store Reports', 'gend-society'), __('Store Reports', 'gend-society'), 'manage_options', 'gdc-store-reports', 'gdc_render_store_reports_page');
-            add_submenu_page('gs-store', __('Advanced Product Fields', 'gend-society'), __('Advanced Product Fields', 'gend-society'), 'manage_options', 'edit.php?post_type=wapf_product', '');
         }
 
         // Note: Sales Team and Projects register their own submenus under gs-store, so we don't need to manually add_submenu_page for them here.
@@ -114,28 +125,26 @@ function gs_register_admin_menu()
             'gs-social',
             '__return_null',
             'none',
-            6
+            7
         );
-        add_submenu_page('gs-social', __('Network Settings', 'gend-society'), __('Network Settings', 'gend-society'), 'manage_options', 'gdc-social-network-settings', '');
-        add_submenu_page('gs-social', __('Profile Features', 'gend-society'), __('Profile Features', 'gend-society'), 'manage_options', 'gdc-social-profile-features', '');
-        add_submenu_page('gs-social', __('Membership System', 'gend-society'), __('Membership System', 'gend-society'), 'manage_options', 'gdc-social-membership-system', '');
+        add_submenu_page('gs-social', __('Network Settings', 'gend-society'), __('Network Settings', 'gend-society'), 'manage_options', 'gdc-social-network-settings', 'sn_render_network_settings_page');
+
         remove_submenu_page('gs-social', 'gs-social');
     }
 
-    // ── REWARDS (conditional) ─────────────────────────────────────────────────
     if (gs_plugin_active('reward-programs/reward-programs.php')) {
-        add_menu_page(
+        add_submenu_page(
+            'gs-social',
+            __('Rewards & Loyalty', 'gend-society'),
             __('Rewards', 'gend-society'),
-            '<span class="gs-menu-icon dashicons dashicons-awards"></span><span class="gs-menu-label">' . __('Rewards', 'gend-society') . '</span>',
             'manage_options',
             'gs-rewards',
-            '__return_null',
-            'none',
-            7
+            'reward_programs_proxy_member_wallets'
         );
-        add_submenu_page('gs-rewards', __('Points', 'gend-society'), __('Points', 'gend-society'), 'manage_options', 'gdc-reward-points', '');
-        add_submenu_page('gs-rewards', __('Wallets', 'gend-society'), __('Wallets', 'gend-society'), 'manage_options', 'gdc-reward-wallets', '');
-        remove_submenu_page('gs-rewards', 'gs-rewards');
+    }
+
+    if (gs_plugin_active('member-management/member-management.php')) {
+        add_submenu_page('gs-social', __('Membership System', 'gend-society'), __('Membership System', 'gend-society'), 'manage_options', 'gdc-social-membership-system', 'mm_render_membership_system_page');
     }
 
     // ── FEATURES ──────────────────────────────────────────────────────────────
@@ -156,6 +165,9 @@ function gs_register_admin_menu()
     add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'activate_plugins', 'plugins.php', '');
     add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'update_core', 'update-core.php', '');
 
+    // Add Permalinks to App Menu
+    add_submenu_page('gs-app', __('Permalinks', 'gend-society'), __('Permalinks', 'gend-society'), 'manage_options', 'options-permalink.php', '');
+
     // Prevent redundant submenus from being added inside the Dashboard rendering engine by removing them late in another hook
     remove_submenu_page('gs-app', 'gs-app');
     remove_submenu_page('gs-features', 'gs-features');
@@ -163,7 +175,51 @@ function gs_register_admin_menu()
         remove_submenu_page('gs-store', 'gs-store');
     }
     remove_submenu_page('gs-social', 'gs-social');
+    remove_submenu_page('gs-social', 'youzify-panel');
+    remove_submenu_page('gs-social', 'youzify-profile-settings');
+    remove_submenu_page('gs-social', 'youzify-widgets-settings');
+    remove_submenu_page('gs-social', 'youzify-membership-settings');
+    remove_submenu_page('gs-social', 'youzify-extensions-settings');
+    remove_submenu_page('gs-social', 'youzify-reports');
     remove_submenu_page('gs-rewards', 'gs-rewards');
+    remove_submenu_page('gs-content', 'gs-content');
+    remove_submenu_page('index.php', 'index.php');
+    remove_submenu_page('index.php', 'update-core.php');
+    remove_submenu_page('gs-users', 'gs-users');
+}
+
+/**
+ * Move Blog Manager and Email Manager submenus to Content if active.
+ * Must run after their registration (1100).
+ */
+add_action('admin_menu', 'gs_move_plugin_submenus_to_content', 1200);
+function gs_move_plugin_submenus_to_content()
+{
+    // Blog Manager
+    if (gs_plugin_active('blog-manager/blog-manager.php')) {
+        remove_submenu_page('gs-app', 'blog-manager');
+        add_submenu_page(
+            'gs-content',
+            __('Blog Manager', 'blog-manager'),
+            __('Blog Manager', 'blog-manager'),
+            'edit_posts',
+            'blog-manager',
+            'bm_render_page'
+        );
+    }
+
+    // Email Manager
+    if (gs_plugin_active('email-manager/email-manager.php')) {
+        remove_submenu_page('gs-app', 'email-manager');
+        add_submenu_page(
+            'gs-content',
+            __('Email Manager', 'email-manager'),
+            __('Email Manager', 'email-manager'),
+            'manage_options',
+            'email-manager',
+            'em_render_email_manager_page'
+        );
+    }
 }
 
 /**
@@ -195,6 +251,7 @@ function gs_suppress_plugin_menus()
         'index.php',
         'gs-users',
         'gs-app',
+        'gs-content',
         'gs-store',
         'gs-social',
         'gs-rewards',
@@ -253,6 +310,40 @@ function gs_suppress_plugin_menus()
         if (!$slug) {
             continue;
         }
+
+        // Feature Access Control
+        // Get current user and their allowed features. Super admins bypass this.
+        $current_user_id = get_current_user_id();
+        if (!is_super_admin($current_user_id) && !current_user_can('manage_network')) {
+            $allowed_features = get_user_meta($current_user_id, 'gs_feature_access', true);
+            if (!is_array($allowed_features)) {
+                $allowed_features = []; // Default: No access if never set
+            }
+
+            // Always allow basic profile access
+            $allowed_features[] = 'profile.php';
+
+            if (!in_array($slug, $allowed_features, true) && !in_array($slug, ['separator', 'separator1', 'separator2', 'separator-last'], true)) {
+                remove_menu_page($slug);
+                unset($menu[$pos]);
+                if (isset($submenu[$slug])) {
+                    unset($submenu[$slug]);
+                }
+                continue;
+            }
+        }
+
+        // Process submenu filtering if the top-level menu survived
+        if (isset($submenu[$slug]) && !is_super_admin($current_user_id) && !current_user_can('manage_network')) {
+            foreach ($submenu[$slug] as $sub_pos => $sub_item) {
+                $sub_slug = isset($sub_item[2]) ? $sub_item[2] : '';
+                if ($sub_slug && !in_array($sub_slug, $allowed_features, true) && $sub_slug !== 'profile.php') {
+                    unset($submenu[$slug][$sub_pos]);
+                }
+            }
+        }
+
+        // Below here is the standard cleanup for WP/Plugin defaults if bypassing feature access
         // Skip our own menu items and separators
         if (in_array($slug, $gs_owned, true)) {
             continue;

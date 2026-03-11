@@ -3,12 +3,21 @@
     'use strict';
 
     function initAI() {
+        // GS Template Modal auto-open is disabled.
+        // The Leo canvas widget handles AI assistance in the Site Editor canvas.
+        // Close any panel that may have been left open from a previous session.
+        const existingPanel = document.querySelector('.gs-template-panel-root');
+        if (existingPanel) existingPanel.remove();
+        return;
+
+        /* eslint-disable no-unreachable */
         if (!window.wp || !window.wp.data || !window.GS_TemplateModal) {
             setTimeout(initAI, 500);
             return;
         }
 
         const urlParams = new URLSearchParams(window.location.search);
+
         let workflow = 'content_writer';
 
         // Detect Site Editor context (using decoded values)

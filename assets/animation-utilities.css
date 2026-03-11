@@ -1,0 +1,363 @@
+/**
+ * Scroll-Driven Animation Utilities
+ * Uses native CSS animation-timeline: view() — zero JavaScript, 60fps.
+ * Applied via className attributes in the WordPress Block Editor.
+ */
+
+/* ============================================
+   BASE ANIMATION SETUP
+   ============================================ */
+
+/* All animate-* elements start hidden and animate into view */
+[class*="animate-"] {
+    animation-timeline: view();
+    animation-range: entry 10% cover 30%;
+    animation-fill-mode: both;
+    animation-duration: 0.8s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+/* ============================================
+   FADE ANIMATIONS
+   ============================================ */
+
+@keyframes fade-in {
+    from {
+        opacity: 0;
+    }
+
+    to {
+        opacity: 1;
+    }
+}
+
+@keyframes fade-in-up {
+    from {
+        opacity: 0;
+        transform: translateY(40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+@keyframes fade-in-down {
+    from {
+        opacity: 0;
+        transform: translateY(-40px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateY(0);
+    }
+}
+
+.animate-fade-in {
+    animation-name: fade-in;
+}
+
+.animate-fade-in-up {
+    animation-name: fade-in-up;
+}
+
+.animate-fade-in-down {
+    animation-name: fade-in-down;
+}
+
+/* ============================================
+   SLIDE ANIMATIONS
+   ============================================ */
+
+@keyframes slide-in-left {
+    from {
+        opacity: 0;
+        transform: translateX(-60px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+@keyframes slide-in-right {
+    from {
+        opacity: 0;
+        transform: translateX(60px);
+    }
+
+    to {
+        opacity: 1;
+        transform: translateX(0);
+    }
+}
+
+.animate-slide-in-left {
+    animation-name: slide-in-left;
+}
+
+.animate-slide-in-right {
+    animation-name: slide-in-right;
+}
+
+/* ============================================
+   SCALE & ZOOM ANIMATIONS
+   ============================================ */
+
+@keyframes scale-in {
+    from {
+        opacity: 0;
+        transform: scale(0.85);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+@keyframes zoom-in {
+    from {
+        opacity: 0;
+        transform: scale(0.9);
+    }
+
+    to {
+        opacity: 1;
+        transform: scale(1);
+    }
+}
+
+.animate-scale-in {
+    animation-name: scale-in;
+}
+
+.animate-zoom-in {
+    animation-name: zoom-in;
+}
+
+/* ============================================
+   BLUR ANIMATION
+   ============================================ */
+
+@keyframes blur-in {
+    from {
+        opacity: 0;
+        filter: blur(10px);
+    }
+
+    to {
+        opacity: 1;
+        filter: blur(0);
+    }
+}
+
+.animate-blur-in {
+    animation-name: blur-in;
+}
+
+/* ============================================
+   MAGIC SCROLL EFFECTS
+   ============================================ */
+
+@keyframes rotate-in {
+    from {
+        opacity: 0;
+        transform: rotate(-5deg) scale(0.95);
+    }
+
+    to {
+        opacity: 1;
+        transform: rotate(0deg) scale(1);
+    }
+}
+
+.animate-rotate-in {
+    animation-name: rotate-in;
+}
+
+/* Parallax: element moves slower or faster than scroll */
+.animate-parallax-slow {
+    animation-name: fade-in;
+    animation-timeline: scroll();
+    animation-range: 0% 100%;
+    transform: translateY(calc(var(--scroll-offset, 0) * 0.5));
+    will-change: transform;
+}
+
+.animate-parallax-fast {
+    animation-name: fade-in;
+    animation-timeline: scroll();
+    animation-range: 0% 100%;
+    transform: translateY(calc(var(--scroll-offset, 0) * -0.3));
+    will-change: transform;
+}
+
+/* Counter-scroll: moves opposite direction */
+@keyframes counter-scroll {
+    from {
+        transform: translateY(30px);
+    }
+
+    to {
+        transform: translateY(-30px);
+    }
+}
+
+.animate-counter-scroll {
+    animation-name: counter-scroll;
+    animation-timeline: view();
+    animation-range: entry 0% exit 100%;
+}
+
+/* ============================================
+   STAGGER: Parent applies delay cascade to children
+   ============================================ */
+
+.animate-stagger>* {
+    animation-timeline: view();
+    animation-range: entry 10% cover 30%;
+    animation-fill-mode: both;
+    animation-duration: 0.8s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-stagger>*:nth-child(1) {
+    animation-delay: 0ms;
+}
+
+.animate-stagger>*:nth-child(2) {
+    animation-delay: 100ms;
+}
+
+.animate-stagger>*:nth-child(3) {
+    animation-delay: 200ms;
+}
+
+.animate-stagger>*:nth-child(4) {
+    animation-delay: 300ms;
+}
+
+.animate-stagger>*:nth-child(5) {
+    animation-delay: 400ms;
+}
+
+.animate-stagger>*:nth-child(6) {
+    animation-delay: 500ms;
+}
+
+.animate-stagger>*:nth-child(7) {
+    animation-delay: 600ms;
+}
+
+.animate-stagger>*:nth-child(8) {
+    animation-delay: 700ms;
+}
+
+/* Inherit the parent's animation to children */
+.animate-fade-in-up.animate-stagger>* {
+    animation-name: fade-in-up;
+}
+
+.animate-fade-in.animate-stagger>* {
+    animation-name: fade-in;
+}
+
+.animate-fade-in-down.animate-stagger>* {
+    animation-name: fade-in-down;
+}
+
+.animate-slide-in-left.animate-stagger>* {
+    animation-name: slide-in-left;
+}
+
+.animate-slide-in-right.animate-stagger>* {
+    animation-name: slide-in-right;
+}
+
+.animate-scale-in.animate-stagger>* {
+    animation-name: scale-in;
+}
+
+.animate-zoom-in.animate-stagger>* {
+    animation-name: zoom-in;
+}
+
+.animate-blur-in.animate-stagger>* {
+    animation-name: blur-in;
+}
+
+.animate-stagger-slow>* {
+    animation-timeline: view();
+    animation-range: entry 10% cover 30%;
+    animation-fill-mode: both;
+    animation-duration: 0.8s;
+    animation-timing-function: cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.animate-stagger-slow>*:nth-child(1) {
+    animation-delay: 0ms;
+}
+
+.animate-stagger-slow>*:nth-child(2) {
+    animation-delay: 200ms;
+}
+
+.animate-stagger-slow>*:nth-child(3) {
+    animation-delay: 400ms;
+}
+
+.animate-stagger-slow>*:nth-child(4) {
+    animation-delay: 600ms;
+}
+
+.animate-stagger-slow>*:nth-child(5) {
+    animation-delay: 800ms;
+}
+
+.animate-stagger-slow>*:nth-child(6) {
+    animation-delay: 1000ms;
+}
+
+.animate-fade-in-up.animate-stagger-slow>* {
+    animation-name: fade-in-up;
+}
+
+.animate-fade-in.animate-stagger-slow>* {
+    animation-name: fade-in;
+}
+
+.animate-scale-in.animate-stagger-slow>* {
+    animation-name: scale-in;
+}
+
+/* ============================================
+   SPEED MODIFIERS
+   ============================================ */
+
+.animate-slow {
+    animation-duration: 1.2s !important;
+}
+
+.animate-fast {
+    animation-duration: 0.4s !important;
+}
+
+/* ============================================
+   REDUCED MOTION: Respect user preferences
+   ============================================ */
+
+@media (prefers-reduced-motion: reduce) {
+
+    [class*="animate-"],
+    .animate-stagger>*,
+    .animate-stagger-slow>* {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+}

@@ -15,7 +15,7 @@ function gs_enqueue_frontend_assets()
   wp_enqueue_script('gs-frontend-bar-js', GS_URL . 'assets/frontend-bar.js', [], $v, true);
 
   // Enqueue chat modal
-  wp_enqueue_script('gs-template-modal', GS_URL . 'assets/gs-template-modal.js', ['jquery'], $v, true);
+  wp_enqueue_script('gs-template-modal', GS_URL . 'assets/gs-template-modal.js', ['jquery'], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-template-modal.js'), true);
   wp_localize_script('gs-template-modal', 'GS_TEMPLATE_MODAL', [
     'rest_url' => esc_url_raw(rest_url()),
     'nonce' => wp_create_nonce('wp_rest')
@@ -26,6 +26,13 @@ function gs_enqueue_frontend_assets()
   add_action('wp_head', function () {
     echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;}</style>';
   });
+}
+
+// Enqueue animation utilities for ALL visitors (not just admins)
+add_action('wp_enqueue_scripts', 'gs_enqueue_animation_css');
+function gs_enqueue_animation_css()
+{
+  wp_enqueue_style('gs-animation-utilities', GS_URL . 'assets/animation-utilities.css', [], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/animation-utilities.css'));
 }
 
 // Localize data for the admin script
@@ -98,11 +105,19 @@ function gs_render_frontend_bar()
     <div class="gs-sidebar-divider"></div>
 
     <!-- Edit Action -->
-    <?php if ($edit_url): ?>
+    <?php if ($edit_url):
+      $workflow = 'content_writer';
+      if ($post_type === 'product') {
+        $workflow = 'content_writer';
+      } elseif ($post_type === 'page' || $post_type === 'post') {
+        $workflow = 'blog_architect';
+      }
+      ?>
       <div class="gs-sidebar-actions">
         <a href="#" class="gs-sidebar-action-btn gs-open-template-modal" data-page-id="<?php echo esc_attr($post_id); ?>"
           data-page-title="<?php echo esc_attr(get_the_title($post_id)); ?>"
-          data-edit-url="<?php echo esc_url($edit_url); ?>" data-workflow="content_writer"
+          data-edit-url="<?php echo esc_url($edit_url); ?>" data-post-type="<?php echo esc_attr($post_type); ?>"
+          data-workflow="<?php echo esc_attr($workflow); ?>"
           aria-label="<?php esc_attr_e('Edit this page', 'gend-society'); ?>">
           <span class="gs-sidebar-icon dashicons dashicons-edit"></span>
           <span class="gs-sidebar-label"><?php esc_html_e('Edit Page', 'gend-society'); ?></span>
@@ -170,15 +185,21 @@ function gs_build_frontend_nav()
     'children' => [],
   ];
 
+  $users_children = [
+    ['label' => __('All Users', 'gend-society'), 'url' => admin_url('users.php')]
+  ];
+  if (current_user_can('create_users')) {
+    $users_children[] = ['label' => __('Add New', 'gend-society'), 'url' => admin_url('user-new.php')];
+  }
+  $users_children[] = ['label' => __('Feature Access', 'gend-society'), 'url' => admin_url('admin.php?page=gs-feature-access')];
+  $users_children[] = ['label' => __('Your Profile', 'gend-society'), 'url' => admin_url('profile.php')];
+
   $items[] = [
     'label' => __('Users', 'gend-society'),
     'url' => admin_url('admin.php?page=gs-users'),
     'icon' => 'dashicons-groups',
     'cap' => 'list_users',
-    'children' => [
-      ['label' => __('All Users', 'gend-society'), 'url' => admin_url('users.php')],
-      ['label' => __('Your Profile', 'gend-society'), 'url' => admin_url('profile.php')],
-    ],
+    'children' => $users_children,
   ];
 
   // Build the App menu children dynamically
@@ -190,11 +211,8 @@ function gs_build_frontend_nav()
     $app_children[] = ['label' => __('Media', 'gend-society'), 'url' => admin_url('upload.php')];
   }
 
-  if (gs_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
-    $app_children[] = ['label' => __('Blog Manager', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
-  }
-  if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
-    $app_children[] = ['label' => __('Email Manager', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
+  if (current_user_can('manage_options')) {
+    $app_children[] = ['label' => __('Permalinks', 'gend-society'), 'url' => admin_url('options-permalink.php')];
   }
 
   $items[] = [
@@ -205,6 +223,25 @@ function gs_build_frontend_nav()
     'children' => $app_children,
   ];
 
+  // Build the Content menu
+  $content_children = [
+    ['label' => __('Pages', 'gend-society'), 'url' => admin_url('edit.php?post_type=page')],
+  ];
+  if (gs_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
+    $content_children[] = ['label' => __('Blog Manager', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
+  }
+  if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
+    $content_children[] = ['label' => __('Email Manager', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
+  }
+
+  $items[] = [
+    'label' => __('Content', 'gend-society'),
+    'url' => admin_url('admin.php?page=gs-content'),
+    'icon' => 'dashicons-edit',
+    'cap' => 'manage_options',
+    'children' => $content_children,
+  ];
+
   // Conditionally add Store
   $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/sales-team.php') || gs_plugin_active('projects/projects.php');
   if ($has_store_apps) {
@@ -212,10 +249,7 @@ function gs_build_frontend_nav()
 
     // Add Online Store submenus if active
     if (gs_plugin_active('online-store/online-store.php') && current_user_can('manage_woocommerce')) {
-      $store_children[] = ['label' => __('Overview', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store')];
-      $store_children[] = ['label' => __('Orders', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-orders')];
-      $store_children[] = ['label' => __('Products', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-product-sales-funnels')];
-      $store_children[] = ['label' => __('Settings', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-settings')];
+      $store_children[] = ['label' => __('Store Settings', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-settings')];
     }
 
     if (gs_plugin_active('sales-team/sales-team.php') && current_user_can('manage_options')) {
@@ -236,34 +270,23 @@ function gs_build_frontend_nav()
 
   // Conditionally add Social
   if (gs_plugin_active('social-network/social-network.php') && current_user_can('manage_options')) {
+    $social_children = [
+      ['label' => __('Network Settings', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-network-settings')],
+      ['label' => __('Membership System', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-membership-system')],
+    ];
+    if (gs_plugin_active('reward-programs/reward-programs.php')) {
+      $social_children[] = ['label' => __('Rewards', 'gend-society'), 'url' => admin_url('admin.php?page=gs-rewards')];
+    }
     $items[] = [
       'label' => __('Social', 'gend-society'),
-      'url' => admin_url('admin.php?page=gdc-social'),
+      'url' => admin_url('admin.php?page=gs-social'),
       'icon' => 'dashicons-share',
       'cap' => 'manage_options',
-      'children' => [
-        ['label' => __('Social Network', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social')],
-        ['label' => __('Groups', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-groups')],
-        ['label' => __('Members', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-members')],
-      ],
+      'children' => $social_children,
     ];
   }
 
-  // Conditionally add Rewards
-  if (gs_plugin_active('reward-programs/reward-programs.php') && current_user_can('manage_options')) {
-    $items[] = [
-      'label' => __('Reward', 'gend-society'),
-      'url' => admin_url('admin.php?page=gdc-reward'),
-      'icon' => 'dashicons-awards',
-      'cap' => 'manage_options',
-      'children' => [
-        ['label' => __('Reward Points', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-reward')],
-        ['label' => __('Point Bank', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-reward-point-bank')],
-        ['label' => __('Smart Contracts', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-reward-smart-contracts')],
-        ['label' => __('Member Wallets', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-reward-member-wallets')],
-      ],
-    ];
-  }
+  // Note: Rewards is listed under Social children above, not as a top-level item.
 
   $items[] = [
     'label' => __('Features', 'gend-society'),
@@ -277,12 +300,64 @@ function gs_build_frontend_nav()
     ],
   ];
 
-  // Filter by capability
+  // Filter by capability and feature access
   $final_items = [];
+  $current_user_id = get_current_user_id();
+  $is_super = is_super_admin($current_user_id) || current_user_can('manage_network');
+  $allowed_features = get_user_meta($current_user_id, 'gs_feature_access', true);
+  if (!is_array($allowed_features)) {
+    $allowed_features = [];
+  }
+
+  // Pre-process items: if the parent slug isn't strictly known, we might need a mapping.
+  // We'll rely on the top-level slugs defined in admin-menu.php where possible.
+  $slug_map = [
+    'Dashboard' => 'index.php',
+    'Users' => 'gs-users',
+    'App' => 'gs-app',
+    'Content' => 'gs-content',
+    'Store' => 'gs-store',
+    'Social' => 'gs-social',
+    'Features' => 'gs-features'
+  ];
+
   foreach ($items as $item) {
     if (!current_user_can($item['cap'])) {
       continue;
     }
+
+    if (!$is_super) {
+      $mapped_slug = isset($slug_map[$item['label']]) ? $slug_map[$item['label']] : '';
+      if ($mapped_slug && !in_array($mapped_slug, $allowed_features, true)) {
+        continue; // Top level menu not allowed
+      }
+    }
+
+    // Filter children
+    if (!empty($item['children']) && !$is_super) {
+      $filtered_children = [];
+      foreach ($item['children'] as $child) {
+        // Extract the slug from the URL. e.g., admin.php?page=gdc-store -> gdc-store, or edit.php -> edit.php
+        $parsed_url = wp_parse_url($child['url']);
+        $child_slug = '';
+        if (isset($parsed_url['query'])) {
+          parse_str($parsed_url['query'], $query_args);
+          if (isset($query_args['page'])) {
+            $child_slug = $query_args['page'];
+          } else if (strpos($parsed_url['path'], 'edit.php') !== false) {
+            $child_slug = $query_args['post_type'] ? 'edit.php?post_type=' . $query_args['post_type'] : 'edit.php';
+          }
+        } else if (isset($parsed_url['path'])) {
+          $child_slug = basename($parsed_url['path']);
+        }
+
+        if ($child_slug === 'profile.php' || in_array($child_slug, $allowed_features, true)) {
+          $filtered_children[] = $child;
+        }
+      }
+      $item['children'] = $filtered_children;
+    }
+
     $final_items[] = $item;
   }
 

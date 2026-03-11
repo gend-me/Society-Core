@@ -471,7 +471,7 @@ body.site-editor-php .edit-site-header {
     top: var(--gs-header-h) !important;
 }
 
-body.block-editor-page.is-fullscreen-mode .interface-interface-skeleton,
+body.block-editor-page .interface-interface-skeleton,
 body.site-editor-php .interface-interface-skeleton,
 body.site-editor-php .edit-site {
     top: var(--gs-header-h) !important;
@@ -482,6 +482,27 @@ body.site-editor-php .edit-site {
 body.block-editor-page .interface-interface-skeleton__sidebar,
 body.site-editor-php .interface-interface-skeleton__sidebar {
     top: var(--gs-header-h) !important;
+}
+
+/* Pre-publish / Post-publish panel (the sidebar that appears when you click Publish) */
+body.block-editor-page .editor-post-publish-panel,
+body.block-editor-page .editor-post-publish-panel__prepublish,
+body.block-editor-page .editor-post-publish-panel__header {
+    z-index: 100002 !important;
+}
+
+/* Ensure the publish panel & its containing slot/popover sit below the header */
+body.block-editor-page .interface-interface-skeleton__actions,
+body.block-editor-page .editor-post-publish-panel {
+    top: var(--gs-header-h) !important;
+    max-height: calc(100vh - var(--gs-header-h)) !important;
+    overflow-y: auto !important;
+}
+
+/* Popover slots used by the block editor for publish flows */
+body.block-editor-page .components-popover.is-bottom-right,
+body.block-editor-page .popover-slot .components-popover {
+    z-index: 100002 !important;
 }
 
 /* ------ GS PAGE LAYOUT ------------------------------------ */
@@ -1177,5 +1198,10 @@ select option {
     background: var(--gs-surface) !important;
     color: var(--gs-text) !important;
 }
+
 /* Failsafe to hide any surviving standalone plugin menus from the sidebar */
-#toplevel_page_gdc-social, #toplevel_page_gdc-store, #toplevel_page_gdc-reward { display: none !important; }
+#toplevel_page_gdc-social,
+#toplevel_page_gdc-store,
+#toplevel_page_gdc-reward {
+    display: none !important;
+}
