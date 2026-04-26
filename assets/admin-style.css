@@ -43,156 +43,199 @@ a:hover {
     display: none !important;
 }
 
-/* ------ FAKE HEADER ---------------------------------------- */
-#gs-admin-header {
-    position: fixed;
+/* ------ TOP HEADER (3D glass nav) -------------------------- */
+.header-anchor-wrap {
+    position: fixed !important;
     top: 0;
     left: 0;
-    right: 0;
-    height: var(--gs-header-h);
+    width: 100%;
     z-index: 100001;
-    background: rgba(11, 14, 20, 0.92);
-    backdrop-filter: blur(25px) saturate(180%);
-    -webkit-backdrop-filter: blur(25px) saturate(180%);
-    border-bottom: 1px solid var(--gs-border);
+    background: rgba(11, 14, 20, 0.45);
+    backdrop-filter: blur(40px) saturate(180%);
+    -webkit-backdrop-filter: blur(40px) saturate(180%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+    padding: 8px 30px 8px 110px;
     display: flex;
     align-items: center;
-    justify-content: space-between;
-    padding: 0 24px 0 0;
-    box-shadow: 0 2px 40px rgba(0, 0, 0, .45);
-}
-
-#gs-admin-header::after {
-    content: '';
-    position: absolute;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    height: 2px;
-    background: linear-gradient(90deg, var(--gs-magenta), var(--gs-red), var(--gs-blue));
-    opacity: .7;
-}
-
-/* ------ LOGO CONTAINER & TITLE ----------------------------- */
-.logo-container {
-    display: flex;
-    align-items: center;
-    padding: 0 16px;
-    height: 100%;
+    box-sizing: border-box;
+    perspective: 1500px;
     gap: 12px;
+    animation: gsHeaderSlideDown 0.8s cubic-bezier(0.2, 1, 0.3, 1) forwards;
 }
 
-.logo-container a {
-    display: flex;
-    align-items: center;
-    text-decoration: none;
+@keyframes gsHeaderSlideDown {
+    0%   { transform: translateY(-100%); opacity: 0; }
+    100% { transform: translateY(0); opacity: 1; }
 }
 
-.logo-container img {
-    height: 38px;
-    border-radius: 6px;
-}
-
-.gs-site-title {
-    font-size: 1.1rem;
-    font-weight: 800;
-    letter-spacing: .5px;
-    background: linear-gradient(90deg, var(--gs-magenta), var(--gs-blue));
-    -webkit-background-clip: text;
-    -webkit-text-fill-color: transparent;
-    background-clip: text;
-    white-space: nowrap;
-}
-
-/* ------ CENTRAL NAV PILLS ---------------------------------- */
-.nav-central {
-    flex: 1;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 16px;
-}
-
-.nav-pill {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-    padding: 6px 16px 6px 6px;
-    border-radius: 999px;
-    background: rgba(255, 255, 255, 0.05);
-    border: 1px solid rgba(255, 255, 255, 0.1);
-    color: var(--gs-text) !important;
-    text-decoration: none;
-    font-size: .85rem;
-    font-weight: 600;
-    transition: all .2s ease;
-    white-space: nowrap;
-}
-
-.nav-pill:hover {
-    background: rgba(182, 8, 201, 0.15) !important;
-    border-color: var(--gs-magenta) !important;
-    color: #fff !important;
-    transform: translateY(-1px);
-}
-
-.pill-icon {
-    width: 28px;
-    height: 28px;
-    border-radius: 50%;
-    overflow: hidden;
-    background: #000;
-    display: flex;
-    align-items: center;
-    justify-content: center;
+.header-anchor-wrap .visit-site-slot {
+    order: 3;
     flex-shrink: 0;
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.8s ease-out forwards 1.2s;
 }
 
-.pill-icon img {
+.header-anchor-wrap .btn-visit-site {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: #cc0000;
+    color: #fff !important;
+    font-weight: 800;
+    font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    border: 1px solid #cc0000;
+    box-shadow: 0 0 12px rgba(204, 0, 0, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+    white-space: nowrap;
+}
+
+.header-anchor-wrap .btn-visit-site:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 18px rgba(204, 0, 0, 0.6);
+}
+
+.header-anchor-wrap .nav-central {
+    order: 1;
+    display: flex;
+    gap: 8px;
+    align-items: center;
+    flex: 1;
+    justify-content: flex-start;
+    transform-style: preserve-3d;
+    min-width: 0;
+}
+
+.header-anchor-wrap .nav-pill {
+    position: relative;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    text-decoration: none;
+    color: #fff;
+    font-weight: 800;
+    font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+    width: 160px;
+    height: 38px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    opacity: 0;
+    transform-style: preserve-3d;
+    animation: gsHeaderFadeBlurIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+
+.header-anchor-wrap .nav-pill:nth-child(1) { animation-delay: 0.4s; }
+.header-anchor-wrap .nav-pill:nth-child(2) { animation-delay: 0.55s; }
+.header-anchor-wrap .nav-pill:nth-child(3) { animation-delay: 0.7s; }
+
+@keyframes gsHeaderFadeBlurIn {
+    0%   { transform: translateY(-10px) scale(0.95); filter: blur(10px); opacity: 0; }
+    100% { transform: translateY(0) scale(1); filter: blur(0); opacity: 1; }
+}
+
+.header-anchor-wrap .pill-bg {
+    position: absolute;
+    inset: 0;
     width: 100%;
     height: 100%;
     object-fit: cover;
+    z-index: 1;
+    filter: brightness(0.4) saturate(1.2);
+    transition: 0.5s ease;
 }
 
-.gs-header-right {
+.header-anchor-wrap .pill-content {
+    position: relative;
+    z-index: 2;
+    width: 100%;
+    height: 100%;
     display: flex;
     align-items: center;
-    gap: 16px;
-}
-
-.gs-btn-site {
-    padding: 8px 18px;
-    border-radius: 9px;
-    background: var(--gs-red);
-    color: #fff !important;
-    font-weight: 800;
-    font-size: .75rem;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.25);
+    backdrop-filter: blur(4px);
     text-transform: uppercase;
     letter-spacing: 1px;
+    white-space: nowrap;
+}
+
+.header-anchor-wrap .nav-actions-right {
+    order: 2;
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+    margin-right: 20px;
+}
+
+.header-anchor-wrap .btn-header-action {
+    display: none;
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.6s ease-out forwards;
+    align-items: center;
+    justify-content: center;
+    gap: 5px;
+    padding: 6px 14px;
+    border-radius: 8px;
     text-decoration: none;
-    transition: .2s;
-    border: none;
-    cursor: pointer;
+    font-weight: 800;
+    text-transform: uppercase;
+    font-size: clamp(0.58rem, 0.68vw, 0.68rem);
+    letter-spacing: 0.5px;
+    transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    white-space: nowrap;
 }
 
-.gs-btn-site:hover {
-    transform: scale(1.04);
-    box-shadow: 0 0 16px var(--gs-red);
-}
+.header-anchor-wrap .btn-pilot    { animation-delay: 0.85s; }
+.header-anchor-wrap .btn-projects { animation-delay: 0.95s; }
+.header-anchor-wrap .btn-tasks    { animation-delay: 1.05s; }
+.header-anchor-wrap .btn-sales    { animation-delay: 1.15s; }
+.header-anchor-wrap .btn-my-apps  { animation-delay: 1.25s; }
 
-.gs-header-user {
-    color: var(--gs-muted);
-    font-size: .8rem;
-}
-
-.gs-header-user a {
-    color: var(--gs-text);
+.header-anchor-wrap .dash-link {
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.6s forwards 1.35s;
     text-decoration: none;
-    font-weight: 700;
+    color: #fff;
+    font-size: 0.68rem;
+    font-weight: 900;
+    text-transform: uppercase;
+    margin-left: 6px;
 }
 
-.gs-header-user a:hover {
-    color: var(--gs-blue);
+/* Visibility by login state */
+body:not(.logged-in) .header-anchor-wrap .btn-pilot { display: flex !important; }
+body:not(.logged-in) .header-anchor-wrap .btn-sales,
+body:not(.logged-in) .header-anchor-wrap .btn-my-apps,
+body:not(.logged-in) .header-anchor-wrap .dash-link { display: none !important; }
+body.logged-in .header-anchor-wrap .btn-pilot { display: none !important; }
+body.logged-in .header-anchor-wrap .btn-sales,
+body.logged-in .header-anchor-wrap .btn-my-apps,
+body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
+.header-anchor-wrap .show-admin-tools { display: flex !important; }
+
+.header-anchor-wrap .btn-pilot    { background: #cc0000;                    color: #fff !important;  border: 1px solid #cc0000; }
+.header-anchor-wrap .btn-sales    { background: rgba(255, 204, 0, 0.1);     color: #ffcc00;           border: 1px solid #ffcc00; }
+.header-anchor-wrap .btn-my-apps  { background: rgba(11, 193, 228, 0.1);    color: #6ec1e4;           border: 1px solid #6ec1e4; }
+.header-anchor-wrap .btn-projects { background: rgba(225, 0, 255, 0.15);    color: #fff;              border: 1.5px solid #e100ff; }
+.header-anchor-wrap .btn-tasks    { background: rgba(0, 255, 136, 0.1);     color: #00ff88;           border: 1px solid #00ff88; }
+
+.header-anchor-wrap .dash-link:hover { opacity: 1; color: #6ec1e4; }
+
+/* Tablet: drop the centre nav, keep action buttons + Visit Site */
+@media (max-width: 900px) {
+    .header-anchor-wrap .nav-central { display: none !important; }
+}
+
+/* Mobile: Visit Site is the only thing in the header */
+@media (max-width: 600px) {
+    .header-anchor-wrap .nav-actions-right { display: none !important; }
 }
 
 /* ------ LEFT SIDEBAR --------------------------------------- */
@@ -471,17 +514,35 @@ body.site-editor-php .edit-site-header {
     top: var(--gs-header-h) !important;
 }
 
-body.block-editor-page .interface-interface-skeleton,
-body.site-editor-php .interface-interface-skeleton,
+/* Block editor: .interface-interface-skeleton is position:fixed at viewport level */
+body.block-editor-page .interface-interface-skeleton {
+    top: var(--gs-header-h) !important;
+    height: calc(100vh - var(--gs-header-h)) !important;
+    bottom: 0 !important;
+}
+
+body.block-editor-page .interface-interface-skeleton__sidebar {
+    top: var(--gs-header-h) !important;
+}
+
+/* Site editor: .edit-site is position:fixed — offset from the viewport.
+   Its children (.edit-site-layout, .interface-interface-skeleton) are
+   positioned relative to .edit-site, so top:0 avoids a double 56px offset. */
 body.site-editor-php .edit-site {
     top: var(--gs-header-h) !important;
     height: calc(100vh - var(--gs-header-h)) !important;
     bottom: 0 !important;
 }
 
-body.block-editor-page .interface-interface-skeleton__sidebar,
+body.site-editor-php .edit-site-layout,
+body.site-editor-php .interface-interface-skeleton {
+    top: 0 !important;
+    height: calc(100vh - var(--gs-header-h)) !important;
+    bottom: 0 !important;
+}
+
 body.site-editor-php .interface-interface-skeleton__sidebar {
-    top: var(--gs-header-h) !important;
+    top: 0 !important;
 }
 
 /* Pre-publish / Post-publish panel (the sidebar that appears when you click Publish) */
@@ -1204,4 +1265,91 @@ select option {
 #toplevel_page_gdc-store,
 #toplevel_page_gdc-reward {
     display: none !important;
+}
+
+/* =========================================================================
+   YOUZIFY DARK MODE OVERRIDES (GenD Society)
+   ========================================================================= */
+
+/* Main Containers */
+.gdc-admin-dashboard .youzify-settings-form,
+.gdc-admin-dashboard .ukai-panel-actions,
+.gdc-admin-dashboard .youzify-section-content,
+.gdc-admin-dashboard .uk-box-item,
+.gdc-admin-dashboard .uk-box-content,
+.gdc-admin-dashboard .ukai-accordion-item-header,
+.gdc-admin-dashboard .ukai-accordion-item-content,
+.gdc-admin-dashboard .ukai-panel-actions.uk-header-actions,
+.gdc-admin-dashboard .ukai-panel-actions.uk-footer-actions {
+    background: #0b0e14 !important;
+    background-color: #0b0e14 !important;
+    color: #e8edf5 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+/* Rounded Header Fix (from screenshot) */
+.gdc-admin-dashboard .ukai-panel-actions.uk-header-actions {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+    border-radius: 12px 12px 0 0 !important;
+}
+
+.gdc-admin-dashboard .uk-box-item {
+    border-radius: 12px !important;
+    overflow: hidden;
+}
+
+/* Titles and Headers */
+.gdc-admin-dashboard .uk-box-title,
+.gdc-admin-dashboard .ukai-accordion-item-header {
+    background: rgba(255, 255, 255, 0.03) !important;
+}
+
+.gdc-admin-dashboard h2,
+.gdc-admin-dashboard h3,
+.gdc-admin-dashboard .uk-box-title h2,
+.gdc-admin-dashboard .ukai-accordion-item-header h3,
+.gdc-admin-dashboard .ukai-panel-title h2 {
+    color: #fff !important;
+}
+
+/* Options and Fields */
+.gdc-admin-dashboard .uk-option-item .option-infos .option-title,
+.gdc-admin-dashboard .uk-option-item .uk-option-label label {
+    color: #e8edf5 !important;
+}
+
+.gdc-admin-dashboard .uk-option-item .option-infos .option-desc,
+.gdc-admin-dashboard .uk-option-item .uk-option-label .description {
+    color: #8b98b0 !important;
+}
+
+/* Form Controls */
+.gdc-admin-dashboard input[type="text"],
+.gdc-admin-dashboard input[type="number"],
+.gdc-admin-dashboard input[type="password"],
+.gdc-admin-dashboard textarea,
+.gdc-admin-dashboard select {
+    background: rgba(16, 18, 23, 0.8) !important;
+    border: 1px solid rgba(255, 255, 255, 0.1) !important;
+    color: #e8edf5 !important;
+    border-radius: 8px !important;
+}
+
+/* Modals and Other Floating Elements */
+.youzify-md-modal,
+.youzify-no-content,
+.youzify-ad-item {
+    background: #0f1420 !important;
+    color: #e8edf5 !important;
+    border-color: rgba(255, 255, 255, 0.1) !important;
+}
+
+.youzify-md-modal .ukai-md-header {
+    background: rgba(255, 255, 255, 0.05) !important;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.1) !important;
+}
+
+.youzify-md-modal .ukai-md-header h2 {
+    color: #fff !important;
 }

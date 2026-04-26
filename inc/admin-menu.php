@@ -93,7 +93,7 @@ function gs_register_admin_menu()
     add_submenu_page('gs-content', __('Pages', 'gend-society'), __('Pages', 'gend-society'), 'edit_pages', 'edit.php?post_type=page', '');
 
     // ── STORE (conditional) ───────────────────────────────────────────────────
-    $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/sales-team.php') || gs_plugin_active('projects/projects.php');
+    $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/advanced-affiliate-system.php') || gs_plugin_active('projects/project-service-orders.php');
     if ($has_store_apps) {
         add_menu_page(
             __('Store', 'gend-society'),
@@ -127,7 +127,7 @@ function gs_register_admin_menu()
             'none',
             7
         );
-        add_submenu_page('gs-social', __('Network Settings', 'gend-society'), __('Network Settings', 'gend-society'), 'manage_options', 'gdc-social-network-settings', 'sn_render_network_settings_page');
+        add_submenu_page('gs-social', __('Social Profiles', 'gend-society'), __('Social Profiles', 'gend-society'), 'manage_options', 'gdc-social-network-settings', 'sn_render_network_settings_page');
 
         remove_submenu_page('gs-social', 'gs-social');
     }
@@ -185,6 +185,57 @@ function gs_register_admin_menu()
     remove_submenu_page('gs-content', 'gs-content');
     remove_submenu_page('index.php', 'index.php');
     remove_submenu_page('index.php', 'update-core.php');
+    remove_submenu_page('gs-users', 'gs-users');
+}
+
+/**
+ * Register network admin menus for Multisite.
+ */
+add_action('network_admin_menu', 'gs_register_network_admin_menu', 5);
+function gs_register_network_admin_menu()
+{
+    // Remove default WP menus we are replacing
+    remove_menu_page('users.php');                   // Users
+    remove_menu_page('plugins.php');                 // Plugins
+    remove_menu_page('update-core.php');             // Updates
+
+    // ── USERS ─────────────────────────────────────────────────────────────────
+    add_menu_page(
+        __('Users', 'gend-society'),
+        '<span class="gs-menu-icon dashicons dashicons-groups"></span><span class="gs-menu-label">' . __('Users', 'gend-society') . '</span>',
+        'manage_network_users',
+        'gs-users',
+        function () {
+            require GS_DIR . 'inc/pages/users.php';
+        },
+        'none',
+        3
+    );
+    add_submenu_page('gs-users', __('All Users', 'gend-society'), __('All Users', 'gend-society'), 'manage_network_users', 'users.php', '');
+    add_submenu_page('gs-users', __('Add New', 'gend-society'), __('Add New', 'gend-society'), 'manage_network_users', 'user-new.php', '');
+    add_submenu_page('gs-users', __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'manage_network_users', 'gs-feature-access', function () {
+        require GS_DIR . 'inc/pages/feature-access.php';
+    });
+
+    // ── FEATURES ──────────────────────────────────────────────────────────────
+    add_menu_page(
+        __('Features', 'gend-society'),
+        '<span class="gs-menu-icon dashicons dashicons-admin-plugins"></span><span class="gs-menu-label">' . __('Features', 'gend-society') . '</span>',
+        'manage_network_plugins',
+        'gs-features',
+        function () {
+            require GS_DIR . 'inc/pages/features.php';
+        },
+        'none',
+        8
+    );
+    add_submenu_page('gs-features', __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'manage_network_plugins', 'gs-shortcodes', function () {
+        require GS_DIR . 'inc/pages/shortcodes.php';
+    });
+    add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'manage_network_plugins', 'plugins.php', '');
+    add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'manage_network_plugins', 'update-core.php', '');
+
+    remove_submenu_page('gs-features', 'gs-features');
     remove_submenu_page('gs-users', 'gs-users');
 }
 
@@ -277,6 +328,7 @@ function gs_suppress_plugin_menus()
         'gdc-social-network-settings',
         'gdc-social-profile-features',
         'gdc-social-membership-system',
+        'bp-groups',
         // Reward Program
         'gdc-reward',
         'gdc-reward-points',

@@ -4,7 +4,7 @@
 
 :root {
     --gs-bar-w-collapsed: 60px;
-    --gs-bar-w-expanded: 230px;
+    --gs-bar-w-expanded: 200px;
     --gs-bar-bg: rgba(11, 14, 20, 0.88);
     --gs-bar-border: rgba(255, 255, 255, 0.10);
     --gs-bar-magenta: #b608c9;
@@ -21,19 +21,23 @@
     left: 0;
     width: var(--gs-bar-w-collapsed);
     height: 100vh;
-    z-index: 999999;
+    z-index: 9999;
     background: var(--gs-bar-bg);
     backdrop-filter: blur(20px) saturate(160%);
     -webkit-backdrop-filter: blur(20px) saturate(160%);
     border-right: 1px solid var(--gs-bar-border);
-    border-radius: 0 14px 14px 0;
+    border-radius: 0 0 14px 0;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     padding-top: 12px;
     box-shadow: 0 0 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transition: width .2s cubic-bezier(.4, 0, .2, 1);
+    transition: width .2s cubic-bezier(.4, 0, .2, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s ease;
     overflow: hidden;
+    perspective: 1200px;
+    transform-style: preserve-3d;
+    backface-visibility: hidden;
+    animation: gsSidebarEntrance 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 .gs-front-sidebar:hover,
@@ -64,6 +68,11 @@
     overflow: hidden;
     white-space: nowrap;
     flex-shrink: 0;
+    transition: transform 0.3s cubic-bezier(0.2, 0, 0, 1) !important;
+}
+
+.gs-sidebar-brand:hover {
+    transform: perspective(600px) translateZ(20px) scale(1.02);
 }
 
 .gs-sidebar-brand-icon {
@@ -132,20 +141,40 @@
     white-space: nowrap;
     overflow: hidden;
     border: 1px solid transparent;
-    transition: all .18s ease;
+    transition: all .25s cubic-bezier(0.2, 0, 0, 1) !important;
+    transform-style: preserve-3d;
+    position: relative;
+}
+
+.gs-sidebar-link::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(120deg, transparent, rgba(255,255,255,0.05), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.6s ease;
+    pointer-events: none;
 }
 
 .gs-sidebar-link:hover,
 .gs-sidebar-link:focus {
-    background: rgba(182, 8, 201, 0.12);
-    border-color: rgba(182, 8, 201, 0.25);
-    color: #fff;
+    background: rgba(182, 8, 201, 0.15) !important;
+    border-color: rgba(182, 8, 201, 0.4) !important;
+    color: #fff !important;
+    transform: perspective(600px) translateZ(12px) rotateY(-8deg) translateX(4px) !important;
+    box-shadow: -5px 5px 20px rgba(0,0,0,0.4);
+}
+
+.gs-sidebar-link:hover::after {
+    transform: translateX(100%);
 }
 
 .gs-sidebar-link.gs-active {
-    background: rgba(182, 8, 201, 0.18);
-    border-color: rgba(182, 8, 201, 0.45);
-    box-shadow: 0 0 10px rgba(182, 8, 201, 0.15);
+    background: rgba(182, 8, 201, 0.22) !important;
+    border-color: rgba(182, 8, 201, 0.6) !important;
+    box-shadow: 0 0 15px rgba(182, 8, 201, 0.25) !important;
+    color: #fff !important;
+    transform: translateZ(5px);
 }
 
 .gs-sidebar-icon {
@@ -433,3 +462,47 @@ body.gs-bar-expanded [data-elementor-type="header"] {
     border: none;
     width: 100%;
 }
+
+/* ============================================================
+   ADVANCED ANIMATIONS
+   ============================================================ */
+
+/* 3D Sidebar Entrance */
+@keyframes gsSidebarEntrance {
+    0% {
+        opacity: 0;
+        transform: perspective(1200px) rotateY(-40deg) translateX(-150px) scale(0.9);
+        filter: blur(10px);
+    }
+    100% {
+        opacity: 1;
+        transform: perspective(1200px) rotateY(0deg) translateX(0) scale(1);
+        filter: blur(0);
+    }
+}
+
+/* Staggered Entrance for Items */
+[data-gs-animate] {
+    opacity: 0;
+    transform: translateX(-20px) translateZ(-50px);
+    animation: gsItemEntrance 0.6s cubic-bezier(0.2, 0, 0, 1) forwards;
+}
+
+@keyframes gsItemEntrance {
+    to {
+        opacity: 1;
+        transform: translateX(0) translateZ(0);
+    }
+}
+
+/* Delay staggered classes */
+.gs-delay-1 { animation-delay: 0.1s; }
+.gs-delay-2 { animation-delay: 0.15s; }
+.gs-delay-3 { animation-delay: 0.2s; }
+.gs-delay-4 { animation-delay: 0.25s; }
+.gs-delay-5 { animation-delay: 0.3s; }
+.gs-delay-6 { animation-delay: 0.35s; }
+.gs-delay-7 { animation-delay: 0.4s; }
+.gs-delay-8 { animation-delay: 0.45s; }
+.gs-delay-9 { animation-delay: 0.5s; }
+.gs-delay-10 { animation-delay: 0.55s; }

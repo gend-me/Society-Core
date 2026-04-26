@@ -22,6 +22,7 @@ define('GS_URL', plugin_dir_url(__FILE__));
 require_once GS_DIR . 'inc/admin-style.php';
 require_once GS_DIR . 'inc/admin-menu.php';
 require_once GS_DIR . 'inc/frontend-bar.php';
+require_once GS_DIR . 'inc/live-view.php';
 
 // GitHub Updater
 require_once GS_DIR . 'inc/class-gend-github-updater.php';
@@ -31,3 +32,17 @@ new GenD_GitHub_Updater(__FILE__, 'gend-me/Society-Core');
 require_once GS_DIR . 'inc/dashboard-overview.php';
 require_once GS_DIR . 'inc/feature-cards.php';
 require_once GS_DIR . 'inc/pages/dashboard.php';
+
+// Member profile pages (per-user CPT + BuddyPress embed)
+require_once GS_DIR . 'inc/member-profile-pages.php';
+
+// Member profile header (terminal-style header + nav bar)
+require_once GS_DIR . 'inc/member-profile-header.php';
+
+// Custom Login Styling
+require_once GS_DIR . 'inc/login-style.php';
+
+// gend.me portal handshake + support access + feature gating
+require_once GS_DIR . 'inc/portal-connect.php';
+require_once GS_DIR . 'inc/support-access.php';
+require_once GS_DIR . 'inc/feature-gates.php';

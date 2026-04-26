@@ -155,7 +155,7 @@
           const hideStyle = iframeDoc.createElement('style');
           hideStyle.textContent = `
             :root, body { --gs-header-h: 0px !important; }
-            #gs-admin-header, #wpadminbar, #adminmenumain, aipa-widget { display: none !important; }
+            #main-3d-header, .header-anchor-wrap, #wpadminbar, #adminmenumain, aipa-widget { display: none !important; }
             html, body, #wpwrap, #wpcontent { margin-top: 0 !important; padding-top: 0 !important; margin-left: 0 !important; padding-left: 0 !important; }
             .interface-interface-skeleton { top: 0 !important; }
           `;

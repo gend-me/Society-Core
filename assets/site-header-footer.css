@@ -1,0 +1,158 @@
+/* GenD Society — Global Site Header & Footer Styles */
+
+:root {
+    --gs-magenta: #b608c9;
+    --gs-blue: #6ec1e4;
+    --gs-red: #cc0000;
+    --gs-accent: #97e46e;
+    --gs-bg: #0b0e14;
+    --gs-border: rgba(255, 255, 255, 0.1);
+    --gs-muted: #8b98b0;
+    --gs-text: #e8edf5;
+}
+
+/* Header Branding */
+.nav-pills-container {
+    display: flex;
+    gap: 12px;
+    align-items: center;
+}
+
+.nav-pill {
+    display: flex;
+
+    align-items: center;
+    gap: 8px;
+    padding: 6px 16px 6px 6px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.05);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    color: #e8edf5 !important;
+    text-decoration: none;
+    font-size: .85rem;
+    font-weight: 600;
+    transition: all .2s ease;
+    white-space: nowrap;
+}
+
+.nav-pill:hover {
+    background: rgba(182, 8, 201, 0.15) !important;
+    border-color: var(--gs-magenta) !important;
+    color: #fff !important;
+    transform: translateY(-1px);
+}
+
+.pill-icon {
+    width: 24px;
+    height: 24px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.pill-icon img {
+    max-width: 100%;
+    height: auto;
+    border-radius: 50%;
+}
+
+/* Header Buttons */
+.btn-pilot {
+    padding: 8px 18px;
+    border-radius: 9px;
+    background: var(--gs-red);
+    color: #fff !important;
+    font-weight: 800;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    text-decoration: none;
+    transition: .2s;
+    border: none;
+    cursor: pointer;
+    display: inline-block;
+}
+
+.btn-pilot:hover {
+    transform: scale(1.04);
+    box-shadow: 0 0 16px var(--gs-red);
+}
+
+.dash-link {
+    color: var(--gs-accent) !important;
+    text-decoration: none;
+    font-weight: 800;
+    font-size: .75rem;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    padding: 8px 4px;
+    transition: color .2s ease;
+}
+
+.dash-link:hover {
+    color: #fff !important;
+}
+
+/* Footer Branding */
+.site-footer {
+    background: var(--gs-bg) !important;
+    border-top: 1px solid var(--gs-border) !important;
+    color: var(--gs-muted) !important;
+    padding: 40px 0;
+    font-size: 0.85rem;
+}
+
+.site-footer a {
+    color: var(--gs-muted) !important;
+    text-decoration: none;
+    transition: color .2s ease;
+}
+
+.site-footer a:hover {
+    color: var(--gs-blue) !important;
+}
+
+.footer-container {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 30px;
+    max-width: 1200px;
+    margin: 0 auto;
+    padding: 0 20px;
+}
+
+.footer-left {
+    flex: 1;
+    min-width: 300px;
+}
+
+.footer-right {
+    text-align: right;
+    min-width: 200px;
+}
+
+.footer-right h3 {
+    margin: 0 0 10px;
+    font-size: 0.75rem;
+    letter-spacing: 1.5px;
+    color: #fff;
+    font-weight: 800;
+}
+
+.dot.online {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    background: #4ade80;
+    border-radius: 50%;
+    margin-right: 5px;
+    box-shadow: 0 0 10px #4ade80;
+}
+
+.footer-links {
+    margin-top: 15px;
+    display: flex;
+    gap: 15px;
+    justify-content: flex-end;
+}

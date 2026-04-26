@@ -27,6 +27,9 @@ function gs_dashboard_save_app_settings()
     if (isset($_POST['gs_app_icon'])) {
         update_option('site_icon', absint($_POST['gs_app_icon']));
     }
+    if (isset($_POST['gs_site_logo'])) {
+        set_theme_mod('custom_logo', absint($_POST['gs_site_logo']));
+    }
 
     wp_safe_redirect(add_query_arg('gs_settings_saved', 'true', admin_url('index.php')));
     exit;
@@ -517,12 +520,21 @@ function gs_render_custom_dashboard_screen()
         $current_title = get_option('blogname');
         $current_tagline = get_option('blogdescription');
         $current_icon_id = get_option('site_icon');
+        $current_logo_id = get_theme_mod('custom_logo');
         
         $icon_url = '';
         if ($current_icon_id) {
             $image_attributes = wp_get_attachment_image_src($current_icon_id, 'full');
             if ($image_attributes) {
                 $icon_url = $image_attributes[0];
+            }
+        }
+
+        $logo_url = '';
+        if ($current_logo_id) {
+            $logo_attributes = wp_get_attachment_image_src($current_logo_id, 'full');
+            if ($logo_attributes) {
+                $logo_url = $logo_attributes[0];
             }
         }
 
@@ -587,6 +599,33 @@ function gs_render_custom_dashboard_screen()
         
         echo '</div>'; // End input group
         echo '</div>'; // End form row
+
+        // Site Logo
+        echo '<div class="gs-settings-form-row">';
+        echo '<label>' . esc_html__('Site Logo', 'gend-society') . '</label>';
+        echo '<div class="gs-settings-input-group">';
+        
+        echo '<div class="gs-app-icon-preview" style="height: 120px; background: rgba(0,0,0,0.1); border: 1px dashed rgba(255,255,255,0.1);">';
+        echo '<div id="gs-site-logo-preview-div" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;">';
+        if ($logo_url) {
+            echo '<img src="' . esc_url($logo_url) . '" alt="Site Logo" id="gs-site-logo-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">';
+        } else {
+            echo '<span class="dashicons dashicons-format-image" style="font-size: 48px; width: 48px; height: 48px; color: rgba(255,255,255,0.2);" id="gs-site-logo-dashicon"></span>';
+            echo '<img src="" alt="Site Logo" id="gs-site-logo-img" style="display:none; max-width: 100%; max-height: 100%; object-fit: contain;">';
+        }
+        echo '</div>';
+        echo '</div>';
+        
+        echo '<div class="gs-app-icon-actions">';
+        echo '<button type="button" class="gs-btn gs-btn-secondary" id="gs-site-logo-upload-btn" style="background:#fff; color:#0073aa; border:none; border-radius:2px; font-weight:normal;">' . esc_html__('Change Site Logo', 'gend-society') . '</button>';
+        echo '<a href="#" class="gs-app-icon-remove" id="gs-site-logo-remove-btn" ' . ($logo_url ? '' : 'style="display:none;"') . '>' . esc_html__('Remove Site Logo', 'gend-society') . '</a>';
+        echo '</div>';
+        
+        echo '<input type="hidden" id="gs_site_logo_id" name="gs_site_logo" value="' . esc_attr($current_logo_id) . '">';
+        echo '<p class="gs-settings-help-text">The Site Logo is typically displayed in the header of your website. Most themes work best with a landscape or square logo.</p>';
+        
+        echo '</div>'; // End input group
+        echo '</div>'; // End form row
         
         echo '<div style="margin-top: 30px;">';
         echo '<button type="submit" class="gs-btn">' . esc_html__('Save Settings', 'gend-society') . '</button>';
@@ -629,6 +668,34 @@ function gs_render_custom_dashboard_screen()
                 });
                 mediaUploader.open();
             });
+
+            var logoUploader;
+            $('#gs-site-logo-upload-btn').click(function(e) {
+                e.preventDefault();
+                if (logoUploader) {
+                    logoUploader.open();
+                    return;
+                }
+                logoUploader = wp.media.frames.file_frame = wp.media({
+                    title: 'Choose Site Logo',
+                    button: {
+                        text: 'Select Logo'
+                    },
+                    multiple: false
+                });
+                logoUploader.on('select', function() {
+                    var attachment = logoUploader.state().get('selection').first().toJSON();
+                    $('#gs_site_logo_id').val(attachment.id);
+                    
+                    var imgUrl = attachment.sizes && attachment.sizes.full ? attachment.sizes.full.url : attachment.url;
+                    
+                    $('#gs-site-logo-img').attr('src', imgUrl).show();
+                    $('#gs-site-logo-dashicon').hide();
+                    
+                    $('#gs-site-logo-remove-btn').show();
+                });
+                logoUploader.open();
+            });
             
             $('#gs-app-icon-remove-btn').click(function(e){
                 e.preventDefault();
@@ -639,6 +706,16 @@ function gs_render_custom_dashboard_screen()
                 
                 $('#gs-app-icon-tab-img').attr('src', '').hide();
                 $('#gs-app-icon-tab-dashicon').show();
+                
+                $(this).hide();
+            });
+
+            $('#gs-site-logo-remove-btn').click(function(e){
+                e.preventDefault();
+                $('#gs_site_logo_id').val('');
+                
+                $('#gs-site-logo-img').attr('src', '').hide();
+                $('#gs-site-logo-dashicon').show();
                 
                 $(this).hide();
             });
