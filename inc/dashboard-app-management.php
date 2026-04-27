@@ -106,20 +106,22 @@ if (!function_exists('gs_get_app_management_html')) {
             }
         }
 
-        // Build deep-link URLs.
+        // Build deep-link URLs — all customer-accessible front-end pages.
+        // /my-account/membership/<id>/ now hosts the inline Domain +
+        // Migration UIs (we replaced the old network-admin deep links
+        // with embedded customer-permissioned shortcodes there).
         $manage_domains_url = '';
         $manage_plan_url    = '';
         $migrate_url        = '';
-        if ($container_site_id > 0) {
-            // Network admin Site Edit anchors for the section IDs we
-            // surface in vendor-app-manager.
-            $manage_domains_url = network_admin_url('admin.php?page=wp-ultimo-edit-site&id=' . $container_site_id . '#gdc_container_domains');
-            $migrate_url        = network_admin_url('admin.php?page=wp-ultimo-edit-site&id=' . $container_site_id . '#gdc_migration');
-        }
         if ($membership && method_exists($membership, 'get_id')) {
-            $manage_plan_url = $network_home . 'my-account/membership/' . (int) $membership->get_id() . '/';
+            $base = $network_home . 'my-account/membership/' . (int) $membership->get_id() . '/';
+            $manage_plan_url    = $base;
+            $manage_domains_url = $base . '#gdc-domain-card';
+            $migrate_url        = $base . '#gdc-migrate-card';
         } elseif ($membership === null) {
-            $manage_plan_url = $network_home . 'my-account/memberships/';
+            $manage_plan_url    = $network_home . 'my-account/memberships/';
+            $manage_domains_url = $manage_plan_url;
+            $migrate_url        = $manage_plan_url;
         }
 
         ob_start();
