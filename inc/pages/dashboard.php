@@ -508,6 +508,15 @@ function gs_render_custom_dashboard_screen()
         echo '</section>';
     }
 
+    // App Management — Domain + Plan upgrade/migrate buttons. Renders on
+    // every dashboard load (works on gend.me with $membership AND on
+    // standalone container sites without one).
+    if (function_exists('gs_get_app_management_html')) {
+        echo '<section class="gs-dashboard__surface" style="margin-top: 32px;">';
+        echo gs_get_app_management_html($membership);
+        echo '</section>';
+    }
+
     // Notice for successful save
     if (isset($_GET['gs_settings_saved']) && $_GET['gs_settings_saved'] == 'true') {
         echo '<div style="background: rgba(0, 163, 42, 0.1); border: 1px solid #00a32a; color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 500;">' . esc_html__('Settings saved successfully.', 'gend-society') . '</div>';
