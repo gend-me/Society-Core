@@ -312,24 +312,106 @@ function gdc_render_profile_header() {
                            class="gdc-action-btn gdc-view-site-btn"
                            target="_blank" rel="noopener">View Site</a>
                         <?php
-                        // Details button — surfaced when the viewer is a
-                        // logged-in customer who's also the group admin
-                        // (i.e., the membership owner from this view's
-                        // perspective). Routes them to /my-account/memberships/
-                        // where the membership-detail popup with all three
-                        // tabs (Orders / Domain / Backups) lives. Cross-page
-                        // deep-link rather than rendering the popup inline
-                        // because the membership modal HTML is only emitted
-                        // on the my-account endpoint render.
-                        $current_uid = get_current_user_id();
-                        $is_admin_viewing_own_admin_group = $current_uid && $admin_group && isset($admin_group->creator_id) && (int) $admin_group->creator_id === $current_uid;
-                        if ($is_admin_viewing_own_admin_group && function_exists('wc_get_account_endpoint_url')) {
-                          $details_url = wc_get_account_endpoint_url('memberships');
-                          ?>
-                          <a href="<?php echo esc_url( $details_url ); ?>"
-                             class="gdc-action-btn gdc-details-btn"
-                             style="margin-left:8px;background:rgba(120,87,255,.18);color:#c4b5fd;border:1px solid rgba(167,139,250,.35);">Details</a>
-                          <?php
+                        // Details button — surfaced when the viewer is the
+                        // group's creator (membership owner). Opens the
+                        // existing /my-account/memberships/ detail popup
+                        // INLINE on the profile page by fetching the
+                        // gdc_membership_modal AJAX endpoint (which already
+                        // renders the popup HTML for the memberships
+                        // index page) and injecting it into a body-portaled
+                        // overlay container.
+                        $current_uid  = get_current_user_id();
+                        $is_owner     = $current_uid && $admin_group && isset($admin_group->creator_id) && (int) $admin_group->creator_id === $current_uid;
+                        $details_mid  = 0;
+                        if ($is_owner && function_exists('wu_get_current_customer')) {
+                            $cust = wu_get_current_customer();
+                            if ($cust && method_exists($cust, 'get_memberships')) {
+                                $mems = (array) $cust->get_memberships();
+                                if (!empty($mems)) {
+                                    $first_mem = reset($mems);
+                                    if ($first_mem && method_exists($first_mem, 'get_id')) {
+                                        $details_mid = (int) $first_mem->get_id();
+                                    }
+                                }
+                            }
+                        }
+                        if ($details_mid) {
+                            $details_nonce = wp_create_nonce('gdc_membership_modal');
+                            $details_ajax  = admin_url('admin-ajax.php');
+                            ?>
+                            <button type="button"
+                                    class="gdc-action-btn gdc-details-btn"
+                                    data-gdc-open-details="1"
+                                    data-membership-id="<?php echo esc_attr($details_mid); ?>"
+                                    data-nonce="<?php echo esc_attr($details_nonce); ?>"
+                                    data-ajax="<?php echo esc_attr($details_ajax); ?>"
+                                    style="margin-left:8px;background:rgba(120,87,255,.18);color:#c4b5fd;border:1px solid rgba(167,139,250,.35);cursor:pointer;">Details</button>
+                            <script>
+                            (function(){
+                              if (window.__gdcProfileDetailsBound) return;
+                              window.__gdcProfileDetailsBound = true;
+
+                              function executeScripts(container) {
+                                if (!container) return;
+                                container.querySelectorAll('script').forEach(function(old){
+                                  var s = document.createElement('script');
+                                  Array.prototype.slice.call(old.attributes || []).forEach(function(a){ s.setAttribute(a.name, a.value); });
+                                  if (old.src) { s.src = old.src; s.async = false; } else { s.textContent = old.textContent || ''; }
+                                  old.parentNode.replaceChild(s, old);
+                                });
+                              }
+
+                              function ensureOverlay() {
+                                var existing = document.getElementById('gdc-profile-details-overlay');
+                                if (existing) { existing.remove(); }
+                                var overlay = document.createElement('div');
+                                overlay.id = 'gdc-profile-details-overlay';
+                                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;background:rgba(2,8,23,.85);backdrop-filter:blur(6px);overflow:auto;';
+                                overlay.addEventListener('click', function(ev){ if (ev.target === overlay) { overlay.remove(); } });
+                                var dialog = document.createElement('div');
+                                dialog.style.cssText = 'position:relative;width:min(1100px,100%);background:#0a1019;border-radius:20px;color:#e2e8f0;box-shadow:0 60px 160px rgba(0,0,0,.6),0 0 0 1px rgba(148,163,184,.18);overflow:hidden;';
+                                var closeBtn = document.createElement('button');
+                                closeBtn.type = 'button';
+                                closeBtn.textContent = '×';
+                                closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(15,23,42,.7);color:#f1f5f9;border:1px solid rgba(148,163,184,.3);width:32px;height:32px;border-radius:999px;cursor:pointer;font-size:18px;line-height:1;z-index:2;';
+                                closeBtn.addEventListener('click', function(){ overlay.remove(); });
+                                dialog.appendChild(closeBtn);
+                                var body = document.createElement('div');
+                                body.id = 'gdc-profile-details-body';
+                                body.style.cssText = 'padding:24px 28px;color:#e2e8f0;';
+                                body.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">Loading membership details...</p>';
+                                dialog.appendChild(body);
+                                overlay.appendChild(dialog);
+                                document.body.appendChild(overlay);
+                                return body;
+                              }
+
+                              document.addEventListener('click', function(ev){
+                                var btn = ev.target && ev.target.closest && ev.target.closest('[data-gdc-open-details="1"]');
+                                if (!btn) return;
+                                ev.preventDefault();
+                                var mid   = btn.getAttribute('data-membership-id') || '';
+                                var nonce = btn.getAttribute('data-nonce')         || '';
+                                var ajax  = btn.getAttribute('data-ajax')          || '/wp-admin/admin-ajax.php';
+                                if (!mid) return;
+                                var body = ensureOverlay();
+                                var fd = new FormData();
+                                fd.append('action', 'gdc_membership_modal');
+                                fd.append('nonce', nonce);
+                                fd.append('membership_id', mid);
+                                fetch(ajax, { method: 'POST', credentials: 'same-origin', body: fd })
+                                  .then(function(r){ return r.text(); })
+                                  .then(function(html){
+                                    body.innerHTML = html;
+                                    executeScripts(body);
+                                  })
+                                  .catch(function(err){
+                                    body.innerHTML = '<p style="color:#fca5a5;text-align:center;padding:40px;">Could not load details: ' + (err && err.message ? err.message : err) + '</p>';
+                                  });
+                              });
+                            })();
+                            </script>
+                            <?php
                         }
                         ?>
                     </div>
