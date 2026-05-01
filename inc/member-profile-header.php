@@ -351,63 +351,49 @@ function gdc_render_profile_header() {
                               if (window.__gdcProfileDetailsBound) return;
                               window.__gdcProfileDetailsBound = true;
 
-                              function executeScripts(container) {
-                                if (!container) return;
-                                container.querySelectorAll('script').forEach(function(old){
-                                  var s = document.createElement('script');
-                                  Array.prototype.slice.call(old.attributes || []).forEach(function(a){ s.setAttribute(a.name, a.value); });
-                                  if (old.src) { s.src = old.src; s.async = false; } else { s.textContent = old.textContent || ''; }
-                                  old.parentNode.replaceChild(s, old);
-                                });
-                              }
-
-                              function ensureOverlay() {
-                                var existing = document.getElementById('gdc-profile-details-overlay');
-                                if (existing) { existing.remove(); }
-                                var overlay = document.createElement('div');
-                                overlay.id = 'gdc-profile-details-overlay';
-                                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:flex-start;justify-content:center;padding:40px 20px;background:rgba(2,8,23,.85);backdrop-filter:blur(6px);overflow:auto;';
-                                overlay.addEventListener('click', function(ev){ if (ev.target === overlay) { overlay.remove(); } });
-                                var dialog = document.createElement('div');
-                                dialog.style.cssText = 'position:relative;width:min(1100px,100%);background:#0a1019;border-radius:20px;color:#e2e8f0;box-shadow:0 60px 160px rgba(0,0,0,.6),0 0 0 1px rgba(148,163,184,.18);overflow:hidden;';
-                                var closeBtn = document.createElement('button');
-                                closeBtn.type = 'button';
-                                closeBtn.textContent = '×';
-                                closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(15,23,42,.7);color:#f1f5f9;border:1px solid rgba(148,163,184,.3);width:32px;height:32px;border-radius:999px;cursor:pointer;font-size:18px;line-height:1;z-index:2;';
-                                closeBtn.addEventListener('click', function(){ overlay.remove(); });
-                                dialog.appendChild(closeBtn);
-                                var body = document.createElement('div');
-                                body.id = 'gdc-profile-details-body';
-                                body.style.cssText = 'padding:24px 28px;color:#e2e8f0;';
-                                body.innerHTML = '<p style="text-align:center;padding:40px;color:#94a3b8;">Loading membership details...</p>';
-                                dialog.appendChild(body);
-                                overlay.appendChild(dialog);
-                                document.body.appendChild(overlay);
-                                return body;
-                              }
-
                               document.addEventListener('click', function(ev){
                                 var btn = ev.target && ev.target.closest && ev.target.closest('[data-gdc-open-details="1"]');
                                 if (!btn) return;
                                 ev.preventDefault();
-                                var mid   = btn.getAttribute('data-membership-id') || '';
-                                var nonce = btn.getAttribute('data-nonce')         || '';
-                                var ajax  = btn.getAttribute('data-ajax')          || '/wp-admin/admin-ajax.php';
+                                var mid = btn.getAttribute('data-membership-id') || '';
                                 if (!mid) return;
-                                var body = ensureOverlay();
-                                var fd = new FormData();
-                                fd.append('action', 'gdc_membership_modal');
-                                fd.append('nonce', nonce);
-                                fd.append('membership_id', mid);
-                                fetch(ajax, { method: 'POST', credentials: 'same-origin', body: fd })
-                                  .then(function(r){ return r.text(); })
-                                  .then(function(html){
-                                    body.innerHTML = html;
-                                    executeScripts(body);
-                                  })
-                                  .catch(function(err){
-                                    body.innerHTML = '<p style="color:#fca5a5;text-align:center;padding:40px;">Could not load details: ' + (err && err.message ? err.message : err) + '</p>';
-                                  });
+
+                                var existing = document.getElementById('gdc-profile-details-overlay');
+                                if (existing) { existing.remove(); }
+
+                                // Iframe the /my-account/memberships/ page with a
+                                // query arg that auto-opens the requested
+                                // membership's detail modal. The same modal +
+                                // tabs + buttons + checkout popup the user gets
+                                // when visiting the page directly — no
+                                // re-rendering, no re-implementing.
+                                var memUrl = '<?php echo esc_js( wc_get_account_endpoint_url('memberships') ); ?>';
+                                var sep = memUrl.indexOf('?') === -1 ? '?' : '&';
+                                var iframeUrl = memUrl + sep + 'gdc_open_modal=' + encodeURIComponent(mid);
+
+                                var overlay = document.createElement('div');
+                                overlay.id = 'gdc-profile-details-overlay';
+                                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,8,23,.85);backdrop-filter:blur(6px);';
+                                overlay.addEventListener('click', function(e){ if (e.target === overlay) overlay.remove(); });
+
+                                var dialog = document.createElement('div');
+                                dialog.style.cssText = 'position:relative;width:min(1200px,100%);height:min(92vh,1000px);background:#0a1019;border-radius:20px;overflow:hidden;box-shadow:0 60px 160px rgba(0,0,0,.6),0 0 0 1px rgba(148,163,184,.2);display:flex;flex-direction:column;';
+
+                                var closeBtn = document.createElement('button');
+                                closeBtn.type = 'button';
+                                closeBtn.textContent = '×';
+                                closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(15,23,42,.85);color:#f1f5f9;border:1px solid rgba(148,163,184,.3);width:34px;height:34px;border-radius:999px;cursor:pointer;font-size:20px;line-height:1;z-index:2;';
+                                closeBtn.addEventListener('click', function(){ overlay.remove(); });
+                                dialog.appendChild(closeBtn);
+
+                                var iframe = document.createElement('iframe');
+                                iframe.src = iframeUrl;
+                                iframe.setAttribute('title', 'Membership details');
+                                iframe.style.cssText = 'border:0;width:100%;flex:1;background:#0a1019;';
+                                dialog.appendChild(iframe);
+
+                                overlay.appendChild(dialog);
+                                document.body.appendChild(overlay);
                               });
                             })();
                             </script>
