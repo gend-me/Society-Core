@@ -311,6 +311,27 @@ function gdc_render_profile_header() {
                         <a href="<?php echo esc_url( $admin_group_app ); ?>"
                            class="gdc-action-btn gdc-view-site-btn"
                            target="_blank" rel="noopener">View Site</a>
+                        <?php
+                        // Details button — surfaced when the viewer is a
+                        // logged-in customer who's also the group admin
+                        // (i.e., the membership owner from this view's
+                        // perspective). Routes them to /my-account/memberships/
+                        // where the membership-detail popup with all three
+                        // tabs (Orders / Domain / Backups) lives. Cross-page
+                        // deep-link rather than rendering the popup inline
+                        // because the membership modal HTML is only emitted
+                        // on the my-account endpoint render.
+                        $current_uid = get_current_user_id();
+                        $is_admin_viewing_own_admin_group = $current_uid && $admin_group && isset($admin_group->creator_id) && (int) $admin_group->creator_id === $current_uid;
+                        if ($is_admin_viewing_own_admin_group && function_exists('wc_get_account_endpoint_url')) {
+                          $details_url = wc_get_account_endpoint_url('memberships');
+                          ?>
+                          <a href="<?php echo esc_url( $details_url ); ?>"
+                             class="gdc-action-btn gdc-details-btn"
+                             style="margin-left:8px;background:rgba(120,87,255,.18);color:#c4b5fd;border:1px solid rgba(167,139,250,.35);">Details</a>
+                          <?php
+                        }
+                        ?>
                     </div>
                 </div>
                 <?php endif; ?>
