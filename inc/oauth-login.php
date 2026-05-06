@@ -409,7 +409,18 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     }
     $http_code = (int) wp_remote_retrieve_response_code( $resp );
     $raw_body  = (string) wp_remote_retrieve_body( $resp );
-    $token     = json_decode( $raw_body, true );
+    // gend.me's WP-OAuth Server prefixes its JSON responses with a
+    // UTF-8 BOM (\xEF\xBB\xBF) — likely a stray echo / BOM-saved file
+    // somewhere on the server. PHP's json_decode returns null on BOM-
+    // prefixed input. Strip + retry. Same workaround Leo's
+    // aipa_oauth_exchange already uses for the same endpoint.
+    $clean_body = trim( str_replace( "\xEF\xBB\xBF", '', $raw_body ) );
+    $token      = json_decode( $clean_body, true );
+    // Belt-and-suspenders: if there's still leading garbage, regex out
+    // the first {…} JSON object.
+    if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $clean_body, $m ) ) {
+        $token = json_decode( $m[1], true );
+    }
     if ( ! is_array( $token ) || empty( $token['access_token'] ) ) {
         // Surface the gend.me-side error verbatim so the on-page toast
         // shows e.g. "invalid_client: client authentication failed"
@@ -445,7 +456,15 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     if ( is_wp_error( $info_resp ) ) {
         return new WP_Error( 'userinfo_failed', $info_resp->get_error_message(), array( 'status' => 502 ) );
     }
-    $info = json_decode( (string) wp_remote_retrieve_body( $info_resp ), true );
+    // Same BOM workaround as the token exchange — gend.me's WP-OAuth
+    // userinfo endpoint emits the same prefix and json_decode chokes
+    // on BOM-prefixed input.
+    $info_raw   = (string) wp_remote_retrieve_body( $info_resp );
+    $info_clean = trim( str_replace( "\xEF\xBB\xBF", '', $info_raw ) );
+    $info       = json_decode( $info_clean, true );
+    if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $info_clean, $m ) ) {
+        $info = json_decode( $m[1], true );
+    }
     $email = '';
     if ( is_array( $info ) ) {
         // Different OAuth servers shape userinfo differently — try the
