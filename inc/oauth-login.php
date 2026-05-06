@@ -380,17 +380,28 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     }
 
     // ── Exchange code → token ───────────────────────────────────────────
+    // RFC 6749 §2.3.1 prefers HTTP Basic Auth for confidential clients;
+    // many OAuth servers (including some WP-OAuth Server versions) only
+    // accept credentials this way and return invalid_client when they're
+    // sent as body params. Send via Basic Auth header AND keep client_id
+    // in the body — some servers route by client_id from the body even
+    // when the secret comes from the header.
     $token_body = array(
         'grant_type'    => 'authorization_code',
         'code'          => $code,
         'redirect_uri'  => $hub_url . '/oauth-bridge/',
         'client_id'     => $client_id,
-        'client_secret' => $client_secret,
     );
     if ( $verifier !== '' ) $token_body['code_verifier'] = $verifier;
 
+    $token_headers = array();
+    if ( $client_secret !== '' ) {
+        $token_headers['Authorization'] = 'Basic ' . base64_encode( $client_id . ':' . $client_secret );
+    }
+
     $resp = wp_remote_post( $hub_url . '/oauth/token', array(
         'timeout' => 15,
+        'headers' => $token_headers,
         'body'    => $token_body,
     ) );
     if ( is_wp_error( $resp ) ) {
