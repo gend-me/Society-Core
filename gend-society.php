@@ -40,8 +40,20 @@ require_once GS_DIR . 'inc/member-profile-pages.php';
 // Member profile header (terminal-style header + nav bar)
 require_once GS_DIR . 'inc/member-profile-header.php';
 
+// Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL)
+require_once GS_DIR . 'inc/profile-invite.php';
+require_once GS_DIR . 'inc/profile-invite-oauth.php';
+require_once GS_DIR . 'inc/profile-invite-settings.php';
+
 // Custom Login Styling
 require_once GS_DIR . 'inc/login-style.php';
+
+// OAuth login replacement — replaces wp-login.php with a "Sign in with
+// gend.me" flow on every site that has gend-society active EXCEPT
+// gend.me itself. Plays nice with login-style.php (CSS + animations
+// still apply on action=lostpassword/register where we fall through
+// to the native form).
+require_once GS_DIR . 'inc/oauth-login.php';
 
 // gend.me portal handshake + support access + feature gating
 require_once GS_DIR . 'inc/portal-connect.php';
