@@ -40,10 +40,20 @@ require_once GS_DIR . 'inc/member-profile-pages.php';
 // Member profile header (terminal-style header + nav bar)
 require_once GS_DIR . 'inc/member-profile-header.php';
 
-// Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL)
-require_once GS_DIR . 'inc/profile-invite.php';
-require_once GS_DIR . 'inc/profile-invite-oauth.php';
-require_once GS_DIR . 'inc/profile-invite-settings.php';
+// Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
+// Optional — file_exists guard so the plugin still activates when these
+// modules aren't shipped on this branch (caught in production where
+// gend-society.php hard-required them but they weren't in the build,
+// fataling activation cluster-wide).
+foreach ( array(
+    'inc/profile-invite.php',
+    'inc/profile-invite-oauth.php',
+    'inc/profile-invite-settings.php',
+) as $gs_optional_file ) {
+    if ( file_exists( GS_DIR . $gs_optional_file ) ) {
+        require_once GS_DIR . $gs_optional_file;
+    }
+}
 
 // Custom Login Styling
 require_once GS_DIR . 'inc/login-style.php';
