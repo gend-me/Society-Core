@@ -509,6 +509,24 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
         );
     }
 
+    // ── Owner-email auto-promote ───────────────────────────────────────
+    // GDC_OWNER_EMAIL is baked into the customer container by the gend.me
+    // listener (membership customer's email). When the OAuth user matches,
+    // ensure they have administrator — covers the migration case where
+    // the source DB had bbp_keymaster but no administrator role, AND the
+    // common case where a customer signs up fresh and wp_users hasn't
+    // been seeded yet. The grant is idempotent (add_role no-ops if the
+    // user already has it).
+    $owner_email = strtolower( trim( gs_oauth_config_value( 'GDC_OWNER_EMAIL', '' ) ) );
+    if ( $owner_email !== '' && strtolower( $email ) === $owner_email ) {
+        if ( ! in_array( 'administrator', (array) $user->roles, true ) ) {
+            $user->add_role( 'administrator' );
+            // Refresh the in-memory user so capability checks downstream
+            // see the new role without a re-fetch.
+            $user = get_user_by( 'id', $user->ID );
+        }
+    }
+
     // ── Save tokens for downstream plugins (Leo, contracts, etc.) ──────
     update_user_meta( $user->ID, 'gend_oauth_token', $access_token );
     if ( $refresh_token !== '' ) {
