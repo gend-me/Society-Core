@@ -42,29 +42,48 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 // ────────────────────────────────────────────────────────────────────────
 
 /**
- * Hub URL — defaults to https://gend.me. Override via the
- * GDC_OAUTH_HUB_URL constant (in wp-config.php) or the
- * aipa_central_hub_url site option (set by the Leo plugin).
+ * Read GDC_OAUTH_* configuration in priority order:
+ *   1. wp-config.php constant (definitive override)
+ *   2. environment variable (set by the K8s Composition's per-namespace
+ *      gend-oauth-credentials Secret — every fresh customer container
+ *      gets one wired in automatically)
+ *   3. legacy site option (aipa_*) the Leo plugin used to set
+ *
+ * The env-var path is what makes "no manual steps for new customer
+ * signups" work: gend.me's listener writes the OAuth client_id +
+ * secret into a per-namespace Secret on claim creation, the Deployment
+ * mounts it as envFrom, and oauth-login.php picks it up here.
  */
-function gs_oauth_hub_url(): string {
-    if ( defined( 'GDC_OAUTH_HUB_URL' ) && GDC_OAUTH_HUB_URL ) {
-        return rtrim( (string) GDC_OAUTH_HUB_URL, '/' );
+function gs_oauth_config_value( string $constant, string $legacy_option, string $default = '' ): string {
+    if ( defined( $constant ) && constant( $constant ) ) {
+        return (string) constant( $constant );
     }
-    return rtrim( (string) get_site_option( 'aipa_central_hub_url', 'https://gend.me' ), '/' );
+    $env = getenv( $constant );
+    if ( $env !== false && $env !== '' ) {
+        return (string) $env;
+    }
+    // $_SERVER fallback — some PHP-FPM pools set clear_env=yes which
+    // strips getenv() but still passes vars through Apache/$_SERVER.
+    if ( isset( $_SERVER[ $constant ] ) && $_SERVER[ $constant ] !== '' ) {
+        return (string) $_SERVER[ $constant ];
+    }
+    if ( $legacy_option !== '' ) {
+        $stored = (string) get_site_option( $legacy_option, '' );
+        if ( $stored !== '' ) return $stored;
+    }
+    return $default;
+}
+
+function gs_oauth_hub_url(): string {
+    return rtrim( gs_oauth_config_value( 'GDC_OAUTH_HUB_URL', 'aipa_central_hub_url', 'https://gend.me' ), '/' );
 }
 
 function gs_oauth_client_id(): string {
-    if ( defined( 'GDC_OAUTH_CLIENT_ID' ) && GDC_OAUTH_CLIENT_ID ) {
-        return (string) GDC_OAUTH_CLIENT_ID;
-    }
-    return (string) get_site_option( 'aipa_oauth_client_id', '' );
+    return gs_oauth_config_value( 'GDC_OAUTH_CLIENT_ID', 'aipa_oauth_client_id' );
 }
 
 function gs_oauth_client_secret(): string {
-    if ( defined( 'GDC_OAUTH_CLIENT_SECRET' ) && GDC_OAUTH_CLIENT_SECRET ) {
-        return (string) GDC_OAUTH_CLIENT_SECRET;
-    }
-    return (string) get_site_option( 'aipa_oauth_client_secret', '' );
+    return gs_oauth_config_value( 'GDC_OAUTH_CLIENT_SECRET', 'aipa_oauth_client_secret' );
 }
 
 /**
