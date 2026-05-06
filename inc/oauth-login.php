@@ -277,11 +277,14 @@ function gs_oauth_render_login_page() {
                     return;
                 }
 
+                var gotMessage = false;
                 function onMessage(ev) {
                     if (ev.origin !== hubUrl) return;
                     var d = ev.data;
                     if (!d || d.type !== 'gend_oauth') return;
                     if (d.state && d.state !== state) return;
+                    gotMessage = true;
+                    if (typeof watchdog !== 'undefined') clearInterval(watchdog);
                     window.removeEventListener('message', onMessage);
                     try { popup.close(); } catch (_) {}
 
@@ -314,7 +317,7 @@ function gs_oauth_render_login_page() {
                 var watchdog = setInterval(function () {
                     if (popup.closed) {
                         clearInterval(watchdog);
-                        if (btn.disabled) {
+                        if (btn.disabled && !gotMessage) {
                             window.removeEventListener('message', onMessage);
                             showError('Login window was closed before authorization completed.');
                         }
@@ -393,9 +396,24 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     if ( is_wp_error( $resp ) ) {
         return new WP_Error( 'exchange_failed', $resp->get_error_message(), array( 'status' => 502 ) );
     }
-    $token = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
+    $http_code = (int) wp_remote_retrieve_response_code( $resp );
+    $raw_body  = (string) wp_remote_retrieve_body( $resp );
+    $token     = json_decode( $raw_body, true );
     if ( ! is_array( $token ) || empty( $token['access_token'] ) ) {
-        $msg = isset( $token['error_description'] ) ? $token['error_description'] : ( $token['error'] ?? 'Token exchange failed.' );
+        // Surface the gend.me-side error verbatim so the on-page toast
+        // shows e.g. "invalid_client: client authentication failed"
+        // instead of a generic "Token exchange failed."
+        $msg = '';
+        if ( is_array( $token ) ) {
+            if ( ! empty( $token['error_description'] ) ) $msg = (string) $token['error_description'];
+            elseif ( ! empty( $token['error'] ) )         $msg = (string) $token['error'];
+        }
+        if ( $msg === '' ) {
+            $snip = substr( trim( $raw_body ), 0, 200 );
+            $msg  = 'Token exchange failed (HTTP ' . $http_code . ')' . ( $snip !== '' ? ': ' . $snip : '.' );
+        } else {
+            $msg = 'Token exchange failed (HTTP ' . $http_code . '): ' . $msg;
+        }
         return new WP_Error( 'exchange_failed', $msg, array( 'status' => 502 ) );
     }
     $access_token  = (string) $token['access_token'];
