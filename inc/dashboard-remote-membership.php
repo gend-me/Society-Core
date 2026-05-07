@@ -263,7 +263,9 @@ function gs_render_membership_panel( $payload = null ) {
         .gs-mship-step.is-done .dot { background: #00b450; border-color: #00b450; box-shadow: 0 0 12px rgba(0,180,80,0.5); }
         .gs-mship-step .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gs-muted); }
         .gs-mship-step.is-done .label { color: #4ee68a; }
-        .gs-mship-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 24px; }
+        .gs-mship-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
+        @media (max-width: 1100px) { .gs-mship-grid { grid-template-columns: repeat(2, 1fr); } }
+        @media (max-width: 600px)  { .gs-mship-grid { grid-template-columns: 1fr; } }
         .gs-mship-cell { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px; }
         .gs-mship-cell h3 { margin: 0 0 12px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gs-muted); text-align: center; }
         .gs-mship-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 0.85rem; }
@@ -374,10 +376,9 @@ function gs_render_membership_panel( $payload = null ) {
                     </div>
                     <?php if ( $g_link !== '' ) : ?>
                         <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link ); ?>" target="_blank" rel="noopener">⌕ <?php esc_html_e( 'Members', 'gend-society' ); ?> <?php if ( isset( $group['members_count'] ) ) echo (int) $group['members_count']; ?></a>
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'projects/' ); ?>" target="_blank" rel="noopener">▤ <?php esc_html_e( 'Projects', 'gend-society' ); ?></a>
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'files/' ); ?>" target="_blank" rel="noopener">▣ <?php esc_html_e( 'Files', 'gend-society' ); ?></a>
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'messages/' ); ?>" target="_blank" rel="noopener">✉ <?php esc_html_e( 'Messages', 'gend-society' ); ?></a>
+                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'proposals/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Proposals', 'gend-society' ); ?></a>
+                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'projects/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Projects', 'gend-society' ); ?></a>
+                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'payments/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Payments', 'gend-society' ); ?></a>
                         </div>
                     <?php endif; ?>
                 <?php else : ?>
@@ -691,7 +692,9 @@ function gs_membership_payload_from_local( $membership ) {
         return wp_date( get_option( 'date_format' ) . ' g:i a', $ts );
     };
 
-    // Plans
+    // Plans — for hosting we pick the highest-priced product as the
+    // main tier (multi-product memberships have main tier + storage
+    // upgrades; the main tier almost always has the higher amount).
     $dash_plan = null;
     $host_plan = null;
     $all = method_exists( $membership, 'get_all_products' ) ? (array) $membership->get_all_products() : array();
@@ -700,7 +703,13 @@ function gs_membership_payload_from_local( $membership ) {
         if ( ! $prod || ! is_object( $prod ) || ! method_exists( $prod, 'get_group' ) ) continue;
         $g = (string) $prod->get_group();
         if ( $g === 'dashboard' && ! $dash_plan ) $dash_plan = $prod;
-        if ( $g === 'hosting'   && ! $host_plan ) $host_plan = $prod;
+        if ( $g === 'hosting' ) {
+            if ( ! $host_plan ) {
+                $host_plan = $prod;
+            } elseif ( method_exists( $prod, 'get_amount' ) && method_exists( $host_plan, 'get_amount' ) && (float) $prod->get_amount() > (float) $host_plan->get_amount() ) {
+                $host_plan = $prod;
+            }
+        }
     }
     if ( ! $dash_plan && method_exists( $membership, 'get_plan' ) ) {
         $dash_plan = $membership->get_plan();

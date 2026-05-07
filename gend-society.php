@@ -71,3 +71,7 @@ require_once GS_DIR . 'inc/oauth-login.php';
 require_once GS_DIR . 'inc/portal-connect.php';
 require_once GS_DIR . 'inc/support-access.php';
 require_once GS_DIR . 'inc/feature-gates.php';
+
+// Feature-access upgrade prompt page — shown when a customer hits a
+// wp-admin area their current Dashboard plan doesn't include.
+require_once GS_DIR . 'inc/pages/feature-upgrade.php';
