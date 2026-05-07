@@ -25,6 +25,56 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+if (!function_exists('gs_dashboard_hub_url')) {
+
+    /**
+     * Resolve the gend.me hub URL for deep-linking from a customer's
+     * dashboard. Order of preference:
+     *
+     *   1. gs_oauth_hub_url() — the OAuth hub URL we baked into the
+     *      container via the gend-oauth-credentials Secret. Set on
+     *      every container, so this is the right answer everywhere
+     *      EXCEPT the gend.me hub itself.
+     *   2. wu_get_main_site_id() + get_blog_option('home') — only
+     *      meaningful when we're on the actual multisite network
+     *      (gend.me itself).
+     *   3. network_home_url() / home_url() — last-ditch fallback.
+     *
+     * Crucial fix: previously this function fell straight to
+     * home_url('/') on container sites, which is the customer's own
+     * site URL — producing "Manage Domains" / "Change Plan" buttons
+     * that pointed at https://customer.gend.me/my-account/... 404s.
+     */
+    function gs_dashboard_hub_url() {
+
+        if (function_exists('gs_oauth_hub_url') && function_exists('gs_oauth_is_hub_site')) {
+            $hub = (string) gs_oauth_hub_url();
+            // Use the OAuth hub URL when we're NOT the hub. On the hub
+            // itself, fall through so links remain local.
+            if ($hub !== '' && !gs_oauth_is_hub_site()) {
+                return trailingslashit($hub);
+            }
+        }
+
+        if (function_exists('wu_get_main_site_id') && function_exists('get_blog_option')) {
+            $main_id = (int) wu_get_main_site_id();
+            $h = (string) get_blog_option($main_id, 'home');
+            if ($h !== '') {
+                return trailingslashit($h);
+            }
+        }
+
+        if (function_exists('network_home_url')) {
+            $h = (string) network_home_url('/');
+            if ($h !== '') {
+                return $h;
+            }
+        }
+
+        return trailingslashit((string) home_url('/'));
+    }
+}
+
 if (!function_exists('gs_get_app_management_html')) {
 
     /**
@@ -37,20 +87,7 @@ if (!function_exists('gs_get_app_management_html')) {
      */
     function gs_get_app_management_html($membership = null) {
 
-        // Resolve the network home URL — used for any deep link back to
-        // gend.me even when we're rendering on a container site.
-        $network_home = '';
-        if (function_exists('wu_get_main_site_id') && function_exists('get_blog_option')) {
-            $main_id = (int) wu_get_main_site_id();
-            $network_home = (string) get_blog_option($main_id, 'home');
-        }
-        if ($network_home === '' && function_exists('network_home_url')) {
-            $network_home = (string) network_home_url('/');
-        }
-        if ($network_home === '') {
-            $network_home = (string) home_url('/');
-        }
-        $network_home = trailingslashit($network_home);
+        $network_home = gs_dashboard_hub_url();
 
         // Pick the customer's container site (where applicable). We need
         // its site_id to deep-link to its Site Edit page on gend.me.
@@ -110,11 +147,29 @@ if (!function_exists('gs_get_app_management_html')) {
         // /my-account/membership/<id>/ now hosts the inline Domain +
         // Migration UIs (we replaced the old network-admin deep links
         // with embedded customer-permissioned shortcodes there).
+        //
+        // On container sites we don't have $membership locally, but we
+        // CAN get the membership_id from the remote-membership payload
+        // (cached). When that's available, deep-link straight to the
+        // customer's specific membership; otherwise list all of them.
         $manage_domains_url = '';
         $manage_plan_url    = '';
         $migrate_url        = '';
+        $remote_mid         = 0;
+        if (!$membership && function_exists('gs_remote_membership_get_cached')) {
+            $remote = gs_remote_membership_get_cached();
+            if (is_array($remote) && !empty($remote['membership_id'])) {
+                $remote_mid = (int) $remote['membership_id'];
+            }
+        }
+
         if ($membership && method_exists($membership, 'get_id')) {
             $base = $network_home . 'my-account/membership/' . (int) $membership->get_id() . '/';
+            $manage_plan_url    = $base;
+            $manage_domains_url = $base . '#gdc-domain-card';
+            $migrate_url        = $base . '#gdc-migrate-card';
+        } elseif ($remote_mid > 0) {
+            $base = $network_home . 'my-account/membership/' . $remote_mid . '/';
             $manage_plan_url    = $base;
             $manage_domains_url = $base . '#gdc-domain-card';
             $migrate_url        = $base . '#gdc-migrate-card';

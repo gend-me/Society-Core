@@ -31,6 +31,7 @@ new GenD_GitHub_Updater(__FILE__, 'gend-me/Society-Core');
 // Dashboard overrides (Standalone)
 require_once GS_DIR . 'inc/dashboard-overview.php';
 require_once GS_DIR . 'inc/dashboard-app-management.php';
+require_once GS_DIR . 'inc/dashboard-remote-membership.php';
 require_once GS_DIR . 'inc/feature-cards.php';
 require_once GS_DIR . 'inc/pages/dashboard.php';
 
@@ -49,6 +50,7 @@ foreach ( array(
     'inc/profile-invite.php',
     'inc/profile-invite-oauth.php',
     'inc/profile-invite-settings.php',
+    'inc/profile-portfolio.php',
 ) as $gs_optional_file ) {
     if ( file_exists( GS_DIR . $gs_optional_file ) ) {
         require_once GS_DIR . $gs_optional_file;

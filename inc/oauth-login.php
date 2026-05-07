@@ -518,13 +518,31 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     // been seeded yet. The grant is idempotent (add_role no-ops if the
     // user already has it).
     $owner_email = strtolower( trim( gs_oauth_config_value( 'GDC_OWNER_EMAIL', '' ) ) );
-    if ( $owner_email !== '' && strtolower( $email ) === $owner_email ) {
+    $is_owner    = $owner_email !== '' && strtolower( $email ) === $owner_email;
+    if ( $is_owner ) {
         if ( ! in_array( 'administrator', (array) $user->roles, true ) ) {
             $user->add_role( 'administrator' );
             // Refresh the in-memory user so capability checks downstream
             // see the new role without a re-fetch.
             $user = get_user_by( 'id', $user->ID );
         }
+    }
+
+    // ── Auto-pair this install with gend.me ────────────────────────────
+    // When the membership owner signs in, ask gend.me for an install
+    // token via /connect-by-install. Replaces the manual pairing-code
+    // paste step (portal-connect.php) for container sites: the OAuth
+    // token already proves who the user is, and the install_id is
+    // already known on both sides. After this, feature-gates.php and
+    // dashboard membership sync work without any operator action.
+    //
+    // No-op when:
+    //   - user isn't the owner (random admin with a matching email
+    //     elsewhere shouldn't claim our install)
+    //   - we're already paired (gs_install_token already populated)
+    //   - we don't have a known install_id (constant or env)
+    if ( $is_owner && function_exists( 'gs_oauth_autopair_install' ) ) {
+        gs_oauth_autopair_install( $hub_url, $access_token );
     }
 
     // ── Save tokens for downstream plugins (Leo, contracts, etc.) ──────
@@ -580,3 +598,115 @@ add_filter( 'lostpassword_url', function ( $url ) {
     if ( ! gs_oauth_should_intercept() ) return $url;
     return gs_oauth_hub_url() . '/wp-login.php?action=lostpassword';
 }, 99 );
+
+// ────────────────────────────────────────────────────────────────────────
+// Auto-pair install (Container sites)
+// ────────────────────────────────────────────────────────────────────────
+
+/**
+ * Resolve the install_id this customer container was provisioned with.
+ * Set by the migration mu-plugin / Composition env. Empty string when
+ * we're not on a known container (e.g. dev box, gend.me hub itself).
+ */
+function gs_oauth_resolve_install_id(): string {
+    if ( defined( 'GDC_CONTAINER_INSTALL_ID' ) && GDC_CONTAINER_INSTALL_ID ) {
+        return (string) GDC_CONTAINER_INSTALL_ID;
+    }
+    $env = getenv( 'GDC_CONTAINER_INSTALL_ID' );
+    if ( $env !== false && $env !== '' ) return (string) $env;
+
+    // Fallback: site option set by the migration runner.
+    $opt = (string) get_option( 'gdc_container_install_id', '' );
+    if ( $opt !== '' ) return $opt;
+
+    return '';
+}
+
+/**
+ * One-shot pairing: POST {install_id, install_url, society_pubkey} to
+ * gend.me's /connect-by-install with the user's OAuth access token,
+ * then persist the returned install_token + signing pubkey under the
+ * same gs_install_* options portal-connect.php uses. Re-runs are
+ * idempotent — already-paired installs short-circuit at the top.
+ *
+ * @param string $hub_url      Hub URL (already has trailing-slash logic applied).
+ * @param string $access_token OAuth access_token from the just-completed exchange.
+ */
+function gs_oauth_autopair_install( string $hub_url, string $access_token ): void {
+
+    if ( $access_token === '' || $hub_url === '' ) return;
+
+    // Already paired? Nothing to do — re-pairing would just rotate
+    // the install token unnecessarily on every login.
+    if ( (string) get_option( 'gs_install_token', '' ) !== '' ) return;
+
+    $install_id = gs_oauth_resolve_install_id();
+    if ( $install_id === '' ) return;
+
+    // Generate or reuse our local Ed25519 keypair (same convention
+    // portal-connect.php uses). Stable across reconnects so gend.me's
+    // signature verification keeps working through token rotations.
+    $keypair_b64 = (string) get_option( 'gs_keypair', '' );
+    $keypair_raw = $keypair_b64 !== '' ? base64_decode( $keypair_b64, true ) : '';
+    if ( ! is_string( $keypair_raw ) || strlen( $keypair_raw ) !== SODIUM_CRYPTO_SIGN_KEYPAIRBYTES ) {
+        $keypair_raw = sodium_crypto_sign_keypair();
+        update_option( 'gs_keypair', base64_encode( $keypair_raw ), false );
+    }
+    $pubkey_b64 = base64_encode( sodium_crypto_sign_publickey( $keypair_raw ) );
+
+    $endpoint = rtrim( $hub_url, '/' ) . '/wp-json/gdc-app-manager/v1/connect-by-install';
+
+    $resp = wp_remote_post( $endpoint, array(
+        'timeout' => 15,
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $access_token,
+            'Content-Type'  => 'application/json',
+            'Accept'        => 'application/json',
+        ),
+        'body' => wp_json_encode( array(
+            'install_id'     => $install_id,
+            'install_url'    => home_url( '/' ),
+            'society_pubkey' => $pubkey_b64,
+        ) ),
+    ) );
+
+    if ( is_wp_error( $resp ) ) {
+        // Auto-pair is opportunistic — log and move on so we don't
+        // block login on a transient gend.me hiccup.
+        error_log( '[gs-oauth] auto-pair failed: ' . $resp->get_error_message() );
+        return;
+    }
+
+    $code = (int) wp_remote_retrieve_response_code( $resp );
+    $raw  = (string) wp_remote_retrieve_body( $resp );
+    $clean = trim( str_replace( "\xEF\xBB\xBF", '', $raw ) );
+    $data  = json_decode( $clean, true );
+    if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $clean, $m ) ) {
+        $data = json_decode( $m[1], true );
+    }
+
+    if ( $code !== 200 || ! is_array( $data ) || empty( $data['install_token'] ) ) {
+        $msg = is_array( $data ) && ! empty( $data['message'] ) ? (string) $data['message'] : substr( $clean, 0, 200 );
+        error_log( '[gs-oauth] auto-pair HTTP ' . $code . ': ' . $msg );
+        return;
+    }
+
+    update_option( 'gs_install_id',     $install_id,                                                       false );
+    update_option( 'gs_install_token',  (string) $data['install_token'],                                   false );
+    update_option( 'gs_gend_base_url',  rtrim( $hub_url, '/' ),                                            false );
+    update_option( 'gs_gend_pubkey',    isset( $data['gend_signing_pubkey'] ) ? (string) $data['gend_signing_pubkey'] : '', false );
+    update_option( 'gs_connected_at',   time(),                                                            false );
+
+    // Pre-warm feature gates so the menu update doesn't lag a render.
+    if ( function_exists( 'gs_features_get_cached' ) ) {
+        delete_option( 'gs_features_cache_expires' );
+        gs_features_get_cached();
+    }
+
+    // Pre-warm remote-membership cache so the dashboard renders Plan
+    // Details on the very first post-login page view.
+    if ( function_exists( 'gs_remote_membership_get_cached' ) ) {
+        delete_option( 'gs_remote_membership_cache_expires' );
+        gs_remote_membership_get_cached();
+    }
+}

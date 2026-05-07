@@ -486,7 +486,19 @@ function gs_render_custom_dashboard_screen()
         $account_section = gs_get_account_overview_html($membership);
     }
 
-    // Fallback if no WP Ultimo module
+    // Container site fallback: no WP Ultimo locally, but auto-pair has
+    // populated gs_install_token via the OAuth login flow. Pull the
+    // same membership/plan/customer payload from gend.me and render
+    // the matching UI so customers see their plan info post-migration.
+    if ($account_section === '' && !$membership && function_exists('gs_remote_membership_get_cached')) {
+        $remote = gs_remote_membership_get_cached();
+        if (is_array($remote) && function_exists('gs_get_remote_account_overview_html')) {
+            $account_section = gs_get_remote_account_overview_html($remote);
+        }
+    }
+
+    // Last-ditch fallback when neither WP Ultimo nor a paired install
+    // is available (dev environments, broken pairing).
     if ($account_section === '' && !$membership && $can_manage_site) {
         $account_section = gs_dashboard_render_admin_users_panel();
     } elseif ($account_section === '' && !$membership) {

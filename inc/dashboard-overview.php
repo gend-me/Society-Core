@@ -73,13 +73,12 @@ if (!function_exists('gs_get_account_overview_html')) {
         echo '</div>';
         echo '</div>';
 
-        // Change Membership button
-        $main_id = function_exists('wu_get_main_site_id') ? (int) wu_get_main_site_id() : (function_exists('get_main_site_id') ? (int) get_main_site_id() : 1);
-        $main_home = function_exists('get_blog_option') ? (string) get_blog_option($main_id, 'home') : (string) get_option('home');
-        if (empty($main_home)) {
-            $main_home = (string) network_home_url('/');
-        }
-        $myacc = trailingslashit(rtrim($main_home, '/') . '/my-account');
+        // Change Membership button — link back to gend.me's /my-account
+        // area. gs_dashboard_hub_url() prefers the OAuth hub URL on
+        // container sites (where wu_get_main_site_id resolves to the
+        // customer's own site, producing broken local links).
+        $hub_home = function_exists('gs_dashboard_hub_url') ? gs_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
+        $myacc = trailingslashit(rtrim($hub_home, '/') . '/my-account');
         $mid = ($membership && method_exists($membership, 'get_id')) ? (int) $membership->get_id() : 0;
 
         if ($mid) {
@@ -104,12 +103,7 @@ if (!function_exists('gs_get_account_overview_html')) {
             $name = method_exists($customer, 'get_display_name') ? $customer->get_display_name() : $username;
             $user_id = method_exists($customer, 'get_user_id') ? (int) $customer->get_user_id() : 0;
 
-            $main_id = function_exists('wu_get_main_site_id') ? (int) wu_get_main_site_id() : (function_exists('get_main_site_id') ? (int) get_main_site_id() : 1);
-            $main_home = function_exists('get_blog_option') ? (string) get_blog_option($main_id, 'home') : (string) get_option('home');
-            if (empty($main_home)) {
-                $main_home = (string) network_home_url('/');
-            }
-            $root = trailingslashit(rtrim($main_home, '/'));
+            $root = function_exists('gs_dashboard_hub_url') ? gs_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
             $profile = $root . 'members/' . rawurlencode($username) . '/';
             $messages_slug = function_exists('bp_get_messages_slug') ? bp_get_messages_slug() : 'messages';
             $msg = $profile . trailingslashit($messages_slug) . 'compose/?r=' . rawurlencode($username);
@@ -207,12 +201,7 @@ if (!function_exists('gs_get_account_overview_html')) {
                 }
             }
 
-            $main_id = function_exists('wu_get_main_site_id') ? (int) wu_get_main_site_id() : (function_exists('get_main_site_id') ? (int) get_main_site_id() : 1);
-            $main_home_link = function_exists('get_blog_option') ? (string) get_blog_option($main_id, 'home') : (string) get_option('home');
-            if (empty($main_home_link)) {
-                $main_home_link = (string) network_home_url('/');
-            }
-            $root = trailingslashit(rtrim($main_home_link, '/'));
+            $root = function_exists('gs_dashboard_hub_url') ? gs_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
             $slug_safe = $slug ? sanitize_title($slug) : (string) $gid;
             $link = $root . 'groups/' . $slug_safe . '/';
 
