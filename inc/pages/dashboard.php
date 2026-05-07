@@ -482,26 +482,32 @@ function gs_render_custom_dashboard_screen()
 
     $membership = gs_dashboard_get_membership();
 
-    if ($membership && function_exists('gs_get_account_overview_html')) {
-        $account_section = gs_get_account_overview_html($membership);
-    }
+    // Single panel renderer used for every site type. Resolves the
+    // membership payload from whichever data source is available:
+    //   1. Local WP Ultimo $membership (gend.me itself / networked
+    //      subsite) — built without a network roundtrip.
+    //   2. Cached remote payload from gend.me's /install/{id}/membership
+    //      (container / self-hosted / paired sites).
+    if (function_exists('gs_render_membership_panel')) {
+        $payload = null;
 
-    // Container site fallback: no WP Ultimo locally, but auto-pair has
-    // populated gs_install_token via the OAuth login flow. Pull the
-    // same membership/plan/customer payload from gend.me and render
-    // the matching UI so customers see their plan info post-migration.
-    if ($account_section === '' && !$membership && function_exists('gs_remote_membership_get_cached')) {
-        $remote = gs_remote_membership_get_cached();
-        if (is_array($remote) && function_exists('gs_get_remote_account_overview_html')) {
-            $account_section = gs_get_remote_account_overview_html($remote);
+        if ($membership && function_exists('gs_membership_payload_from_local')) {
+            $payload = gs_membership_payload_from_local($membership);
+        }
+        if (!is_array($payload) && function_exists('gs_remote_membership_get_cached')) {
+            $payload = gs_remote_membership_get_cached();
+        }
+        if (is_array($payload)) {
+            $account_section = gs_render_membership_panel($payload);
         }
     }
 
-    // Last-ditch fallback when neither WP Ultimo nor a paired install
-    // is available (dev environments, broken pairing).
-    if ($account_section === '' && !$membership && $can_manage_site) {
+    // Last-ditch fallback when neither path produced a payload (dev
+    // environments, broken pairing, brand-new install before first
+    // OAuth login).
+    if ($account_section === '' && $can_manage_site) {
         $account_section = gs_dashboard_render_admin_users_panel();
-    } elseif ($account_section === '' && !$membership) {
+    } elseif ($account_section === '') {
         $account_section = '<div class="notice notice-warning"><p>No active membership found for this site.</p></div>';
     }
 
@@ -513,19 +519,12 @@ function gs_render_custom_dashboard_screen()
     echo '<p class="gs-dashboard__intro">Monitor membership health, manage team access, and spot opportunities to grow your app.</p>';
     echo '</div>';
 
-    // Output the account/membership section
+    // The unified panel includes Domain + Plan + Backups tabs
+    // inline. The legacy App Management / Account Overview cards
+    // are no longer rendered — the panel covers everything they did.
     if ($account_section !== '') {
         echo '<section class="gs-dashboard__surface">';
         echo $account_section;
-        echo '</section>';
-    }
-
-    // App Management — Domain + Plan upgrade/migrate buttons. Renders on
-    // every dashboard load (works on gend.me with $membership AND on
-    // standalone container sites without one).
-    if (function_exists('gs_get_app_management_html')) {
-        echo '<section class="gs-dashboard__surface" style="margin-top: 32px;">';
-        echo gs_get_app_management_html($membership);
         echo '</section>';
     }
 
