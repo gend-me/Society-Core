@@ -403,7 +403,7 @@ function gs_render_membership_panel( $payload = null ) {
                     <?php endif; ?>
                 </div>
                 <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="dashboard" style="width: 100%; margin-top: 12px;">
-                    <?php esc_html_e( 'Change Dashboard Plan', 'gend-society' ); ?>
+                    <?php esc_html_e( 'Change Plan', 'gend-society' ); ?>
                 </button>
             </div>
 
@@ -424,7 +424,7 @@ function gs_render_membership_panel( $payload = null ) {
                     <?php endif; ?>
                 </div>
                 <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="hosting" style="width: 100%; margin-top: 12px;">
-                    <?php esc_html_e( 'Change Hosting Plan', 'gend-society' ); ?>
+                    <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
                 </button>
             </div>
 
