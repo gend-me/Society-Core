@@ -3,11 +3,50 @@ if (!defined('ABSPATH')) {
   exit;
 }
 
-// Enqueue frontend assets for logged-in users with at least 'edit_posts' cap
+// Cached admin-mirror nav for the current request. Used by both the gate and
+// the renderer so we don't rebuild it three times per page.
+function gs_frontend_bar_admin_nav()
+{
+  static $cache = null;
+  if ($cache === null) {
+    $cache = is_user_logged_in() ? gs_build_frontend_nav() : [];
+  }
+  return $cache;
+}
+
+// The sidebar shows when the user is logged in AND (admin-mirror nav has
+// items OR social plugin is active so we can use the profile-mirror nav).
+function gs_frontend_bar_should_show()
+{
+  if (!is_user_logged_in()) {
+    return false;
+  }
+  if (!empty(gs_frontend_bar_admin_nav())) {
+    return true;
+  }
+  return gs_plugin_active('social-network/social-network.php');
+}
+
+// Profile-mirror mode kicks in whenever the admin-mirror nav is empty AND
+// the social plugin is active — covers BOTH "user lacks edit_posts" and
+// "user has edit_posts but no gs_feature_access entries" (the symptom is the
+// same: a logged-in user with no accessible WP-admin menus).
+function gs_frontend_bar_is_profile_mode()
+{
+  if (!is_user_logged_in()) {
+    return false;
+  }
+  if (!gs_plugin_active('social-network/social-network.php')) {
+    return false;
+  }
+  return empty(gs_frontend_bar_admin_nav());
+}
+
+// Enqueue frontend assets for the sidebar.
 add_action('wp_enqueue_scripts', 'gs_enqueue_frontend_assets');
 function gs_enqueue_frontend_assets()
 {
-  if (!is_user_logged_in() || !current_user_can('edit_posts')) {
+  if (!gs_frontend_bar_should_show()) {
     return;
   }
   $v = GS_VERSION . '.' . filemtime(GS_DIR . 'assets/frontend-bar.css');
@@ -62,7 +101,7 @@ function gs_localize_admin_data()
 add_action('wp_footer', 'gs_render_frontend_bar', 5);
 function gs_render_frontend_bar()
 {
-  if (!is_user_logged_in() || !current_user_can('edit_posts')) {
+  if (!gs_frontend_bar_should_show()) {
     return;
   }
 
@@ -96,8 +135,14 @@ function gs_render_frontend_bar()
     }
   }
 
-  // Build the nav items mirroring admin menu
-  $nav_items = gs_build_frontend_nav();
+  // Build the nav items.
+  // - If the admin-mirror nav has items → render those (existing behaviour).
+  // - Otherwise (no accessible WP-admin menus) and social plugin active →
+  //   render the profile-mirror nav.
+  $nav_items = gs_frontend_bar_admin_nav();
+  if (empty($nav_items) && gs_frontend_bar_is_profile_mode()) {
+    $nav_items = gs_build_frontend_profile_nav();
+  }
   ?>
   <div class="gs-front-sidebar" role="navigation" aria-label="<?php esc_attr_e('Admin Sidebar', 'gend-society'); ?>">
 
@@ -144,6 +189,23 @@ function gs_render_frontend_bar()
       <?php endforeach; ?>
     </nav>
 
+    <!-- Mini-Cart trigger (only when WooCommerce is active). Sits just above
+         the user/avatar footer so it visually pairs with the divider line.
+         Reuses the #gs-mini-cart-overlay drawer injected in wp_footer. -->
+    <?php if (function_exists('WC')):
+      $cart       = WC()->cart;
+      $cart_count = $cart ? (int) $cart->get_cart_contents_count() : 0;
+    ?>
+      <div class="gs-sidebar-item gs-sidebar-cart-row" data-gs-animate>
+        <a href="#" class="gs-sidebar-link gs-sidebar-cart-trigger"
+           aria-label="<?php esc_attr_e('Open shopping cart', 'gend-society'); ?>">
+          <span class="gs-sidebar-icon dashicons dashicons-cart">
+            <span class="gs-sidebar-cart-count"<?php echo $cart_count > 0 ? '' : ' style="display:none"'; ?>><?php echo (int) $cart_count; ?></span>
+          </span>
+        </a>
+      </div>
+    <?php endif; ?>
+
     <!-- Footer / User -->
     <div class="gs-sidebar-footer gs-delay-10" data-gs-animate>
       <a href="/members/me" class="gs-sidebar-user">
@@ -161,6 +223,72 @@ function gs_render_frontend_bar()
       </a>
     </div>
   </div>
+
+  <?php if (function_exists('WC')): ?>
+  <style>
+    /* Make the cart icon a positioning context for the count badge. The
+       icon span keeps its own 22x22 / flex-center sizing (defined in
+       frontend-bar.css) so the cart row stays in the same icon column as
+       every other row. The badge floats over the icon's top-right corner. */
+    .gs-sidebar-cart-trigger .gs-sidebar-icon { position: relative; }
+    .gs-sidebar-cart-count {
+      position: absolute;
+      top: -6px;
+      right: -8px;
+      min-width: 16px;
+      height: 16px;
+      padding: 0 4px;
+      background: var(--gs-magenta, #b608c9);
+      color: #fff;
+      font-size: 10px;
+      font-weight: 800;
+      line-height: 16px;
+      border-radius: 999px;
+      text-align: center;
+      box-sizing: border-box;
+      pointer-events: none;
+      /* The parent .gs-sidebar-icon is a dashicons span, so the count text
+         would otherwise inherit the dashicons font and render as a glyph.
+         Force a normal font + reset the dashicons typography. */
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
+    }
+  </style>
+  <script>
+    (function () {
+      // Wire the sidebar cart trigger to the existing #gs-mini-cart-overlay
+      // drawer (injected in wp_footer by gs_inject_mini_cart). Also keep the
+      // count badge in sync with WC's cart-fragments AJAX events.
+      function gsBindSidebarCart () {
+        var trigger = document.querySelector('.gs-sidebar-cart-trigger');
+        var overlay = document.getElementById('gs-mini-cart-overlay');
+        if (!trigger || !overlay || trigger.__gsBound) return;
+        trigger.__gsBound = true;
+        trigger.addEventListener('click', function (e) {
+          e.preventDefault();
+          overlay.classList.toggle('is-open');
+          overlay.setAttribute('aria-hidden', overlay.classList.contains('is-open') ? 'false' : 'true');
+        });
+        document.body.addEventListener('wc_fragments_refreshed', function () {
+          var countEl = trigger.querySelector('.gs-sidebar-cart-count');
+          if (!countEl) return;
+          var items = document.querySelectorAll('#gs-mini-cart-overlay .mini_cart_item');
+          var total = items.length;
+          if (total > 0) {
+            countEl.textContent = total;
+            countEl.style.display = '';
+          } else {
+            countEl.style.display = 'none';
+          }
+        });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', gsBindSidebarCart);
+      } else {
+        gsBindSidebarCart();
+      }
+    })();
+  </script>
+  <?php endif; ?>
   <?php
 }
 
@@ -267,10 +395,12 @@ function gs_build_frontend_nav()
   if (gs_plugin_active('social-network/social-network.php') && current_user_can('manage_options')) {
     $social_children = [
       ['label' => __('Social Profiles', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-network-settings')],
-      ['label' => __('Membership System', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-membership-system')],
     ];
     if (gs_plugin_active('reward-programs/reward-programs.php')) {
-      $social_children[] = ['label' => __('Rewards', 'gend-society'), 'url' => admin_url('admin.php?page=gs-rewards')];
+      $social_children[] = ['label' => __('Point Bank', 'gend-society'), 'url' => admin_url('admin.php?page=gs-rewards')];
+    }
+    if (gs_plugin_active('contracts-and-payments/contracts-and-payments.php')) {
+      $social_children[] = ['label' => __('Contracts & Payments', 'gend-society'), 'url' => admin_url('admin.php?page=gend-contracts-payments')];
     }
     $items[] = [
       'label' => __('Social', 'gend-society'),
@@ -357,6 +487,88 @@ function gs_build_frontend_nav()
   }
 
   return $final_items;
+}
+
+/**
+ * Build the frontend sidebar nav for non-backend users when the social plugin
+ * is active. Mirrors the member profile primary tabs and links each item to
+ * the LOGGED-IN user's own profile section, so the sidebar acts as the user's
+ * personal navigation regardless of which page they're on.
+ *
+ * A "Profile" item is prepended only when the viewer is on another member's
+ * profile — hidden on their own profile (redundant) and on non-profile pages
+ * (per the explicit "shown only when viewing other profiles" rule).
+ */
+function gs_build_frontend_profile_nav()
+{
+  $base = function_exists('bp_loggedin_user_domain') ? bp_loggedin_user_domain() : '';
+  if (!$base) {
+    return [];
+  }
+  $base = trailingslashit($base);
+
+  $bp_active = function_exists('bp_is_active');
+
+  $items = [];
+
+  // Overview (Youzify default landing tab)
+  $items[] = ['label' => __('Overview', 'gend-society'), 'url' => $base, 'icon' => 'dashicons-id'];
+
+  // App Projects (BP Groups → renamed to App Projects)
+  if ($bp_active && bp_is_active('groups')) {
+    $items[] = ['label' => __('App Projects', 'gend-society'), 'url' => $base . 'groups/', 'icon' => 'dashicons-screenoptions'];
+  }
+
+  // Activity
+  if ($bp_active && bp_is_active('activity')) {
+    $items[] = ['label' => __('Activity', 'gend-society'), 'url' => $base . 'activity/', 'icon' => 'dashicons-megaphone'];
+  }
+
+  // Connections (BP Friends)
+  if ($bp_active && bp_is_active('friends')) {
+    $items[] = ['label' => __('Connections', 'gend-society'), 'url' => $base . 'friends/', 'icon' => 'dashicons-networking'];
+  }
+
+  // Wallet (gend-society custom BP tab — registered with slug 'member-wallet'
+  // in member-profile-pages.php via bp_core_new_nav_item, so URL is
+  // /members/<user>/member-wallet/, NOT /wallet/ which 404s).
+  $items[] = ['label' => __('Wallet', 'gend-society'), 'url' => $base . 'member-wallet/', 'icon' => 'dashicons-money-alt'];
+
+  // Visitors (Youzify "Who Viewed My Profile" addon)
+  $items[] = ['label' => __('Visitors', 'gend-society'), 'url' => $base . 'visitors/', 'icon' => 'dashicons-visibility'];
+
+  // Messages
+  if ($bp_active && bp_is_active('messages')) {
+    $items[] = ['label' => __('Messages', 'gend-society'), 'url' => $base . 'messages/', 'icon' => 'dashicons-email'];
+  }
+
+  // Portfolio (Youzify Media tab — renamed to Portfolio).
+  // Lives at /members/<user>/media/ (the Files subnav under Media defaults
+  // to the Media landing page, which is the Portfolio tab).
+  $items[] = ['label' => __('Portfolio', 'gend-society'), 'url' => $base . 'media/', 'icon' => 'dashicons-portfolio'];
+
+  // Settings
+  if ($bp_active && bp_is_active('settings')) {
+    $items[] = ['label' => __('Settings', 'gend-society'), 'url' => $base . 'settings/', 'icon' => 'dashicons-admin-generic'];
+  }
+
+  // "Profile" — only visible when viewing another member's profile.
+  if (function_exists('bp_is_user') && bp_is_user()
+      && function_exists('bp_is_my_profile') && !bp_is_my_profile()) {
+    array_unshift($items, [
+      'label' => __('Profile', 'gend-society'),
+      'url'   => $base,
+      'icon'  => 'dashicons-admin-users',
+    ]);
+  }
+
+  // Match the shape used by gs_build_frontend_nav (renderer expects 'children').
+  foreach ($items as &$it) {
+    $it['children'] = [];
+  }
+  unset($it);
+
+  return $items;
 }
 
 

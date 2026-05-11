@@ -12,12 +12,39 @@ function gs_enqueue_admin_assets()
     wp_enqueue_script('gs-admin-script', GS_URL . 'assets/admin-script.js', [], $ver, true);
 
     $current_user = wp_get_current_user();
+
+    // Always render the gend.me-profile-menu variant of the wp-admin header
+    // for every logged-in user. The links target gend.me/members/me/* which
+    // resolves to whichever account the viewer is signed into on gend.me
+    // (or prompts them to sign in there) — so the same markup works for
+    // OAuth-linked, unlinked, and hub-side users without branching.
+    $is_gend_oauth = true;
+    $hub_url       = function_exists('gs_oauth_hub_url') ? gs_oauth_hub_url() : 'https://gend.me';
+    $hub_url       = rtrim($hub_url, '/');
+    $members_base  = $hub_url . '/members/me/';
+
     wp_localize_script('gs-admin-script', 'gsAdminData', [
         'userName' => $current_user->display_name,
         'logoutUrl' => wp_logout_url(),
         'profileUrl' => admin_url('user-edit.php?user_id=' . $current_user->ID),
         'adminUrl' => admin_url(),
-        'siteTitle' => get_bloginfo('name')
+        'siteTitle' => get_bloginfo('name'),
+        'gendOauth' => $is_gend_oauth,
+        'gendHubUrl' => $hub_url,
+        'gendAvatarUrl' => get_avatar_url($current_user->ID, ['size' => 80]),
+        'gendProfileUrl' => $members_base,
+        'gendProfileMenu' => [
+            ['label' => 'Overview',     'url' => $members_base],
+            ['label' => 'Portfolio',    'url' => $members_base . 'media/'],
+            ['label' => 'App Projects', 'url' => $members_base . 'groups/'],
+            ['label' => 'Activity',     'url' => $members_base . 'activity/'],
+            ['label' => 'Connections',  'url' => $members_base . 'friends/'],
+            ['label' => 'Wallet',       'url' => $members_base . 'member-wallet/'],
+        ],
+        // Inputs the header's Login-to-GenD button needs to drive the same
+        // PKCE popup flow as wp-login.php (see oauth-login.php).
+        'gendOauthClientId' => function_exists('gs_oauth_client_id') ? gs_oauth_client_id() : '',
+        'gendOauthRestUrl'  => esc_url_raw(rest_url('gend-society/v1/oauth/login')),
     ]);
 
     global $pagenow;

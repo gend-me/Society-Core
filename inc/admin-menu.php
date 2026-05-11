@@ -135,17 +135,14 @@ function gs_register_admin_menu()
     if (gs_plugin_active('reward-programs/reward-programs.php')) {
         add_submenu_page(
             'gs-social',
-            __('Rewards & Loyalty', 'gend-society'),
-            __('Rewards', 'gend-society'),
+            __('Point Bank', 'gend-society'),
+            __('Point Bank', 'gend-society'),
             'manage_options',
             'gs-rewards',
             'reward_programs_proxy_member_wallets'
         );
     }
 
-    if (gs_plugin_active('member-management/member-management.php')) {
-        add_submenu_page('gs-social', __('Membership System', 'gend-society'), __('Membership System', 'gend-society'), 'manage_options', 'gdc-social-membership-system', 'mm_render_membership_system_page');
-    }
 
     // ── FEATURES ──────────────────────────────────────────────────────────────
     add_menu_page(
@@ -251,8 +248,8 @@ function gs_move_plugin_submenus_to_content()
         remove_submenu_page('gs-app', 'blog-manager');
         add_submenu_page(
             'gs-content',
-            __('Blog Manager', 'blog-manager'),
-            __('Blog Manager', 'blog-manager'),
+            __('Content Campaigns', 'gend-society'),
+            __('Content Campaigns', 'gend-society'),
             'edit_posts',
             'blog-manager',
             'bm_render_page'
@@ -264,12 +261,33 @@ function gs_move_plugin_submenus_to_content()
         remove_submenu_page('gs-app', 'email-manager');
         add_submenu_page(
             'gs-content',
-            __('Email Manager', 'email-manager'),
-            __('Email Manager', 'email-manager'),
+            __('Emails & Forms', 'gend-society'),
+            __('Emails & Forms', 'gend-society'),
             'manage_options',
             'email-manager',
             'em_render_email_manager_page'
         );
+    }
+
+    // Contracts & Payments — the plugin self-registers under the Store parent
+    // (gdc-store) when present, OR falls back to a top-level menu when Store
+    // isn't active. When social is active, we relocate it under Social
+    // regardless of which path the plugin took, so we have to clear BOTH
+    // possible registration sites before re-adding it.
+    if (gs_plugin_active('contracts-and-payments/contracts-and-payments.php')
+        && gs_plugin_active('social-network/social-network.php')) {
+        remove_submenu_page('gdc-store', 'gend-contracts-payments');
+        remove_menu_page('gend-contracts-payments');
+        if (class_exists('Gend_CP_Admin_Page')) {
+            add_submenu_page(
+                'gs-social',
+                __('Contracts & Payments', 'contracts-and-payments'),
+                __('Contracts & Payments', 'contracts-and-payments'),
+                'manage_options',
+                'gend-contracts-payments',
+                ['Gend_CP_Admin_Page', 'render']
+            );
+        }
     }
 }
 

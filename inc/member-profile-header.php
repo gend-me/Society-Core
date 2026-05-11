@@ -424,6 +424,18 @@ function gdc_render_profile_header() {
         </div><!-- .gdc-profile-hub -->
 
         <!-- ── 3. Nav Bar ────────────────────────────────────────────── -->
+        <?php
+        // Hide the in-page profile tab strip when:
+        //   - viewer has no WP-admin (edit_posts) access
+        //   - they're on their OWN profile
+        //   - the social plugin is active (so the sidebar already mirrors these tabs)
+        // Backend-access users always see the strip; non-backend users still see
+        // it on OTHER members' profiles, where the sidebar is "their" menu.
+        $gs_hide_profile_nav = function_exists( 'gs_frontend_bar_is_profile_mode' )
+            && gs_frontend_bar_is_profile_mode()
+            && bp_is_my_profile();
+        ?>
+        <?php if ( ! $gs_hide_profile_nav ) : ?>
         <nav class="gdc-profile-nav" id="gdc-profile-nav" aria-label="Profile navigation">
             <div class="gdc-profile-nav-inner">
                 <?php foreach ( $nav_items as $item ) :
@@ -436,6 +448,7 @@ function gdc_render_profile_header() {
                 <?php endforeach; ?>
             </div>
         </nav>
+        <?php endif; ?>
 
     </section>
     <?php

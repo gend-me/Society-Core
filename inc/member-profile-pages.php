@@ -117,12 +117,30 @@ function gdc_minimal_block_editor_css() {
         .components-notice-list,
         #wpbody-content > .notice,
         #wpbody-content > .error          { display: none !important; }
-        
+
         /* Force hide the WP admin bar and custom headers in the embed */
         #wpadminbar { display: none !important; height: 0 !important; overflow: hidden !important; }
         html.wp-toolbar { padding-top: 0 !important; margin-top: 0 !important; }
         body { margin-top: 0 !important; padding-top: 0 !important; }
-    </style>
+
+        /* gend-society/assets/admin-script.js injects a custom 3D header
+           (#main-3d-header) at the top of <body> on every wp-admin load with
+           Digital Business / Build with LEO / Contract Wallet / Projects /
+           Tasks / Sales / My Apps / Dashboard / Visit Site links. It's
+           irrelevant inside the page-builder iframe — hide it. */
+        #main-3d-header,
+        .header-anchor-wrap { display: none !important; }
+
+        /* admin-style.css reserves 56px at the top for the (now-hidden) header
+           via --gs-header-h on #wpbody, the editor skeleton, the sidebar, the
+           publish panel, etc. Collapse the variable to 0 in embed mode so all
+           the var() references in admin-style.css naturally resolve to zero.
+           Don't hard-code top/height on individual editor elements — admin-
+           style.css is using CALCULATED values (top: var(--gs-header-h);
+           height: calc(100vh - var(--gs-header-h))) so they correct
+           themselves once the variable is 0. */
+        :root, html, body { --gs-header-h: 0px !important; }
+        #wpbody { padding-top: 0 !important; }
     <script>
     /* Apply is-fullscreen-mode as early as possible so WP's own CSS
        hides the sidebar and admin bar before the page paints. */
@@ -884,11 +902,26 @@ function gs_wallet_profile_screen_content() {
     // Scoped to .member-wallet body class which BP adds automatically for this component slug.
     echo '<style>
         /* ── Wallet tab: hide sidebar, make main column full width ───────── */
+        /* The actual two-column constraint is on .youzify-right-sidebar-layout
+           (display:grid; grid-template-columns: calc(72% - 35px) 28%). Without
+           collapsing that grid first, the .youzify-main-column width:100% below
+           is just 100% of its 72% grid cell, not the row. */
+        .member-wallet .youzify-right-sidebar-layout,
+        .member-wallet .youzify-left-sidebar-layout {
+            display: block !important;
+            grid-template-columns: 1fr !important;
+            grid-gap: 0 !important;
+        }
         .member-wallet .youzify-sidebar-column,
         .member-wallet .youzify-sidebar,
         .member-wallet .yz-sidebar-column,
+        .member-wallet .youzify-profile-sidebar,
         .member-wallet #secondary {
             display: none !important;
+        }
+        .member-wallet .youzify-page-main-content {
+            max-width: none !important;
+            width: 100% !important;
         }
 
         .member-wallet .youzify-main-column,
@@ -979,6 +1012,13 @@ function gs_member_groups_tabs_open() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
         return;
     }
+
+    // Memberships tab is only meaningful on the viewer's OWN profile —
+    // gdc_render_account_memberships_endpoint() reads wu_get_current_customer()
+    // (the logged-in user), not the displayed user, so showing it on others'
+    // profiles would leak the viewer's own memberships across pages.
+    $gs_show_memberships = function_exists( 'bp_is_my_profile' ) && bp_is_my_profile()
+        && function_exists( 'gdc_render_account_memberships_endpoint' );
     ?>
     <style id="gs-member-groups-tabs-css">
     /* ── Member profile groups tab interface ─────────────────────────────── */
@@ -1019,16 +1059,139 @@ function gs_member_groups_tabs_open() {
 
     .gs-member-groups-panel { display: none; }
     .gs-member-groups-panel.is-active { display: block; }
+
+    /* ── Groups page: full-width main column, hide right sidebar ──────────────
+       Confirmed DOM ancestor chain from browser console:
+         #youzify > #youzify-bp.youzify > .youzify-content
+           > <main>.youzify-page-main-content
+             > .youzify-right-sidebar-layout         (display:grid 72%/28%)
+               > .youzify-main-column.grid-column    (our wrap parent)
+
+       All overrides are scoped to body.my-groups so other profile tabs
+       (Portfolio, Connections, Activity, etc.) keep their normal layout.
+       The .youzify-sidebar bare selector is intentionally NOT used — it's
+       too broad and was blanking unrelated widgets. */
+    body.my-groups .youzify-right-sidebar-layout,
+    body.my-groups .youzify-left-sidebar-layout {
+        display: block !important;
+        grid-template-columns: 1fr !important;
+        grid-gap: 0 !important;
+    }
+    body.my-groups .youzify-main-column,
+    body.my-groups .youzify-main-column.grid-column {
+        width: 100% !important;
+        max-width: none !important;
+        flex: 0 0 100% !important;
+    }
+    body.my-groups .gs-member-groups-wrap,
+    body.my-groups .youzify-page-main-content,
+    body.my-groups .youzify-content {
+        max-width: none !important;
+        width: 100% !important;
+    }
+    body.my-groups .youzify-profile-sidebar,
+    body.my-groups .youzify-sidebar-column,
+    body.my-groups .yz-sidebar-column {
+        display: none !important;
+    }
+
+    /* ── Memberships panel: undo Youzify's .youzify table { background:#fff }
+       and tbody{ text-align:center; color:#7c838a } overrides so the dark-
+       glass .gdc-membership-card styling can show through. ── */
+    .gs-member-groups-panel[data-gs-panel="memberships"] table,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table thead,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tbody,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tfoot,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tbody tr,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tbody td,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table thead tr,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table thead tr th,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tfoot tr,
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tfoot tr th {
+        background-color: transparent !important;
+        background: transparent !important;
+        border: none !important;
+        text-align: inherit !important;
+        color: inherit !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="memberships"] table tbody td {
+        padding: 0 !important;
+    }
+
+    /* ── Groups panel: dark-theme styling for the BP groups loop. The
+       member-profile-header.php styles target body.youzify-profile, which
+       this install doesn't add — so we restyle here, scoped to our panel. ── */
+    .gs-member-groups-panel[data-gs-panel="groups"] #groups-list,
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list {
+        list-style: none !important;
+        padding: 0 !important;
+        margin: 0 !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list > li {
+        list-style: none !important;
+        background: rgba(255,255,255,0.03) !important;
+        border: 1px solid rgba(255,255,255,0.08) !important;
+        border-radius: 12px !important;
+        padding: 16px 20px !important;
+        margin: 0 0 12px 0 !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 16px !important;
+        color: #e2e8f0 !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list > li::marker {
+        content: '' !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list > li:hover {
+        background: rgba(255,255,255,0.05) !important;
+        border-color: rgba(137,194,224,0.3) !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-avatar img {
+        width: 56px !important;
+        height: 56px !important;
+        border-radius: 12px !important;
+        object-fit: cover !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item {
+        flex: 1 1 auto !important;
+        min-width: 0 !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-title,
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-title a {
+        color: #f8fafc !important;
+        font-weight: 600 !important;
+        font-size: 1rem !important;
+        text-decoration: none !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-meta,
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-desc,
+    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item .meta {
+        color: #94a3b8 !important;
+        font-size: 0.85rem !important;
+    }
+    .gs-member-groups-panel[data-gs-panel="groups"] .pagination {
+        color: #cbd5e1 !important;
+        padding: 12px 0 !important;
+    }
     </style>
 
     <div class="gs-member-groups-wrap">
 
         <div class="gs-member-groups-tabs" role="tablist">
+            <?php if ( $gs_show_memberships ) : ?>
             <button type="button"
                     class="gs-member-groups-tab is-active"
-                    data-gs-panel="groups"
+                    data-gs-panel="memberships"
                     role="tab"
                     aria-selected="true">
+                <?php esc_html_e( 'Memberships', 'gend-society' ); ?>
+            </button>
+            <?php endif; ?>
+            <button type="button"
+                    class="gs-member-groups-tab<?php echo $gs_show_memberships ? '' : ' is-active'; ?>"
+                    data-gs-panel="groups"
+                    role="tab"
+                    aria-selected="<?php echo $gs_show_memberships ? 'false' : 'true'; ?>">
                 <?php esc_html_e( 'Groups', 'gend-society' ); ?>
             </button>
             <button type="button"
@@ -1040,7 +1203,21 @@ function gs_member_groups_tabs_open() {
             </button>
         </div>
 
-        <div class="gs-member-groups-panel is-active" data-gs-panel="groups" role="tabpanel">
+        <?php if ( $gs_show_memberships ) : ?>
+        <div class="gs-member-groups-panel is-active" data-gs-panel="memberships" role="tabpanel">
+            <?php
+            // The shared customer-surface CSS (membership cards, subgroup tags,
+            // domain-stage tags) only auto-enqueues on is_account_page(). On
+            // the BP profile we have to inject it manually, otherwise the
+            // membership card renders unstyled (faded text, broken layout).
+            $gs_shared_css = plugins_url( 'vendor-app-manager/assets/css/gdc-customer-shared.css' );
+            echo '<link rel="stylesheet" id="gdc-customer-shared-bp-profile" href="' . esc_url( $gs_shared_css ) . '?ver=1.0.0" type="text/css" media="all" />';
+            gdc_render_account_memberships_endpoint();
+            ?>
+        </div>
+        <?php endif; ?>
+
+        <div class="gs-member-groups-panel<?php echo $gs_show_memberships ? '' : ' is-active'; ?>" data-gs-panel="groups" role="tabpanel">
     <?php
 }
 
@@ -1116,6 +1293,74 @@ function gs_member_groups_tabs_close() {
                 if ( panel ) panel.classList.add('is-active');
             } );
         } );
+
+        // ── Brute-force full-width — walk up from our wrap to <body> and
+        // force every ancestor to width:100% / max-width:none via inline
+        // !important. Bypasses guessing which Youzify/theme/plugin class is
+        // creating the constraint: every link in the actual ancestor chain
+        // gets expanded.
+        function gsForceWidthOnAncestors () {
+            var node  = wrap.parentElement;
+            var depth = 0;
+            var report = [];
+            while ( node && node !== document.body && depth < 30 ) {
+                node.style.setProperty( 'max-width',     'none',     'important' );
+                node.style.setProperty( 'width',         '100%',     'important' );
+                node.style.setProperty( 'margin-left',   '0',        'important' );
+                node.style.setProperty( 'margin-right',  '0',        'important' );
+                node.style.setProperty( 'padding-left',  '0',        'important' );
+                node.style.setProperty( 'padding-right', '0',        'important' );
+                node.style.setProperty( 'flex',          '0 0 100%', 'important' );
+                report.push(
+                    '<' + node.tagName.toLowerCase() + '>'
+                    + ( node.id ? '#' + node.id : '' )
+                    + ( node.className ? '.' + String( node.className ).trim().split( /\s+/ ).join( '.' ) : '' )
+                );
+                node = node.parentElement;
+                depth++;
+            }
+            // Sidebar siblings → just remove them. The bare .youzify-sidebar
+            // class is intentionally NOT in this list — it matches widgets
+            // inside the BP groups loop and was wiping out group cards.
+            document.querySelectorAll(
+                '.youzify-profile-sidebar, .youzify-sidebar-column, .yz-sidebar-column, #secondary'
+            ).forEach( function ( s ) { s.remove(); } );
+            // Our own wrap full-width too.
+            wrap.style.setProperty( 'max-width', 'none', 'important' );
+            wrap.style.setProperty( 'width',     '100%', 'important' );
+            // One-time debug breadcrumb in the browser console.
+            if ( ! window.__gsForceWidthLogged ) {
+                window.__gsForceWidthLogged = true;
+                console.log( '[gs-groups] body class:', document.body.className );
+                console.log( '[gs-groups] forced full-width on ancestors:', report );
+            }
+        }
+
+        gsForceWidthOnAncestors();
+        setTimeout( gsForceWidthOnAncestors,    0 );
+        setTimeout( gsForceWidthOnAncestors,  250 );
+        setTimeout( gsForceWidthOnAncestors, 1000 );
+        window.addEventListener( 'load',   gsForceWidthOnAncestors );
+        window.addEventListener( 'resize', gsForceWidthOnAncestors );
+
+        // Observe inline-style writes on every ancestor — revert any change.
+        if ( window.MutationObserver ) {
+            var anc = wrap.parentElement;
+            var d   = 0;
+            while ( anc && anc !== document.body && d < 30 ) {
+                ( function ( el ) {
+                    var obs = new MutationObserver( function () {
+                        if ( el.style.maxWidth !== 'none' || el.style.width !== '100%' ) {
+                            el.style.setProperty( 'max-width', 'none', 'important' );
+                            el.style.setProperty( 'width',     '100%', 'important' );
+                        }
+                    } );
+                    obs.observe( el, { attributes: true, attributeFilter: [ 'style' ] } );
+                } )( anc );
+                anc = anc.parentElement;
+                d++;
+            }
+        }
     }());
     </script>
     <?php
@@ -1186,9 +1431,38 @@ function gs_member_friends_tabs_open() {
     .gs-member-friends-panel { display: none; }
     .gs-member-friends-panel.is-active { display: block; }
 
+    /* ── Connections page: full-width main column, hide right sidebar.
+       Scoped to body.my-friends so other profile tabs are unaffected. */
+    body.my-friends .youzify-right-sidebar-layout,
+    body.my-friends .youzify-left-sidebar-layout {
+        display: block !important;
+        grid-template-columns: 1fr !important;
+        grid-gap: 0 !important;
+    }
+    body.my-friends .youzify-main-column,
+    body.my-friends .youzify-main-column.grid-column {
+        width: 100% !important;
+        max-width: none !important;
+        flex: 0 0 100% !important;
+    }
+    body.my-friends .gs-member-friends-wrap,
+    body.my-friends .youzify-page-main-content,
+    body.my-friends .youzify-content {
+        max-width: none !important;
+        width: 100% !important;
+    }
+    body.my-friends .youzify-profile-sidebar,
+    body.my-friends .youzify-sidebar-column,
+    body.my-friends .yz-sidebar-column {
+        display: none !important;
+    }
+
     /* ── Youzify table reset — youzify.css forces white bg, no borders, centered
-       text on all .youzify table/td/th elements; restore AAS table styles here. ── */
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table {
+       text on all .youzify table/td/th elements; restore AAS table styles here.
+       Scope is the whole connections wrap so the AAS dashboard tables stay
+       styled no matter which top-level panel they end up in (referral-sales /
+       sales-team / payments — note JS relocates the latter two after render). */
+    .gs-member-friends-wrap table {
         background-color: transparent !important;
         border: none !important;
         box-shadow: none !important;
@@ -1196,14 +1470,14 @@ function gs_member_friends_tabs_open() {
         border-collapse: collapse !important;
         border-spacing: 0 !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table thead tr,
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tfoot tr {
+    .gs-member-friends-wrap table thead tr,
+    .gs-member-friends-wrap table tfoot tr {
         background-color: transparent !important;
         color: inherit !important;
         border-bottom: none !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table thead tr th,
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tfoot tr th {
+    .gs-member-friends-wrap table thead tr th,
+    .gs-member-friends-wrap table tfoot tr th {
         border: none !important;
         color: rgba(226, 232, 240, 0.55) !important;
         font-size: 0.75rem !important;
@@ -1216,12 +1490,12 @@ function gs_member_friends_tabs_open() {
         vertical-align: middle !important;
         background-color: transparent !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody tr {
+    .gs-member-friends-wrap table tbody tr {
         text-align: left !important;
         border-bottom: none !important;
         background-color: transparent !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody td {
+    .gs-member-friends-wrap table tbody td {
         padding: clamp(14px, 2vw, 22px) !important;
         color: #e2e8f0 !important;
         border: none !important;
@@ -1232,22 +1506,22 @@ function gs_member_friends_tabs_open() {
         font-weight: inherit !important;
         vertical-align: middle !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody td:first-child {
+    .gs-member-friends-wrap table tbody td:first-child {
         border-left: 1px solid rgba(99, 102, 241, 0.3) !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody td:last-child {
+    .gs-member-friends-wrap table tbody td:last-child {
         border-right: 1px solid rgba(99, 102, 241, 0.3) !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody tr + tr td {
+    .gs-member-friends-wrap table tbody tr + tr td {
         border-top: 1px solid rgba(99, 102, 241, 0.35) !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody td a,
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody td a:hover {
+    .gs-member-friends-wrap table tbody td a,
+    .gs-member-friends-wrap table tbody td a:hover {
         color: #89C2E0 !important;
         font-size: inherit !important;
         font-weight: inherit !important;
     }
-    .gs-member-friends-panel[data-gs-panel="sales-team"] table tbody td:empty {
+    .gs-member-friends-wrap table tbody td:empty {
         display: table-cell !important;
     }
     </style>
@@ -1264,10 +1538,24 @@ function gs_member_friends_tabs_open() {
             </button>
             <button type="button"
                     class="gs-member-friends-tab"
+                    data-gs-panel="referral-sales"
+                    role="tab"
+                    aria-selected="false">
+                <?php esc_html_e( 'Referral Sales', 'gend-society' ); ?>
+            </button>
+            <button type="button"
+                    class="gs-member-friends-tab"
                     data-gs-panel="sales-team"
                     role="tab"
                     aria-selected="false">
                 <?php esc_html_e( 'Sales Team', 'gend-society' ); ?>
+            </button>
+            <button type="button"
+                    class="gs-member-friends-tab"
+                    data-gs-panel="invite"
+                    role="tab"
+                    aria-selected="false">
+                <?php esc_html_e( 'Invite', 'gend-society' ); ?>
             </button>
         </div>
 
@@ -1288,15 +1576,37 @@ function gs_member_friends_tabs_close() {
     ?>
         </div><!-- /panel:connections -->
 
-        <div class="gs-member-friends-panel" data-gs-panel="sales-team" role="tabpanel">
+        <div class="gs-member-friends-panel" data-gs-panel="referral-sales" role="tabpanel">
             <?php
+            // The full AAS dashboard renders here. The shortcode
+            // [affiliate_sales_dashboard] internally has 3 top-level tabs
+            // (Referral Sales / Sales Team / Payments & Analytics). We use
+            // JS below to (a) hide its tab strip and (b) move the Sales Team
+            // and Payments sub-panels OUT of here into our new top-level
+            // panels — so the user only sees the Referral Sales sub-tabs
+            // (Tracking URLs / Sales / Commission Rates / Linked Apps)
+            // beneath the "Your Network is a Lifetime Asset" header.
             if ( function_exists( 'aas_earnings_endpoint_content' ) ) {
                 aas_earnings_endpoint_content();
             } else {
                 echo '<p class="psoo-pm-empty">' . esc_html__( 'Earnings dashboard not available.', 'gend-society' ) . '</p>';
             }
             ?>
+        </div><!-- /panel:referral-sales -->
+
+        <div class="gs-member-friends-panel" data-gs-panel="sales-team" role="tabpanel">
+            <!-- populated by JS - sales-team panel relocated here from the AAS dashboard -->
         </div><!-- /panel:sales-team -->
+
+        <div class="gs-member-friends-panel" data-gs-panel="invite" role="tabpanel">
+            <?php
+            if ( function_exists( 'gs_invite_render_panel' ) ) {
+                gs_invite_render_panel();
+            } else {
+                echo '<p class="psoo-pm-empty">' . esc_html__( 'Invite UI not available.', 'gend-society' ) . '</p>';
+            }
+            ?>
+        </div><!-- /panel:invite -->
 
     </div><!-- /.gs-member-friends-wrap -->
 
@@ -1330,6 +1640,76 @@ function gs_member_friends_tabs_close() {
                 if ( panel ) panel.classList.add('is-active');
             } );
         } );
+
+        // ── Relocate the AAS dashboard's two non-Referral panels ─────────
+        // The affiliate sales dashboard shortcode renders 3 top-level
+        // panels (referral-sales / sales-team / payments). We want to
+        // promote sales-team and payments to OUR top-level tabs and hide
+        // the inner tab strip - so the Referral Sales panel only shows
+        // the 4 sub-tabs (Tracking URLs / Sales / Commission Rates /
+        // Linked Apps) under the Lifetime Asset header.
+        function gsRelocateAasPanels () {
+            var dashboard = wrap.querySelector('.aas-affiliate-dashboard');
+            if ( ! dashboard ) return false;
+
+            // Hide the dashboard's own 3-tab strip
+            var innerTabs = dashboard.querySelector('.aas-dashboard-tabs');
+            if ( innerTabs ) innerTabs.style.display = 'none';
+
+            // Move the sales-team panel out
+            var salesTeamPanel = dashboard.querySelector('[data-aas-panel="sales-team"]');
+            var salesTeamHost  = wrap.querySelector('.gs-member-friends-panel[data-gs-panel="sales-team"]');
+            if ( salesTeamPanel && salesTeamHost && salesTeamPanel.parentElement !== salesTeamHost ) {
+                salesTeamPanel.removeAttribute('hidden');
+                salesTeamPanel.setAttribute('aria-hidden', 'false');
+                salesTeamPanel.classList.add('is-active');
+                salesTeamHost.appendChild( salesTeamPanel );
+            }
+
+            // Lift the Referral Performance Pulse + metric grid out of the
+            // payments sub-panel and dock them ABOVE the referral-sales sub-tab
+            // strip. This replaces the old "Payments & Analytics" top-level tab
+            // — those KPIs make more sense visible on the Referral Sales tab
+            // landing.
+            var referralPanel = dashboard.querySelector('[data-aas-panel="referral-sales"]');
+            var subtabsRow    = referralPanel ? referralPanel.querySelector('.aas-dashboard-subtabs') : null;
+            var perfPulse     = dashboard.querySelector('.aas-card.aas-analytics-hero');
+            var perfGrid      = dashboard.querySelector('.aas-card.aas-metric-grid--analytics');
+            if ( referralPanel && subtabsRow ) {
+                if ( perfPulse && perfPulse.parentElement !== referralPanel ) {
+                    referralPanel.insertBefore( perfPulse, subtabsRow );
+                }
+                if ( perfGrid && perfGrid.parentElement !== referralPanel ) {
+                    referralPanel.insertBefore( perfGrid, subtabsRow );
+                }
+            }
+
+            return true;
+        }
+
+        // Defer the move until AFTER the AAS dashboard JS has wired up its
+        // sub-tab click handlers. AAS attaches them in a DOMContentLoaded
+        // listener that walks the .aas-affiliate-dashboard container looking
+        // for [data-aas-panel] children — so if we move the panels OUT before
+        // that walk runs, those panels are skipped and their sub-tabs never
+        // get click handlers (the symptom: sub-tabs render but do nothing on
+        // click). DOM moves preserve attached listeners, so initializing first
+        // and moving second gives us both correct placement and working clicks.
+        function gsScheduleRelocate () {
+            // setTimeout(0) inside DOMContentLoaded queues us behind AAS's
+            // own DOMContentLoaded handler.
+            if ( document.readyState === 'loading' ) {
+                document.addEventListener( 'DOMContentLoaded', function () {
+                    setTimeout( gsRelocateAasPanels, 0 );
+                } );
+            } else {
+                setTimeout( gsRelocateAasPanels, 0 );
+            }
+        }
+        gsScheduleRelocate();
+        // Belt + braces: re-run on window load too, in case the dashboard
+        // hydrates content lazily after DOMContentLoaded.
+        window.addEventListener( 'load', gsRelocateAasPanels );
     }());
     </script>
     <?php

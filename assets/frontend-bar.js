@@ -56,10 +56,23 @@
     
 
     // ---- Mark active sidebar link --------------------------------
-    var cur = window.location.href;
+    // Exact-path match (after stripping trailing slashes + query/hash) so
+    // Overview's base URL "/members/<u>/" doesn't substring-match every
+    // other profile sub-page like "/members/<u>/groups/".
+    function gsNormalizePath(u) {
+        try {
+            var url = new URL(u, window.location.origin);
+            var p = url.pathname.replace(/\/+$/, '');
+            return p + (url.search || '');
+        } catch (e) {
+            return String(u || '').split('#')[0].replace(/\/+$/, '');
+        }
+    }
+    var curPath = gsNormalizePath(window.location.href);
     document.querySelectorAll('.gs-sidebar-link').forEach(function (a) {
         var href = a.getAttribute('href') || '';
-        if (href && href !== '#' && cur.indexOf(href) !== -1) {
+        if (!href || href === '#') return;
+        if (gsNormalizePath(href) === curPath) {
             a.classList.add('gs-active');
         }
     });

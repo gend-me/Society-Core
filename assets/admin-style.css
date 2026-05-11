@@ -75,6 +75,45 @@ a:hover {
     animation: gsHeaderFadeBlurIn 0.8s ease-out forwards 1.2s;
 }
 
+/* ── Login-to-GenD button (shown when user is NOT yet OAuth-linked) ─── */
+.header-anchor-wrap .gs-login-gend-btn {
+    order: 0;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    height: 38px;
+    padding: 0 18px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, #b608c9 0%, #7e058a 100%);
+    color: #fff;
+    font-weight: 800;
+    font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border: 0;
+    cursor: pointer;
+    box-shadow: 0 0 14px rgba(182, 8, 201, 0.35);
+    transition: transform 0.2s ease, box-shadow 0.2s ease, opacity 0.2s ease;
+    white-space: nowrap;
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards 0.3s;
+}
+
+.header-anchor-wrap .gs-login-gend-btn:hover:not([disabled]) {
+    transform: scale(1.04);
+    box-shadow: 0 0 22px rgba(182, 8, 201, 0.6);
+}
+
+.header-anchor-wrap .gs-login-gend-btn[disabled] {
+    opacity: 0.6;
+    cursor: not-allowed;
+}
+
+.header-anchor-wrap .gs-login-gend-btn.is-busy[disabled] {
+    cursor: wait;
+}
+
 .header-anchor-wrap .btn-visit-site {
     display: inline-flex;
     align-items: center;
@@ -236,6 +275,114 @@ body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
 /* Mobile: Visit Site is the only thing in the header */
 @media (max-width: 600px) {
     .header-anchor-wrap .nav-actions-right { display: none !important; }
+}
+
+/* ------ OAUTH PROFILE HEADER VARIANT ----------------------- */
+/* Shown when the user is logged in via gend.me OAuth: avatar + */
+/* gend.me profile menu (Overview/Portfolio/App Projects/etc.)  */
+/* + View Site button (right). Mirrors the profile page nav     */
+/* (member-profile-header.php → .gdc-nav-item) so the wp-admin  */
+/* header reads as a continuation of the gend.me profile.       */
+
+.header-anchor-wrap--oauth { gap: 24px; }
+
+.header-anchor-wrap--oauth .gs-profile-avatar-link {
+    order: 1;
+    flex-shrink: 0;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    overflow: hidden;
+    border: 2px solid var(--gs-magenta);
+    box-shadow: 0 0 16px rgba(182, 8, 201, 0.45);
+    text-decoration: none;
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards 0.25s;
+    transition: transform 0.2s ease, box-shadow 0.2s ease;
+}
+
+.header-anchor-wrap--oauth .gs-profile-avatar-link:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 22px rgba(182, 8, 201, 0.7);
+}
+
+.header-anchor-wrap--oauth .gs-profile-avatar-img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
+}
+
+.header-anchor-wrap--oauth .nav-central--profile {
+    order: 2;
+    flex: 1;
+    display: flex;
+    align-items: center;
+    gap: 32px;
+    min-width: 0;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+
+.header-anchor-wrap--oauth .nav-central--profile::-webkit-scrollbar { display: none; }
+
+/* Mirror .gdc-nav-item from member-profile-header.php — text-only, */
+/* uppercase, letter-spaced, magenta active/hover with bottom border. */
+.header-anchor-wrap--oauth .gs-profile-nav-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    height: 100%;
+    padding: 0 2px;
+    color: #64748b;
+    font-weight: 900;
+    font-size: 0.72rem;
+    letter-spacing: 2px;
+    text-transform: uppercase;
+    text-decoration: none;
+    background: transparent;
+    border: 0;
+    border-bottom: 2px solid transparent;
+    white-space: nowrap;
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transition: color 0.25s ease, border-color 0.25s ease;
+}
+
+.header-anchor-wrap--oauth .gs-profile-nav-item .pill-content {
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0;
+    height: auto;
+    width: auto;
+    letter-spacing: inherit;
+}
+
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(1) { animation-delay: 0.40s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(2) { animation-delay: 0.50s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(3) { animation-delay: 0.60s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(4) { animation-delay: 0.70s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(5) { animation-delay: 0.80s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(6) { animation-delay: 0.90s; }
+
+.header-anchor-wrap--oauth .gs-profile-nav-item:hover {
+    color: rgba(255, 255, 255, 0.85);
+    border-bottom-color: rgba(182, 8, 201, 0.4);
+}
+
+.header-anchor-wrap--oauth .gs-profile-nav-item.is-active {
+    color: var(--gs-magenta);
+    border-bottom-color: var(--gs-magenta);
+}
+
+.header-anchor-wrap--oauth .visit-site-slot { order: 3; }
+
+@media (max-width: 900px) {
+    .header-anchor-wrap--oauth .nav-central--profile { display: flex !important; gap: 18px; }
+    .header-anchor-wrap--oauth .gs-profile-nav-item { font-size: 0.65rem; letter-spacing: 1.5px; }
 }
 
 /* ------ LEFT SIDEBAR --------------------------------------- */
