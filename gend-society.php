@@ -78,6 +78,10 @@ require_once GS_DIR . 'inc/feature-gates.php';
 // contracts-and-payments OAuth bearer.
 require_once GS_DIR . 'inc/ai-proxy.php';
 
+// AI chat widget loader — serves LEO's frontend widget from the hub on
+// subsites without LEO. Dormant while LEO is active locally.
+require_once GS_DIR . 'inc/ai-widget.php';
+
 // Feature-access upgrade prompt page — shown when a customer hits a
 // wp-admin area their current Dashboard plan doesn't include.
 require_once GS_DIR . 'inc/pages/feature-upgrade.php';

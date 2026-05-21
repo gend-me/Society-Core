@@ -69,6 +69,35 @@ class GS_AI_Proxy {
             'callback'            => array( __CLASS__, 'route_status' ),
             'permission_callback' => array( __CLASS__, 'require_login' ),
         ) );
+
+        // Catch-all aipa/v1 forwarder. Lets the migrated LEO frontend
+        // surfaces (chat widget, [aipa_wireframe], content blocks, email
+        // designer, blog manager, product manager) keep calling their
+        // original aipa/v1/* endpoints unchanged — every request is relayed
+        // to the hub with the OAuth bearer.
+        //
+        // GUARDED: only registers when LEO is NOT active locally and this
+        // is NOT the gend.me hub. On the hub (and on any subsite still
+        // running LEO) the real aipa/v1 routes own the namespace and this
+        // catch-all must stay out of the way, or it would shadow them and
+        // break AI network-wide.
+        if ( self::should_register_aipa_forwarder() ) {
+            register_rest_route( 'aipa/v1', '/(?P<gs_path>.+)', array(
+                'methods'             => array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ),
+                'callback'            => array( __CLASS__, 'route_aipa_forward' ),
+                'permission_callback' => array( __CLASS__, 'require_login' ),
+            ) );
+        }
+    }
+
+    protected static function should_register_aipa_forwarder() {
+        if ( function_exists( 'aipa_widget_register_scripts' ) || class_exists( 'AIPA_REST_AI_Proxy' ) ) {
+            return false; // LEO active locally — it owns aipa/v1
+        }
+        if ( function_exists( 'gs_oauth_is_hub_site' ) && gs_oauth_is_hub_site() ) {
+            return false; // the hub runs LEO natively
+        }
+        return true;
     }
 
     public static function require_login() {
@@ -139,6 +168,49 @@ class GS_AI_Proxy {
             'timeout' => 20,
             'headers' => self::auth_headers( $bearer ),
         ) );
+        return self::relay( $r );
+    }
+
+    /**
+     * Transparent forwarder for any aipa/v1/<path> request. Preserves
+     * method, query string, body, and content-type; attaches the bearer.
+     */
+    public static function route_aipa_forward( WP_REST_Request $request ) {
+        $bearer = self::bearer();
+        if ( '' === $bearer ) {
+            return new WP_REST_Response( array(
+                'error'   => 'not_connected',
+                'message' => 'Connect your gend.me account to use AI features.',
+            ), 402 );
+        }
+
+        $path  = ltrim( (string) $request->get_param( 'gs_path' ), '/' );
+        $query = $request->get_query_params();
+        unset( $query['gs_path'], $query['rest_route'] );
+
+        $url = self::hub_base() . '/wp-json/aipa/v1/' . $path;
+        if ( ! empty( $query ) ) {
+            $url = add_query_arg( $query, $url );
+        }
+
+        $method  = $request->get_method();
+        $headers = self::auth_headers( $bearer );
+        $ct      = $request->get_header( 'content_type' );
+        if ( $ct ) {
+            $headers['Content-Type'] = $ct;
+        }
+
+        $args = array(
+            'method'  => $method,
+            'timeout' => 90,
+            'headers' => $headers,
+        );
+        if ( ! in_array( $method, array( 'GET', 'HEAD' ), true ) ) {
+            // Pass the raw body through so JSON, form, and multipart all relay intact.
+            $args['body'] = $request->get_body();
+        }
+
+        $r = wp_remote_request( $url, $args );
         return self::relay( $r );
     }
 
