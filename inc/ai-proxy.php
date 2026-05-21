@@ -272,6 +272,16 @@ class GS_AI_Proxy {
             $headers['Authorization'] = 'Basic ' . base64_encode( $client_id . ':' . $client_secret );
         }
 
+        error_log( sprintf(
+            '[GS OAuth DIAG] LOCAL exchange code_hash=%s code_len=%d verifier_len=%d redirect_uri=%s client_id=%s secret=%s',
+            substr( hash( 'sha256', $code ), 0, 12 ),
+            strlen( $code ),
+            strlen( $verifier ),
+            $token_body['redirect_uri'],
+            $client_id,
+            $client_secret !== '' ? 'present' : 'absent'
+        ) );
+
         $resp = wp_remote_post( $hub_url . '/oauth/token', array(
             'timeout' => 15,
             'headers' => $headers,
@@ -287,6 +297,8 @@ class GS_AI_Proxy {
         if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $clean, $m ) ) {
             $body = json_decode( $m[1], true );
         }
+        error_log( '[GS OAuth DIAG] LOCAL token endpoint HTTP ' . $status . ' body=' . substr( $clean, 0, 400 ) );
+
         if ( $status !== 200 || empty( $body['access_token'] ) ) {
             return new WP_REST_Response( array(
                 'error'   => $body['error'] ?? 'exchange_failed',
