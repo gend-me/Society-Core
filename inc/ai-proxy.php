@@ -205,13 +205,42 @@ class GS_AI_Proxy {
      *   the subsite user, and a guest session is established on this site.
      * ----------------------------------------------------------------- */
 
+    /**
+     * Resolve the OAuth client the AI WIDGET uses. The widget is an AIPA
+     * (LEO) surface, so it authorizes with the AIPA client — site options
+     * aipa_oauth_client_id / aipa_oauth_client_secret (e.g. W1MTC…), which
+     * is a DIFFERENT WP-OAuth client than gend-society's own login client
+     * (GDC_OAUTH_CLIENT_ID → gs_oauth_client_id, e.g. XuyL…). The exchange
+     * MUST use the same client the authorize step used, or WP-OAuth Server
+     * returns "code invalid for the client". Fall back to gend-society's
+     * client only if the AIPA one isn't configured.
+     */
+    protected static function aipa_client() {
+        $id     = (string) get_site_option( 'aipa_oauth_client_id', '' );
+        $secret = (string) get_site_option( 'aipa_oauth_client_secret', '' );
+        if ( $id === '' && function_exists( 'gs_oauth_client_id' ) ) {
+            $id     = gs_oauth_client_id();
+            $secret = function_exists( 'gs_oauth_client_secret' ) ? gs_oauth_client_secret() : '';
+        }
+        $hub = (string) get_site_option( 'aipa_central_hub_url', '' );
+        if ( $hub === '' ) {
+            $hub = function_exists( 'gs_oauth_hub_url' ) ? gs_oauth_hub_url() : self::hub_base();
+        }
+        return array(
+            'id'     => $id,
+            'secret' => $secret,
+            'hub'    => untrailingslashit( $hub ),
+        );
+    }
+
     public static function route_oauth_status( WP_REST_Request $request ) {
         $uid       = get_current_user_id();
         $connected = $uid && get_user_meta( $uid, 'gend_oauth_token', true ) !== '';
+        $client    = self::aipa_client();
         return new WP_REST_Response( array(
             'connected'  => (bool) $connected,
-            'hub_url'    => function_exists( 'gs_oauth_hub_url' ) ? gs_oauth_hub_url() : self::hub_base(),
-            'client_id'  => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '',
+            'hub_url'    => $client['hub'],
+            'client_id'  => $client['id'],
             'user_id'    => $uid,
         ), 200 );
     }
@@ -251,9 +280,12 @@ class GS_AI_Proxy {
             return new WP_REST_Response( array( 'error' => 'invalid_verifier', 'message' => 'code_verifier has an invalid format.' ), 400 );
         }
 
-        $hub_url       = gs_oauth_hub_url();
-        $client_id     = gs_oauth_client_id();
-        $client_secret = function_exists( 'gs_oauth_client_secret' ) ? gs_oauth_client_secret() : '';
+        // Use the AIPA client the widget authorized with (NOT gend-society's
+        // own login client), or the exchange fails with invalid_grant.
+        $client        = self::aipa_client();
+        $hub_url       = $client['hub'];
+        $client_id     = $client['id'];
+        $client_secret = $client['secret'];
         if ( $client_id === '' ) {
             return new WP_REST_Response( array( 'error' => 'no_client', 'message' => 'OAuth client not configured.' ), 503 );
         }
