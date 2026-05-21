@@ -70,18 +70,42 @@ class GS_AI_Proxy {
             'permission_callback' => array( __CLASS__, 'require_login' ),
         ) );
 
-        // Catch-all aipa/v1 forwarder. Lets the migrated LEO frontend
-        // surfaces (chat widget, [aipa_wireframe], content blocks, email
-        // designer, blog manager, product manager) keep calling their
-        // original aipa/v1/* endpoints unchanged — every request is relayed
-        // to the hub with the OAuth bearer.
-        //
-        // GUARDED: only registers when LEO is NOT active locally and this
-        // is NOT the gend.me hub. On the hub (and on any subsite still
-        // running LEO) the real aipa/v1 routes own the namespace and this
-        // catch-all must stay out of the way, or it would shadow them and
-        // break AI network-wide.
         if ( self::should_register_aipa_forwarder() ) {
+            // OAuth endpoints must run LOCALLY (on the subsite), NOT be
+            // forwarded to the hub: the authorize code is bound to a PKCE
+            // challenge + redirect_uri created in the subsite browser, and
+            // the exchange must establish the subsite session and store the
+            // subsite user's token. Forwarding it to the hub produced
+            // "invalid_grant: code invalid for the client". These concrete
+            // routes are registered BEFORE the catch-all so they win, and
+            // they mirror gend-society's proven wp-login OAuth exchange.
+            register_rest_route( 'aipa/v1', '/oauth/exchange', array(
+                'methods'             => 'POST',
+                'callback'            => array( __CLASS__, 'route_oauth_exchange' ),
+                'permission_callback' => '__return_true', // server-to-server token exchange
+            ) );
+            register_rest_route( 'aipa/v1', '/oauth/status', array(
+                'methods'             => 'GET',
+                'callback'            => array( __CLASS__, 'route_oauth_status' ),
+                'permission_callback' => '__return_true',
+            ) );
+            register_rest_route( 'aipa/v1', '/oauth/sync', array(
+                'methods'             => 'POST',
+                'callback'            => array( __CLASS__, 'route_oauth_sync' ),
+                'permission_callback' => function () { return is_user_logged_in(); },
+            ) );
+            register_rest_route( 'aipa/v1', '/oauth/revoke', array(
+                'methods'             => 'POST',
+                'callback'            => array( __CLASS__, 'route_oauth_revoke' ),
+                'permission_callback' => function () { return is_user_logged_in(); },
+            ) );
+
+            // Catch-all forwarder for every OTHER aipa/v1 path → hub with
+            // the bearer. Migrated LEO surfaces (chat, wireframe, content
+            // blocks, email, campaigns, products) keep working unchanged.
+            // GUARDED: only when LEO is absent locally (see
+            // should_register_aipa_forwarder). The oauth/* paths above are
+            // matched first, so they are NOT forwarded.
             register_rest_route( 'aipa/v1', '/(?P<gs_path>.+)', array(
                 'methods'             => array( 'GET', 'POST', 'PUT', 'PATCH', 'DELETE' ),
                 'callback'            => array( __CLASS__, 'route_aipa_forward' ),
@@ -171,6 +195,166 @@ class GS_AI_Proxy {
             'headers' => self::auth_headers( $bearer ),
         ) );
         return self::relay( $r );
+    }
+
+    /* -----------------------------------------------------------------
+     *   Local OAuth handlers (NOT forwarded). Mirror gend-society's
+     *   proven wp-login OAuth exchange so the widget's "Sign in with
+     *   gend.me" works on the subsite: exchange runs here with the shared
+     *   client + redirect_uri=hub/oauth-bridge/, the token is stored for
+     *   the subsite user, and a guest session is established on this site.
+     * ----------------------------------------------------------------- */
+
+    public static function route_oauth_status( WP_REST_Request $request ) {
+        $uid       = get_current_user_id();
+        $connected = $uid && get_user_meta( $uid, 'gend_oauth_token', true ) !== '';
+        return new WP_REST_Response( array(
+            'connected'  => (bool) $connected,
+            'hub_url'    => function_exists( 'gs_oauth_hub_url' ) ? gs_oauth_hub_url() : self::hub_base(),
+            'client_id'  => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '',
+            'user_id'    => $uid,
+        ), 200 );
+    }
+
+    public static function route_oauth_sync( WP_REST_Request $request ) {
+        $token = sanitize_text_field( (string) $request->get_param( 'token' ) );
+        if ( $token === '' ) {
+            return new WP_Error( 'missing_token', 'Token is required', array( 'status' => 400 ) );
+        }
+        update_user_meta( get_current_user_id(), 'gend_oauth_token', $token );
+        return new WP_REST_Response( array( 'success' => true ), 200 );
+    }
+
+    public static function route_oauth_revoke( WP_REST_Request $request ) {
+        delete_user_meta( get_current_user_id(), 'gend_oauth_token' );
+        delete_user_meta( get_current_user_id(), 'gend_oauth_refresh_token' );
+        return new WP_REST_Response( array( 'success' => true ), 200 );
+    }
+
+    /**
+     * POST /aipa/v1/oauth/exchange (local). Exchanges the authorization
+     * code for a token at the hub using gend-society's client + the
+     * canonical redirect_uri, stores it for the subsite user, logs guests
+     * in, and returns the shape LEO's widget expects.
+     */
+    public static function route_oauth_exchange( WP_REST_Request $request ) {
+        if ( ! function_exists( 'gs_oauth_hub_url' ) || ! function_exists( 'gs_oauth_client_id' ) ) {
+            return new WP_REST_Response( array( 'error' => 'oauth_unavailable', 'message' => 'gend-society OAuth not loaded.' ), 503 );
+        }
+
+        $code     = sanitize_text_field( (string) $request->get_param( 'code' ) );
+        $verifier = (string) $request->get_param( 'code_verifier' );
+        if ( $code === '' ) {
+            return new WP_REST_Response( array( 'error' => 'missing_code', 'message' => 'Authorization code is required' ), 400 );
+        }
+        if ( $verifier !== '' && ! preg_match( '/^[A-Za-z0-9\-_]{43,128}$/', $verifier ) ) {
+            return new WP_REST_Response( array( 'error' => 'invalid_verifier', 'message' => 'code_verifier has an invalid format.' ), 400 );
+        }
+
+        $hub_url       = gs_oauth_hub_url();
+        $client_id     = gs_oauth_client_id();
+        $client_secret = function_exists( 'gs_oauth_client_secret' ) ? gs_oauth_client_secret() : '';
+        if ( $client_id === '' ) {
+            return new WP_REST_Response( array( 'error' => 'no_client', 'message' => 'OAuth client not configured.' ), 503 );
+        }
+
+        $token_body = array(
+            'grant_type'   => 'authorization_code',
+            'code'         => $code,
+            'redirect_uri' => $hub_url . '/oauth-bridge/',
+            'client_id'    => $client_id,
+        );
+        if ( $verifier !== '' ) {
+            $token_body['code_verifier'] = $verifier;
+        }
+        $headers = array();
+        if ( $client_secret !== '' ) {
+            $headers['Authorization'] = 'Basic ' . base64_encode( $client_id . ':' . $client_secret );
+        }
+
+        $resp = wp_remote_post( $hub_url . '/oauth/token', array(
+            'timeout' => 15,
+            'headers' => $headers,
+            'body'    => $token_body,
+        ) );
+        if ( is_wp_error( $resp ) ) {
+            return new WP_REST_Response( array( 'error' => 'exchange_failed', 'message' => $resp->get_error_message() ), 502 );
+        }
+
+        $status = (int) wp_remote_retrieve_response_code( $resp );
+        $clean  = trim( str_replace( "\xEF\xBB\xBF", '', (string) wp_remote_retrieve_body( $resp ) ) );
+        $body   = json_decode( $clean, true );
+        if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $clean, $m ) ) {
+            $body = json_decode( $m[1], true );
+        }
+        if ( $status !== 200 || empty( $body['access_token'] ) ) {
+            return new WP_REST_Response( array(
+                'error'   => $body['error'] ?? 'exchange_failed',
+                'message' => $body['error_description'] ?? $body['error'] ?? ( 'Token exchange failed (HTTP ' . $status . ')' ),
+                'raw'     => $body ?: array( 'snippet' => substr( $clean, 0, 300 ) ),
+            ), $status ?: 502 );
+        }
+
+        $access_token  = (string) $body['access_token'];
+        $refresh_token = (string) ( $body['refresh_token'] ?? '' );
+        $expires_in    = (int) ( $body['expires_in'] ?? 3600 );
+
+        // Persist for the current (logged-in) user immediately.
+        if ( is_user_logged_in() ) {
+            update_user_meta( get_current_user_id(), 'gend_oauth_token', $access_token );
+            if ( $refresh_token !== '' ) {
+                update_user_meta( get_current_user_id(), 'gend_oauth_refresh_token', $refresh_token );
+            }
+            update_user_meta( get_current_user_id(), 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
+        } else {
+            // Guest sign-in: resolve the gend.me user by email and log them
+            // into THIS subsite (the whole point of doing the exchange
+            // locally rather than on the hub).
+            $userinfo_url = ( defined( 'GDC_OAUTH_USERINFO_URL' ) && GDC_OAUTH_USERINFO_URL )
+                ? (string) GDC_OAUTH_USERINFO_URL
+                : ( $hub_url . '/oauth/me' );
+            $info_resp = wp_remote_get( $userinfo_url, array(
+                'timeout' => 10,
+                'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
+            ) );
+            if ( ! is_wp_error( $info_resp ) ) {
+                $iclean = trim( str_replace( "\xEF\xBB\xBF", '', (string) wp_remote_retrieve_body( $info_resp ) ) );
+                $info   = json_decode( $iclean, true );
+                if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $iclean, $mi ) ) {
+                    $info = json_decode( $mi[1], true );
+                }
+                $email = '';
+                if ( is_array( $info ) ) {
+                    foreach ( array( 'email', 'user_email', 'preferred_email' ) as $k ) {
+                        if ( ! empty( $info[ $k ] ) ) { $email = (string) $info[ $k ]; break; }
+                    }
+                    if ( $email === '' && ! empty( $info['data']['user']['email'] ) ) {
+                        $email = (string) $info['data']['user']['email'];
+                    }
+                }
+                $email = sanitize_email( $email );
+                if ( $email !== '' ) {
+                    $user = get_user_by( 'email', $email );
+                    if ( $user ) {
+                        update_user_meta( $user->ID, 'gend_oauth_token', $access_token );
+                        if ( $refresh_token !== '' ) {
+                            update_user_meta( $user->ID, 'gend_oauth_refresh_token', $refresh_token );
+                        }
+                        update_user_meta( $user->ID, 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
+                        wp_set_current_user( $user->ID, $user->user_login );
+                        wp_set_auth_cookie( $user->ID, true );
+                        do_action( 'wp_login', $user->user_login, $user );
+                    }
+                }
+            }
+        }
+
+        return new WP_REST_Response( array(
+            'access_token' => $access_token,
+            'token_type'   => $body['token_type'] ?? 'Bearer',
+            'expires_in'   => $expires_in,
+            'has_refresh'  => $refresh_token !== '',
+        ), 200 );
     }
 
     /**
