@@ -103,12 +103,22 @@ class GS_AI_Widget {
             'nonce'             => wp_create_nonce( 'wp_rest' ),
             'model'             => 'gemini-2.0-flash',
             'default_model'     => 'gemini-2.0-flash',
-            // Server-side proxy model: the widget calls LOCAL rest; the hub
-            // is reached by the forwarder, not the browser. So hub mode off
-            // and no token in JS.
+            // Server-side proxy model: the widget calls LOCAL rest for chat;
+            // the hub is reached by the forwarder, not the browser. So hub
+            // mode off and no token in JS.
             'centralHubEnabled' => false,
             'oauthToken'        => '',
             'isGendConnected'   => true,
+            // OAuth login config — REQUIRED so the widget's "Sign in with
+            // gend.me" popup uses the SAME client the hub exchanges with
+            // (gend-society + LEO share this client id). Without these the
+            // authorize step had no client_id and the forwarded exchange on
+            // the hub failed with "code invalid for the client". The
+            // exchange itself is forwarded to the hub via the aipa/v1
+            // catch-all (POST /aipa/v1/oauth/exchange).
+            'oauthClientId'     => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '',
+            'centralHubUrl'     => self::hub_base(),
+            'oauthClientID'     => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '', // alt-case alias some widget builds read
             'icon'              => 'https://gend.me/wp-content/uploads/2025/12/Futuristic_Logo_Animation_Generation-ezgif.com-crop-1.gif',
             'leo_avatar'        => 'https://gend.me/wp-content/uploads/2025/12/Animated_Profile_Picture_At_Desk-ezgif.com-optimize.gif',
             'user_avatar'       => self::user_avatar_url(),
