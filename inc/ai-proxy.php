@@ -91,11 +91,13 @@ class GS_AI_Proxy {
     }
 
     protected static function should_register_aipa_forwarder() {
+        // The sole reliable signal on path-based multisite (where hub and
+        // subsites share the gend.me host) is whether LEO is loaded here.
+        // On the hub LEO is network-active and present → forwarder stays
+        // out of the way. On subsites a mu-plugin removes LEO from the
+        // network-active list → LEO absent → forwarder takes over aipa/v1.
         if ( function_exists( 'aipa_widget_register_scripts' ) || class_exists( 'AIPA_REST_AI_Proxy' ) ) {
-            return false; // LEO active locally — it owns aipa/v1
-        }
-        if ( function_exists( 'gs_oauth_is_hub_site' ) && gs_oauth_is_hub_site() ) {
-            return false; // the hub runs LEO natively
+            return false;
         }
         return true;
     }

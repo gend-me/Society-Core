@@ -22,13 +22,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 class GS_AI_Widget {
 
     public static function init() {
-        // Stand down entirely when LEO is active locally — LEO owns the
-        // widget then. aipa_widget_register_scripts() is LEO's enqueuer.
+        // Stand down entirely when LEO is loaded on this site — LEO owns
+        // the widget then (this is the hub, where LEO is network-active and
+        // not filtered out). On subsites a mu-plugin removes LEO, so this
+        // function check is false and gend-society serves the widget.
+        // Runs on plugins_loaded so LEO's includes have all run by now.
         if ( function_exists( 'aipa_widget_register_scripts' ) || class_exists( 'AIPA_REST_AI_Proxy' ) ) {
-            return;
-        }
-        // Never run on the gend.me hub itself (LEO lives there).
-        if ( function_exists( 'gs_oauth_is_hub_site' ) && gs_oauth_is_hub_site() ) {
             return;
         }
 
@@ -192,4 +191,7 @@ class GS_AI_Widget {
     }
 }
 
-GS_AI_Widget::init();
+// Defer to plugins_loaded so LEO's presence is reliably known before we
+// decide whether to register the widget (LEO requires its widget.php at
+// include time, so the function exists by plugins_loaded).
+add_action( 'plugins_loaded', array( 'GS_AI_Widget', 'init' ), 20 );
