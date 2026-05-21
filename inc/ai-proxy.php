@@ -374,6 +374,20 @@ class GS_AI_Proxy {
      * method, query string, body, and content-type; attaches the bearer.
      */
     public static function route_aipa_forward( WP_REST_Request $request ) {
+        // Defense in depth: if WP's route matching let this catch-all win
+        // over the concrete /aipa/v1/oauth/* routes, delegate oauth paths
+        // to the LOCAL handlers instead of forwarding to the hub. OAuth must
+        // run on the subsite (the authorize code is bound to this site's
+        // client + PKCE challenge); forwarding it caused "invalid_grant".
+        $oauth_path = ltrim( (string) $request->get_param( 'gs_path' ), '/' );
+        if ( strpos( $oauth_path, 'oauth/' ) === 0 ) {
+            $sub = substr( $oauth_path, strlen( 'oauth/' ) );
+            if ( $sub === 'exchange' ) return self::route_oauth_exchange( $request );
+            if ( $sub === 'status' )   return self::route_oauth_status( $request );
+            if ( $sub === 'sync' )     return self::route_oauth_sync( $request );
+            if ( $sub === 'revoke' )   return self::route_oauth_revoke( $request );
+        }
+
         $bearer = self::bearer();
         if ( '' === $bearer ) {
             return new WP_REST_Response( array(
