@@ -72,6 +72,12 @@ require_once GS_DIR . 'inc/portal-connect.php';
 require_once GS_DIR . 'inc/support-access.php';
 require_once GS_DIR . 'inc/feature-gates.php';
 
+// AI proxy — server-side bridge to the LEO backend on the gend.me hub.
+// Lets subsites use AI features (chat, wireframe, content blocks, etc.)
+// without LEO installed locally; auth + central AI-token balance ride the
+// contracts-and-payments OAuth bearer.
+require_once GS_DIR . 'inc/ai-proxy.php';
+
 // Feature-access upgrade prompt page — shown when a customer hits a
 // wp-admin area their current Dashboard plan doesn't include.
 require_once GS_DIR . 'inc/pages/feature-upgrade.php';
