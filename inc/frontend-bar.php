@@ -79,23 +79,13 @@ function gs_enqueue_global_frontend_assets()
 }
 
 
-// Localize data for the admin script
-add_action('admin_enqueue_scripts', 'gs_localize_admin_data');
-function gs_localize_admin_data()
-{
-  $user = wp_get_current_user();
-  wp_add_inline_script(
-    'gs-admin-script',
-    'window.gsAdminData=' . wp_json_encode([
-      'userName' => $user->display_name,
-      'adminUrl' => admin_url(),
-      'profileUrl' => admin_url('profile.php'),
-      'logoutUrl' => wp_logout_url(home_url()),
-      'siteUrl' => home_url(),
-    ]) . ';',
-    'before'
-  );
-}
+// NOTE: admin gsAdminData is localized by admin-style.php
+// (gs_enqueue_admin_assets) with the FULL data set — userName, logout,
+// gendOauth, gendProfileMenu, etc. A second, minimal localize used to
+// live here and clobbered window.gsAdminData (it ran on the same
+// admin_enqueue_scripts hook and overwrote the rich object with one that
+// had no gendOauth), which made the backend header fall back to the old
+// image-button layout. Removed — admin-style.php is the single source.
 
 // Inject the sidebar into wp_footer for logged-in users
 add_action('wp_footer', 'gs_render_frontend_bar', 5);

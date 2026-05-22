@@ -28,6 +28,7 @@ function gs_enqueue_admin_assets()
         'logoutUrl' => wp_logout_url(),
         'profileUrl' => admin_url('user-edit.php?user_id=' . $current_user->ID),
         'adminUrl' => admin_url(),
+        'siteUrl' => home_url(),
         'siteTitle' => get_bloginfo('name'),
         'gendOauth' => $is_gend_oauth,
         'gendHubUrl' => $hub_url,
