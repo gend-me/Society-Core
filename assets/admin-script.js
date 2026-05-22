@@ -17,8 +17,12 @@
         var pills = '';
         for (var i = 0; i < menu.length; i++) {
             var item = menu[i] || {};
+            var icon = item.icon
+                ? '<span class="dashicons ' + escapeHtml(item.icon) + ' gs-profile-nav-icon" aria-hidden="true"></span>'
+                : '';
             pills +=
                 '<a href="' + escapeHtml(item.url) + '" class="gs-profile-nav-item" target="_blank" rel="noopener">' +
+                    icon +
                     '<span class="pill-content">' + escapeHtml(item.label) + '</span>' +
                 '</a>';
         }

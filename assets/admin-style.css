@@ -361,12 +361,27 @@ body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
     letter-spacing: inherit;
 }
 
+/* Icon (dashicon) before each label — mirrors the gend.me frontend
+ * sidebar's icon+label treatment. */
+.header-anchor-wrap--oauth .gs-profile-nav-item .gs-profile-nav-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    margin-right: 7px;
+    color: inherit;
+    flex: 0 0 auto;
+}
+
 .header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(1) { animation-delay: 0.40s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(2) { animation-delay: 0.50s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(3) { animation-delay: 0.60s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(4) { animation-delay: 0.70s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(5) { animation-delay: 0.80s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(6) { animation-delay: 0.90s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(2) { animation-delay: 0.48s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(3) { animation-delay: 0.56s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(4) { animation-delay: 0.64s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(5) { animation-delay: 0.72s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(6) { animation-delay: 0.80s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(7) { animation-delay: 0.88s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(8) { animation-delay: 0.96s; }
+.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(9) { animation-delay: 1.04s; }
 
 .header-anchor-wrap--oauth .gs-profile-nav-item:hover {
     color: rgba(255, 255, 255, 0.85);
