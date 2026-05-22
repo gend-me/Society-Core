@@ -963,6 +963,40 @@ function gs_wallet_profile_screen_content() {
         .member-wallet .bp-page-title,
         .member-wallet .entry-title { display: none !important; }
 
+        /* ── Strip the entire Youzify member-profile shell so the wallet tab is a
+              standalone dashboard: cover photo, avatar header, and profile nav are
+              siblings of the content (not ancestors), so the shortcode JS cannot
+              reach them — kill them here. */
+        .member-wallet #youzify-profile-header,
+        .member-wallet .youzify-profile-header,
+        .member-wallet #youzify-header,
+        .member-wallet .youzify-header,
+        .member-wallet .yz-header,
+        .member-wallet #item-header,
+        .member-wallet #item-header-cover-image,
+        .member-wallet .youzify-header-cover,
+        .member-wallet .youzify-cover-image,
+        .member-wallet .youzify-cover-content,
+        .member-wallet .youzify-cover-area,
+        .member-wallet #youzify-profile-navmenu,
+        .member-wallet .youzify-profile-navmenu,
+        .member-wallet .youzify-navbar,
+        .member-wallet .youzify-header-nav,
+        .member-wallet #object-nav,
+        .member-wallet #item-nav { display: none !important; }
+
+        /* Drop the Youzify shell background/padding on this tab too. */
+        .member-wallet #youzify,
+        .member-wallet #youzify-bp,
+        .member-wallet .youzify,
+        .member-wallet .youzify-content {
+            background: transparent !important;
+            box-shadow: none !important;
+            border: 0 !important;
+            padding: 0 !important;
+            margin: 0 !important;
+        }
+
         /* gend_wallet shortcode outer wrapper */
         .gend-wallet {
             width: 100% !important;
@@ -992,8 +1026,24 @@ function gs_wallet_profile_screen_content() {
     }
 
     $wallet_content = str_replace( ['”', '“', '″'], '"', $wallet_content );
-    
+
     echo do_shortcode( $wallet_content );
+
+    // Guarantee the .member-wallet body class is present so the CSS above applies,
+    // even if a theme/Youzify body_class path drops it. This screen only renders on
+    // the wallet tab, so adding the class here is correctly scoped.
+    echo '<script>(function(){var b=document.body;if(b){b.classList.add("member-wallet","gend-wallet-fullbleed");}})();</script>';
+}
+
+// Make the .member-wallet body class authoritative server-side for the wallet tab.
+add_filter( 'body_class', 'gs_wallet_body_class' );
+function gs_wallet_body_class( $classes ) {
+    if ( function_exists( 'bp_is_user' ) && bp_is_user()
+         && function_exists( 'bp_current_component' ) && bp_current_component() === 'member-wallet' ) {
+        $classes[] = 'member-wallet';
+        $classes[] = 'gend-wallet-fullbleed';
+    }
+    return $classes;
 }
 
 // ─── Member Profile Groups Page — Tabbed Interface ───────────────────────────
