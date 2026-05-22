@@ -38,16 +38,13 @@ function gs_enqueue_admin_assets()
         // (gs_build_frontend_profile_nav) — same items, order, and
         // dashicons — but pointed at gend.me/members/me/* so every wp-admin
         // user gets their own gend.me profile menu in the backend header.
+        // Curated subset (avatar is rendered separately): the four
+        // most-used profile sections.
         'gendProfileMenu' => [
-            ['label' => 'Overview',     'url' => $members_base,                  'icon' => 'dashicons-id'],
             ['label' => 'App Projects', 'url' => $members_base . 'groups/',      'icon' => 'dashicons-screenoptions'],
-            ['label' => 'Activity',     'url' => $members_base . 'activity/',    'icon' => 'dashicons-megaphone'],
             ['label' => 'Connections',  'url' => $members_base . 'friends/',     'icon' => 'dashicons-networking'],
             ['label' => 'Wallet',       'url' => $members_base . 'member-wallet/', 'icon' => 'dashicons-money-alt'],
-            ['label' => 'Visitors',     'url' => $members_base . 'visitors/',    'icon' => 'dashicons-visibility'],
             ['label' => 'Messages',     'url' => $members_base . 'messages/',    'icon' => 'dashicons-email'],
-            ['label' => 'Portfolio',    'url' => $members_base . 'media/',       'icon' => 'dashicons-portfolio'],
-            ['label' => 'Settings',     'url' => $members_base . 'settings/',    'icon' => 'dashicons-admin-generic'],
         ],
         // Inputs the header's Login-to-GenD button needs to drive the same
         // PKCE popup flow as wp-login.php (see oauth-login.php).

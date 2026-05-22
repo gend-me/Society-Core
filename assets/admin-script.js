@@ -20,15 +20,10 @@
         var menu = (data && Array.isArray(data.gendProfileMenu) && data.gendProfileMenu.length)
             ? data.gendProfileMenu
             : [
-                { label: 'Overview',     url: base,                   icon: 'dashicons-id' },
                 { label: 'App Projects', url: base + 'groups/',       icon: 'dashicons-screenoptions' },
-                { label: 'Activity',     url: base + 'activity/',     icon: 'dashicons-megaphone' },
                 { label: 'Connections',  url: base + 'friends/',      icon: 'dashicons-networking' },
                 { label: 'Wallet',       url: base + 'member-wallet/', icon: 'dashicons-money-alt' },
-                { label: 'Visitors',     url: base + 'visitors/',     icon: 'dashicons-visibility' },
-                { label: 'Messages',     url: base + 'messages/',     icon: 'dashicons-email' },
-                { label: 'Portfolio',    url: base + 'media/',        icon: 'dashicons-portfolio' },
-                { label: 'Settings',     url: base + 'settings/',     icon: 'dashicons-admin-generic' }
+                { label: 'Messages',     url: base + 'messages/',     icon: 'dashicons-email' }
               ];
         var profileUrl = base;
         var avatarUrl  = (data && data.gendAvatarUrl)  ? data.gendAvatarUrl  : '';
