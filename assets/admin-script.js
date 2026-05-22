@@ -9,8 +9,28 @@
     }
 
     function buildOauthProfileHeader(data) {
-        var menu = (data && Array.isArray(data.gendProfileMenu)) ? data.gendProfileMenu : [];
-        var profileUrl = (data && data.gendProfileUrl) ? data.gendProfileUrl : 'https://gend.me/members/me/';
+        data = data || {};
+        var hub  = String(data.gendHubUrl || 'https://gend.me').replace(/\/+$/, '');
+        var base = data.gendProfileUrl || (hub + '/members/me/');
+        if (base.charAt(base.length - 1) !== '/') base += '/';
+
+        // Self-contained fallback menu so the header always shows the
+        // gend.me profile nav even if the server localize didn't run /
+        // was clobbered. Mirrors the gend.me frontend sidebar.
+        var menu = (data && Array.isArray(data.gendProfileMenu) && data.gendProfileMenu.length)
+            ? data.gendProfileMenu
+            : [
+                { label: 'Overview',     url: base,                   icon: 'dashicons-id' },
+                { label: 'App Projects', url: base + 'groups/',       icon: 'dashicons-screenoptions' },
+                { label: 'Activity',     url: base + 'activity/',     icon: 'dashicons-megaphone' },
+                { label: 'Connections',  url: base + 'friends/',      icon: 'dashicons-networking' },
+                { label: 'Wallet',       url: base + 'member-wallet/', icon: 'dashicons-money-alt' },
+                { label: 'Visitors',     url: base + 'visitors/',     icon: 'dashicons-visibility' },
+                { label: 'Messages',     url: base + 'messages/',     icon: 'dashicons-email' },
+                { label: 'Portfolio',    url: base + 'media/',        icon: 'dashicons-portfolio' },
+                { label: 'Settings',     url: base + 'settings/',     icon: 'dashicons-admin-generic' }
+              ];
+        var profileUrl = base;
         var avatarUrl  = (data && data.gendAvatarUrl)  ? data.gendAvatarUrl  : '';
         var userName   = (data && data.userName)       ? data.userName       : 'Profile';
 
@@ -203,17 +223,17 @@
         document.body.classList.add('logged-in');
 
         var data = window.gsAdminData || {};
-        var oauthLinked = !!data.gendOauth;
 
+        // Always render the gend.me profile menu. Every wp-admin viewer is
+        // signed in via gend.me OAuth, so there's no "logged out" header
+        // variant any more — the old image-button (buildDefaultHeader) +
+        // gendOauth gating is removed. buildOauthProfileHeader carries its
+        // own fallback menu, so it renders even if gsAdminData is empty.
         var header = document.createElement('header');
-        header.className = 'header-anchor-wrap' + (oauthLinked ? ' header-anchor-wrap--oauth' : '');
+        header.className = 'header-anchor-wrap header-anchor-wrap--oauth';
         header.id = 'main-3d-header';
-        header.innerHTML = oauthLinked ? buildOauthProfileHeader(data) : buildDefaultHeader();
+        header.innerHTML = buildOauthProfileHeader(data);
         document.body.insertBefore(header, document.body.firstChild);
-
-        if (!oauthLinked) {
-            bindLoginButton();
-        }
     }
 
     function attach3DHover() {
