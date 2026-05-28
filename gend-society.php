@@ -32,11 +32,31 @@ new GenD_GitHub_Updater(__FILE__, 'gend-me/Society-Core');
 require_once GS_DIR . 'inc/dashboard-overview.php';
 require_once GS_DIR . 'inc/dashboard-app-management.php';
 require_once GS_DIR . 'inc/dashboard-remote-membership.php';
+// Container → hub plugin-state reporter (no-op on hub since it has no
+// install pairing). Powers the "Active on linked web app" sub-status
+// on the BP-group Feature Suite tab via gdc_get_container_active_plugins.
+require_once GS_DIR . 'inc/feature-state-reporter.php';
+require_once GS_DIR . 'inc/dashboard-hosting.php';
 require_once GS_DIR . 'inc/feature-cards.php';
 require_once GS_DIR . 'inc/pages/dashboard.php';
 
+// BP group tabs (Feature Suite / User Access / Hosting / Compute Gas)
+// have to wait for BuddyPress to define BP_Group_Extension. Loaded via
+// `bp_include` mirrors the projects-plugin pattern. gend-society sits
+// alphabetically before social-network (where BP ships), so a plain
+// top-level require would no-op the extension classes via the
+// class_exists guard inside the file.
+add_action( 'bp_include', function () {
+    if ( ! class_exists( 'BP_Group_Extension' ) ) return;
+    require_once GS_DIR . 'inc/group-feature-suite.php';
+    require_once GS_DIR . 'inc/group-app-tabs.php';
+} );
+
 // Member profile pages (per-user CPT + BuddyPress embed)
 require_once GS_DIR . 'inc/member-profile-pages.php';
+
+// Member playlists (per-user CPT + REST + Library profile tab; player UI lands separately)
+require_once GS_DIR . 'inc/member-playlists.php';
 
 // Member profile header (terminal-style header + nav bar)
 require_once GS_DIR . 'inc/member-profile-header.php';
