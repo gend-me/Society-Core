@@ -18,8 +18,15 @@
  *
  * Surface:
  *   Plan badge ("You're on Store Owner — $70/mo")  +  primary upgrade CTA
- *   Filter bar (status, category, plan tier, text search)
- *   Card grid: each card carries data-* attrs the filter JS reads
+ *   Filter bar (status + plan tier — category & search removed 2026-05-30
+ *               after the category was redundant on a dashboard-only catalog
+ *               and search added noise for only 9 cards)
+ *   Card grid: each card carries data-status / data-tiers attrs the filter
+ *              JS reads, and a CSS --reveal-delay so an IntersectionObserver
+ *              staggers their entrance as they scroll into view. Cards that
+ *              aren't usable on the linked web app (not included on plan OR
+ *              not active on the container) wash out to greyscale until
+ *              hover so the available ones read first.
  *
  * Upgrade CTAs point at gend.me's checkout
  * (/my-account/membership/<id>/?ui=embed&group=dashboard&plan=<slug>)
@@ -250,15 +257,54 @@ function gs_render_group_feature_suite($group_id) {
             border-radius: 18px;
             overflow: hidden;
             display: flex; flex-direction: column;
-            transition: transform 0.2s var(--fs-ease), border-color 0.2s var(--fs-ease), box-shadow 0.2s var(--fs-ease);
+            transition:
+                transform     0.7s var(--fs-ease),
+                opacity       0.7s var(--fs-ease),
+                filter        0.45s var(--fs-ease),
+                border-color  0.2s var(--fs-ease),
+                box-shadow    0.2s var(--fs-ease);
+            /* Entrance state — IntersectionObserver flips .is-revealed when
+               the card scrolls into view, staggered via --reveal-delay. */
+            opacity: 0;
+            transform: translateY(28px) scale(0.985);
+            transition-delay: var(--reveal-delay, 0s);
+            will-change: transform, opacity;
+        }
+        [data-gs-fs-scope] .gs-fs-card.is-revealed {
+            opacity: 1;
+            transform: none;
         }
         [data-gs-fs-scope] .gs-fs-card:hover {
-            transform: translateY(-3px);
             border-color: rgba(255,255,255,0.18);
             box-shadow: 0 18px 40px rgba(0,0,0,0.35);
         }
-        [data-gs-fs-scope] .gs-fs-card.is-locked { opacity: 0.92; }
+        [data-gs-fs-scope] .gs-fs-card.is-revealed:hover {
+            transform: translateY(-3px);
+        }
+        /* Locked cards (not available on the customer's plan or not yet
+           installed on the linked container) wash out to greyscale +
+           dimmer until hover. Image, status pill, and CTAs all carry the
+           same filter so the whole card reads as inactive. */
+        [data-gs-fs-scope] .gs-fs-card.is-locked {
+            filter: grayscale(1) brightness(0.78);
+            opacity: 0.62;
+        }
+        [data-gs-fs-scope] .gs-fs-card.is-locked.is-revealed:hover {
+            filter: grayscale(0) brightness(1);
+            opacity: 1;
+        }
         [data-gs-fs-scope] .gs-fs-card[hidden] { display: none !important; }
+
+        /* prefers-reduced-motion: skip the entrance animation entirely so
+           the cards land in their final state without movement. */
+        @media (prefers-reduced-motion: reduce) {
+            [data-gs-fs-scope] .gs-fs-card {
+                transition: filter 0.2s, border-color 0.2s, box-shadow 0.2s;
+                opacity: 1;
+                transform: none;
+                transition-delay: 0s !important;
+            }
+        }
 
         [data-gs-fs-scope] .gs-fs-card-img {
             width: 100%; height: 160px; object-fit: cover; object-position: top center;
@@ -412,24 +458,6 @@ function gs_render_group_feature_suite($group_id) {
                 <button type="button" class="gs-fs-pill" data-gs-filter="status" data-value="addon"><?php esc_html_e('Add-on', 'gend-society'); ?> <span class="gs-fs-pill-count"><?php echo (int) max(0, count($cards) - $included_count - $upgrade_count); ?></span></button>
             </div>
 
-            <div class="gs-fs-filterrow">
-                <span class="gs-fs-filterlabel"><?php esc_html_e('Category', 'gend-society'); ?></span>
-                <?php
-                $categories = array();
-                foreach ($cards as $c) {
-                    $cat = (string) ($c['feature']['category'] ?? 'dashboard');
-                    $categories[$cat] = ($categories[$cat] ?? 0) + 1;
-                }
-                ?>
-                <button type="button" class="gs-fs-pill is-active" data-gs-filter="category" data-value="all"><?php esc_html_e('All', 'gend-society'); ?></button>
-                <?php foreach ($categories as $cat => $count) : ?>
-                    <button type="button" class="gs-fs-pill" data-gs-filter="category" data-value="<?php echo esc_attr($cat); ?>">
-                        <?php echo esc_html(ucfirst($cat)); ?>
-                        <span class="gs-fs-pill-count"><?php echo (int) $count; ?></span>
-                    </button>
-                <?php endforeach; ?>
-            </div>
-
             <?php if (!empty($plan_catalog)) : ?>
                 <div class="gs-fs-filterrow">
                     <span class="gs-fs-filterlabel"><?php esc_html_e('Plan tier', 'gend-society'); ?></span>
@@ -442,11 +470,6 @@ function gs_render_group_feature_suite($group_id) {
                     <?php endforeach; ?>
                 </div>
             <?php endif; ?>
-
-            <div class="gs-fs-filterrow">
-                <span class="gs-fs-filterlabel"><?php esc_html_e('Search', 'gend-society'); ?></span>
-                <input type="search" class="gs-fs-search" placeholder="<?php esc_attr_e('Filter by name or description…', 'gend-society'); ?>" data-gs-fs-search />
-            </div>
         </section>
 
         <?php /* ── Card grid ─────────────────────────────────────── */ ?>
@@ -458,7 +481,6 @@ function gs_render_group_feature_suite($group_id) {
                 $unlock_plan_name = $card['unlock_plan_name'];
                 $unlock_plan = $card['unlock_plan'];
                 $tiers_attr = implode(',', $card['tiers']);
-                $haystack = strtolower($f['name'] . ' ' . $f['description']);
 
                 $status_label = '';
                 $status_class = '';
@@ -476,12 +498,16 @@ function gs_render_group_feature_suite($group_id) {
                         $status_class = 'addon';
                         break;
                 }
+                // "Locked" = not currently usable on the linked web app, so
+                // it desaturates to grey until hover. A feature is locked
+                // when the plan doesn't include it, OR — when we have a
+                // container probe — when the plugin file isn't active on
+                // the linked app even though the plan includes it.
+                $is_locked = ($status !== 'included') || ($probe_available && !$is_active_on_app);
                 ?>
-                <article class="gs-fs-card <?php echo $status !== 'included' ? 'is-locked' : ''; ?>"
+                <article class="gs-fs-card<?php echo $is_locked ? ' is-locked' : ''; ?>"
                          data-status="<?php echo esc_attr($status); ?>"
-                         data-category="<?php echo esc_attr((string) ($f['category'] ?? 'dashboard')); ?>"
-                         data-tiers="<?php echo esc_attr($tiers_attr); ?>"
-                         data-haystack="<?php echo esc_attr($haystack); ?>">
+                         data-tiers="<?php echo esc_attr($tiers_attr); ?>">
 
                     <span class="gs-fs-card-status <?php echo esc_attr($status_class); ?>"><?php echo esc_html($status_label); ?></span>
 
@@ -568,25 +594,18 @@ function gs_render_group_feature_suite($group_id) {
         if (!root) return;
         var grid  = root.querySelector('[data-gs-fs-grid]');
         var empty = root.querySelector('[data-gs-fs-empty]');
-        var search = root.querySelector('[data-gs-fs-search]');
         if (!grid) return;
 
-        var state = { status: 'all', category: 'all', tier: 'all', q: '' };
+        var state = { status: 'all', tier: 'all' };
 
         function applyFilters() {
-            var q = state.q.trim().toLowerCase();
             var visible = 0;
             grid.querySelectorAll('.gs-fs-card').forEach(function (card) {
                 var match = true;
-                if (state.status   !== 'all' && card.getAttribute('data-status')   !== state.status)   match = false;
-                if (state.category !== 'all' && card.getAttribute('data-category') !== state.category) match = false;
-                if (state.tier     !== 'all') {
+                if (state.status !== 'all' && card.getAttribute('data-status') !== state.status) match = false;
+                if (state.tier !== 'all') {
                     var tiers = (card.getAttribute('data-tiers') || '').split(',');
                     if (tiers.indexOf(state.tier) === -1) match = false;
-                }
-                if (q !== '') {
-                    var hay = card.getAttribute('data-haystack') || '';
-                    if (hay.indexOf(q) === -1) match = false;
                 }
                 card.hidden = !match;
                 if (match) visible++;
@@ -606,8 +625,32 @@ function gs_render_group_feature_suite($group_id) {
                 applyFilters();
             });
         });
-        if (search) {
-            search.addEventListener('input', function () { state.q = search.value || ''; applyFilters(); });
+
+        // Staggered scroll-in reveal. Each card carries a CSS
+        // transition-delay derived from its DOM order; IntersectionObserver
+        // adds .is-revealed once the card enters the viewport (with a
+        // small bottom-margin so the animation starts a hair before the
+        // card is fully in view). We unobserve after the first reveal so
+        // the animation never replays on subsequent scroll passes.
+        var cards = grid.querySelectorAll('.gs-fs-card');
+        cards.forEach(function (card, i) {
+            card.style.setProperty('--reveal-delay', (i % 6) * 60 + 'ms');
+        });
+
+        var motionOK = !(window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches);
+        if (motionOK && 'IntersectionObserver' in window) {
+            var io = new IntersectionObserver(function (entries) {
+                entries.forEach(function (entry) {
+                    if (entry.isIntersecting) {
+                        entry.target.classList.add('is-revealed');
+                        io.unobserve(entry.target);
+                    }
+                });
+            }, { rootMargin: '0px 0px -10% 0px', threshold: 0.05 });
+            cards.forEach(function (card) { io.observe(card); });
+        } else {
+            // No IO (very old browsers) or reduced-motion: reveal immediately.
+            cards.forEach(function (card) { card.classList.add('is-revealed'); });
         }
     })();
     </script>
