@@ -55,9 +55,6 @@ add_action( 'bp_include', function () {
 // Member profile pages (per-user CPT + BuddyPress embed)
 require_once GS_DIR . 'inc/member-profile-pages.php';
 
-// Member playlists (per-user CPT + REST + Library profile tab; player UI lands separately)
-require_once GS_DIR . 'inc/member-playlists.php';
-
 // Member profile header (terminal-style header + nav bar)
 require_once GS_DIR . 'inc/member-profile-header.php';
 
