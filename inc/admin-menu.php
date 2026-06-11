@@ -45,21 +45,11 @@ function gs_register_admin_menu()
         2
     );
 
-    // ── USERS ─────────────────────────────────────────────────────────────────
-    add_menu_page(
-        __('Users', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-groups"></span><span class="gs-menu-label">' . __('Users', 'gend-society') . '</span>',
-        'list_users',
-        'gs-users',
-        function () {
-            require GS_DIR . 'inc/pages/users.php';
-        },
-        'none',
-        3
-    );
-    add_submenu_page('gs-users', __('All Users', 'gend-society'), __('All Users', 'gend-society'), 'list_users', 'users.php', '');
-    add_submenu_page('gs-users', __('Add New', 'gend-society'), __('Add New', 'gend-society'), 'create_users', 'user-new.php', '');
-    add_submenu_page('gs-users', __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'list_users', 'gs-feature-access', function () {
+    // ── USERS — removed from the sidebar. Feature Access lives in the
+    //    dashboard membership card's User Access tab; the standalone URL
+    //    (?page=gs-feature-access) is kept registered as a hidden submenu
+    //    so any existing deep links continue to resolve.
+    add_submenu_page(null, __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'list_users', 'gs-feature-access', function () {
         require GS_DIR . 'inc/pages/feature-access.php';
     });
 
@@ -80,10 +70,13 @@ function gs_register_admin_menu()
 
     // Note: Blog Manager and Email Manager register their own submenus under gs-app.
 
-    // ── CONTENT ──────────────────────────────────────────────────────────────
+    // ── WRITE (was "Content") ─────────────────────────────────────────────────
+    // Slug stays gs-content for backwards-compat with existing deep links,
+    // submenu registrations from sibling plugins, and the frontend bar's
+    // slug_map. Only the visible label changed.
     add_menu_page(
-        __('Content', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-edit"></span><span class="gs-menu-label">' . __('Content', 'gend-society') . '</span>',
+        __('Write', 'gend-society'),
+        '<span class="gs-menu-icon dashicons dashicons-edit"></span><span class="gs-menu-label">' . __('Write', 'gend-society') . '</span>',
         'manage_options',
         'gs-content',
         '__return_null',
@@ -182,7 +175,6 @@ function gs_register_admin_menu()
     remove_submenu_page('gs-content', 'gs-content');
     remove_submenu_page('index.php', 'index.php');
     remove_submenu_page('index.php', 'update-core.php');
-    remove_submenu_page('gs-users', 'gs-users');
 }
 
 /**
@@ -196,21 +188,10 @@ function gs_register_network_admin_menu()
     remove_menu_page('plugins.php');                 // Plugins
     remove_menu_page('update-core.php');             // Updates
 
-    // ── USERS ─────────────────────────────────────────────────────────────────
-    add_menu_page(
-        __('Users', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-groups"></span><span class="gs-menu-label">' . __('Users', 'gend-society') . '</span>',
-        'manage_network_users',
-        'gs-users',
-        function () {
-            require GS_DIR . 'inc/pages/users.php';
-        },
-        'none',
-        3
-    );
-    add_submenu_page('gs-users', __('All Users', 'gend-society'), __('All Users', 'gend-society'), 'manage_network_users', 'users.php', '');
-    add_submenu_page('gs-users', __('Add New', 'gend-society'), __('Add New', 'gend-society'), 'manage_network_users', 'user-new.php', '');
-    add_submenu_page('gs-users', __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'manage_network_users', 'gs-feature-access', function () {
+    // ── USERS — removed from network sidebar; Feature Access lives in the
+    //    dashboard membership card. Standalone gs-feature-access URL stays
+    //    registered (hidden) so deep links keep working.
+    add_submenu_page(null, __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'manage_network_users', 'gs-feature-access', function () {
         require GS_DIR . 'inc/pages/feature-access.php';
     });
 
@@ -233,7 +214,6 @@ function gs_register_network_admin_menu()
     add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'manage_network_plugins', 'update-core.php', '');
 
     remove_submenu_page('gs-features', 'gs-features');
-    remove_submenu_page('gs-users', 'gs-users');
 }
 
 /**
@@ -261,8 +241,8 @@ function gs_move_plugin_submenus_to_content()
         remove_submenu_page('gs-app', 'email-manager');
         add_submenu_page(
             'gs-content',
-            __('Emails & Forms', 'gend-society'),
-            __('Emails & Forms', 'gend-society'),
+            __('Conversations', 'gend-society'),
+            __('Conversations', 'gend-society'),
             'manage_options',
             'email-manager',
             'em_render_email_manager_page'
@@ -318,7 +298,6 @@ function gs_suppress_plugin_menus()
     // Slugs GenD Society owns — everything else gets removed
     $gs_owned = [
         'index.php',
-        'gs-users',
         'gs-app',
         'gs-content',
         'gs-store',
@@ -446,4 +425,184 @@ function gs_suppress_plugin_menus()
             remove_menu_page($slug);
         }
     }
+}
+
+/**
+ * Render the per-user menu access checkbox grid used by the Feature Access
+ * tab and the modal that opens from the user list.
+ *
+ * Lives here (always loaded) so the AJAX endpoints below can call it
+ * without requiring the side-effecting feature-access.php page file.
+ * Reads $menu/$submenu — admin-ajax.php fires admin_menu, so those globals
+ * are populated by the time this runs.
+ */
+/**
+ * Build (or fetch from cache) the normalized list of menu items used by the
+ * Manage Access checkbox grid. The expensive bit — firing `admin_menu` so
+ * every plugin registers its pages — runs once per cache window instead of
+ * on every modal open.
+ *
+ * Cache lasts an hour but is busted on plugin (de)activation. If a customer
+ * really needs a fresh menu list (e.g. they just deployed a new plugin),
+ * they can hit the standalone /wp-admin/admin.php?page=gs-feature-access
+ * page once — that path falls through to the real $menu / $submenu globals
+ * directly without touching the transient.
+ */
+if (!function_exists('gs_get_admin_menu_structure_cached')) {
+    function gs_get_admin_menu_structure_cached($force_rebuild = false) {
+        $cache_key = 'gs_admin_menu_structure_v1';
+        if (!$force_rebuild) {
+            $cached = get_transient($cache_key);
+            if (is_array($cached)) {
+                return $cached;
+            }
+        }
+
+        global $menu, $submenu;
+        if (empty($menu) || !is_array($menu)) {
+            if (!is_array($menu)) $menu = array();
+            if (!is_array($submenu)) $submenu = array();
+            // admin-ajax doesn't fire admin_menu; do it here, buffered so any
+            // plugin echo/notice can't break JSON responses up the stack.
+            ob_start();
+            try {
+                do_action('_admin_menu');
+                do_action('admin_menu', '');
+            } catch (\Throwable $e) {
+                // Best-effort: keep whatever registered successfully.
+            }
+            ob_end_clean();
+        }
+
+        $items = array();
+        foreach ((array) $menu as $item) {
+            $menu_slug = isset($item[2]) ? $item[2] : '';
+            if (!$menu_slug || $menu_slug === 'separator' || strpos($menu_slug, 'separator') === 0) {
+                continue;
+            }
+            $menu_name = wp_strip_all_tags(isset($item[0]) ? $item[0] : '');
+            $sub_items = array();
+            if (isset($submenu[$menu_slug]) && is_array($submenu[$menu_slug])) {
+                foreach ($submenu[$menu_slug] as $sub_item) {
+                    $sub_slug = isset($sub_item[2]) ? $sub_item[2] : '';
+                    if (!$sub_slug) continue;
+                    $sub_items[] = array(
+                        'slug' => $sub_slug,
+                        'name' => wp_strip_all_tags(isset($sub_item[0]) ? $sub_item[0] : ''),
+                    );
+                }
+            }
+            $items[] = array(
+                'slug'    => $menu_slug,
+                'name'    => $menu_name,
+                'submenu' => $sub_items,
+            );
+        }
+
+        set_transient($cache_key, $items, HOUR_IN_SECONDS);
+        return $items;
+    }
+}
+
+// Bust the menu cache whenever the install's plugin set changes.
+add_action('activated_plugin',   function () { delete_transient('gs_admin_menu_structure_v1'); });
+add_action('deactivated_plugin', function () { delete_transient('gs_admin_menu_structure_v1'); });
+add_action('upgrader_process_complete', function () { delete_transient('gs_admin_menu_structure_v1'); });
+add_action('switch_theme',       function () { delete_transient('gs_admin_menu_structure_v1'); });
+
+if (!function_exists('gs_render_menu_access_checkboxes')) {
+    function gs_render_menu_access_checkboxes($target_user_id) {
+        $saved_access = get_user_meta($target_user_id, 'gs_feature_access', true);
+        if (!is_array($saved_access)) {
+            $saved_access = [];
+        }
+        // Quick lookup map so the per-item in_array() calls don't get
+        // O(n²) on installs with hundreds of menu items.
+        $saved_lookup = array_flip($saved_access);
+
+        $items = gs_get_admin_menu_structure_cached();
+
+        $html = '<div class="gs-grid gs-grid-2">';
+        foreach ($items as $item) {
+            $menu_slug = $item['slug'];
+            $menu_name = $item['name'];
+            $is_menu_checked = isset($saved_lookup[$menu_slug]) ? 'checked' : '';
+
+            $html .= '<div class="gs-card" style="margin-bottom: 20px; padding: 15px;">';
+            $html .= '<h4><label><input type="checkbox" name="gs_allowed_menus[]" value="' . esc_attr($menu_slug) . '" ' . $is_menu_checked . ' class="gs-parent-checkbox"> <strong>' . esc_html($menu_name) . '</strong></label></h4>';
+
+            if (!empty($item['submenu'])) {
+                $html .= '<ul style="margin-left: 20px;">';
+                foreach ($item['submenu'] as $sub) {
+                    $is_sub_checked = isset($saved_lookup[$sub['slug']]) ? 'checked' : '';
+                    $html .= '<li><label><input type="checkbox" name="gs_allowed_menus[]" value="' . esc_attr($sub['slug']) . '" ' . $is_sub_checked . ' class="gs-child-checkbox"> ' . esc_html($sub['name']) . '</label></li>';
+                }
+                $html .= '</ul>';
+            }
+            $html .= '</div>';
+        }
+        $html .= '</div>';
+
+        return $html;
+    }
+}
+
+/**
+ * AJAX: return the checkbox grid HTML + user label for a given user_id.
+ * Powers the Manage Access modal in the User Access tab.
+ */
+add_action('wp_ajax_gs_feature_access_form', 'gs_ajax_feature_access_form');
+function gs_ajax_feature_access_form() {
+    if (!current_user_can('list_users')) {
+        wp_send_json_error(array('message' => __('Insufficient permissions.', 'gend-society')), 403);
+    }
+    check_ajax_referer('gs_feature_access_modal', 'nonce');
+
+    $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+    $user = $user_id ? get_userdata($user_id) : null;
+    if (!$user || !current_user_can('edit_user', $user_id)) {
+        wp_send_json_error(array('message' => __('User not found or not editable.', 'gend-society')));
+    }
+
+    // gs_render_menu_access_checkboxes() pulls the menu structure from a
+    // 1-hour transient (busted on plugin (de)activation), so we no longer
+    // fire admin_menu on every modal click — that's what was making the
+    // popup take seconds to load on installs with many active plugins.
+
+    $label = $user->display_name;
+    if (!empty($user->user_email)) {
+        $label .= ' (' . $user->user_email . ')';
+    }
+
+    wp_send_json_success(array(
+        'user_id'    => $user_id,
+        'user_label' => $label,
+        'html'       => gs_render_menu_access_checkboxes($user_id),
+    ));
+}
+
+/**
+ * AJAX: save the per-user feature access selections.
+ */
+add_action('wp_ajax_gs_feature_access_save', 'gs_ajax_feature_access_save');
+function gs_ajax_feature_access_save() {
+    if (!current_user_can('list_users')) {
+        wp_send_json_error(array('message' => __('Insufficient permissions.', 'gend-society')), 403);
+    }
+    check_ajax_referer('gs_feature_access_modal', 'nonce');
+
+    $user_id = isset($_POST['user_id']) ? intval($_POST['user_id']) : 0;
+    if (!$user_id || !current_user_can('edit_user', $user_id)) {
+        wp_send_json_error(array('message' => __('You do not have permission to edit this user.', 'gend-society')));
+    }
+
+    $allowed_slugs = isset($_POST['gs_allowed_menus']) && is_array($_POST['gs_allowed_menus'])
+        ? array_map('sanitize_text_field', wp_unslash($_POST['gs_allowed_menus']))
+        : [];
+    update_user_meta($user_id, 'gs_feature_access', $allowed_slugs);
+
+    wp_send_json_success(array(
+        'user_id' => $user_id,
+        'count'   => count($allowed_slugs),
+    ));
 }

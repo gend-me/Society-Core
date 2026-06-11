@@ -14,10 +14,27 @@ function gs_frontend_bar_admin_nav()
   return $cache;
 }
 
+// True when the current request is an iframed embed of a BP group
+// (rendered by [psoo_group] from the projects plugin). In that case the
+// parent host page is already painting the gend-society chrome — we
+// must not duplicate it inside the iframe.
+function gs_is_embed_request()
+{
+  static $cached = null;
+  if ($cached !== null) return $cached;
+  $cached = isset($_GET['gend_embed']) && (string) $_GET['gend_embed'] === '1';
+  return $cached;
+}
+
 // The sidebar shows when the user is logged in AND (admin-mirror nav has
 // items OR social plugin is active so we can use the profile-mirror nav).
+// Suppressed entirely on iframed embed requests so the parent page's
+// chrome isn't duplicated inside the iframe.
 function gs_frontend_bar_should_show()
 {
+  if (gs_is_embed_request()) {
+    return false;
+  }
   if (!is_user_logged_in()) {
     return false;
   }
@@ -65,6 +82,227 @@ function gs_enqueue_frontend_assets()
   add_action('wp_head', function () {
     echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;}</style>';
   });
+}
+
+/**
+ * Paint the gend.me gif background on BuddyPress groups pages so the
+ * frontend groups area matches the wp-admin look. Same fixed pseudo-element
+ * pattern as inc/admin-style.php — gif on body::before, dark radial
+ * overlay on body::after, theme wrappers go transparent so it shows
+ * through. BuddyPress group "item" cards get a light glass treatment so
+ * they sit on the gif rather than floating raw.
+ *
+ * Scoped to any /groups/* URL (directory, single group, user's groups tab)
+ * by bp_is_groups_component(). All other frontend pages render normally.
+ */
+add_action('wp_head', 'gs_groups_frontend_background', 99);
+function gs_groups_frontend_background() {
+    if ( is_admin() ) {
+        return;
+    }
+    if ( ! function_exists( 'bp_is_groups_component' ) || ! bp_is_groups_component() ) {
+        return;
+    }
+    $bg_url = 'https://gend.me/wp-content/uploads/2026/03/account-background.gif';
+    ?>
+    <style id="gs-groups-bg">
+        html { background: transparent !important; }
+        body { background: transparent !important; position: relative; }
+        body::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url("<?php echo esc_url( $bg_url ); ?>");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -2;
+            pointer-events: none;
+        }
+        body::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at top, rgba(11, 14, 20, 0.55) 0%, rgba(5, 7, 10, 0.85) 80%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        /* Theme content wrappers — broad selector so this works whether the
+           hub theme is Astra, Hello, Elementor canvas, or block themes. Any
+           wrapper that paints its own solid background gets cleared so the
+           gif shows through. */
+        body #page,
+        body .site,
+        body #content,
+        body #primary,
+        body .content-area,
+        body .site-content,
+        body .site-main,
+        body .elementor-section-wrap,
+        body .entry-content { background: transparent !important; }
+
+        /* Group cards — frosted glass so each tile reads on the gif. */
+        body #buddypress .item-list li.item,
+        body #buddypress .bp-list li.item,
+        body #buddypress #groups-dir-list .item,
+        body #buddypress .group-card,
+        body #buddypress .members-group-loop .item,
+        body #groups-list .item {
+            background: linear-gradient(180deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.65)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.10) !important;
+            border-radius: 14px !important;
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 16px 40px rgba(0, 0, 0, 0.35);
+            color: #e6edf7 !important;
+            padding: 18px !important;
+            margin-bottom: 14px !important;
+        }
+        body #buddypress .item-list li.item a,
+        body #buddypress .bp-list li.item a,
+        body #buddypress #groups-dir-list .item a { color: #c7d2fe !important; }
+        body #buddypress .item-list li.item a:hover,
+        body #buddypress .bp-list li.item a:hover { color: #fff !important; }
+
+        /* Single group header / nav so it doesn't look like a white slab
+           pasted onto the gif. */
+        body #buddypress.single-item,
+        body #buddypress #item-header,
+        body #buddypress #item-nav,
+        body #buddypress #item-body,
+        body #buddypress .item-list-tabs,
+        body #buddypress .item-list-tabs ul {
+            background: transparent !important;
+            color: #e6edf7;
+        }
+        body #buddypress #item-header,
+        body #buddypress #item-body {
+            background: linear-gradient(180deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.65)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.10) !important;
+            border-radius: 16px !important;
+            padding: 20px !important;
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 16px 40px rgba(0, 0, 0, 0.35);
+            margin-bottom: 16px;
+        }
+        body #buddypress #item-header h2,
+        body #buddypress #item-header h1,
+        body #buddypress #item-body h1,
+        body #buddypress #item-body h2,
+        body #buddypress #item-body h3 { color: #fff !important; }
+
+        /* Directory subnav pills */
+        body #buddypress .item-list-tabs li a,
+        body #buddypress div.item-list-tabs#subnav ul li a {
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 8px;
+            color: #cbd5f5;
+            padding: 6px 12px;
+        }
+        body #buddypress .item-list-tabs li.selected a,
+        body #buddypress div.item-list-tabs#subnav ul li.selected a {
+            background: rgba(78, 170, 255, 0.18) !important;
+            border-color: rgba(78, 170, 255, 0.45) !important;
+            color: #fff !important;
+        }
+
+        /* ── Group-page section blocks ─────────────────────────────────
+           Every "panel" you can land on inside a group (home, members,
+           activity, invites, manage, send-invites, custom tabs) gets the
+           same frosted-glass treatment so the gif background reads
+           consistently across the whole group experience. */
+        body #buddypress .home-tabs,
+        body #buddypress .group-home,
+        body #buddypress #activity-stream,
+        body #buddypress .activity,
+        body #buddypress .activity-list .activity-item,
+        body #buddypress #subnav,
+        body #buddypress .subnav,
+        body #buddypress .group-members,
+        body #buddypress #members-group-list,
+        body #buddypress .members .item-list,
+        body #buddypress .group-invites,
+        body #buddypress #invitation-list,
+        body #buddypress .group-settings-section,
+        body #buddypress .group-create-body,
+        body #buddypress .standard-form,
+        body #buddypress .dir-form,
+        body #buddypress .bp-feedback,
+        body #buddypress .bp-messages,
+        body #buddypress .info-group,
+        body #buddypress .gs-group-tab-panel {
+            background: linear-gradient(180deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.65)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.10) !important;
+            border-radius: 14px !important;
+            backdrop-filter: blur(18px) saturate(160%);
+            -webkit-backdrop-filter: blur(18px) saturate(160%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 14px 32px rgba(0, 0, 0, 0.32);
+            color: #e6edf7 !important;
+            padding: 18px !important;
+            margin-bottom: 14px !important;
+        }
+        /* Nested panels inside an already-glassed wrapper drop the second
+           backdrop blur so things don't fog up. */
+        body #buddypress #item-body .home-tabs,
+        body #buddypress #item-body .group-home,
+        body #buddypress #item-body .activity-list .activity-item,
+        body #buddypress #item-body .standard-form,
+        body #buddypress #item-body .group-members,
+        body #buddypress #item-body #members-group-list,
+        body #buddypress #item-body .gs-group-tab-panel {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: rgba(255, 255, 255, 0.03) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+        }
+        /* Common BP text + meta legibility on the dark glass */
+        body #buddypress p,
+        body #buddypress .activity-content,
+        body #buddypress .activity-header,
+        body #buddypress .activity-meta,
+        body #buddypress .item-meta,
+        body #buddypress .item-desc,
+        body #buddypress .info-group p { color: #e6edf7 !important; }
+        body #buddypress .activity-header strong a,
+        body #buddypress .item-title a,
+        body #buddypress h2 a,
+        body #buddypress h3 a { color: #fff !important; }
+        body #buddypress .item-meta,
+        body #buddypress .activity-meta a,
+        body #buddypress small,
+        body #buddypress time { color: rgba(203, 213, 245, 0.65) !important; }
+        body #buddypress input[type="text"],
+        body #buddypress input[type="search"],
+        body #buddypress input[type="email"],
+        body #buddypress textarea {
+            background: rgba(0, 0, 0, 0.25) !important;
+            border: 1px solid rgba(255, 255, 255, 0.12) !important;
+            color: #fff !important;
+            border-radius: 8px !important;
+        }
+        body #buddypress button,
+        body #buddypress .button,
+        body #buddypress input[type="submit"] {
+            background: rgba(78, 170, 255, 0.18) !important;
+            border: 1px solid rgba(78, 170, 255, 0.40) !important;
+            color: #fff !important;
+            border-radius: 8px !important;
+        }
+        body #buddypress button:hover,
+        body #buddypress .button:hover,
+        body #buddypress input[type="submit"]:hover {
+            background: rgba(78, 170, 255, 0.30) !important;
+        }
+    </style>
+    <?php
 }
 
 // Enqueue global site branding and animation utilities for ALL visitors
@@ -133,8 +371,22 @@ function gs_render_frontend_bar()
   if (empty($nav_items) && gs_frontend_bar_is_profile_mode()) {
     $nav_items = gs_build_frontend_profile_nav();
   }
+  $cart_count = 0;
+  if (function_exists('WC') && WC() && WC()->cart) {
+    $cart_count = (int) WC()->cart->get_cart_contents_count();
+  }
   ?>
-  <div class="gs-front-sidebar" role="navigation" aria-label="<?php esc_attr_e('Admin Sidebar', 'gend-society'); ?>">
+  <!-- Top-right floating menu toggle: reveals the slide-in sidebar. -->
+  <button type="button" class="gs-float-menu" id="gs-float-menu"
+          aria-label="<?php esc_attr_e('Open menu', 'gend-society'); ?>"
+          aria-expanded="false" aria-controls="gs-front-sidebar">
+    <span class="gs-float-menu-glow" aria-hidden="true"></span>
+    <span class="gs-float-menu-icon" aria-hidden="true">
+      <span></span><span></span><span></span>
+    </span>
+  </button>
+
+  <div class="gs-front-sidebar" id="gs-front-sidebar" role="navigation" aria-label="<?php esc_attr_e('Admin Sidebar', 'gend-society'); ?>" aria-hidden="true">
 
     <!-- Brand -->
     <a href="<?php echo esc_url(admin_url('index.php')); ?>" class="gs-sidebar-brand gs-delay-1" data-gs-animate style="min-height: 56px;">
@@ -156,7 +408,7 @@ function gs_render_frontend_bar()
 
     <!-- Nav -->
     <nav class="gs-sidebar-nav">
-      <?php 
+      <?php
       $idx = 5;
       foreach ($nav_items as $item):
         $has_sub = !empty($item['children']);
@@ -178,78 +430,43 @@ function gs_render_frontend_bar()
         </div>
       <?php endforeach; ?>
     </nav>
+  </div>
 
-    <!-- Mini-Cart trigger (only when WooCommerce is active). Sits just above
-         the user/avatar footer so it visually pairs with the divider line.
-         Reuses the #gs-mini-cart-overlay drawer injected in wp_footer. -->
-    <?php if (function_exists('WC')):
-      $cart       = WC()->cart;
-      $cart_count = $cart ? (int) $cart->get_cart_contents_count() : 0;
-    ?>
-      <div class="gs-sidebar-item gs-sidebar-cart-row" data-gs-animate>
-        <a href="#" class="gs-sidebar-link gs-sidebar-cart-trigger"
-           aria-label="<?php esc_attr_e('Open shopping cart', 'gend-society'); ?>">
-          <span class="gs-sidebar-icon dashicons dashicons-cart">
-            <span class="gs-sidebar-cart-count"<?php echo $cart_count > 0 ? '' : ' style="display:none"'; ?>><?php echo (int) $cart_count; ?></span>
-          </span>
-        </a>
-      </div>
+  <!-- Bottom-left floating dock: profile + cart, both glassmorphic. -->
+  <div class="gs-float-dock" role="group" aria-label="<?php esc_attr_e('Quick actions', 'gend-society'); ?>">
+    <a href="/members/me" class="gs-float-btn gs-float-profile"
+       aria-label="<?php echo esc_attr(sprintf(__('Open profile for %s', 'gend-society'), $user->display_name)); ?>">
+      <span class="gs-float-btn-ring" aria-hidden="true"></span>
+      <span class="gs-float-avatar">
+        <?php if ($avatar): ?>
+          <img src="<?php echo esc_url($avatar); ?>" alt="<?php echo esc_attr($user->display_name); ?>">
+        <?php else: ?>
+          <?php echo esc_html($avatar_init); ?>
+        <?php endif; ?>
+      </span>
+      <span class="gs-float-tooltip"><?php echo esc_html($user->display_name); ?></span>
+    </a>
+
+    <?php if (function_exists('WC')): ?>
+      <button type="button" class="gs-float-btn gs-float-cart" id="gs-float-cart"
+              aria-label="<?php esc_attr_e('Open shopping cart', 'gend-society'); ?>">
+        <span class="gs-float-btn-ring" aria-hidden="true"></span>
+        <svg class="gs-float-cart-icon" xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="9" cy="21" r="1"/><circle cx="20" cy="21" r="1"/><path d="M1 1h4l2.68 13.39a2 2 0 0 0 2 1.61h9.72a2 2 0 0 0 2-1.61L23 6H6"/>
+        </svg>
+        <span class="gs-float-cart-count"<?php echo $cart_count > 0 ? '' : ' hidden'; ?>><?php echo (int) $cart_count; ?></span>
+        <span class="gs-float-tooltip"><?php esc_html_e('Cart', 'gend-society'); ?></span>
+      </button>
     <?php endif; ?>
-
-    <!-- Footer / User -->
-    <div class="gs-sidebar-footer gs-delay-10" data-gs-animate>
-      <a href="/members/me" class="gs-sidebar-user">
-        <div class="gs-sidebar-avatar">
-          <?php if ($avatar): ?>
-            <img src="<?php echo esc_url($avatar); ?>" alt="<?php echo esc_attr($user->display_name); ?>">
-          <?php else: ?>
-            <?php echo esc_html($avatar_init); ?>
-          <?php endif; ?>
-        </div>
-        <div class="gs-sidebar-user-info">
-          <span class="gs-sidebar-username"><?php echo esc_html($user->display_name); ?></span>
-          <span class="gs-sidebar-role"><?php echo esc_html($role); ?></span>
-        </div>
-      </a>
-    </div>
   </div>
 
   <?php if (function_exists('WC')): ?>
-  <style>
-    /* Make the cart icon a positioning context for the count badge. The
-       icon span keeps its own 22x22 / flex-center sizing (defined in
-       frontend-bar.css) so the cart row stays in the same icon column as
-       every other row. The badge floats over the icon's top-right corner. */
-    .gs-sidebar-cart-trigger .gs-sidebar-icon { position: relative; }
-    .gs-sidebar-cart-count {
-      position: absolute;
-      top: -6px;
-      right: -8px;
-      min-width: 16px;
-      height: 16px;
-      padding: 0 4px;
-      background: var(--gs-magenta, #b608c9);
-      color: #fff;
-      font-size: 10px;
-      font-weight: 800;
-      line-height: 16px;
-      border-radius: 999px;
-      text-align: center;
-      box-sizing: border-box;
-      pointer-events: none;
-      /* The parent .gs-sidebar-icon is a dashicons span, so the count text
-         would otherwise inherit the dashicons font and render as a glyph.
-         Force a normal font + reset the dashicons typography. */
-      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif !important;
-    }
-  </style>
   <script>
     (function () {
-      // Wire the sidebar cart trigger to the existing #gs-mini-cart-overlay
-      // drawer (injected in wp_footer by gs_inject_mini_cart). Also keep the
-      // count badge in sync with WC's cart-fragments AJAX events.
-      function gsBindSidebarCart () {
-        var trigger = document.querySelector('.gs-sidebar-cart-trigger');
+      // Wire the floating cart button to #gs-mini-cart-overlay (injected by
+      // gs_inject_mini_cart) and keep the badge synced with WC fragments.
+      function gsBindFloatCart () {
+        var trigger = document.getElementById('gs-float-cart');
         var overlay = document.getElementById('gs-mini-cart-overlay');
         if (!trigger || !overlay || trigger.__gsBound) return;
         trigger.__gsBound = true;
@@ -259,23 +476,28 @@ function gs_render_frontend_bar()
           overlay.setAttribute('aria-hidden', overlay.classList.contains('is-open') ? 'false' : 'true');
         });
         document.body.addEventListener('wc_fragments_refreshed', function () {
-          var countEl = trigger.querySelector('.gs-sidebar-cart-count');
+          var countEl = trigger.querySelector('.gs-float-cart-count');
           if (!countEl) return;
           var items = document.querySelectorAll('#gs-mini-cart-overlay .mini_cart_item');
           var total = items.length;
           if (total > 0) {
             countEl.textContent = total;
-            countEl.style.display = '';
+            countEl.hidden = false;
           } else {
-            countEl.style.display = 'none';
+            countEl.hidden = true;
           }
         });
       }
       if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', gsBindSidebarCart);
+        document.addEventListener('DOMContentLoaded', gsBindFloatCart);
       } else {
-        gsBindSidebarCart();
+        gsBindFloatCart();
       }
+      // The header-injected .gs-mini-cart-btn is redundant for logged-in
+      // users — hide it so we don't show two cart triggers.
+      var hide = document.createElement('style');
+      hide.textContent = '.gs-mini-cart-btn{display:none!important;}';
+      document.head.appendChild(hide);
     })();
   </script>
   <?php endif; ?>
@@ -298,22 +520,9 @@ function gs_build_frontend_nav()
     'children' => [],
   ];
 
-  $users_children = [
-    ['label' => __('All Users', 'gend-society'), 'url' => admin_url('users.php')]
-  ];
-  if (current_user_can('create_users')) {
-    $users_children[] = ['label' => __('Add New', 'gend-society'), 'url' => admin_url('user-new.php')];
-  }
-  $users_children[] = ['label' => __('Feature Access', 'gend-society'), 'url' => admin_url('admin.php?page=gs-feature-access')];
-  $users_children[] = ['label' => __('Your Profile', 'gend-society'), 'url' => admin_url('profile.php')];
-
-  $items[] = [
-    'label' => __('Users', 'gend-society'),
-    'url' => admin_url('admin.php?page=gs-users'),
-    'icon' => 'dashicons-groups',
-    'cap' => 'list_users',
-    'children' => $users_children,
-  ];
+  // Users menu removed from the sidebar — User Access lives in the
+  // dashboard membership card's User Access tab. Your Profile is still
+  // reachable via the admin bar avatar dropdown.
 
   // Build the App menu children dynamically
   $app_children = [
@@ -344,11 +553,11 @@ function gs_build_frontend_nav()
     $content_children[] = ['label' => __('Blog Manager', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
   }
   if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
-    $content_children[] = ['label' => __('Email Manager', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
+    $content_children[] = ['label' => __('Conversations', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
   }
 
   $items[] = [
-    'label' => __('Content', 'gend-society'),
+    'label' => __('Write', 'gend-society'),
     'url' => admin_url('admin.php?page=gs-content'),
     'icon' => 'dashicons-edit',
     'cap' => 'manage_options',
@@ -428,9 +637,8 @@ function gs_build_frontend_nav()
   // We'll rely on the top-level slugs defined in admin-menu.php where possible.
   $slug_map = [
     'Dashboard' => 'index.php',
-    'Users' => 'gs-users',
     'App' => 'gs-app',
-    'Content' => 'gs-content',
+    'Write' => 'gs-content',
     'Store' => 'gs-store',
     'Social' => 'gs-social',
     'Features' => 'gs-features'
@@ -578,6 +786,10 @@ function gs_build_frontend_profile_nav()
  */
 add_action( 'wp_footer', 'gs_inject_mini_cart', 20 );
 function gs_inject_mini_cart() {
+    // Skip on iframed embeds — the host page already renders one.
+    if ( gs_is_embed_request() ) {
+        return;
+    }
     // Only run if WooCommerce is active
     if ( ! function_exists( 'WC' ) ) {
         return;
