@@ -3,7 +3,7 @@
  * Plugin Name: GenD Society
  * Plugin URI:  https://gend.me
  * Description: Futuristic glassmorphic WordPress admin experience with custom menus, redesigned backend, and dynamic frontend sidebar.
- * Version:     1.0.2
+ * Version:     1.0.3
  * Author:      By GenD
  * Author URI:  https://gend.me
  * Network:     true
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('GS_VERSION', '1.0.0');
+define('GS_VERSION', '1.1.0');
 define('GS_DIR', plugin_dir_path(__FILE__));
 define('GS_URL', plugin_dir_url(__FILE__));
 
