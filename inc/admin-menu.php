@@ -305,6 +305,15 @@ function gs_suppress_plugin_menus()
         'gs-rewards',
         'gs-features',
         'gs-shortcodes',
+        // v6.0 Phase 21: surface reward-programs' Point Bank dashboard so
+        // operators can reach the Derivatives modal mounted there. The
+        // visible "Point Bank" link at gs-rewards renders Member Wallets;
+        // gdc-reward-point-bank is the real Point Bank dashboard. Long-term
+        // reconciliation (collapse to a single surface) is a v6.0.1 phase.
+        'gdc-reward',
+        'gdc-reward-point-bank',
+        'gdc-reward-smart-contracts',
+        'gdc-reward-member-wallets',
         // WP native pages that are legitimately needed (submenus/redirects)
         'separator',
         'separator1',
@@ -326,8 +335,8 @@ function gs_suppress_plugin_menus()
         'gdc-social-profile-features',
         'gdc-social-membership-system',
         'bp-groups',
-        // Reward Program
-        'gdc-reward',
+        // Reward Program — gdc-reward + children REMOVED from blocklist for v6.0
+        // Phase 21 (Derivatives modal lives on gdc-reward-point-bank).
         'gdc-reward-points',
         'gdc-reward-wallets',
         'gdc-rewards',
