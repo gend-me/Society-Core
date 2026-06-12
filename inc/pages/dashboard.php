@@ -58,6 +58,12 @@ function gs_dashboard_setup_custom_screen()
 
 function gs_dashboard_enqueue_media() {
     wp_enqueue_media();
+    // Invite New User modal (in the User Access tab) embeds wp_editor /
+    // TinyMCE via gs_invite_render_panel(). Without these enqueues, the
+    // editor renders as a plain textarea inside the modal.
+    if ( function_exists( 'wp_enqueue_editor' ) ) {
+        wp_enqueue_editor();
+    }
 }
 
 function gs_dashboard_remove_default_widgets()
@@ -112,13 +118,19 @@ function gs_dashboard_admin_head_styles()
         body.wp-admin.index-php #wpbody-content > .wrap > h1,
         body.wp-admin.index-php #wpbody-content > .wrap > .welcome-panel,
         body.wp-admin.index-php #dashboard-widgets-wrap { display:none !important; }
-        
+
+        /* Background gif + transparent chrome live in the global admin_head
+           block in inc/admin-style.php so every wp-admin page shares them.
+           Dashboard-specific glass surfaces continue below. */
+
         .gs-dashboard-wrap {
             padding: 40px clamp(20px, 4vw, 50px) 60px;
             display: flex;
             flex-direction: column;
             gap: 32px;
             color: var(--gs-text);
+            position: relative;
+            z-index: 1;
         }
         .gs-dashboard__header {
             margin-bottom: 10px;
@@ -153,14 +165,49 @@ function gs_dashboard_admin_head_styles()
             max-width: 700px;
         }
         
-        /* Surface Cards */
-        .gs-dashboard__surface {
-            background: var(--gs-card-bg, rgba(11, 14, 20, 0.6));
-            border: 1px solid var(--gs-border);
+        /* ── Glass surfaces ────────────────────────────────────────────
+           A consistent "frosted panel over the gif" look applied to every
+           card on the dashboard. Strong backdrop blur + saturate so the
+           gif behind it stays vibrant; inset highlight so the panels feel
+           lifted rather than flat. */
+        .gs-dashboard__surface,
+        body.wp-admin.index-php .gs-mship-card,
+        body.wp-admin.index-php .gs-fa-card,
+        body.wp-admin.index-php .gs-card,
+        body.wp-admin.index-php .gs-admin-card,
+        body.wp-admin.index-php .gs-hosting__card {
+            background: linear-gradient(180deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.65)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.10) !important;
             border-radius: 20px;
+            backdrop-filter: blur(24px) saturate(160%);
+            -webkit-backdrop-filter: blur(24px) saturate(160%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.08),
+                inset 0 0 0 1px rgba(255, 255, 255, 0.02),
+                0 24px 60px rgba(0, 0, 0, 0.45);
+        }
+        .gs-dashboard__surface {
             padding: 30px;
-            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
-            backdrop-filter: blur(20px);
+        }
+        /* Surfaces nested inside a glass surface drop their own backdrop
+           so we don\'t double-blur (which makes panels look muddy). */
+        body.wp-admin.index-php .gs-dashboard__surface .gs-admin-card,
+        body.wp-admin.index-php .gs-dashboard__surface .gs-hosting__card,
+        body.wp-admin.index-php .gs-mship-card .gs-hosting__card,
+        body.wp-admin.index-php .gs-mship-card .gs-card {
+            backdrop-filter: none !important;
+            -webkit-backdrop-filter: none !important;
+            background: rgba(255, 255, 255, 0.03) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+        }
+        /* Hosting nav rail glass */
+        body.wp-admin.index-php .gs-hosting__nav.is-active {
+            background: linear-gradient(180deg, rgba(78, 170, 255, 0.18), rgba(78, 170, 255, 0.08)) !important;
+            box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+        }
+        /* Subtle tab strip glass */
+        body.wp-admin.index-php .gs-mship-tabs {
+            border-bottom: 1px solid rgba(255, 255, 255, 0.08);
         }
         .gs-dashboard__surface h2 {
             margin: 0 0 20px 0;
@@ -528,236 +575,224 @@ function gs_render_custom_dashboard_screen()
         echo '</section>';
     }
 
-    // Notice for successful save
+    // Notice for successful App Settings save (form posts to
+    // admin-post.php which redirects back here with gs_settings_saved=true)
     if (isset($_GET['gs_settings_saved']) && $_GET['gs_settings_saved'] == 'true') {
-        echo '<div style="background: rgba(0, 163, 42, 0.1); border: 1px solid #00a32a; color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 500;">' . esc_html__('Settings saved successfully.', 'gend-society') . '</div>';
+        echo '<div style="background: rgba(0, 163, 42, 0.1); border: 1px solid #00a32a; color: #fff; padding: 12px 20px; border-radius: 8px; font-weight: 500; margin-top: 16px;">' . esc_html__('Settings saved successfully.', 'gend-society') . '</div>';
     }
 
-    // App Settings Section
-    if (current_user_can('manage_options')) {
-        echo '<section class="gs-dashboard__surface" style="margin-top: 32px;">';
-        
-        $current_title = get_option('blogname');
-        $current_tagline = get_option('blogdescription');
-        $current_icon_id = get_option('site_icon');
-        $current_logo_id = get_theme_mod('custom_logo');
-        
-        $icon_url = '';
-        if ($current_icon_id) {
-            $image_attributes = wp_get_attachment_image_src($current_icon_id, 'full');
-            if ($image_attributes) {
-                $icon_url = $image_attributes[0];
-            }
-        }
-
-        $logo_url = '';
-        if ($current_logo_id) {
-            $logo_attributes = wp_get_attachment_image_src($current_logo_id, 'full');
-            if ($logo_attributes) {
-                $logo_url = $logo_attributes[0];
-            }
-        }
-
-        echo '<form action="' . esc_url(admin_url('admin-post.php')) . '" method="POST">';
-        wp_nonce_field('gs_app_settings_action', 'gs_app_settings_nonce');
-        echo '<input type="hidden" name="action" value="gs_save_app_settings">';
-        
-        // App Title
-        echo '<div class="gs-settings-form-row">';
-        echo '<label for="gs_app_title">' . esc_html__('App Title', 'gend-society') . '</label>';
-        echo '<div class="gs-settings-input-group">';
-        echo '<input type="text" id="gs_app_title" name="gs_app_title" value="' . esc_attr($current_title) . '">';
-        echo '</div>';
-        echo '</div>';
-
-        // Tagline
-        echo '<div class="gs-settings-form-row">';
-        echo '<label for="gs_app_tagline">' . esc_html__('Tagline', 'gend-society') . '</label>';
-        echo '<div class="gs-settings-input-group">';
-        echo '<input type="text" id="gs_app_tagline" name="gs_app_tagline" value="' . esc_attr($current_tagline) . '">';
-        echo '<p class="gs-settings-help-text">In a few words, explain what this app is about. Example: "Just another GEND.ME Sites app."</p>';
-        echo '</div>';
-        echo '</div>';
-        
-        // App Icon
-        echo '<div class="gs-settings-form-row">';
-        echo '<label>' . esc_html__('App Icon', 'gend-society') . '</label>';
-        echo '<div class="gs-settings-input-group">';
-        
-        // The Preview Box mimicking the screenshot
-        echo '<div class="gs-app-icon-preview">';
-        echo '<div class="gs-app-icon-real-preview" id="gs-app-icon-real-preview-div">';
-        if ($icon_url) {
-            echo '<img src="' . esc_url($icon_url) . '" alt="App Icon" id="gs-app-icon-img">';
-        } else {
-            echo '<span class="dashicons dashicons-admin-site" style="display:block;" id="gs-app-icon-dashicon"></span>';
-            echo '<img src="" alt="App Icon" id="gs-app-icon-img" style="display:none;">';
-        }
-        echo '</div>';
-        echo '<div class="gs-app-icon-browser-chrome">';
-        echo '<div class="gs-app-icon-browser-dots"><span></span><span></span><span></span></div>';
-        echo '<div class="gs-app-icon-browser-tab">';
-        if ($icon_url) {
-           echo '<img src="' . esc_url($icon_url) . '" class="gs-app-icon-tab-img" id="gs-app-icon-tab-img">';
-        } else {
-           echo '<span class="dashicons dashicons-admin-site" style="font-size:16px;width:16px;height:16px;color:#ccc;display:block;" id="gs-app-icon-tab-dashicon"></span>';
-           echo '<img src="" class="gs-app-icon-tab-img" id="gs-app-icon-tab-img" style="display:none;">';
-        }
-        echo '<span id="gs-app-icon-tab-title">' . esc_html($current_title ? $current_title : 'Site Title') . '</span>';
-        echo '<span style="color: #999; margin-left:8px; font-size:10px;">×</span>';
-        echo '</div>';
-        echo '</div>';
-        echo '</div>';
-        
-        echo '<div class="gs-app-icon-actions">';
-        echo '<button type="button" class="gs-btn gs-btn-secondary" id="gs-app-icon-upload-btn" style="background:#fff; color:#0073aa; border:none; border-radius:2px; font-weight:normal;">' . esc_html__('Change App Icon', 'gend-society') . '</button>';
-        echo '<a href="#" class="gs-app-icon-remove" id="gs-app-icon-remove-btn" ' . ($icon_url ? '' : 'style="display:none;"') . '>' . esc_html__('Remove App Icon', 'gend-society') . '</a>';
-        echo '</div>';
-        
-        echo '<input type="hidden" id="gs_app_icon_id" name="gs_app_icon" value="' . esc_attr($current_icon_id) . '">';
-        echo '<p class="gs-settings-help-text">The App Icon is what you see in browser tabs, bookmark bars, and within the Gend.me mobile apps. It should be square and at least 512 by 512 pixels.</p>';
-        
-        echo '</div>'; // End input group
-        echo '</div>'; // End form row
-
-        // Site Logo
-        echo '<div class="gs-settings-form-row">';
-        echo '<label>' . esc_html__('Site Logo', 'gend-society') . '</label>';
-        echo '<div class="gs-settings-input-group">';
-        
-        echo '<div class="gs-app-icon-preview" style="height: 120px; background: rgba(0,0,0,0.1); border: 1px dashed rgba(255,255,255,0.1);">';
-        echo '<div id="gs-site-logo-preview-div" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;">';
-        if ($logo_url) {
-            echo '<img src="' . esc_url($logo_url) . '" alt="Site Logo" id="gs-site-logo-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">';
-        } else {
-            echo '<span class="dashicons dashicons-format-image" style="font-size: 48px; width: 48px; height: 48px; color: rgba(255,255,255,0.2);" id="gs-site-logo-dashicon"></span>';
-            echo '<img src="" alt="Site Logo" id="gs-site-logo-img" style="display:none; max-width: 100%; max-height: 100%; object-fit: contain;">';
-        }
-        echo '</div>';
-        echo '</div>';
-        
-        echo '<div class="gs-app-icon-actions">';
-        echo '<button type="button" class="gs-btn gs-btn-secondary" id="gs-site-logo-upload-btn" style="background:#fff; color:#0073aa; border:none; border-radius:2px; font-weight:normal;">' . esc_html__('Change Site Logo', 'gend-society') . '</button>';
-        echo '<a href="#" class="gs-app-icon-remove" id="gs-site-logo-remove-btn" ' . ($logo_url ? '' : 'style="display:none;"') . '>' . esc_html__('Remove Site Logo', 'gend-society') . '</a>';
-        echo '</div>';
-        
-        echo '<input type="hidden" id="gs_site_logo_id" name="gs_site_logo" value="' . esc_attr($current_logo_id) . '">';
-        echo '<p class="gs-settings-help-text">The Site Logo is typically displayed in the header of your website. Most themes work best with a landscape or square logo.</p>';
-        
-        echo '</div>'; // End input group
-        echo '</div>'; // End form row
-        
-        echo '<div style="margin-top: 30px;">';
-        echo '<button type="submit" class="gs-btn">' . esc_html__('Save Settings', 'gend-society') . '</button>';
-        echo '</div>';
-        
-        echo '</form>';
-        echo '</section>';
-        
-        // Media upload JS
-        ?>
-        <script>
-        jQuery(document).ready(function($){
-            var mediaUploader;
-            $('#gs-app-icon-upload-btn').click(function(e) {
-                e.preventDefault();
-                if (mediaUploader) {
-                    mediaUploader.open();
-                    return;
-                }
-                mediaUploader = wp.media.frames.file_frame = wp.media({
-                    title: 'Choose App Icon',
-                    button: {
-                        text: 'Select Icon'
-                    },
-                    multiple: false
-                });
-                mediaUploader.on('select', function() {
-                    var attachment = mediaUploader.state().get('selection').first().toJSON();
-                    $('#gs_app_icon_id').val(attachment.id);
-                    
-                    var imgUrl = attachment.sizes && attachment.sizes.full ? attachment.sizes.full.url : attachment.url;
-                    
-                    $('#gs-app-icon-img').attr('src', imgUrl).show();
-                    $('#gs-app-icon-dashicon').hide();
-                    
-                    $('#gs-app-icon-tab-img').attr('src', imgUrl).show();
-                    $('#gs-app-icon-tab-dashicon').hide();
-                    
-                    $('#gs-app-icon-remove-btn').show();
-                });
-                mediaUploader.open();
-            });
-
-            var logoUploader;
-            $('#gs-site-logo-upload-btn').click(function(e) {
-                e.preventDefault();
-                if (logoUploader) {
-                    logoUploader.open();
-                    return;
-                }
-                logoUploader = wp.media.frames.file_frame = wp.media({
-                    title: 'Choose Site Logo',
-                    button: {
-                        text: 'Select Logo'
-                    },
-                    multiple: false
-                });
-                logoUploader.on('select', function() {
-                    var attachment = logoUploader.state().get('selection').first().toJSON();
-                    $('#gs_site_logo_id').val(attachment.id);
-                    
-                    var imgUrl = attachment.sizes && attachment.sizes.full ? attachment.sizes.full.url : attachment.url;
-                    
-                    $('#gs-site-logo-img').attr('src', imgUrl).show();
-                    $('#gs-site-logo-dashicon').hide();
-                    
-                    $('#gs-site-logo-remove-btn').show();
-                });
-                logoUploader.open();
-            });
-            
-            $('#gs-app-icon-remove-btn').click(function(e){
-                e.preventDefault();
-                $('#gs_app_icon_id').val('');
-                
-                $('#gs-app-icon-img').attr('src', '').hide();
-                $('#gs-app-icon-dashicon').show();
-                
-                $('#gs-app-icon-tab-img').attr('src', '').hide();
-                $('#gs-app-icon-tab-dashicon').show();
-                
-                $(this).hide();
-            });
-
-            $('#gs-site-logo-remove-btn').click(function(e){
-                e.preventDefault();
-                $('#gs_site_logo_id').val('');
-                
-                $('#gs-site-logo-img').attr('src', '').hide();
-                $('#gs-site-logo-dashicon').show();
-                
-                $(this).hide();
-            });
-            
-            // Live update tab title
-            $('#gs_app_title').on('input', function() {
-                var val = $(this).val();
-                $('#gs-app-icon-tab-title').text(val ? val : 'Site Title');
-            });
-        });
-        </script>
-        <?php
-    }
-
-    // Render feature cards directly in the dashboard
-    if (current_user_can('manage_options') && function_exists('gs_render_feature_cards_widget')) {
-        echo '<section class="gs-dashboard__surface" style="margin-top: 32px;">';
-        echo '<h2>' . esc_html__('App Feature Access', 'gend-society') . '</h2>';
-        echo '<p style="color: var(--gs-muted); margin-bottom: 24px;">' . esc_html__('Manage which plugins and features are available on this site.', 'gend-society') . '</p>';
-        gs_render_feature_cards_widget();
-        echo '</section>';
-    }
+    // App Settings, Feature Suite, and User Access now live inside the
+    // membership card's tab strip (rendered via gs_render_membership_panel).
+    // The standalone <section> blocks that used to sit below the card are
+    // gone; only the dashboard wrap / header / membership panel remain here.
 
     echo '</div>';
+}
+
+/**
+ * Renders the App Settings form (App Title, Tagline, App Icon, Site Logo,
+ * Save button) plus the media-uploader/preview JS. Output is echoed.
+ *
+ * Used by the Settings tab in gs_render_membership_panel() — the form posts
+ * to admin-post.php (gs_save_app_settings handler at the top of this file)
+ * which redirects back to index.php?gs_settings_saved=true so the success
+ * notice in gs_render_custom_dashboard_screen still surfaces.
+ *
+ * Gated on manage_options upstream; this function does NOT re-check the cap.
+ */
+function gs_render_app_settings_form()
+{
+    $current_title   = get_option('blogname');
+    $current_tagline = get_option('blogdescription');
+    $current_icon_id = get_option('site_icon');
+    $current_logo_id = get_theme_mod('custom_logo');
+
+    $icon_url = '';
+    if ($current_icon_id) {
+        $image_attributes = wp_get_attachment_image_src($current_icon_id, 'full');
+        if ($image_attributes) {
+            $icon_url = $image_attributes[0];
+        }
+    }
+
+    $logo_url = '';
+    if ($current_logo_id) {
+        $logo_attributes = wp_get_attachment_image_src($current_logo_id, 'full');
+        if ($logo_attributes) {
+            $logo_url = $logo_attributes[0];
+        }
+    }
+
+    echo '<form action="' . esc_url(admin_url('admin-post.php')) . '" method="POST">';
+    wp_nonce_field('gs_app_settings_action', 'gs_app_settings_nonce');
+    echo '<input type="hidden" name="action" value="gs_save_app_settings">';
+
+    // App Title
+    echo '<div class="gs-settings-form-row">';
+    echo '<label for="gs_app_title">' . esc_html__('App Title', 'gend-society') . '</label>';
+    echo '<div class="gs-settings-input-group">';
+    echo '<input type="text" id="gs_app_title" name="gs_app_title" value="' . esc_attr($current_title) . '">';
+    echo '</div>';
+    echo '</div>';
+
+    // Tagline
+    echo '<div class="gs-settings-form-row">';
+    echo '<label for="gs_app_tagline">' . esc_html__('Tagline', 'gend-society') . '</label>';
+    echo '<div class="gs-settings-input-group">';
+    echo '<input type="text" id="gs_app_tagline" name="gs_app_tagline" value="' . esc_attr($current_tagline) . '">';
+    echo '<p class="gs-settings-help-text">In a few words, explain what this app is about. Example: "Just another GEND.ME Sites app."</p>';
+    echo '</div>';
+    echo '</div>';
+
+    // App Icon
+    echo '<div class="gs-settings-form-row">';
+    echo '<label>' . esc_html__('App Icon', 'gend-society') . '</label>';
+    echo '<div class="gs-settings-input-group">';
+
+    echo '<div class="gs-app-icon-preview">';
+    echo '<div class="gs-app-icon-real-preview" id="gs-app-icon-real-preview-div">';
+    if ($icon_url) {
+        echo '<img src="' . esc_url($icon_url) . '" alt="App Icon" id="gs-app-icon-img">';
+    } else {
+        echo '<span class="dashicons dashicons-admin-site" style="display:block;" id="gs-app-icon-dashicon"></span>';
+        echo '<img src="" alt="App Icon" id="gs-app-icon-img" style="display:none;">';
+    }
+    echo '</div>';
+    echo '<div class="gs-app-icon-browser-chrome">';
+    echo '<div class="gs-app-icon-browser-dots"><span></span><span></span><span></span></div>';
+    echo '<div class="gs-app-icon-browser-tab">';
+    if ($icon_url) {
+        echo '<img src="' . esc_url($icon_url) . '" class="gs-app-icon-tab-img" id="gs-app-icon-tab-img">';
+    } else {
+        echo '<span class="dashicons dashicons-admin-site" style="font-size:16px;width:16px;height:16px;color:#ccc;display:block;" id="gs-app-icon-tab-dashicon"></span>';
+        echo '<img src="" class="gs-app-icon-tab-img" id="gs-app-icon-tab-img" style="display:none;">';
+    }
+    echo '<span id="gs-app-icon-tab-title">' . esc_html($current_title ? $current_title : 'Site Title') . '</span>';
+    echo '<span style="color: #999; margin-left:8px; font-size:10px;">×</span>';
+    echo '</div>';
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="gs-app-icon-actions">';
+    echo '<button type="button" class="gs-btn gs-btn-secondary" id="gs-app-icon-upload-btn" style="background:#fff; color:#0073aa; border:none; border-radius:2px; font-weight:normal;">' . esc_html__('Change App Icon', 'gend-society') . '</button>';
+    echo '<a href="#" class="gs-app-icon-remove" id="gs-app-icon-remove-btn" ' . ($icon_url ? '' : 'style="display:none;"') . '>' . esc_html__('Remove App Icon', 'gend-society') . '</a>';
+    echo '</div>';
+
+    echo '<input type="hidden" id="gs_app_icon_id" name="gs_app_icon" value="' . esc_attr($current_icon_id) . '">';
+    echo '<p class="gs-settings-help-text">The App Icon is what you see in browser tabs, bookmark bars, and within the Gend.me mobile apps. It should be square and at least 512 by 512 pixels.</p>';
+
+    echo '</div>'; // End input group
+    echo '</div>'; // End form row
+
+    // Site Logo
+    echo '<div class="gs-settings-form-row">';
+    echo '<label>' . esc_html__('Site Logo', 'gend-society') . '</label>';
+    echo '<div class="gs-settings-input-group">';
+
+    echo '<div class="gs-app-icon-preview" style="height: 120px; background: rgba(0,0,0,0.1); border: 1px dashed rgba(255,255,255,0.1);">';
+    echo '<div id="gs-site-logo-preview-div" style="width: 100%; height: 100%; display: flex; align-items: center; justify-content: center; padding: 10px;">';
+    if ($logo_url) {
+        echo '<img src="' . esc_url($logo_url) . '" alt="Site Logo" id="gs-site-logo-img" style="max-width: 100%; max-height: 100%; object-fit: contain;">';
+    } else {
+        echo '<span class="dashicons dashicons-format-image" style="font-size: 48px; width: 48px; height: 48px; color: rgba(255,255,255,0.2);" id="gs-site-logo-dashicon"></span>';
+        echo '<img src="" alt="Site Logo" id="gs-site-logo-img" style="display:none; max-width: 100%; max-height: 100%; object-fit: contain;">';
+    }
+    echo '</div>';
+    echo '</div>';
+
+    echo '<div class="gs-app-icon-actions">';
+    echo '<button type="button" class="gs-btn gs-btn-secondary" id="gs-site-logo-upload-btn" style="background:#fff; color:#0073aa; border:none; border-radius:2px; font-weight:normal;">' . esc_html__('Change Site Logo', 'gend-society') . '</button>';
+    echo '<a href="#" class="gs-app-icon-remove" id="gs-site-logo-remove-btn" ' . ($logo_url ? '' : 'style="display:none;"') . '>' . esc_html__('Remove Site Logo', 'gend-society') . '</a>';
+    echo '</div>';
+
+    echo '<input type="hidden" id="gs_site_logo_id" name="gs_site_logo" value="' . esc_attr($current_logo_id) . '">';
+    echo '<p class="gs-settings-help-text">The Site Logo is typically displayed in the header of your website. Most themes work best with a landscape or square logo.</p>';
+
+    echo '</div>'; // End input group
+    echo '</div>'; // End form row
+
+    echo '<div style="margin-top: 30px;">';
+    echo '<button type="submit" class="gs-btn">' . esc_html__('Save Settings', 'gend-society') . '</button>';
+    echo '</div>';
+
+    echo '</form>';
+
+    // Media upload JS
+    ?>
+    <script>
+    jQuery(document).ready(function($){
+        var mediaUploader;
+        $('#gs-app-icon-upload-btn').click(function(e) {
+            e.preventDefault();
+            if (mediaUploader) {
+                mediaUploader.open();
+                return;
+            }
+            mediaUploader = wp.media.frames.file_frame = wp.media({
+                title: 'Choose App Icon',
+                button: { text: 'Select Icon' },
+                multiple: false
+            });
+            mediaUploader.on('select', function() {
+                var attachment = mediaUploader.state().get('selection').first().toJSON();
+                $('#gs_app_icon_id').val(attachment.id);
+                var imgUrl = attachment.sizes && attachment.sizes.full ? attachment.sizes.full.url : attachment.url;
+                $('#gs-app-icon-img').attr('src', imgUrl).show();
+                $('#gs-app-icon-dashicon').hide();
+                $('#gs-app-icon-tab-img').attr('src', imgUrl).show();
+                $('#gs-app-icon-tab-dashicon').hide();
+                $('#gs-app-icon-remove-btn').show();
+            });
+            mediaUploader.open();
+        });
+
+        var logoUploader;
+        $('#gs-site-logo-upload-btn').click(function(e) {
+            e.preventDefault();
+            if (logoUploader) {
+                logoUploader.open();
+                return;
+            }
+            logoUploader = wp.media.frames.file_frame = wp.media({
+                title: 'Choose Site Logo',
+                button: { text: 'Select Logo' },
+                multiple: false
+            });
+            logoUploader.on('select', function() {
+                var attachment = logoUploader.state().get('selection').first().toJSON();
+                $('#gs_site_logo_id').val(attachment.id);
+                var imgUrl = attachment.sizes && attachment.sizes.full ? attachment.sizes.full.url : attachment.url;
+                $('#gs-site-logo-img').attr('src', imgUrl).show();
+                $('#gs-site-logo-dashicon').hide();
+                $('#gs-site-logo-remove-btn').show();
+            });
+            logoUploader.open();
+        });
+
+        $('#gs-app-icon-remove-btn').click(function(e){
+            e.preventDefault();
+            $('#gs_app_icon_id').val('');
+            $('#gs-app-icon-img').attr('src', '').hide();
+            $('#gs-app-icon-dashicon').show();
+            $('#gs-app-icon-tab-img').attr('src', '').hide();
+            $('#gs-app-icon-tab-dashicon').show();
+            $(this).hide();
+        });
+
+        $('#gs-site-logo-remove-btn').click(function(e){
+            e.preventDefault();
+            $('#gs_site_logo_id').val('');
+            $('#gs-site-logo-img').attr('src', '').hide();
+            $('#gs-site-logo-dashicon').show();
+            $(this).hide();
+        });
+
+        // Live update tab title
+        $('#gs_app_title').on('input', function() {
+            var val = $(this).val();
+            $('#gs-app-icon-tab-title').text(val ? val : 'Site Title');
+        });
+    });
+    </script>
+    <?php
 }

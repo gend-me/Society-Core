@@ -277,135 +277,298 @@ body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
     .header-anchor-wrap .nav-actions-right { display: none !important; }
 }
 
-/* ------ OAUTH PROFILE HEADER VARIANT ----------------------- */
-/* Shown when the user is logged in via gend.me OAuth: avatar + */
-/* gend.me profile menu (Overview/Portfolio/App Projects/etc.)  */
-/* + View Site button (right). Mirrors the profile page nav     */
-/* (member-profile-header.php → .gdc-nav-item) so the wp-admin  */
-/* header reads as a continuation of the gend.me profile.       */
+/* ------ CONNECTED-GROUP HEADER VARIANT --------------------- */
+/* Centre of the bar carries the connected web-app GROUP menu     */
+/* (Feature Suite / Hosting / Compute Gas / Organization); each   */
+/* link opens a wp-admin page that embeds that section inline.    */
+/* The gend.me profile nav collapses behind the avatar on the far */
+/* right (beside View Site) into an animated, staggered dropdown. */
 
-.header-anchor-wrap--oauth { gap: 24px; }
+.header-anchor-wrap--oauth { gap: 18px; }
 
-.header-anchor-wrap--oauth .gs-profile-avatar-link {
+/* ── Centre: connected web-app group menu ─────────────────────── */
+.header-anchor-wrap--oauth .nav-central--group {
     order: 1;
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+    justify-content: flex-start;
+    overflow-x: auto;
+    scrollbar-width: none;
+}
+.header-anchor-wrap--oauth .nav-central--group::-webkit-scrollbar { display: none; }
+
+.header-anchor-wrap--oauth .gs-group-nav-item {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    height: 38px;
+    padding: 0 16px;
+    border-radius: 10px;
+    color: #cbd5f5;
+    font-weight: 800;
+    font-size: clamp(0.64rem, 0.78vw, 0.74rem);
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    text-decoration: none;
+    white-space: nowrap;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    opacity: 0;
+    animation: gsHeaderFadeBlurIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+    transition: color 0.2s ease, background 0.2s ease, border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+}
+.header-anchor-wrap--oauth .gs-group-nav-item .gs-group-nav-icon {
+    font-size: 16px;
+    width: 16px;
+    height: 16px;
+    line-height: 16px;
+    color: var(--gs-blue);
+    flex: 0 0 auto;
+    transition: color 0.2s ease;
+}
+.header-anchor-wrap--oauth .gs-group-nav-item .pill-content {
+    background: transparent;
+    backdrop-filter: none;
+    padding: 0;
+    width: auto;
+    height: auto;
+    letter-spacing: inherit;
+}
+.header-anchor-wrap--oauth .gs-group-nav-item:nth-child(1) { animation-delay: 0.34s; }
+.header-anchor-wrap--oauth .gs-group-nav-item:nth-child(2) { animation-delay: 0.42s; }
+.header-anchor-wrap--oauth .gs-group-nav-item:nth-child(3) { animation-delay: 0.50s; }
+.header-anchor-wrap--oauth .gs-group-nav-item:nth-child(4) { animation-delay: 0.58s; }
+.header-anchor-wrap--oauth .gs-group-nav-item:nth-child(5) { animation-delay: 0.66s; }
+.header-anchor-wrap--oauth .gs-group-nav-item:nth-child(6) { animation-delay: 0.74s; }
+
+.header-anchor-wrap--oauth .gs-group-nav-item:hover {
+    color: #fff;
+    background: rgba(110, 193, 228, 0.10);
+    border-color: rgba(110, 193, 228, 0.35);
+    transform: translateY(-1px);
+}
+.header-anchor-wrap--oauth .gs-group-nav-item.is-active {
+    color: #fff;
+    background: rgba(182, 8, 201, 0.16);
+    border-color: rgba(182, 8, 201, 0.5);
+    box-shadow: 0 0 16px rgba(182, 8, 201, 0.25);
+}
+.header-anchor-wrap--oauth .gs-group-nav-item.is-active .gs-group-nav-icon { color: #e090ff; }
+
+/* ── Right: avatar + animated profile dropdown ────────────────── */
+.header-anchor-wrap--oauth .gs-profile-cluster {
+    order: 2;
+    position: relative;
     flex-shrink: 0;
-    /* Auto-margin centering: this + margin-right:auto on the nav splits the
-     * free space evenly, centering the avatar+menu cluster while View Site
-     * stays pinned right. */
-    margin-left: auto;
+    display: inline-flex;
+    align-items: center;
+}
+
+.header-anchor-wrap--oauth .gs-profile-avatar-btn {
+    position: relative;
     display: inline-flex;
     align-items: center;
     justify-content: center;
     width: 42px;
     height: 42px;
+    padding: 0;
     border-radius: 50%;
-    overflow: hidden;
-    border: 2px solid var(--gs-magenta);
-    box-shadow: 0 0 16px rgba(182, 8, 201, 0.45);
-    text-decoration: none;
-    opacity: 0;
-    animation: gsHeaderFadeBlurIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards 0.25s;
-    transition: transform 0.2s ease, box-shadow 0.2s ease;
-}
-
-.header-anchor-wrap--oauth .gs-profile-avatar-link:hover {
-    transform: scale(1.05);
-    box-shadow: 0 0 22px rgba(182, 8, 201, 0.7);
-}
-
-.header-anchor-wrap--oauth .gs-profile-avatar-img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-    display: block;
-}
-
-.header-anchor-wrap--oauth .nav-central--profile {
-    order: 2;
-    /* Natural width (don't grow) + margin-right:auto so the avatar+menu
-     * cluster centers as a group; View Site stays right. */
-    flex: 0 1 auto;
-    margin-right: auto;
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 32px;
-    min-width: 0;
-    overflow-x: auto;
-    scrollbar-width: none;
-}
-
-.header-anchor-wrap--oauth .nav-central--profile::-webkit-scrollbar { display: none; }
-
-/* Mirror .gdc-nav-item from member-profile-header.php — text-only, */
-/* uppercase, letter-spaced, magenta active/hover with bottom border. */
-.header-anchor-wrap--oauth .gs-profile-nav-item {
-    position: relative;
-    display: inline-flex;
-    align-items: center;
-    height: 100%;
-    padding: 0 2px;
-    color: #64748b;
-    font-weight: 900;
-    font-size: 0.72rem;
-    letter-spacing: 2px;
-    text-transform: uppercase;
-    text-decoration: none;
+    overflow: visible;
     background: transparent;
     border: 0;
-    border-bottom: 2px solid transparent;
-    white-space: nowrap;
+    cursor: pointer;
     opacity: 0;
-    animation: gsHeaderFadeBlurIn 0.6s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
-    transition: color 0.25s ease, border-color 0.25s ease;
+    animation: gsHeaderFadeBlurIn 0.7s cubic-bezier(0.34, 1.56, 0.64, 1) forwards 0.28s;
+    transition: transform 0.2s ease;
+}
+.header-anchor-wrap--oauth .gs-profile-avatar-btn:hover { transform: scale(1.05); }
+.header-anchor-wrap--oauth .gs-profile-avatar-btn:focus-visible { outline: none; }
+
+.header-anchor-wrap--oauth .gs-profile-avatar-img {
+    width: 42px;
+    height: 42px;
+    border-radius: 50%;
+    object-fit: cover;
+    display: block;
+    border: 2px solid var(--gs-magenta);
+    box-shadow: 0 0 16px rgba(182, 8, 201, 0.45);
+    position: relative;
+    z-index: 1;
 }
 
-.header-anchor-wrap--oauth .gs-profile-nav-item .pill-content {
-    background: transparent;
-    backdrop-filter: none;
-    padding: 0;
-    height: auto;
-    width: auto;
-    letter-spacing: inherit;
+/* Pulsing futuristic ring around the avatar to telegraph "click me". */
+.header-anchor-wrap--oauth .gs-profile-avatar-ring {
+    position: absolute;
+    inset: -4px;
+    border-radius: 50%;
+    border: 1.5px solid rgba(182, 8, 201, 0.55);
+    pointer-events: none;
+    animation: gsAvatarPulse 2.6s ease-in-out infinite;
+}
+@keyframes gsAvatarPulse {
+    0%, 100% { transform: scale(1);    opacity: 0.55; }
+    50%      { transform: scale(1.18); opacity: 0;    }
+}
+.header-anchor-wrap--oauth .gs-profile-avatar-btn[aria-expanded="true"] .gs-profile-avatar-img {
+    box-shadow: 0 0 24px rgba(182, 8, 201, 0.8);
 }
 
-/* Icon (dashicon) before each label — mirrors the gend.me frontend
- * sidebar's icon+label treatment. */
-.header-anchor-wrap--oauth .gs-profile-nav-item .gs-profile-nav-icon {
-    font-size: 16px;
-    width: 16px;
-    height: 16px;
-    line-height: 16px;
-    margin-right: 7px;
-    color: inherit;
+/* The dropdown panel — hidden until `.is-open`. display:none → block on
+ * open makes the staggered child animations replay every time. */
+.header-anchor-wrap--oauth .gs-profile-dropdown {
+    display: none;
+    position: absolute;
+    top: calc(100% + 14px);
+    right: 0;
+    width: 268px;
+    padding: 10px;
+    border-radius: 16px;
+    background: linear-gradient(180deg, rgba(18, 22, 32, 0.96), rgba(9, 11, 17, 0.97));
+    border: 1px solid rgba(182, 8, 201, 0.35);
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.6),
+        0 0 0 1px rgba(255, 255, 255, 0.04) inset,
+        0 0 30px rgba(182, 8, 201, 0.18);
+    backdrop-filter: blur(26px) saturate(170%);
+    -webkit-backdrop-filter: blur(26px) saturate(170%);
+    z-index: 100002;
+}
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open {
+    display: block;
+    transform-origin: top right;
+    animation: gsPdPanelIn 0.34s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+}
+@keyframes gsPdPanelIn {
+    0%   { opacity: 0; transform: translateY(-10px) scale(0.94); filter: blur(8px); }
+    100% { opacity: 1; transform: translateY(0) scale(1);        filter: blur(0); }
+}
+
+/* A small notch pointing up at the avatar. */
+.header-anchor-wrap--oauth .gs-profile-dropdown::before {
+    content: "";
+    position: absolute;
+    top: -7px;
+    right: 16px;
+    width: 12px;
+    height: 12px;
+    background: rgba(18, 22, 32, 0.96);
+    border-left: 1px solid rgba(182, 8, 201, 0.35);
+    border-top: 1px solid rgba(182, 8, 201, 0.35);
+    transform: rotate(45deg);
+}
+
+.header-anchor-wrap--oauth .gs-pd-head {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 8px 10px 14px;
+    margin-bottom: 8px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    opacity: 0;
+}
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-head {
+    animation: gsPdItemIn 0.42s cubic-bezier(0.34, 1.4, 0.64, 1) forwards 0.04s;
+}
+.header-anchor-wrap--oauth .gs-pd-head-avatar {
+    width: 40px; height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 1.5px solid rgba(182, 8, 201, 0.6);
     flex: 0 0 auto;
 }
+.header-anchor-wrap--oauth .gs-pd-head-meta { display: flex; flex-direction: column; min-width: 0; }
+.header-anchor-wrap--oauth .gs-pd-head-name {
+    color: #fff; font-weight: 800; font-size: 0.85rem;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.header-anchor-wrap--oauth .gs-pd-head-link {
+    color: var(--gs-blue) !important; font-size: 0.7rem; font-weight: 700;
+    text-decoration: none; text-transform: uppercase; letter-spacing: 0.5px;
+}
+.header-anchor-wrap--oauth .gs-pd-head-link:hover { color: var(--gs-accent) !important; }
 
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(1) { animation-delay: 0.40s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(2) { animation-delay: 0.48s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(3) { animation-delay: 0.56s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(4) { animation-delay: 0.64s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(5) { animation-delay: 0.72s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(6) { animation-delay: 0.80s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(7) { animation-delay: 0.88s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(8) { animation-delay: 0.96s; }
-.header-anchor-wrap--oauth .gs-profile-nav-item:nth-child(9) { animation-delay: 1.04s; }
+.header-anchor-wrap--oauth .gs-pd-items { display: flex; flex-direction: column; gap: 3px; }
 
-.header-anchor-wrap--oauth .gs-profile-nav-item:hover {
-    color: rgba(255, 255, 255, 0.85);
-    border-bottom-color: rgba(182, 8, 201, 0.4);
+.header-anchor-wrap--oauth .gs-pd-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 11px 12px;
+    border-radius: 10px;
+    color: #cbd5f5 !important;
+    font-weight: 700;
+    font-size: 0.82rem;
+    text-decoration: none;
+    border: 1px solid transparent;
+    opacity: 0;
+    transition: background 0.18s ease, color 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.header-anchor-wrap--oauth .gs-pd-item .gs-pd-icon {
+    font-size: 18px; width: 18px; height: 18px; line-height: 18px;
+    color: var(--gs-magenta); flex: 0 0 auto;
+}
+.header-anchor-wrap--oauth .gs-pd-item .gs-pd-arrow {
+    margin-left: auto;
+    font-size: 16px; width: 16px; height: 16px; line-height: 16px;
+    color: rgba(255, 255, 255, 0.25);
+    transform: translateX(-4px);
+    opacity: 0;
+    transition: transform 0.18s ease, opacity 0.18s ease;
+}
+.header-anchor-wrap--oauth .gs-pd-item:hover {
+    background: rgba(182, 8, 201, 0.12);
+    border-color: rgba(182, 8, 201, 0.30);
+    color: #fff !important;
+    transform: translateX(2px);
+}
+.header-anchor-wrap--oauth .gs-pd-item:hover .gs-pd-arrow { opacity: 1; transform: translateX(0); }
+.header-anchor-wrap--oauth .gs-pd-logout { margin-top: 4px; }
+.header-anchor-wrap--oauth .gs-pd-logout .gs-pd-icon { color: var(--gs-red); }
+.header-anchor-wrap--oauth .gs-pd-logout:hover {
+    background: rgba(204, 0, 0, 0.12);
+    border-color: rgba(204, 0, 0, 0.35);
 }
 
-.header-anchor-wrap--oauth .gs-profile-nav-item.is-active {
-    color: var(--gs-magenta);
-    border-bottom-color: var(--gs-magenta);
+/* Each item builds itself in, one after another. */
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item {
+    animation: gsPdItemIn 0.44s cubic-bezier(0.34, 1.4, 0.64, 1) forwards;
+}
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item:nth-child(1) { animation-delay: 0.10s; }
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item:nth-child(2) { animation-delay: 0.17s; }
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item:nth-child(3) { animation-delay: 0.24s; }
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item:nth-child(4) { animation-delay: 0.31s; }
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item:nth-child(5) { animation-delay: 0.38s; }
+.header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item:nth-child(6) { animation-delay: 0.45s; }
+
+@keyframes gsPdItemIn {
+    0%   { opacity: 0; transform: translateX(14px) scale(0.96); filter: blur(5px); }
+    100% { opacity: 1; transform: translateX(0) scale(1);       filter: blur(0); }
 }
 
 .header-anchor-wrap--oauth .visit-site-slot { order: 3; }
 
+@media (prefers-reduced-motion: reduce) {
+    .header-anchor-wrap--oauth .gs-group-nav-item,
+    .header-anchor-wrap--oauth .gs-profile-avatar-btn,
+    .header-anchor-wrap--oauth .gs-profile-avatar-ring,
+    .header-anchor-wrap--oauth .gs-profile-dropdown.is-open,
+    .header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-item,
+    .header-anchor-wrap--oauth .gs-profile-dropdown.is-open .gs-pd-head {
+        animation: none !important;
+        opacity: 1 !important;
+    }
+}
+
+/* Tablet/mobile: group menu scrolls; show icons + shorter labels. */
 @media (max-width: 900px) {
-    .header-anchor-wrap--oauth .nav-central--profile { display: flex !important; gap: 18px; }
-    .header-anchor-wrap--oauth .gs-profile-nav-item { font-size: 0.65rem; letter-spacing: 1.5px; }
+    .header-anchor-wrap--oauth .gs-group-nav-item { padding: 0 12px; font-size: 0.62rem; letter-spacing: 0.5px; }
+}
+@media (max-width: 600px) {
+    .header-anchor-wrap--oauth .gs-profile-dropdown { width: calc(100vw - 28px); }
 }
 
 /* ------ LEFT SIDEBAR --------------------------------------- */

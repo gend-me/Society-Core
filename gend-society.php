@@ -39,6 +39,15 @@ require_once GS_DIR . 'inc/feature-state-reporter.php';
 require_once GS_DIR . 'inc/dashboard-hosting.php';
 require_once GS_DIR . 'inc/feature-cards.php';
 require_once GS_DIR . 'inc/pages/dashboard.php';
+// Connected web-app group menu → embedded (inline, not iframe) tab pages.
+// Reuses the container-local renderers above (feature cards / hosting /
+// compute-gas / feature-access) so the header's group menu opens each
+// section as a real wp-admin page. Must load after those renderers.
+require_once GS_DIR . 'inc/group-embed.php';
+require_once GS_DIR . 'inc/web-shell.php';
+require_once GS_DIR . 'inc/web-shell-gcloud.php';
+require_once GS_DIR . 'inc/web-shell-sites.php';
+require_once GS_DIR . 'inc/web-shell-chat.php';
 
 // BP group tabs (Feature Suite / User Access / Hosting / Compute Gas)
 // have to wait for BuddyPress to define BP_Group_Extension. Loaded via
@@ -98,6 +107,22 @@ require_once GS_DIR . 'inc/ai-proxy.php';
 // AI chat widget loader — serves LEO's frontend widget from the hub on
 // subsites without LEO. Dormant while LEO is active locally.
 require_once GS_DIR . 'inc/ai-widget.php';
+
+// Wireframe artifact store — persists the [aipa_wireframe] output so the
+// shortcode shows the saved version on subsequent loads, and mirrors the
+// HTML to the hub's linked group for the Business Plan → Wireframe sub-tab.
+require_once GS_DIR . 'inc/wireframe-store.php';
+
+// Chatflow router — gs/v1/chatflows/<slug> endpoint that serves the flow
+// definition locally on the hub (via Leo_Chatflow) or forwards to the hub
+// over OAuth on customer subsites. Lets the flow engine target one stable
+// gend-society-namespaced endpoint regardless of where it's running.
+require_once GS_DIR . 'inc/chatflows-router.php';
+
+// User-profile router — gs/v1/user-profile (GET/PUT). Hub delegates to
+// Leo_DB; subsites use blog-suffixed user_meta so each customer's
+// per-user chatflow profile (industry, brand inputs, etc.) stays isolated.
+require_once GS_DIR . 'inc/user-profile-router.php';
 
 // Feature-access upgrade prompt page — shown when a customer hits a
 // wp-admin area their current Dashboard plan doesn't include.

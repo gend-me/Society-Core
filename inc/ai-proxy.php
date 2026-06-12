@@ -459,12 +459,26 @@ class GS_AI_Proxy {
     }
 
     protected static function auth_headers( $bearer ) {
-        return array(
+        $h = array(
             'Authorization'      => 'Bearer ' . $bearer,
             'X-Gend-Token'       => $bearer,
             'X-Gend-Source-Blog' => (string) ( function_exists( 'get_current_blog_id' ) ? get_current_blog_id() : 0 ),
             'X-Gend-Source-Host' => isset( $_SERVER['HTTP_HOST'] ) ? sanitize_text_field( wp_unslash( $_SERVER['HTTP_HOST'] ) ) : '',
         );
+        // Forward chatflow + project-task linkage when the caller (chat
+        // widget, desktop app, plugin) provides them. The hub records
+        // them in aipa_usage.meta so Payments → AI Tokens can break
+        // spend down by chatflow and deep-link to the project task.
+        foreach ( array(
+            'HTTP_X_GEND_CHATFLOW'   => 'X-Gend-Chatflow',
+            'HTTP_X_GEND_TASK_ID'    => 'X-Gend-Task-Id',
+            'HTTP_X_GEND_TASK_LABEL' => 'X-Gend-Task-Label',
+        ) as $srv => $hdr ) {
+            if ( ! empty( $_SERVER[ $srv ] ) ) {
+                $h[ $hdr ] = sanitize_text_field( wp_unslash( $_SERVER[ $srv ] ) );
+            }
+        }
+        return $h;
     }
 
     /**

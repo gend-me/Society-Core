@@ -32,6 +32,106 @@ function gdc_enqueue_profile_header_styles() {
     wp_add_inline_style( 'gdc-profile-header', gdc_profile_header_css() );
 }
 
+// ─── Profile nav icons ────────────────────────────────────────────────────────
+// Returns a futuristic, dashboard-style SVG icon for a given BP/Youzify nav slug.
+// All icons share a unified 24×24 viewBox + currentColor stroke so they inherit
+// the active/hover color treatments and stagger animation from the parent.
+if ( ! function_exists( 'gdc_get_profile_nav_icon' ) ) {
+function gdc_get_profile_nav_icon( $slug ) {
+    $key = strtolower( (string) $slug );
+
+    // Aliases — collapse common variants to one canonical icon.
+    static $alias = [
+        'home'              => 'overview',
+        'activity'          => 'overview',
+        'profile-overview'  => 'overview',
+        'bp-files'          => 'files',
+        'portfolio'         => 'files',
+        'connections'       => 'friends',
+        'wallet'            => 'member-wallet',
+        'wallets'           => 'member-wallet',
+        'notification'      => 'notifications',
+        'notify'            => 'notifications',
+    ];
+    if ( isset( $alias[ $key ] ) ) $key = $alias[ $key ];
+
+    static $icons = [
+        // Overview / Activity — heartbeat trace
+        'overview'      => '<path d="M3 12h4l2.5-7 5 14 2.5-7H21"/>',
+        // Profile — node + ring
+        'profile'       => '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>',
+        // Portfolio (Files) — 4-cell dashboard grid
+        'files'         => '<rect x="3" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2"/>',
+        // App Projects (Groups) — isometric cube stack
+        'groups'        => '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>',
+        // Connections (Friends) — linked nodes triangle
+        'friends'       => '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7.5" x2="11" y2="15.5"/><line x1="16" y1="7.5" x2="13" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/>',
+        // Messages — chat node with signal pips
+        'messages'      => '<path d="M21 12a8 8 0 0 1-12 7l-5 2 1.5-5A8 8 0 1 1 21 12z"/><circle cx="9" cy="12" r="0.9" fill="currentColor"/><circle cx="13" cy="12" r="0.9" fill="currentColor"/><circle cx="17" cy="12" r="0.9" fill="currentColor"/>',
+        // Wallet — chip + slot
+        'member-wallet' => '<rect x="2.5" y="6.5" width="19" height="13" rx="2"/><path d="M2.5 10.5h19"/><rect x="15" y="14" width="4" height="3" rx="0.8"/>',
+        // Settings — orbital sliders
+        'settings'      => '<line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="18" r="2"/>',
+        // Notifications — beacon
+        'notifications' => '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a2 2 0 0 1-3 0"/>',
+        // Forums — stacked nodes
+        'forums'        => '<path d="M21 12a4 4 0 0 1-4 4H9l-4 3V8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4z"/><line x1="9" y1="10" x2="17" y2="10"/><line x1="9" y1="13" x2="14" y2="13"/>',
+        // Media — frame + transmission dot
+        'media'         => '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+        // Blogs / Posts — pulse pad
+        'blogs'         => '<rect x="3" y="4" width="18" height="16" rx="2"/><line x1="7" y1="9" x2="17" y2="9"/><line x1="7" y1="13" x2="17" y2="13"/><line x1="7" y1="17" x2="13" y2="17"/>',
+        // Memberships — ID badge / token card
+        'memberships'   => '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11.5" r="2.2"/><path d="M6 17a3 3 0 0 1 6 0"/><line x1="14.5" y1="10" x2="19" y2="10"/><line x1="14.5" y1="13" x2="18" y2="13"/>',
+        // My Projects — kanban columns
+        'projects'      => '<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="7" rx="1"/>',
+        // Sales Team — chart-up + person
+        'sales-team'    => '<path d="M3 17l5-5 4 4 8-9"/><polyline points="14 7 21 7 21 14"/>',
+        // Referral Sales — share/branching arrows
+        'referral-sales'=> '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><line x1="8.2" y1="10.8" x2="15.8" y2="6.2"/><line x1="8.2" y1="13.2" x2="15.8" y2="17.8"/>',
+        // Invite — user with plus
+        'invite'        => '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><line x1="19" y1="6" x2="19" y2="14"/><line x1="15" y1="10" x2="23" y2="10"/>',
+        // Connections (alias to friends visual, kept explicit for clarity)
+        'connections'   => '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7.5" x2="11" y2="15.5"/><line x1="16" y1="7.5" x2="13" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/>',
+    ];
+
+    $body = isset( $icons[ $key ] )
+        ? $icons[ $key ]
+        // Fallback — reticle (generic targeting node)
+        : '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/><line x1="12" y1="1" x2="12" y2="4"/><line x1="12" y1="20" x2="12" y2="23"/><line x1="1" y1="12" x2="4" y2="12"/><line x1="20" y1="12" x2="23" y2="12"/>';
+
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $body . '</svg>';
+}
+}
+
+// ─── Move "Visitors" into the Connections (friends) subnav ────────────────────
+// The Youzify visitors plugin registers a top-level Profile nav at slug
+// `visitors`. We hide it from our primary nav (above) and add an equivalent
+// subnav entry under friends. The `link` parameter points the subnav directly
+// at the existing /visitors/ URL so the underlying screen function still runs.
+add_action( 'bp_setup_nav', 'gdc_visitors_to_friends_subnav', 999 );
+function gdc_visitors_to_friends_subnav() {
+    if ( ! function_exists( 'bp_core_new_subnav_item' ) ) return;
+    if ( ! function_exists( 'bp_is_active' ) || ! bp_is_active( 'friends' ) ) return;
+    if ( ! bp_displayed_user_id() ) return;
+
+    $friends_slug = function_exists( 'bp_get_friends_slug' ) ? bp_get_friends_slug() : 'friends';
+
+    bp_core_new_subnav_item( array(
+        'name'                    => __( 'Visitors', 'gend-society' ),
+        'slug'                    => 'visitors',
+        'parent_slug'             => $friends_slug,
+        'parent_url'              => bp_displayed_user_domain() . $friends_slug . '/',
+        'link'                    => bp_displayed_user_domain() . 'visitors/',
+        'position'                => 90,
+        'screen_function'         => '__return_true',
+        'show_for_displayed_user' => true,
+    ) );
+}
+
+// "Activity" appears as a tab on the App Projects page itself
+// (see gs_member_groups_tabs_open() in member-profile-pages.php) instead
+// of as a BP subnav entry — keeps the tab strip self-contained.
+
 // ─── Render header ────────────────────────────────────────────────────────────
 // Hook into youzify_profile_before_header (fires before the <header> element)
 // so our section renders first. The original header + navbar are hidden via CSS.
@@ -189,9 +289,19 @@ function gdc_render_profile_header() {
         }
     }
 
-    // Remove "Society"
+    // Remove "Society" + "Visitors" + "Activity" from the primary nav.
+    // Visitors → moved under Connections by gdc_visitors_to_friends_subnav()
+    // Activity → moved under App Projects (groups) by gdc_activity_to_groups_subnav()
     foreach ( $nav_items as $index => $item ) {
         if ( $item->slug === 'society' || strpos( strip_tags( $item->name ), 'Society' ) !== false ) {
+            unset( $nav_items[ $index ] );
+            continue;
+        }
+        if ( $item->slug === 'visitors' || strpos( strip_tags( $item->name ), 'Visitors' ) !== false ) {
+            unset( $nav_items[ $index ] );
+            continue;
+        }
+        if ( $item->slug === 'activity' ) {
             unset( $nav_items[ $index ] );
         }
     }
@@ -438,12 +548,14 @@ function gdc_render_profile_header() {
         <?php if ( ! $gs_hide_profile_nav ) : ?>
         <nav class="gdc-profile-nav" id="gdc-profile-nav" aria-label="Profile navigation">
             <div class="gdc-profile-nav-inner">
-                <?php foreach ( $nav_items as $item ) :
+                <?php foreach ( $nav_items as $i => $item ) :
                     $is_active = ( $current_component === $item->slug );
                 ?>
                 <a href="<?php echo esc_url( $item->link ); ?>"
-                   class="gdc-nav-item<?php echo $is_active ? ' gdc-nav-item--active' : ''; ?>">
-                    <?php echo wp_kses( $item->name, [ 'span' => [ 'class' => true ] ] ); ?>
+                   class="gdc-nav-item<?php echo $is_active ? ' gdc-nav-item--active' : ''; ?>"
+                   style="--gdc-nav-i: <?php echo (int) $i; ?>">
+                    <span class="gdc-nav-icon" aria-hidden="true"><?php echo gdc_get_profile_nav_icon( $item->slug ); ?></span>
+                    <span class="gdc-nav-text"><?php echo wp_kses( $item->name, [ 'span' => [ 'class' => true ] ] ); ?></span>
                 </a>
                 <?php endforeach; ?>
             </div>
@@ -451,6 +563,167 @@ function gdc_render_profile_header() {
         <?php endif; ?>
 
     </section>
+
+    <!-- ── Sub-nav icon injector ───────────────────────────────────────────
+         BP's sub-navs (Friendships/Requests, Inbox/Sent/Compose, General/
+         Notifications/Account, etc.) are rendered by core templates, so we
+         enhance them client-side: detect each <li>, derive its slug from the
+         BP-generated id (`{component}-{slug}-li`), and prepend a futuristic
+         icon chip that matches the primary-nav styling. Re-runs after BP's
+         AJAX tab switches so newly-rendered sub-navs get treated too. ── -->
+    <script id="gdc-subnav-icons">
+    (function () {
+        if ( window.__gdcSubnavBound ) return;
+        window.__gdcSubnavBound = true;
+
+        var ICONS = {
+            // Friends / Connections
+            'my-friends':         '<circle cx="9" cy="10" r="3"/><circle cx="17" cy="12" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14 19a5 5 0 0 1 8 0"/>',
+            'friendships':        '<circle cx="9" cy="10" r="3"/><circle cx="17" cy="12" r="2.5"/><path d="M3 20a6 6 0 0 1 12 0"/><path d="M14 19a5 5 0 0 1 8 0"/>',
+            'requests':           '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><line x1="18" y1="7" x2="18" y2="13"/><line x1="15" y1="10" x2="21" y2="10"/>',
+            'invitations':        '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><line x1="18" y1="7" x2="18" y2="13"/><line x1="15" y1="10" x2="21" y2="10"/>',
+            'visitors':           '<path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7S2 12 2 12z"/><circle cx="12" cy="12" r="3"/>',
+
+            // Messages
+            'inbox':              '<path d="M22 12h-6l-2 3h-4l-2-3H2"/><path d="M5 4h14l3 8v7a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2v-7z"/>',
+            'sentbox':            '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+            'sent':               '<line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/>',
+            'compose':            '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+            'notices':            '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a2 2 0 0 1-3 0"/>',
+            'starred':            '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+
+            // Activity
+            'just-me':            '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+            'personal':           '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+            'mentions':           '<circle cx="12" cy="12" r="4"/><path d="M16 8v5a3 3 0 0 0 6 0v-1a10 10 0 1 0-4 8"/>',
+            'favorites':          '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+            'favourites':         '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+            'groups':             '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>',
+
+            // Groups (My Groups subnav)
+            'my-groups':          '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>',
+            'invites':            '<rect x="2" y="5" width="20" height="14" rx="2"/><polyline points="22 7 12 13 2 7"/>',
+            'pending':            '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+
+            // Profile
+            'public':             '<circle cx="12" cy="8" r="4"/><path d="M4 21a8 8 0 0 1 16 0"/>',
+            'edit':               '<path d="M11 4H4a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2v-7"/><path d="M18.5 2.5a2.121 2.121 0 0 1 3 3L12 15l-4 1 1-4z"/>',
+            'change-avatar':      '<circle cx="12" cy="13" r="4"/><path d="M5 8h2l1.5-3h7L17 8h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-9a2 2 0 0 1 2-2z"/>',
+            'change-cover-image': '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+            'change-cover':       '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>',
+
+            // Settings
+            'general':            '<circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M4.2 4.2l2.1 2.1M17.7 17.7l2.1 2.1M2 12h3M19 12h3M4.2 19.8l2.1-2.1M17.7 6.3l2.1-2.1"/>',
+            'notifications':      '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a2 2 0 0 1-3 0"/>',
+            'capabilities':       '<polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/>',
+            'delete-account':     '<polyline points="3 6 5 6 21 6"/><path d="M19 6l-2 14a2 2 0 0 1-2 2H9a2 2 0 0 1-2-2L5 6"/><path d="M10 11v6M14 11v6"/>',
+            'export':             '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+            'data':               '<ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5v6c0 1.7 4 3 9 3s9-1.3 9-3V5"/><path d="M3 11v6c0 1.7 4 3 9 3s9-1.3 9-3v-6"/>',
+
+            // Visitors plugin subnav (Recent / Analytics / History)
+            'recent':             '<circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 14"/>',
+            'analytics':          '<polyline points="3 17 9 11 13 15 21 7"/><polyline points="14 7 21 7 21 14"/>',
+            'history':            '<path d="M3 12a9 9 0 1 0 3-6.7"/><polyline points="3 4 3 9 8 9"/><polyline points="12 7 12 12 15 14"/>',
+
+            // Wallet subnavs (myCred / store credits / history)
+            'transactions':       '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+            'transfer':           '<polyline points="17 1 21 5 17 9"/><path d="M3 11V9a4 4 0 0 1 4-4h14"/><polyline points="7 23 3 19 7 15"/><path d="M21 13v2a4 4 0 0 1-4 4H3"/>',
+            'orders':             '<path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/>',
+            'downloads':          '<path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/>',
+
+            // Forum (bbPress)
+            'topics':             '<path d="M21 12a4 4 0 0 1-4 4H9l-4 3V8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4z"/>',
+            'replies':            '<polyline points="9 17 4 12 9 7"/><path d="M20 18v-2a4 4 0 0 0-4-4H4"/>',
+            'subscriptions':      '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/>',
+            'engagements':        '<path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/>',
+        };
+
+        function makeIcon(slug) {
+            var body = ICONS[slug] || '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="3"/>';
+            return '<span class="gdc-subnav-icon" aria-hidden="true">' +
+                '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round">' +
+                body + '</svg></span>';
+        }
+
+        // Extract canonical slug from a BP subnav <li>.
+        // BP ids follow `{component}-{slug}-li` (sometimes
+        // `{component}-{slug}-personal-li`). Falls back to the last
+        // non-empty URL segment.
+        function slugFromLi(li) {
+            var id = li.id || '';
+            // Strip trailing -li
+            var s = id.replace(/-li$/, '');
+            // Strip leading component prefix — split at first dash
+            var dash = s.indexOf('-');
+            if (dash > 0) s = s.substring(dash + 1);
+            // Some BP nav ids end with `-personal` — drop it
+            s = s.replace(/-personal$/, '');
+            if (s) return s;
+
+            var a = li.querySelector('a');
+            if (!a) return '';
+            var href = (a.getAttribute('href') || '').replace(/[\?#].*$/, '').replace(/\/+$/,'');
+            var parts = href.split('/');
+            return parts[parts.length - 1] || '';
+        }
+
+        function inject(scope) {
+            scope = scope || document;
+            // Target every BP subnav container we know about
+            var selectors = [
+                '#subnav.item-list-tabs li',
+                '.item-body nav.bp-navs li',
+                '.item-body .bp-navs li',
+                '.youzify-tabs-nav li',
+                'div.item-list-tabs.no-ajax li'
+            ];
+            var lis = scope.querySelectorAll(selectors.join(','));
+
+            // Stagger index per subnav container, not per page
+            var counters = new WeakMap();
+            lis.forEach(function (li) {
+                // Skip the main profile nav (already iconified server-side)
+                if (li.closest('.gdc-profile-nav')) return;
+                var a = li.querySelector('a');
+                if (!a) return;
+                if (a.querySelector('.gdc-subnav-icon')) return;
+
+                var slug = slugFromLi(li);
+                a.insertAdjacentHTML('afterbegin', makeIcon(slug));
+
+                // Stagger relative to parent UL so each subnav animates fresh
+                var parent = li.parentElement || li;
+                var i = counters.get(parent) || 0;
+                li.style.setProperty('--gdc-subnav-i', i);
+                counters.set(parent, i + 1);
+            });
+        }
+
+        function run() { inject(document); }
+
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', run);
+        } else {
+            run();
+        }
+
+        // BP swaps subnav contents over AJAX; re-inject after a short beat
+        document.addEventListener('click', function (e) {
+            if (e.target.closest('#subnav a, .item-body .bp-navs a, .youzify-tabs-nav a')) {
+                setTimeout(run, 250);
+                setTimeout(run, 800);
+            }
+        });
+
+        // Observe DOM mutations inside the BP item body (covers
+        // ajax-replaced content where the click may originate elsewhere).
+        var body = document.querySelector('#item-body, .youzify-page-main-content');
+        if (body && window.MutationObserver) {
+            var mo = new MutationObserver(function () { run(); });
+            mo.observe(body, { childList: true, subtree: true });
+        }
+    }());
+    </script>
     <?php
 }
 
@@ -789,32 +1062,292 @@ function gdc_profile_header_css() {
     max-width: 1400px;
     margin: 0 auto;
     display: flex;
-    gap: 40px;
+    flex-wrap: wrap;                            /* wrap before scrolling */
+    justify-content: space-between;             /* distribute across the row */
+    align-items: center;
+    column-gap: clamp(6px, 1vw, 18px);
+    row-gap: 0;
     padding: 0 20px;
-    overflow-x: auto;
+    overflow-x: hidden;                         /* never produce a scrollbar */
     scrollbar-width: none;
 }
 .gdc-profile-nav-inner::-webkit-scrollbar { display: none; }
 .gdc-nav-item {
-    display: block;
-    padding: 25px 0;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 22px 0;
     color: #64748b;
     text-decoration: none !important;
     font-weight: 900;
-    font-size: 0.75rem;
-    letter-spacing: 2px;
+    font-size: clamp(0.62rem, 0.72vw, 0.75rem);
+    letter-spacing: 1.4px;
     text-transform: uppercase;
     white-space: nowrap;
     border-bottom: 2px solid transparent;
-    transition: color 0.25s, border-color 0.25s;
+    transition: color 0.25s, border-color 0.25s, transform 0.3s;
+    opacity: 0;
+    transform: translateY(14px);
+    animation: gdcNavItemEnter 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
+    animation-delay: calc(1.35s + var(--gdc-nav-i, 0) * 0.07s);
+}
+@keyframes gdcNavItemEnter {
+    to { opacity: 1; transform: none; }
 }
 .gdc-nav-item:hover {
-    color: rgba(255,255,255,0.7);
+    color: rgba(255,255,255,0.85);
 }
 .gdc-nav-item--active {
     color: var(--gph-magenta);
     border-bottom-color: var(--gph-magenta);
 }
+
+/* ══ Nav item icon — futuristic dashboard chip ════════════════════════════
+   Each icon sits in a glass plate with a thin border and powers on a beat
+   after its parent <a> appears (double-stagger). The plate color-shifts
+   on hover and lights up magenta with a pulsing beacon when active.
+   ═══════════════════════════════════════════════════════════════════════ */
+.gdc-nav-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.09);
+    color: #64748b;
+    flex-shrink: 0;
+    transition:
+        color 0.3s ease,
+        background 0.3s ease,
+        border-color 0.3s ease,
+        transform 0.3s cubic-bezier(0.22,1,0.36,1),
+        box-shadow 0.3s ease;
+    opacity: 0;
+    transform: scale(0.45) rotate(-12deg);
+    animation: gdcNavIconPower 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    animation-delay: calc(1.55s + var(--gdc-nav-i, 0) * 0.07s);
+}
+.gdc-nav-icon svg {
+    width: 14px;
+    height: 14px;
+    display: block;
+    filter: drop-shadow(0 0 4px currentColor);
+    opacity: 0.92;
+}
+@keyframes gdcNavIconPower {
+    to { opacity: 1; transform: none; }
+}
+
+/* Scan-line sweep — fires once during the icon power-on */
+.gdc-nav-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(115deg,
+        transparent 0%,
+        transparent 35%,
+        rgba(137,194,224,0.35) 50%,
+        transparent 65%,
+        transparent 100%);
+    background-size: 220% 100%;
+    background-position: 220% 0;
+    pointer-events: none;
+    opacity: 0;
+    animation: gdcNavIconScan 0.9s ease-out forwards;
+    animation-delay: calc(1.75s + var(--gdc-nav-i, 0) * 0.07s);
+}
+@keyframes gdcNavIconScan {
+    0%   { opacity: 0;   background-position:  220% 0; }
+    20%  { opacity: 0.9; }
+    100% { opacity: 0;   background-position: -120% 0; }
+}
+
+/* Hover — icon lifts and switches to the blue terminal color */
+.gdc-nav-item:hover .gdc-nav-icon {
+    color: var(--gph-blue);
+    border-color: rgba(137,194,224,0.45);
+    background: rgba(137,194,224,0.08);
+    transform: translateY(-2px);
+    box-shadow:
+        0 0 14px rgba(137,194,224,0.25),
+        inset 0 0 6px rgba(137,194,224,0.15);
+}
+
+/* Active — magenta glow with a live beacon dot */
+.gdc-nav-item--active .gdc-nav-icon {
+    color: var(--gph-magenta);
+    background: rgba(182,8,201,0.12);
+    border-color: rgba(182,8,201,0.45);
+    box-shadow:
+        0 0 18px rgba(182,8,201,0.35),
+        inset 0 0 8px rgba(182,8,201,0.22);
+}
+.gdc-nav-item--active .gdc-nav-icon::after {
+    content: "";
+    position: absolute;
+    top: 3px;
+    right: 3px;
+    width: 4px;
+    height: 4px;
+    border-radius: 50%;
+    background: var(--gph-magenta);
+    box-shadow: 0 0 6px var(--gph-magenta);
+    animation: gdcNavBeacon 1.6s ease-in-out infinite;
+}
+@keyframes gdcNavBeacon {
+    0%, 100% { opacity: 0.35; transform: scale(0.8); }
+    50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+/* Honor reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+    .gdc-nav-item,
+    .gdc-nav-icon,
+    .gdc-nav-icon::before,
+    .gdc-nav-item--active .gdc-nav-icon::after {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}
+
+/* ══ Mobile — switch nav to a 4-col chip grid ════════════════════════════
+   Each item becomes a vertical glass card with the icon on top and the
+   label below. Active items glow magenta. Count badges become corner
+   bubbles. Touch targets are sized for thumbs (≥36px icon, ≥74px chip).
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 720px) {
+    /* Tighten the surrounding header on phones */
+    .gdc-profile-uplink     { padding: 40px 12px 0; }
+    .gdc-profile-hub        { gap: 22px; }
+    .gdc-identity-inner     { padding: 28px 16px; }
+    .gdc-avatar             { width: 110px; height: 110px; }
+    .gdc-identity-name      { font-size: 1.3rem; }
+    .gdc-balance-grid       { grid-template-columns: 1fr 1fr; gap: 12px; }
+    .gdc-node-content       { padding: 20px 14px; }
+    .gdc-node-value         { font-size: 1.3rem; }
+
+    /* Nav wrapper — sits as a dashboard tray below the cards */
+    .gdc-profile-nav {
+        margin-top: 28px;
+        background: rgba(0,0,0,0.45);
+        padding: 14px 12px 18px;
+        border-top: 1px solid var(--gph-border);
+        border-radius: 16px 16px 0 0;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+    }
+    .gdc-profile-nav-inner {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        column-gap: 8px;
+        row-gap: 10px;
+        padding: 0;
+        max-width: none;
+        flex-wrap: initial;
+        justify-content: initial;
+    }
+
+    /* Each item is a tappable chip */
+    .gdc-nav-item {
+        position: relative;
+        flex-direction: column;
+        align-items: center;
+        justify-content: flex-start;
+        gap: 7px;
+        padding: 11px 4px;
+        min-height: 78px;
+        background: rgba(255,255,255,0.025);
+        border: 1px solid rgba(255,255,255,0.07);
+        border-radius: 12px;
+        border-bottom-width: 1px;            /* override desktop bottom-border accent */
+        font-size: 0.6rem;
+        letter-spacing: 0.6px;
+        line-height: 1.15;
+        text-align: center;
+        color: #94a3b8;
+        transition:
+            background 0.25s ease,
+            border-color 0.25s ease,
+            transform 0.15s ease,
+            box-shadow 0.25s ease;
+    }
+    .gdc-nav-item:active {
+        transform: scale(0.96);
+    }
+    .gdc-nav-item--active {
+        background: rgba(182,8,201,0.1);
+        border-color: rgba(182,8,201,0.45);
+        box-shadow:
+            0 0 16px rgba(182,8,201,0.20),
+            inset 0 0 12px rgba(182,8,201,0.08);
+        color: #fff;
+    }
+
+    /* Larger, thumb-friendly icon plate */
+    .gdc-nav-icon {
+        width: 36px;
+        height: 36px;
+        border-radius: 10px;
+    }
+    .gdc-nav-icon svg {
+        width: 17px;
+        height: 17px;
+    }
+    /* The active beacon dot needs to sit on the larger plate */
+    .gdc-nav-item--active .gdc-nav-icon::after {
+        top: 4px;
+        right: 4px;
+    }
+
+    /* Label wraps to a max of 2 lines */
+    .gdc-nav-text {
+        display: -webkit-box;
+        -webkit-line-clamp: 2;
+        -webkit-box-orient: vertical;
+        overflow: hidden;
+        white-space: normal;
+        word-break: break-word;
+        max-width: 100%;
+    }
+
+    /* Count badge becomes a corner bubble */
+    .gdc-nav-item .count {
+        position: absolute;
+        top: 6px;
+        right: 6px;
+        margin-left: 0;
+        padding: 1px 5px;
+        min-width: 16px;
+        background: rgba(182,8,201,0.85);
+        border-color: rgba(182,8,201,0.6);
+        color: #fff;
+        font-size: 0.52rem;
+        line-height: 1.45;
+        z-index: 2;
+        box-shadow: 0 0 8px rgba(182,8,201,0.4);
+    }
+    .gdc-nav-item--active .count {
+        background: var(--gph-magenta);
+        color: #fff;
+    }
+}
+
+/* Very narrow phones — drop to 3 columns to keep labels readable */
+@media (max-width: 380px) {
+    .gdc-profile-nav-inner {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+    }
+    .gdc-nav-item {
+        min-height: 82px;
+        font-size: 0.62rem;
+    }
+}
+
 /* Count badge inside nav items (e.g. "Groups 5") */
 .gdc-nav-item .count {
     display: inline-flex;
@@ -1021,11 +1554,145 @@ body.youzify-profile-page,
 .youzify.youzify-profile .youzify-tabs-nav a {
     color: #64748b !important;
     border-bottom-color: transparent !important;
+    display: inline-flex !important;
+    align-items: center;
+    gap: 9px;
 }
 .youzify.youzify-profile .item-body nav.bp-navs ul li.current a,
 .youzify.youzify-profile .youzify-tabs-nav a.selected {
     color: #b608c9 !important;
     border-bottom-color: #b608c9 !important;
+}
+
+/* ══ Sub-nav icon chips — matched to primary-nav futuristic style ════════
+   JS injects <span class="gdc-subnav-icon"><svg/></span> as the first child
+   of each BP/Youzify subnav link. Each chip is smaller (22px vs 26px) so
+   it lives comfortably inside the existing subnav row, and powers on with
+   its own per-container stagger via --gdc-subnav-i.
+   ═══════════════════════════════════════════════════════════════════════ */
+.gdc-subnav-icon {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 22px;
+    height: 22px;
+    border-radius: 6px;
+    background: rgba(255,255,255,0.025);
+    border: 1px solid rgba(255,255,255,0.09);
+    color: currentColor;
+    flex-shrink: 0;
+    transition:
+        color 0.25s ease,
+        background 0.25s ease,
+        border-color 0.25s ease,
+        transform 0.25s cubic-bezier(0.22,1,0.36,1),
+        box-shadow 0.25s ease;
+    opacity: 0;
+    transform: scale(0.45) rotate(-10deg);
+    animation: gdcSubnavPower 0.45s cubic-bezier(0.34,1.56,0.64,1) forwards;
+    animation-delay: calc(0.12s + var(--gdc-subnav-i, 0) * 0.06s);
+}
+.gdc-subnav-icon svg {
+    width: 12px;
+    height: 12px;
+    display: block;
+    filter: drop-shadow(0 0 3px currentColor);
+    opacity: 0.92;
+}
+@keyframes gdcSubnavPower {
+    to { opacity: 1; transform: none; }
+}
+
+/* Scan-line sweep — fires once during the icon power-on */
+.gdc-subnav-icon::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    background: linear-gradient(115deg,
+        transparent 0%,
+        transparent 35%,
+        rgba(137,194,224,0.35) 50%,
+        transparent 65%,
+        transparent 100%);
+    background-size: 220% 100%;
+    background-position: 220% 0;
+    pointer-events: none;
+    opacity: 0;
+    animation: gdcSubnavScan 0.8s ease-out forwards;
+    animation-delay: calc(0.28s + var(--gdc-subnav-i, 0) * 0.06s);
+}
+@keyframes gdcSubnavScan {
+    0%   { opacity: 0;   background-position:  220% 0; }
+    20%  { opacity: 0.85; }
+    100% { opacity: 0;   background-position: -120% 0; }
+}
+
+/* Hover — blue terminal lift */
+.item-list-tabs li a:hover .gdc-subnav-icon,
+nav.bp-navs li a:hover .gdc-subnav-icon,
+.youzify-tabs-nav a:hover .gdc-subnav-icon {
+    color: #89C2E0;
+    border-color: rgba(137,194,224,0.45);
+    background: rgba(137,194,224,0.08);
+    transform: translateY(-1px);
+    box-shadow:
+        0 0 12px rgba(137,194,224,0.22),
+        inset 0 0 5px rgba(137,194,224,0.12);
+}
+
+/* Active / current — magenta with beacon dot */
+.item-list-tabs li.current .gdc-subnav-icon,
+.item-list-tabs li.selected .gdc-subnav-icon,
+nav.bp-navs li.current .gdc-subnav-icon,
+nav.bp-navs li.selected .gdc-subnav-icon,
+.youzify-tabs-nav a.selected .gdc-subnav-icon,
+.youzify-tabs-nav a.current .gdc-subnav-icon {
+    color: #b608c9;
+    background: rgba(182,8,201,0.12);
+    border-color: rgba(182,8,201,0.45);
+    box-shadow:
+        0 0 14px rgba(182,8,201,0.32),
+        inset 0 0 6px rgba(182,8,201,0.20);
+}
+.item-list-tabs li.current .gdc-subnav-icon::after,
+.item-list-tabs li.selected .gdc-subnav-icon::after,
+nav.bp-navs li.current .gdc-subnav-icon::after,
+nav.bp-navs li.selected .gdc-subnav-icon::after,
+.youzify-tabs-nav a.selected .gdc-subnav-icon::after,
+.youzify-tabs-nav a.current .gdc-subnav-icon::after {
+    content: "";
+    position: absolute;
+    top: 2px;
+    right: 2px;
+    width: 3px;
+    height: 3px;
+    border-radius: 50%;
+    background: #b608c9;
+    box-shadow: 0 0 5px #b608c9;
+    animation: gdcSubnavBeacon 1.6s ease-in-out infinite;
+}
+@keyframes gdcSubnavBeacon {
+    0%, 100% { opacity: 0.35; transform: scale(0.8); }
+    50%      { opacity: 1;    transform: scale(1.15); }
+}
+
+/* Reduced-motion guard */
+@media (prefers-reduced-motion: reduce) {
+    .gdc-subnav-icon,
+    .gdc-subnav-icon::before,
+    .gdc-subnav-icon::after {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
+}
+
+/* Mobile — slightly larger chip for thumb taps */
+@media (max-width: 720px) {
+    .gdc-subnav-icon { width: 26px; height: 26px; border-radius: 8px; }
+    .gdc-subnav-icon svg { width: 14px; height: 14px; }
 }
 
 /* ── Pagination ──────────────────────────────────────────────────────── */

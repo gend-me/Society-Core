@@ -279,12 +279,109 @@ function gs_render_membership_panel( $payload = null ) {
         .gs-mship-plan-name { color: #fff; font-weight: 700; font-size: 1rem; }
         .gs-mship-plan-price { color: #4eaaff; font-size: 0.9rem; font-weight: 600; }
         .gs-mship-tabs { margin-top: 28px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 18px; }
-        .gs-mship-tabs-nav { display: flex; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 16px; }
-        .gs-mship-tab-btn { padding: 12px 20px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--gs-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; }
+        .gs-mship-tabs-nav { display: flex; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 16px; flex-wrap: wrap; }
+        .gs-mship-tab-btn { padding: 12px 18px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--gs-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: color 0.18s ease; }
         .gs-mship-tab-btn:hover { color: #fff; }
         .gs-mship-tab-btn.is-active { color: #4eaaff; border-bottom-color: #4eaaff; }
+        .gs-mship-tab-icon { font-size: 16px; width: 16px; height: 16px; line-height: 16px; opacity: 0.85; transition: transform 0.2s ease, opacity 0.18s ease; }
+        .gs-mship-tab-btn:hover .gs-mship-tab-icon { transform: translateY(-1px); opacity: 1; }
+        .gs-mship-tab-btn.is-active .gs-mship-tab-icon { opacity: 1; }
         .gs-mship-tab-panel { display: none; }
         .gs-mship-tab-panel.is-active { display: block; }
+
+        /* ── Futuristic dashboard build-up animations ──────────────────
+           Each layer of the membership card fades up and into place with
+           a staggered delay so the dashboard "constructs itself" when
+           the page (or a tab) becomes visible. Tab-panel children also
+           re-animate on tab switch — the .is-active class flip restarts
+           the keyframes because the selector match changes. */
+        @keyframes gs-mship-rise {
+            from { opacity: 0; transform: translateY(12px); filter: blur(2px); }
+            to   { opacity: 1; transform: none; filter: none; }
+        }
+        @keyframes gs-mship-fade {
+            from { opacity: 0; }
+            to   { opacity: 1; }
+        }
+        .gs-mship-card { animation: gs-mship-rise 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) 0.02s both; }
+        .gs-mship-card .gs-mship-header   { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.10s both; }
+        .gs-mship-card .gs-mship-progress { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.18s both; }
+        .gs-mship-card .gs-mship-grid     { animation: gs-mship-fade 0.5s ease-out 0.20s both; }
+        .gs-mship-card .gs-mship-cell:nth-child(1) { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.26s both; }
+        .gs-mship-card .gs-mship-cell:nth-child(2) { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.34s both; }
+        .gs-mship-card .gs-mship-cell:nth-child(3) { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.42s both; }
+        .gs-mship-card .gs-mship-cell:nth-child(4) { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.50s both; }
+        .gs-mship-card .gs-mship-tabs     { animation: gs-mship-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.58s both; }
+
+        /* Tab nav buttons sweep in one after another. Each becomes the
+           reveal cue for its icon. */
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn { animation: gs-mship-rise 0.4s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn:nth-child(1) { animation-delay: 0.62s; }
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn:nth-child(2) { animation-delay: 0.68s; }
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn:nth-child(3) { animation-delay: 0.74s; }
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn:nth-child(4) { animation-delay: 0.80s; }
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn:nth-child(5) { animation-delay: 0.86s; }
+        .gs-mship-card .gs-mship-tabs-nav .gs-mship-tab-btn:nth-child(6) { animation-delay: 0.92s; }
+
+        /* Each active tab panel: its direct children stagger in.
+           Re-fires on tab switch because removing/re-adding .is-active
+           toggles the selector match and CSS restarts the keyframes. */
+        .gs-mship-tab-panel.is-active > * { animation: gs-mship-rise 0.42s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+        .gs-mship-tab-panel.is-active > *:nth-child(1)  { animation-delay: 0.04s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(2)  { animation-delay: 0.10s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(3)  { animation-delay: 0.16s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(4)  { animation-delay: 0.22s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(5)  { animation-delay: 0.28s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(6)  { animation-delay: 0.34s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(7)  { animation-delay: 0.40s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(8)  { animation-delay: 0.46s; }
+        .gs-mship-tab-panel.is-active > *:nth-child(n+9) { animation-delay: 0.52s; }
+
+        /* Hosting sidebar items: same idea, stagger one after another. */
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav {
+            animation: gs-mship-rise 0.4s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+        }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(1) { animation-delay: 0.10s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(2) { animation-delay: 0.16s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(3) { animation-delay: 0.22s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(4) { animation-delay: 0.28s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(5) { animation-delay: 0.34s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(6) { animation-delay: 0.40s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav:nth-child(7) { animation-delay: 0.46s; }
+
+        /* Hosting sub-panel: stagger the cards / stat tiles inside. */
+        .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > * {
+            animation: gs-mship-rise 0.4s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+        }
+        .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > *:nth-child(1) { animation-delay: 0.20s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > *:nth-child(2) { animation-delay: 0.26s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > *:nth-child(3) { animation-delay: 0.32s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > *:nth-child(4) { animation-delay: 0.38s; }
+        .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > *:nth-child(n+5) { animation-delay: 0.44s; }
+
+        /* Hosting sub-panel switch — restart child animations when a
+           hosting nav button activates a different sub-panel. */
+        .gs-hosting__panel.is-active .gs-hosting__stat-grid > *,
+        .gs-hosting__panel.is-active .gs-hosting__card,
+        .gs-hosting__panel.is-active .gs-hosting__section-title,
+        .gs-hosting__panel.is-active .gs-hosting__section-sub {
+            animation: gs-mship-rise 0.35s cubic-bezier(0.2, 0.9, 0.3, 1) both;
+        }
+        .gs-hosting__panel.is-active .gs-hosting__stat-grid > *:nth-child(1) { animation-delay: 0.04s; }
+        .gs-hosting__panel.is-active .gs-hosting__stat-grid > *:nth-child(2) { animation-delay: 0.10s; }
+        .gs-hosting__panel.is-active .gs-hosting__stat-grid > *:nth-child(3) { animation-delay: 0.16s; }
+        .gs-hosting__panel.is-active .gs-hosting__stat-grid > *:nth-child(4) { animation-delay: 0.22s; }
+
+        /* Respect a user's reduced-motion preference — disables every
+           one of the build-up animations above so the dashboard just
+           appears instantly. */
+        @media (prefers-reduced-motion: reduce) {
+            .gs-mship-card, .gs-mship-card *, .gs-mship-tab-panel.is-active > *,
+            .gs-mship-tab-panel.is-active .gs-hosting__sidebar .gs-hosting__nav,
+            .gs-mship-tab-panel.is-active .gs-hosting__panel.is-active > *,
+            .gs-hosting__panel.is-active .gs-hosting__stat-grid > *,
+            .gs-hosting__panel.is-active .gs-hosting__card { animation: none !important; }
+        }
         .gs-mship-empty { padding: 24px; text-align: center; color: var(--gs-muted); background: rgba(255,255,255,0.02); border-radius: 12px; }
         .gs-mship-action-btn { display: inline-flex; align-items: center; gap: 6px; padding: 8px 14px; border-radius: 8px; background: linear-gradient(135deg, #b608c9, #7e058a); color: #fff !important; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; border: 0; cursor: pointer; text-decoration: none; }
         .gs-mship-action-btn[disabled] { opacity: 0.5; cursor: wait; }
@@ -321,11 +418,21 @@ function gs_render_membership_panel( $payload = null ) {
             <?php endif; ?>
         </div>
 
-        <!-- ── 5-stage migration progress ──────────────────────────── -->
+        <!-- ── 5-stage migration progress ────────────────────────────
+             Only renders while a container migration is actively in
+             flight. Hidden once the site is live (final stage reached)
+             AND on hub / self-hosted installs where no migration ever
+             happens (no migration payload from gend.me). -->
         <?php
         $steps    = array( 'prepare' => __('Prepare', 'gend-society'), 'export' => __('Export', 'gend-society'), 'provision' => __('Provision', 'gend-society'), 'verify' => __('Verify', 'gend-society'), 'live' => __('Live', 'gend-society') );
         $stage_ix = isset( $migration['index'] ) ? (int) $migration['index'] : 0;
+        $show_migration_progress =
+            ! empty( $migration )
+            && empty( $migration['live'] )
+            && $stage_ix > 0
+            && $stage_ix < count( $steps );
         ?>
+        <?php if ( $show_migration_progress ) : ?>
         <div class="gs-mship-progress">
             <?php $i = 0; foreach ( $steps as $key => $label ) : $i++; $done = $i <= max( 1, $stage_ix ); ?>
                 <div class="gs-mship-step<?php echo $done ? ' is-done' : ''; ?>">
@@ -334,6 +441,7 @@ function gs_render_membership_panel( $payload = null ) {
                 </div>
             <?php endforeach; ?>
         </div>
+        <?php endif; ?>
 
         <!-- ── 4-card grid: Membership / Group / Feature Access / Hosting ── -->
         <div class="gs-mship-grid">
@@ -430,16 +538,142 @@ function gs_render_membership_panel( $payload = null ) {
 
         </div>
 
-        <!-- ── Tabs: Orders / Domain / Backups ─────────────────────── -->
+        <!-- ── Tabs: Settings / Feature Suite / User Access / Orders / Domain / Backups ── -->
+        <?php
+        $gs_can_manage     = current_user_can( 'manage_options' );
+        $gs_can_list_users = current_user_can( 'list_users' );
+        $gs_default_tab    = $gs_can_manage ? 'settings' : 'orders';
+        ?>
         <div class="gs-mship-tabs">
             <div class="gs-mship-tabs-nav" role="tablist">
-                <button type="button" class="gs-mship-tab-btn is-active" data-tab="orders" role="tab"><?php esc_html_e( 'Orders', 'gend-society' ); ?></button>
-                <button type="button" class="gs-mship-tab-btn" data-tab="domain" role="tab"><?php esc_html_e( 'Domain', 'gend-society' ); ?></button>
-                <button type="button" class="gs-mship-tab-btn" data-tab="backups" role="tab"><?php esc_html_e( 'Backups', 'gend-society' ); ?></button>
+                <?php if ( $gs_can_manage ) : ?>
+                    <button type="button" class="gs-mship-tab-btn is-active" data-tab="settings" role="tab"><span class="dashicons dashicons-admin-generic gs-mship-tab-icon"></span><?php esc_html_e( 'Settings', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn" data-tab="feature-suite" role="tab"><span class="dashicons dashicons-admin-plugins gs-mship-tab-icon"></span><?php esc_html_e( 'Feature Suite', 'gend-society' ); ?></button>
+                <?php endif; ?>
+                <?php if ( $gs_can_list_users ) : ?>
+                    <button type="button" class="gs-mship-tab-btn" data-tab="user-access" role="tab"><span class="dashicons dashicons-admin-users gs-mship-tab-icon"></span><?php esc_html_e( 'User Access', 'gend-society' ); ?></button>
+                <?php endif; ?>
+                <?php if ( $gs_can_manage ) : ?>
+                    <button type="button" class="gs-mship-tab-btn" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Hosting', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn" data-tab="compute-gas" role="tab"><span class="dashicons dashicons-superhero gs-mship-tab-icon"></span><?php esc_html_e( 'Compute Gas', 'gend-society' ); ?></button>
+                <?php endif; ?>
+                <button type="button" class="gs-mship-tab-btn<?php echo $gs_default_tab === 'orders' ? ' is-active' : ''; ?>" data-tab="orders" role="tab"><span class="dashicons dashicons-cart gs-mship-tab-icon"></span><?php esc_html_e( 'Orders', 'gend-society' ); ?></button>
+                <?php // Domain + Backups removed from the top tab strip — both
+                      // now live inside Hosting (Hosting → Domains / Backups).
+                ?>
             </div>
 
+            <?php if ( $gs_can_manage ) : ?>
+            <!-- Settings tab (App Title, Tagline, App Icon, Site Logo, Save) -->
+            <div class="gs-mship-tab-panel is-active" data-panel="settings" role="tabpanel">
+                <?php
+                if ( function_exists( 'gs_render_app_settings_form' ) ) {
+                    gs_render_app_settings_form();
+                }
+                ?>
+            </div>
+
+            <!-- Feature Suite tab (plugin/feature cards) -->
+            <div class="gs-mship-tab-panel" data-panel="feature-suite" role="tabpanel">
+                <h3 style="margin: 0 0 8px 0; color: #fff; font-size: 1.1rem;"><?php esc_html_e( 'App Feature Access', 'gend-society' ); ?></h3>
+                <p style="color: var(--gs-muted); margin: 0 0 24px 0;"><?php esc_html_e( 'Manage which plugins and features are available on this site.', 'gend-society' ); ?></p>
+                <?php
+                if ( function_exists( 'gs_render_feature_cards_widget' ) ) {
+                    gs_render_feature_cards_widget();
+                }
+                ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if ( $gs_can_list_users ) : ?>
+            <!-- User Access tab (per-user menu/feature gates from inc/pages/feature-access.php) -->
+            <div class="gs-mship-tab-panel" data-panel="user-access" role="tabpanel">
+                <?php
+                if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'inc/pages/feature-access.php' ) ) {
+                    require GS_DIR . 'inc/pages/feature-access.php';
+                }
+                ?>
+            </div>
+            <?php endif; ?>
+
+            <?php if ( $gs_can_manage ) : ?>
+            <!-- Hosting tab (Dashboard / Domains / Logs / Tables / Containers / Backups) -->
+            <div class="gs-mship-tab-panel" data-panel="hosting" role="tabpanel">
+                <?php
+                if ( function_exists( 'gs_render_hosting_tab' ) ) {
+                    gs_render_hosting_tab( $payload );
+                }
+                ?>
+            </div>
+
+            <!-- Compute Gas tab — explainer + lazy-loaded cost breakdown -->
+            <div class="gs-mship-tab-panel" data-panel="compute-gas" role="tabpanel">
+                <style>
+                    .gs-compute-gas { display: flex; flex-direction: column; gap: 18px; }
+                    .gs-compute-gas__hero { background: linear-gradient(135deg, rgba(78,170,255,0.14) 0%, rgba(168,85,247,0.10) 100%); border: 1px solid rgba(78,170,255,0.25); border-radius: 16px; padding: 22px 26px; }
+                    .gs-compute-gas__badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(78,170,255,0.18); color: #4eaaff; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
+                    .gs-compute-gas__title { color: #fff; font-size: 1.35rem; font-weight: 700; margin: 12px 0 8px; }
+                    .gs-compute-gas__body { color: #cbd5f5; font-size: 0.95rem; line-height: 1.65; margin: 0; max-width: 760px; }
+                    .gs-compute-gas__body strong { color: #fff; }
+                    .gs-compute-gas__pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 18px; }
+                    .gs-compute-gas__pillar { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; }
+                    .gs-compute-gas__pillar-icon { color: #4eaaff; font-size: 22px; }
+                    .gs-compute-gas__pillar-label { color: #fff; font-weight: 700; font-size: 0.95rem; margin-top: 6px; }
+                    .gs-compute-gas__pillar-desc { color: var(--gs-muted, #94a3b8); font-size: 0.78rem; margin-top: 4px; line-height: 1.5; }
+                    .gs-compute-gas__breakdown { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px; }
+                    .gs-compute-gas__loading { color: var(--gs-muted, #94a3b8); font-style: italic; padding: 18px; text-align: center; }
+                </style>
+                <div class="gs-compute-gas">
+                    <div class="gs-compute-gas__hero">
+                        <span class="gs-compute-gas__badge"><span class="dashicons dashicons-superhero" style="font-size:14px; width:14px; height:14px;"></span><?php esc_html_e( 'No monthly server fees', 'gend-society' ); ?></span>
+                        <h3 class="gs-compute-gas__title"><?php esc_html_e( 'How Compute Gas Works', 'gend-society' ); ?></h3>
+                        <p class="gs-compute-gas__body">
+                            <?php
+                            printf(
+                                /* translators: 1: bold "Blockchain Compute network", 2: bold "Gas Station Nodes" */
+                                esc_html__( 'Networked businesses on GenD don\'t pay flat monthly server or compute fees. Your storage container integrates with our %1$s, which uses the unused compute power of the servers and devices running our %2$s across the network. That same network powers every payment, every workflow, and every smart contract on the platform — so what your app uses, the network earns. You only pay for the compute you actually consume.', 'gend-society' ),
+                                '<strong>' . esc_html__( 'Blockchain Compute network', 'gend-society' ) . '</strong>',
+                                '<strong>' . esc_html__( 'Gas Station Nodes', 'gend-society' ) . '</strong>'
+                            );
+                            ?>
+                        </p>
+                        <div class="gs-compute-gas__pillars">
+                            <div class="gs-compute-gas__pillar">
+                                <span class="dashicons dashicons-money-alt gs-compute-gas__pillar-icon"></span>
+                                <div class="gs-compute-gas__pillar-label"><?php esc_html_e( 'Payments', 'gend-society' ); ?></div>
+                                <div class="gs-compute-gas__pillar-desc"><?php esc_html_e( 'Every checkout settles on the network — no merchant processor fees.', 'gend-society' ); ?></div>
+                            </div>
+                            <div class="gs-compute-gas__pillar">
+                                <span class="dashicons dashicons-performance gs-compute-gas__pillar-icon"></span>
+                                <div class="gs-compute-gas__pillar-label"><?php esc_html_e( 'Compute', 'gend-society' ); ?></div>
+                                <div class="gs-compute-gas__pillar-desc"><?php esc_html_e( 'CPU + RAM for your container is provisioned from unused capacity across the network.', 'gend-society' ); ?></div>
+                            </div>
+                            <div class="gs-compute-gas__pillar">
+                                <span class="dashicons dashicons-shield gs-compute-gas__pillar-icon"></span>
+                                <div class="gs-compute-gas__pillar-label"><?php esc_html_e( 'Smart Contracts', 'gend-society' ); ?></div>
+                                <div class="gs-compute-gas__pillar-desc"><?php esc_html_e( 'Tasks, escrows, and payouts execute on-chain — settlement is the receipt.', 'gend-society' ); ?></div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="gs-compute-gas__breakdown">
+                        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom: 16px;">
+                            <div>
+                                <h4 style="color:#fff; font-size:1.05rem; margin:0;"><?php esc_html_e( 'Your Usage This Period', 'gend-society' ); ?></h4>
+                                <p style="color: var(--gs-muted, #94a3b8); font-size:0.85rem; margin:4px 0 0;"><?php esc_html_e( 'Live tally of compute gas + container fees for this install.', 'gend-society' ); ?></p>
+                            </div>
+                            <button type="button" class="gs-mship-action-btn is-secondary" data-gs-compute-gas="refresh"><?php esc_html_e( 'Refresh', 'gend-society' ); ?></button>
+                        </div>
+                        <div data-gs-compute-gas-body>
+                            <div class="gs-compute-gas__loading"><?php esc_html_e( 'Loading cost breakdown…', 'gend-society' ); ?></div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <?php endif; ?>
+
             <!-- Orders tab (read-only, server-rendered) -->
-            <div class="gs-mship-tab-panel is-active" data-panel="orders" role="tabpanel">
+            <div class="gs-mship-tab-panel<?php echo $gs_default_tab === 'orders' ? ' is-active' : ''; ?>" data-panel="orders" role="tabpanel">
                 <?php if ( empty( $orders ) ) : ?>
                     <div class="gs-mship-empty"><?php esc_html_e( 'No recent orders found for this group.', 'gend-society' ); ?></div>
                 <?php else : ?>
@@ -460,62 +694,11 @@ function gs_render_membership_panel( $payload = null ) {
                 <?php endif; ?>
             </div>
 
-            <!-- Domain tab (inline AJAX) -->
-            <div class="gs-mship-tab-panel" data-panel="domain" role="tabpanel">
-                <form class="gs-mship-form" data-gs-mship="add-domain">
-                    <input type="text" name="domain" placeholder="<?php esc_attr_e( 'yourdomain.com', 'gend-society' ); ?>" required />
-                    <button type="submit" class="gs-mship-action-btn"><?php esc_html_e( 'Add domain', 'gend-society' ); ?></button>
-                </form>
-                <ul class="gs-mship-list" id="gs-mship-domain-list">
-                    <?php foreach ( $domains as $d ) : ?>
-                        <li data-domain="<?php echo esc_attr( $d['host'] ); ?>">
-                            <div>
-                                <code style="background:transparent; color:#fff;"><?php echo esc_html( $d['host'] ); ?></code>
-                                <span class="meta">
-                                    <?php
-                                    $bits = array();
-                                    if ( ! empty( $d['primary'] ) ) $bits[] = __( 'Primary', 'gend-society' );
-                                    if ( ! empty( $d['secure'] ) )  $bits[] = __( 'Secure', 'gend-society' );
-                                    if ( ! empty( $d['stage'] ) )   $bits[] = $d['stage'];
-                                    echo esc_html( implode( ' · ', $bits ) );
-                                    ?>
-                                </span>
-                            </div>
-                            <div style="display: flex; gap: 6px;">
-                                <button type="button" class="gs-mship-action-btn is-secondary" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $d['host'] ); ?>"><?php esc_html_e( 'Verify', 'gend-society' ); ?></button>
-                                <button type="button" class="gs-mship-action-btn is-danger" data-gs-mship="remove-domain" data-domain="<?php echo esc_attr( $d['host'] ); ?>"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
-                            </div>
-                        </li>
-                    <?php endforeach; ?>
-                    <?php if ( empty( $domains ) ) : ?>
-                        <li class="gs-mship-empty"><?php esc_html_e( 'No custom domains added yet.', 'gend-society' ); ?></li>
-                    <?php endif; ?>
-                </ul>
-            </div>
-
-            <!-- Backups tab (inline AJAX) -->
-            <div class="gs-mship-tab-panel" data-panel="backups" role="tabpanel">
-                <div style="margin-bottom: 16px; display: flex; justify-content: space-between; align-items: center;">
-                    <span class="meta" style="color: var(--gs-muted); font-size: 0.85rem;"><?php esc_html_e( 'Daily automatic backups + on-demand snapshots.', 'gend-society' ); ?></span>
-                    <button type="button" class="gs-mship-action-btn" data-gs-mship="backup-now"><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
-                </div>
-                <ul class="gs-mship-list" id="gs-mship-backup-list">
-                    <?php foreach ( $backups as $b ) : ?>
-                        <li>
-                            <div>
-                                <strong style="color:#fff;"><?php echo esc_html( ucfirst( $b['kind'] ?? 'backup' ) ); ?></strong>
-                                <span class="meta"><?php echo esc_html( $b['created_at'] ?? '' ); ?> · <?php echo esc_html( size_format( (int) ( $b['bytes'] ?? 0 ) ) ); ?></span>
-                            </div>
-                            <?php if ( ! empty( $b['restorable'] ) ) : ?>
-                                <button type="button" class="gs-mship-action-btn is-danger" data-gs-mship="restore-backup" data-id="<?php echo (int) $b['id']; ?>"><?php esc_html_e( 'Restore', 'gend-society' ); ?></button>
-                            <?php endif; ?>
-                        </li>
-                    <?php endforeach; ?>
-                    <?php if ( empty( $backups ) ) : ?>
-                        <li class="gs-mship-empty"><?php esc_html_e( 'No backups recorded yet.', 'gend-society' ); ?></li>
-                    <?php endif; ?>
-                </ul>
-            </div>
+            <?php // Domain + Backups panels removed from the top tab strip.
+                  // Equivalent UI lives at Hosting → Domains and Hosting → Backups.
+                  // The AJAX endpoints (gs_membership_domain_*, gs_membership_backup_*)
+                  // are still registered and used by the Hosting sub-panels.
+            ?>
         </div>
     </div>
 
@@ -556,12 +739,89 @@ function gs_render_membership_panel( $payload = null ) {
         }
 
         // Tabs
+        var computeGasLoaded = false;
         root.querySelectorAll('.gs-mship-tab-btn').forEach(function (b) {
             b.addEventListener('click', function () {
                 var tab = b.dataset.tab;
                 root.querySelectorAll('.gs-mship-tab-btn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
                 root.querySelectorAll('.gs-mship-tab-panel').forEach(function (p) { p.classList.toggle('is-active', p.dataset.panel === tab); });
+                if (tab === 'compute-gas' && !computeGasLoaded) {
+                    computeGasLoaded = true;
+                    loadComputeGas();
+                }
             });
+        });
+
+        // Compute Gas — lazy-load the cost breakdown via the existing
+        // gs_hosting_compute_gas AJAX action (the endpoint lives in
+        // dashboard-hosting.php; the panel was promoted out of the
+        // hosting sub-tabs to the top level for visibility).
+        function loadComputeGas() {
+            var body = root.querySelector('[data-gs-compute-gas-body]');
+            if (!body) return;
+            body.innerHTML = '<div style="color: var(--gs-muted, #94a3b8); font-style: italic; padding: 18px; text-align: center;">Loading cost breakdown…</div>';
+            var form = new URLSearchParams({ action: 'gs_hosting_compute_gas', nonce: nonce });
+            fetch(ajax, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() })
+                .then(function(r){ return r.json(); })
+                .then(function(resp){
+                    if (resp && resp.success && resp.data) {
+                        body.innerHTML = renderComputeGas(resp.data);
+                    } else {
+                        body.innerHTML = '<p style="color:var(--gs-muted,#94a3b8); padding:14px;">' +
+                            ((resp && resp.data && resp.data.message) || 'Compute Gas data unavailable.') + '</p>';
+                    }
+                })
+                .catch(function(){
+                    body.innerHTML = '<p style="color:#fca5a5; padding:14px;">Network error loading Compute Gas.</p>';
+                });
+        }
+        function renderComputeGas(d) {
+            function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
+            var period = esc(d.period || 'This period');
+            var html = '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:18px;">' +
+                '<div style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px 16px;">' +
+                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em;">Compute Gas</div>' +
+                    '<div style="color:#fff; font-size:1.5rem; font-weight:700; margin-top:6px;">' + esc(d.gas_fees_label || '$0.00') + '</div>' +
+                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; margin-top:4px;">' + period + '</div>' +
+                '</div>' +
+                '<div style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px 16px;">' +
+                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em;">Container Fees</div>' +
+                    '<div style="color:#fff; font-size:1.5rem; font-weight:700; margin-top:6px;">' + esc(d.container_fees_label || '$0.00') + '</div>' +
+                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; margin-top:4px;">' + period + '</div>' +
+                '</div>' +
+                '<div style="background:linear-gradient(135deg, rgba(78,170,255,0.18), rgba(168,85,247,0.12)); border:1px solid rgba(78,170,255,0.35); border-radius:12px; padding:14px 16px;">' +
+                    '<div style="color:#a5b4fc; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em; font-weight:700;">Total</div>' +
+                    '<div style="color:#fff; font-size:1.5rem; font-weight:700; margin-top:6px;">' + esc(d.total_label || '$0.00') + '</div>' +
+                    '<div style="color:#a5b4fc; font-size:0.75rem; margin-top:4px;">' + period + '</div>' +
+                '</div>' +
+                '</div>';
+            if (Array.isArray(d.breakdown) && d.breakdown.length) {
+                html += '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">' +
+                    '<thead><tr>' +
+                    '<th style="text-align:left; padding:8px 12px; color:var(--gs-muted, #94a3b8); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.06);">Item</th>' +
+                    '<th style="text-align:left; padding:8px 12px; color:var(--gs-muted, #94a3b8); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.06);">Qty</th>' +
+                    '<th style="text-align:right; padding:8px 12px; color:var(--gs-muted, #94a3b8); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.06);">Amount</th>' +
+                    '</tr></thead><tbody>';
+                d.breakdown.forEach(function(b){
+                    html += '<tr>' +
+                        '<td style="padding:10px 12px; color:#e6edf7; border-bottom:1px solid rgba(255,255,255,0.04);">' + esc(b.label || '') + '</td>' +
+                        '<td style="padding:10px 12px; color:#e6edf7; border-bottom:1px solid rgba(255,255,255,0.04);">' + esc(b.qty || '') + '</td>' +
+                        '<td style="padding:10px 12px; color:#e6edf7; text-align:right; border-bottom:1px solid rgba(255,255,255,0.04);">' + esc(b.amount_label || '') + '</td>' +
+                    '</tr>';
+                });
+                html += '</tbody></table>';
+            } else {
+                html += '<p style="color:var(--gs-muted, #94a3b8); font-style:italic; padding:14px 0; margin:0;">' +
+                    (d.message ? esc(d.message) : 'No itemized breakdown available yet for this billing period.') +
+                    '</p>';
+            }
+            return html;
+        }
+        root.addEventListener('click', function(e){
+            if (e.target.closest('[data-gs-compute-gas="refresh"]')) {
+                computeGasLoaded = true; // already true, but safe
+                loadComputeGas();
+            }
         });
 
         // Plan upgrade — opens gend.me's checkout in a popup window. On

@@ -180,6 +180,71 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
     }
 
     /**
+     * Resolve the per-group, per-user gates that determine which of the
+     * three Compute Gas stat panels are LIVE vs in their empty CTA state.
+     *
+     *   compute_active   → hosting plan supports on-chain compute tracking
+     *                      (networked / containers / server). Self-hosted
+     *                      and missing plans show the upgrade CTA.
+     *   payments_active  → _psoo_group_payments_active group_meta is true.
+     *                      When false, the activate-payments CTA points
+     *                      at the group's Payments tab.
+     *   node_active      → current user has a registered Gas Station
+     *                      blockchain node (_gend_chain_node_active
+     *                      user_meta). When false, the three connect-
+     *                      device options render instead.
+     *
+     * URLs returned alongside each gate so the rendering function
+     * doesn't need to re-resolve them.
+     */
+    function gs_compute_gas_resolve_state( $group_id, $uid ) {
+        $group = function_exists( 'groups_get_group' ) ? groups_get_group( (int) $group_id ) : null;
+        $group_link = ( $group && function_exists( 'bp_get_group_permalink' ) ) ? trailingslashit( bp_get_group_permalink( $group ) ) : '';
+
+        // 1. Compute gate — uses the hosting helper from group-hosting-tab.
+        $plan = function_exists( 'psoo_get_group_hosting_plan' ) ? psoo_get_group_hosting_plan( (int) $group_id ) : array();
+        $sub  = isset( $plan['subgroup'] ) ? (string) $plan['subgroup'] : '';
+        $compute_active = in_array( $sub, array( 'networked', 'containers', 'server' ), true );
+        $compute_plan_url = isset( $plan['plan_url'] ) ? (string) $plan['plan_url'] : ( $group_link . 'hosting/' );
+
+        // 2. Payments gate.
+        $payments_active = function_exists( 'groups_get_groupmeta' )
+            ? (bool) groups_get_groupmeta( (int) $group_id, '_psoo_group_payments_active', true )
+            : false;
+        $payments_activate_url = $group_link . 'payments/';
+
+        // 3. Node gate. The desktop app + node-runner set this user_meta
+        // when a Gas Station device successfully registers. We also fall
+        // through to any super-admin-managed "node owner" mapping.
+        $node_active = (bool) get_user_meta( (int) $uid, '_gend_chain_node_active', true );
+        if ( ! $node_active && class_exists( 'Gend_Chain_Node_Scoring' ) ) {
+            $caps = get_site_option( 'gend_chain_node_capabilities', array() );
+            if ( is_array( $caps ) ) {
+                foreach ( $caps as $node ) {
+                    if ( is_array( $node ) && (int) ( $node['owner_user_id'] ?? 0 ) === (int) $uid ) {
+                        $node_active = true;
+                        break;
+                    }
+                }
+            }
+        }
+
+        return array(
+            'is_super'              => is_super_admin( (int) $uid ),
+            'compute_active'        => $compute_active,
+            'compute_plan_url'      => $compute_plan_url,
+            'compute_subgroup'      => $sub,
+            'payments_active'       => $payments_active,
+            'payments_activate_url' => $payments_activate_url,
+            'node_active'           => $node_active,
+            'gas_station_docs_url'  => 'https://gend.me/gas-station/',
+            'gas_station_desktop_url' => 'https://gend.me/gas-station/desktop/',
+            'gas_station_mobile_url'  => 'https://gend.me/gas-station/mobile/',
+            'gas_station_server_url'  => 'https://gend.me/gas-station/server/',
+        );
+    }
+
+    /**
      * Compute Gas — the value-prop explainer + current-period spend.
      * Pure presentational + AJAX-fetched stats; works the same in a
      * group context as on wp-admin.
@@ -324,6 +389,131 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     display: grid; grid-template-columns: 1fr 1fr 1.2fr;
                     gap: 20px; margin-bottom: 35px;
                 }
+                [data-gs-cg-scope] .gs-cg-acct-grid--three {
+                    grid-template-columns: 1fr 1fr 1.3fr;
+                }
+                [data-gs-cg-scope] .gs-cg-card[data-gs-cg-state="gated"] { padding-bottom: 22px; }
+                [data-gs-cg-scope] .gs-cg-empty {
+                    margin-top: 14px; display: flex; flex-direction: column; gap: 14px;
+                }
+                [data-gs-cg-scope] .gs-cg-empty-msg {
+                    font-size: 0.83rem; line-height: 1.55; color: rgba(255,255,255,0.62);
+                    margin: 0;
+                }
+                [data-gs-cg-scope] .gs-cg-cta {
+                    display: inline-flex; align-items: center; justify-content: center;
+                    align-self: flex-start; padding: 10px 18px;
+                    background: linear-gradient(135deg, var(--cg-blue), var(--cg-magenta));
+                    color: #0a0e1c !important; text-decoration: none !important;
+                    border-radius: 10px; font-size: 0.78rem; font-weight: 900;
+                    letter-spacing: 0.6px; text-transform: uppercase;
+                    transition: transform 0.18s var(--cg-ease), filter 0.18s var(--cg-ease);
+                    border: 0;
+                }
+                [data-gs-cg-scope] .gs-cg-cta:hover { transform: translateY(-1px); filter: brightness(1.1); }
+                [data-gs-cg-scope] .gs-cg-cta--ghost {
+                    background: rgba(255,255,255,0.04);
+                    color: #fff !important;
+                    border: 1px solid rgba(110,193,228,0.30);
+                    text-transform: none; letter-spacing: 0.3px;
+                    padding: 11px 14px;
+                    align-self: stretch;
+                    flex-direction: column; align-items: flex-start; gap: 2px;
+                    text-align: left;
+                }
+                [data-gs-cg-scope] .gs-cg-cta--ghost:hover {
+                    background: rgba(110,193,228,0.10);
+                    border-color: rgba(110,193,228,0.55);
+                    filter: none;
+                }
+                [data-gs-cg-scope] .gs-cg-cta-title { font-size: 0.82rem; font-weight: 800; letter-spacing: 0.3px; }
+                [data-gs-cg-scope] .gs-cg-cta-sub   { font-size: 0.7rem; opacity: 0.55; font-weight: 600; letter-spacing: 0; }
+                [data-gs-cg-scope] .gs-cg-connect-options {
+                    display: grid; grid-template-columns: 1fr; gap: 8px;
+                }
+                @media (min-width: 1100px) {
+                    [data-gs-cg-scope] .gs-cg-acct-grid--three { grid-template-columns: 1fr 1fr 1.4fr; }
+                }
+                [data-gs-cg-scope] .gs-cg-card[data-gs-cg-card="earned"][data-gs-cg-state="gated"] {
+                    /* Earned card gets a slightly stronger highlight when gated
+                       because the user can act on it (connect a device) — pull
+                       focus to the three connect options. */
+                    border-color: rgba(110,193,228,0.30);
+                    background: linear-gradient(135deg, rgba(110,193,228,0.04), rgba(0,0,0,0.20));
+                }
+
+                /* ─── Connect-device popup ─── */
+                .gs-cg-modal { position: fixed; inset: 0; z-index: 99999; display: flex; align-items: center; justify-content: center; padding: 24px; }
+                .gs-cg-modal[hidden] { display: none; }
+                .gs-cg-modal-backdrop { position: absolute; inset: 0; background: rgba(2,6,12,0.82); backdrop-filter: blur(12px) saturate(140%); -webkit-backdrop-filter: blur(12px) saturate(140%); }
+                .gs-cg-modal-dialog { position: relative; width: 100%; max-width: 720px; max-height: calc(100vh - 60px); display: flex; flex-direction: column; background: linear-gradient(180deg, rgba(15,18,24,0.98), rgba(11,14,20,0.98)); border: 1px solid rgba(110,193,228,0.30); border-radius: 24px; box-shadow: 0 30px 70px rgba(0,0,0,0.7); overflow: hidden; color: #fff; font-family: 'Inter', system-ui, sans-serif; }
+                .gs-cg-modal-head { display: flex; justify-content: space-between; align-items: center; padding: 22px 26px 18px; border-bottom: 1px solid rgba(255,255,255,0.06); }
+                .gs-cg-modal-head h3 { margin: 0; font-size: 1.25rem; font-weight: 900; letter-spacing: -0.3px; color: #fff !important; font-family: inherit !important; }
+                .gs-cg-modal-close { background: transparent; border: 0; color: rgba(255,255,255,0.5); font-size: 26px; line-height: 1; cursor: pointer; padding: 4px 10px; transition: color .15s; }
+                .gs-cg-modal-close:hover { color: #fff; }
+                .gs-cg-modal-body { padding: 22px 26px 28px; overflow-y: auto; }
+
+                .gs-cg-step-intro { font-size: 0.92rem; line-height: 1.6; color: rgba(255,255,255,0.72); margin: 0 0 22px; }
+
+                .gs-cg-release-card {
+                    margin: 0 0 24px; padding: 18px 20px;
+                    background: linear-gradient(135deg, rgba(110,193,228,0.08), rgba(182,8,201,0.06));
+                    border: 1px solid rgba(110,193,228,0.28);
+                    border-radius: 14px;
+                    display: flex; flex-direction: column; gap: 12px;
+                }
+                .gs-cg-release-meta { display: flex; flex-wrap: wrap; align-items: baseline; gap: 12px; }
+                .gs-cg-release-label { font-size: 0.65rem; font-weight: 900; text-transform: uppercase; letter-spacing: 1.5px; color: var(--cg-blue); }
+                .gs-cg-release-version { font-size: 1.4rem; font-weight: 950; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #fff; letter-spacing: -0.5px; }
+                .gs-cg-release-date { font-size: 0.72rem; color: rgba(255,255,255,0.40); margin-left: auto; }
+                .gs-cg-release-downloads { display: flex; flex-wrap: wrap; gap: 10px; }
+
+                .gs-cg-steps { list-style: none; padding: 0; margin: 0; display: flex; flex-direction: column; gap: 14px; }
+                .gs-cg-steps li { display: flex; gap: 14px; align-items: flex-start; padding: 14px 16px; background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.06); border-radius: 12px; }
+                .gs-cg-step-num {
+                    flex-shrink: 0;
+                    width: 28px; height: 28px;
+                    display: inline-flex; align-items: center; justify-content: center;
+                    border-radius: 8px;
+                    background: linear-gradient(135deg, var(--cg-blue), var(--cg-magenta));
+                    color: #0a0e1c; font-weight: 950; font-size: 0.9rem;
+                    box-shadow: 0 4px 12px rgba(110,193,228,0.20);
+                }
+                .gs-cg-steps li > div h4 { margin: 0 0 4px; font-size: 0.95rem; font-weight: 800; color: #fff !important; font-family: inherit !important; letter-spacing: -0.1px; }
+                .gs-cg-steps li > div p  { margin: 0; font-size: 0.83rem; line-height: 1.55; color: rgba(255,255,255,0.62); }
+                .gs-cg-steps--preview li { opacity: 0.55; background: rgba(0,0,0,0.10); border-style: dashed; }
+                .gs-cg-steps--preview li::before {
+                    content: ''; /* no-op — preview state is by reduced opacity */
+                }
+
+                .gs-cg-modal-actions { margin-top: 20px; display: flex; gap: 10px; flex-wrap: wrap; }
+
+                .gs-cg-coming-soon { padding: 22px; margin-bottom: 22px; background: rgba(0,0,0,0.22); border: 1px dashed rgba(110,193,228,0.30); border-radius: 14px; text-align: center; }
+                .gs-cg-coming-icon { color: var(--cg-magenta); margin-bottom: 10px; }
+                .gs-cg-coming-soon h4 { margin: 0 0 6px; font-size: 1rem; font-weight: 800; color: #fff !important; font-family: inherit !important; }
+                .gs-cg-coming-soon p { font-size: 0.83rem; color: rgba(255,255,255,0.65); margin: 0 0 16px; line-height: 1.5; }
+                .gs-cg-waitlist { display: grid; grid-template-columns: 2fr 1.2fr auto; gap: 8px; align-items: stretch; }
+                .gs-cg-waitlist input, .gs-cg-waitlist select {
+                    padding: 10px 12px; background: rgba(11,14,20,0.78);
+                    border: 1px solid rgba(255,255,255,0.10); color: #fff;
+                    border-radius: 9px; font-size: 0.85rem; outline: none; font-family: inherit;
+                }
+                .gs-cg-waitlist input:focus, .gs-cg-waitlist select:focus { border-color: rgba(110,193,228,0.55); }
+                .gs-cg-waitlist button { white-space: nowrap; }
+                .gs-cg-waitlist-status { grid-column: 1 / -1; margin: 8px 0 0; font-size: 0.78rem; color: rgba(255,255,255,0.55); }
+                .gs-cg-waitlist-status.is-ok  { color: var(--cg-green); }
+                .gs-cg-waitlist-status.is-err { color: #fca5a5; }
+
+                .gs-cg-cta.is-disabled { opacity: 0.45; cursor: not-allowed; pointer-events: none; background: rgba(255,255,255,0.04); border-color: rgba(255,255,255,0.10); }
+
+                @media (max-width: 640px) {
+                    .gs-cg-modal-dialog { max-width: 100%; border-radius: 16px; }
+                    .gs-cg-modal-head { padding: 16px 18px 14px; }
+                    .gs-cg-modal-body { padding: 16px 18px 22px; }
+                    .gs-cg-release-downloads { flex-direction: column; }
+                    .gs-cg-release-downloads .gs-cg-cta { width: 100%; }
+                    .gs-cg-waitlist { grid-template-columns: 1fr; }
+                }
                 [data-gs-cg-scope] .gs-cg-acct {
                     background: rgba(0,0,0,0.2);
                     border: 1px solid var(--cg-glass-border);
@@ -439,31 +629,83 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     </div>
                 </section>
 
+                <?php $st = gs_compute_gas_resolve_state( (int) $group_id, get_current_user_id() ); ?>
                 <section class="gs-cg-panel gs-cg-stagger b6">
                     <div class="gs-cg-usage-head">
                         <div>
                             <h3><?php esc_html_e( 'Usage This Period', 'gend-society' ); ?></h3>
-                            <p class="lede"><?php esc_html_e( 'Live ledger synchronization of active compute gas and private container virtualization metrics.', 'gend-society' ); ?></p>
+                            <p class="lede"><?php esc_html_e( 'Live ledger synchronization of compute, payment facilitation, and gas-station node activity for this group.', 'gend-society' ); ?></p>
                         </div>
                         <button type="button" class="gs-cg-refresh-btn" data-gs-cg-refresh><?php esc_html_e( 'Refresh Ledger', 'gend-society' ); ?></button>
                     </div>
 
-                    <div class="gs-cg-acct-grid">
-                        <div class="gs-cg-acct">
-                            <span class="gs-cg-meta"><?php esc_html_e( 'Compute Gas', 'gend-society' ); ?></span>
-                            <div class="gs-cg-price" data-gs-cg-cell="gas">$0.00</div>
-                            <div class="gs-cg-period" data-gs-cg-cell="gas-period"><?php esc_html_e( 'Current billing increment usage', 'gend-society' ); ?></div>
+                    <div class="gs-cg-acct-grid gs-cg-acct-grid--three">
+
+                        <!-- ─────── Compute fees ─────── -->
+                        <div class="gs-cg-acct gs-cg-card" data-gs-cg-card="compute" data-gs-cg-state="<?php echo $st['compute_active'] ? 'active' : 'gated'; ?>">
+                            <span class="gs-cg-meta"><?php esc_html_e( 'Gas Fees Paid For Compute', 'gend-society' ); ?></span>
+                            <?php if ( $st['compute_active'] ) : ?>
+                                <div class="gs-cg-price" data-gs-cg-cell="gas">$0.00</div>
+                                <div class="gs-cg-period" data-gs-cg-cell="gas-period"><?php esc_html_e( 'Current billing increment usage', 'gend-society' ); ?></div>
+                            <?php else : ?>
+                                <div class="gs-cg-empty">
+                                    <p class="gs-cg-empty-msg">
+                                        <?php esc_html_e( "This site's hosting plan doesn't include on-chain Compute tracking yet. Upgrade or migrate the linked app to a Networked / Containers / Server plan to start metering Compute gas.", 'gend-society' ); ?>
+                                    </p>
+                                    <a class="gs-cg-cta" href="<?php echo esc_url( $st['compute_plan_url'] ); ?>">
+                                        <?php esc_html_e( 'Upgrade Hosting Plan', 'gend-society' ); ?>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
                         </div>
-                        <div class="gs-cg-acct">
-                            <span class="gs-cg-meta"><?php esc_html_e( 'Container Fees', 'gend-society' ); ?></span>
-                            <div class="gs-cg-price" data-gs-cg-cell="container">$0.00</div>
-                            <div class="gs-cg-period" data-gs-cg-cell="container-period"><?php esc_html_e( 'Current billing increment usage', 'gend-society' ); ?></div>
+
+                        <!-- ─────── Payments facilitation fees ─────── -->
+                        <div class="gs-cg-acct gs-cg-card" data-gs-cg-card="payments" data-gs-cg-state="<?php echo $st['payments_active'] ? 'active' : 'gated'; ?>">
+                            <span class="gs-cg-meta"><?php esc_html_e( 'Gas Fees Paid For Payments Facilitation', 'gend-society' ); ?></span>
+                            <?php if ( $st['payments_active'] ) : ?>
+                                <div class="gs-cg-price" data-gs-cg-cell="payments">$0.00</div>
+                                <div class="gs-cg-period" data-gs-cg-cell="payments-period"><?php esc_html_e( 'Current billing increment usage', 'gend-society' ); ?></div>
+                            <?php else : ?>
+                                <div class="gs-cg-empty">
+                                    <p class="gs-cg-empty-msg">
+                                        <?php esc_html_e( "Group Payments aren't activated yet — no payment-facilitation gas is being collected on this group's behalf.", 'gend-society' ); ?>
+                                    </p>
+                                    <a class="gs-cg-cta" href="<?php echo esc_url( $st['payments_activate_url'] ); ?>">
+                                        <?php esc_html_e( 'Activate Payments', 'gend-society' ); ?>
+                                    </a>
+                                </div>
+                            <?php endif; ?>
                         </div>
-                        <div class="gs-cg-acct is-total">
-                            <span class="gs-cg-meta"><?php esc_html_e( 'Consolidated Total', 'gend-society' ); ?></span>
-                            <div class="gs-cg-price" data-gs-cg-cell="total">$0.00</div>
-                            <div class="gs-cg-period" data-gs-cg-cell="total-period"><?php esc_html_e( 'Aggregated outstanding ecosystem ledger balance', 'gend-society' ); ?></div>
+
+                        <!-- ─────── Gas Station earnings ─────── -->
+                        <div class="gs-cg-acct gs-cg-card is-total" data-gs-cg-card="earned" data-gs-cg-state="<?php echo $st['node_active'] ? 'active' : 'gated'; ?>">
+                            <span class="gs-cg-meta"><?php esc_html_e( 'Gas Station Earned Fees', 'gend-society' ); ?></span>
+                            <?php if ( $st['node_active'] ) : ?>
+                                <div class="gs-cg-price" data-gs-cg-cell="earned">$0.00</div>
+                                <div class="gs-cg-period" data-gs-cg-cell="earned-period"><?php esc_html_e( 'Routed to your connected Gas Station node(s)', 'gend-society' ); ?></div>
+                            <?php else : ?>
+                                <div class="gs-cg-empty">
+                                    <p class="gs-cg-empty-msg">
+                                        <?php esc_html_e( 'No Gas Station Node connected. Hook up a device to share its unused compute power with the network and earn gas fees on every web app render + payment it helps process.', 'gend-society' ); ?>
+                                    </p>
+                                    <div class="gs-cg-connect-options">
+                                        <button type="button" class="gs-cg-cta gs-cg-cta--ghost" data-gs-cg-connect="server">
+                                            <span class="gs-cg-cta-title"><?php esc_html_e( 'Connect a Server', 'gend-society' ); ?></span>
+                                            <span class="gs-cg-cta-sub"><?php esc_html_e( 'Linux / dedicated host', 'gend-society' ); ?></span>
+                                        </button>
+                                        <button type="button" class="gs-cg-cta gs-cg-cta--ghost" data-gs-cg-connect="desktop">
+                                            <span class="gs-cg-cta-title"><?php esc_html_e( 'Connect Your Computer', 'gend-society' ); ?></span>
+                                            <span class="gs-cg-cta-sub"><?php esc_html_e( 'via the GenD Desktop App', 'gend-society' ); ?></span>
+                                        </button>
+                                        <button type="button" class="gs-cg-cta gs-cg-cta--ghost" data-gs-cg-connect="mobile">
+                                            <span class="gs-cg-cta-title"><?php esc_html_e( 'Get the Mobile App', 'gend-society' ); ?></span>
+                                            <span class="gs-cg-cta-sub"><?php esc_html_e( 'iOS / Android', 'gend-society' ); ?></span>
+                                        </button>
+                                    </div>
+                                </div>
+                            <?php endif; ?>
                         </div>
+
                     </div>
 
                     <div class="gs-cg-runtime">
@@ -473,6 +715,182 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         </p>
                     </div>
                 </section>
+
+                <?php /* ───────────── Connect-Device step-by-step popups ─────────────
+                         One modal shell with three swappable content panels. The
+                         buttons in the Gas Station gated card flip [data-gs-cg-active]
+                         on the modal to show the matching panel. Each panel walks the
+                         user through provisioning that device class as a node. */ ?>
+                <?php $release = gs_get_desktop_release_info(); ?>
+                <div class="gs-cg-modal" data-gs-cg-modal hidden role="dialog" aria-modal="true" aria-labelledby="gs-cg-modal-title-<?php echo esc_attr( $uid ); ?>">
+                    <div class="gs-cg-modal-backdrop" data-gs-cg-modal-close></div>
+                    <div class="gs-cg-modal-dialog">
+                        <header class="gs-cg-modal-head">
+                            <h3 id="gs-cg-modal-title-<?php echo esc_attr( $uid ); ?>" data-gs-cg-modal-title>—</h3>
+                            <button type="button" class="gs-cg-modal-close" data-gs-cg-modal-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                        </header>
+
+                        <div class="gs-cg-modal-body">
+
+                            <!-- ─── Server panel ─── -->
+                            <div class="gs-cg-step-panel" data-gs-cg-panel="server" hidden>
+                                <p class="gs-cg-step-intro">
+                                    <?php esc_html_e( 'Turn any Linux server into a Gas Station node. The server uses your existing WordPress Management site + the Contracts & Payments plugin to register the device on-chain — no separate runtime to install.', 'gend-society' ); ?>
+                                </p>
+                                <ol class="gs-cg-steps">
+                                    <li>
+                                        <span class="gs-cg-step-num">1</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Have a WordPress Management site ready', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Any WordPress install you control — could be the same site that hosts your business. The Gas Station node piggybacks on its uptime + cron, so the server only needs to host one WP install.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">2</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Install the Contracts &amp; Payments plugin', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'wp-admin → Plugins → Add New → "GenD Contracts & Payments". The plugin ships a node runner that registers the install\'s public key with gend.me on activation.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">3</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Open Settings → Gas Station', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Pick the resources this server should contribute (CPU cores, RAM ceiling, daily DGEN payout target). The node automatically opts in to serve Compute jobs + Payment facilitation as capacity allows.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">4</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Watch earnings flow in', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Within minutes the node appears in the centralized Group Hub on gend.me alongside any other devices you\'ve connected. Earned fees route to the wallet of the gend.me account that signed in to activate the node.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                </ol>
+                                <div class="gs-cg-modal-actions">
+                                    <a class="gs-cg-cta" href="<?php echo esc_url( admin_url( 'admin.php?page=gend-contracts-payments-settings#gas-station' ) ); ?>">
+                                        <?php esc_html_e( 'Open Gas Station Settings', 'gend-society' ); ?>
+                                    </a>
+                                </div>
+                            </div>
+
+                            <!-- ─── Desktop panel ─── -->
+                            <div class="gs-cg-step-panel" data-gs-cg-panel="desktop" hidden>
+                                <p class="gs-cg-step-intro">
+                                    <?php esc_html_e( "Turn the computer you're sitting at into a Gas Station. The GenD Desktop App runs in the background and contributes unused CPU/RAM to the network whenever your machine is idle. It auto-updates as new versions ship.", 'gend-society' ); ?>
+                                </p>
+                                <div class="gs-cg-release-card">
+                                    <div class="gs-cg-release-meta">
+                                        <span class="gs-cg-release-label"><?php esc_html_e( 'Latest version', 'gend-society' ); ?></span>
+                                        <span class="gs-cg-release-version">v<?php echo esc_html( $release['version'] ); ?></span>
+                                        <?php if ( ! empty( $release['published_at'] ) ) : ?>
+                                            <span class="gs-cg-release-date"><?php echo esc_html( sprintf( __( 'Released %s', 'gend-society' ), human_time_diff( strtotime( $release['published_at'] ) ) . ' ago' ) ); ?></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="gs-cg-release-downloads">
+                                        <?php if ( ! empty( $release['windows_url'] ) ) : ?>
+                                            <a class="gs-cg-cta" href="<?php echo esc_url( $release['windows_url'] ); ?>" download>
+                                                <?php esc_html_e( 'Download for Windows', 'gend-society' ); ?>
+                                            </a>
+                                        <?php endif; ?>
+                                        <?php if ( ! empty( $release['mac_url'] ) ) : ?>
+                                            <a class="gs-cg-cta gs-cg-cta--ghost" href="<?php echo esc_url( $release['mac_url'] ); ?>" download>
+                                                <?php esc_html_e( 'Download for macOS', 'gend-society' ); ?>
+                                            </a>
+                                        <?php else : ?>
+                                            <span class="gs-cg-cta gs-cg-cta--ghost is-disabled" aria-disabled="true">
+                                                <span class="gs-cg-cta-title"><?php esc_html_e( 'macOS — Coming Soon', 'gend-society' ); ?></span>
+                                            </span>
+                                        <?php endif; ?>
+                                        <?php if ( ! empty( $release['linux_url'] ) ) : ?>
+                                            <a class="gs-cg-cta gs-cg-cta--ghost" href="<?php echo esc_url( $release['linux_url'] ); ?>" download>
+                                                <?php esc_html_e( 'Download for Linux', 'gend-society' ); ?>
+                                            </a>
+                                        <?php endif; ?>
+                                    </div>
+                                </div>
+                                <ol class="gs-cg-steps">
+                                    <li>
+                                        <span class="gs-cg-step-num">1</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Download &amp; install', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Run the installer above. It registers the auto-updater so every future improvement we ship reaches you without re-downloading manually.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">2</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Sign in with gend.me', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Use the same account you used to land on this page. The OAuth handshake links the device to your wallet so all earnings route to you.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">3</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Open Network &amp; Gas → Gas Station', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( "Toggle Gas Station to ON. Pick the resource ceiling (% of CPU, RAM cap, idle-only). Your device starts serving network compute + payment facilitation jobs and earning fees per request.", 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">4</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'See it in the Group Hub', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'The device + any web apps it serves show up automatically in the centralized Group Hub on gend.me — one view across every Gas Station you have running.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                </ol>
+                            </div>
+
+                            <!-- ─── Mobile panel ─── -->
+                            <div class="gs-cg-step-panel" data-gs-cg-panel="mobile" hidden>
+                                <p class="gs-cg-step-intro">
+                                    <?php esc_html_e( "The GenD Mobile App turns your phone or tablet into a Gas Station whenever it's charging + on Wi-Fi. Earn fees overnight without touching your data plan or battery during the day.", 'gend-society' ); ?>
+                                </p>
+                                <div class="gs-cg-coming-soon">
+                                    <div class="gs-cg-coming-icon" aria-hidden="true">
+                                        <svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="5" y="2" width="14" height="20" rx="2"/><line x1="12" y1="18" x2="12.01" y2="18"/></svg>
+                                    </div>
+                                    <h4><?php esc_html_e( 'iOS &amp; Android apps — coming soon', 'gend-society' ); ?></h4>
+                                    <p><?php esc_html_e( "We're porting the desktop runtime to mobile. Drop your email and we'll ping you the moment beta builds open up.", 'gend-society' ); ?></p>
+                                    <form class="gs-cg-waitlist" data-gs-cg-waitlist>
+                                        <input type="email" name="email" required placeholder="<?php esc_attr_e( 'you@example.com', 'gend-society' ); ?>" value="<?php echo esc_attr( wp_get_current_user()->user_email ?? '' ); ?>" />
+                                        <select name="platform">
+                                            <option value="both"><?php esc_html_e( 'iOS + Android', 'gend-society' ); ?></option>
+                                            <option value="ios"><?php esc_html_e( 'iOS only', 'gend-society' ); ?></option>
+                                            <option value="android"><?php esc_html_e( 'Android only', 'gend-society' ); ?></option>
+                                        </select>
+                                        <button type="submit" class="gs-cg-cta"><?php esc_html_e( 'Join Waitlist', 'gend-society' ); ?></button>
+                                        <p class="gs-cg-waitlist-status" data-gs-cg-waitlist-status aria-live="polite"></p>
+                                    </form>
+                                </div>
+                                <ol class="gs-cg-steps gs-cg-steps--preview">
+                                    <li>
+                                        <span class="gs-cg-step-num">1</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Install from App Store / Play Store', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Same gend.me sign-in as the desktop app. Your devices share one identity + wallet.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">2</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Pick when it runs', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Charging-only, Wi-Fi-only, idle-only — whichever combination protects your battery and data while the device contributes spare capacity.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                    <li>
+                                        <span class="gs-cg-step-num">3</span>
+                                        <div>
+                                            <h4><?php esc_html_e( 'Earnings land in the same wallet', 'gend-society' ); ?></h4>
+                                            <p><?php esc_html_e( 'Mobile fees pool with desktop + server fees in your gend.me wallet — withdraw / spend / re-stake from one place.', 'gend-society' ); ?></p>
+                                        </div>
+                                    </li>
+                                </ol>
+                            </div>
+
+                        </div>
+                    </div>
+                </div>
 
             </div>
 
@@ -484,12 +902,12 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 var nonce = <?php echo wp_json_encode( $nonce ); ?>;
                 var btn = root.querySelector('[data-gs-cg-refresh]');
                 var cells = {
-                    gas:       root.querySelector('[data-gs-cg-cell="gas"]'),
-                    container: root.querySelector('[data-gs-cg-cell="container"]'),
-                    total:     root.querySelector('[data-gs-cg-cell="total"]'),
-                    gasPeriod:       root.querySelector('[data-gs-cg-cell="gas-period"]'),
-                    containerPeriod: root.querySelector('[data-gs-cg-cell="container-period"]'),
-                    totalPeriod:     root.querySelector('[data-gs-cg-cell="total-period"]')
+                    gas:            root.querySelector('[data-gs-cg-cell="gas"]'),
+                    gasPeriod:      root.querySelector('[data-gs-cg-cell="gas-period"]'),
+                    payments:       root.querySelector('[data-gs-cg-cell="payments"]'),
+                    paymentsPeriod: root.querySelector('[data-gs-cg-cell="payments-period"]'),
+                    earned:         root.querySelector('[data-gs-cg-cell="earned"]'),
+                    earnedPeriod:   root.querySelector('[data-gs-cg-cell="earned-period"]')
                 };
                 var runtimeText = root.querySelector('[data-gs-cg-runtime-text]');
                 var defaultRuntime = runtimeText ? runtimeText.textContent : '';
@@ -506,13 +924,18 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         .then(function(r){ return r.json(); })
                         .then(function(resp){
                             var d = (resp && resp.success && resp.data) ? resp.data : {};
-                            if (cells.gas)       cells.gas.textContent       = d.gas_fees_label       || '$0.00';
-                            if (cells.container) cells.container.textContent = d.container_fees_label || '$0.00';
-                            if (cells.total)     cells.total.textContent     = d.total_label          || '$0.00';
+                            if (cells.gas)      cells.gas.textContent      = d.gas_fees_label       || '$0.00';
+                            // Payments-facilitation gas falls back to gas_fees_label
+                            // when the backend hasn't been extended yet — the
+                            // existing endpoint returns combined compute gas; once
+                            // /hosting/compute-gas gains a payments_fees_label we
+                            // preferentially use that. Same pattern for earnings.
+                            if (cells.payments) cells.payments.textContent = d.payments_fees_label    || '$0.00';
+                            if (cells.earned)   cells.earned.textContent   = d.gas_station_earned_label || '$0.00';
                             var period = d.period || '<?php echo esc_js( __( 'Current billing increment usage', 'gend-society' ) ); ?>';
-                            if (cells.gasPeriod)       cells.gasPeriod.textContent       = period;
-                            if (cells.containerPeriod) cells.containerPeriod.textContent = period;
-                            if (cells.totalPeriod)     cells.totalPeriod.textContent     = (d.total_period || period);
+                            if (cells.gasPeriod)      cells.gasPeriod.textContent      = period;
+                            if (cells.paymentsPeriod) cells.paymentsPeriod.textContent = period;
+                            if (cells.earnedPeriod)   cells.earnedPeriod.textContent   = (d.gas_station_period || period);
                             if (runtimeText && d.message) {
                                 runtimeText.textContent = d.message;
                             } else if (runtimeText) {
@@ -528,6 +951,74 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 }
                 if (btn) btn.addEventListener('click', function(e){ e.preventDefault(); load(); });
                 load();
+
+                /* ─── Connect-device popup wiring ─── */
+                var modal = root.querySelector('[data-gs-cg-modal]');
+                var modalTitle = root.querySelector('[data-gs-cg-modal-title]');
+                var panels = {
+                    server:  root.querySelector('[data-gs-cg-panel="server"]'),
+                    desktop: root.querySelector('[data-gs-cg-panel="desktop"]'),
+                    mobile:  root.querySelector('[data-gs-cg-panel="mobile"]')
+                };
+                var titles = {
+                    server:  '<?php echo esc_js( __( 'Connect a Server', 'gend-society' ) ); ?>',
+                    desktop: '<?php echo esc_js( __( 'Connect Your Computer', 'gend-society' ) ); ?>',
+                    mobile:  '<?php echo esc_js( __( 'Get the Mobile App', 'gend-society' ) ); ?>'
+                };
+                function openModal(kind) {
+                    if (!modal || !panels[kind]) return;
+                    if (modalTitle) modalTitle.textContent = titles[kind] || '—';
+                    Object.keys(panels).forEach(function (k) {
+                        if (panels[k]) panels[k].hidden = (k !== kind);
+                    });
+                    modal.hidden = false;
+                    document.body.style.overflow = 'hidden';
+                }
+                function closeModal() {
+                    if (!modal) return;
+                    modal.hidden = true;
+                    document.body.style.overflow = '';
+                }
+                root.querySelectorAll('[data-gs-cg-connect]').forEach(function (b) {
+                    b.addEventListener('click', function () { openModal(b.getAttribute('data-gs-cg-connect')); });
+                });
+                root.querySelectorAll('[data-gs-cg-modal-close]').forEach(function (el) {
+                    el.addEventListener('click', closeModal);
+                });
+                document.addEventListener('keydown', function (e) {
+                    if (e.key === 'Escape' && modal && !modal.hidden) closeModal();
+                });
+
+                /* ─── Mobile waitlist submit ─── */
+                var waitlist = root.querySelector('[data-gs-cg-waitlist]');
+                if (waitlist) {
+                    waitlist.addEventListener('submit', function (e) {
+                        e.preventDefault();
+                        var status = waitlist.querySelector('[data-gs-cg-waitlist-status]');
+                        var emailEl = waitlist.querySelector('input[name="email"]');
+                        var platformEl = waitlist.querySelector('select[name="platform"]');
+                        if (!emailEl || !emailEl.value) return;
+                        if (status) { status.className = 'gs-cg-waitlist-status'; status.textContent = '<?php echo esc_js( __( 'Sending…', 'gend-society' ) ); ?>'; }
+                        var body = new URLSearchParams({
+                            action: 'gs_cg_mobile_waitlist',
+                            nonce:  nonce,
+                            email:  emailEl.value,
+                            platform: platformEl ? platformEl.value : 'both'
+                        });
+                        fetch(ajax, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString() })
+                            .then(function (r) { return r.json(); })
+                            .then(function (resp) {
+                                if (resp && resp.success) {
+                                    if (status) { status.className = 'gs-cg-waitlist-status is-ok'; status.textContent = '<?php echo esc_js( __( '✓ You\'re on the list — we\'ll email when builds open up.', 'gend-society' ) ); ?>'; }
+                                    waitlist.querySelector('button[type="submit"]').disabled = true;
+                                } else if (status) {
+                                    status.className = 'gs-cg-waitlist-status is-err';
+                                    status.textContent = (resp && resp.data && resp.data.message) || '<?php echo esc_js( __( 'Could not save — try again.', 'gend-society' ) ); ?>';
+                                }
+                            })
+                            .catch(function () { if (status) { status.className = 'gs-cg-waitlist-status is-err'; status.textContent = '<?php echo esc_js( __( 'Network error.', 'gend-society' ) ); ?>'; } });
+                    });
+                }
             })();
             </script>
             <?php
@@ -1878,4 +2369,161 @@ function gs_group_render_hosting_scope_styles() {
     })();
     </script>
     <?php
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   DESKTOP RELEASE INFO — backs the download link in the Connect Your
+   Computer popup. The hub stores the latest release metadata in a site
+   option (`gs_desktop_release`) so the link stays current as we ship
+   new builds: bumping the option's `version` + `windows_url` is all
+   it takes for every group's Compute & Gas tab to start serving the
+   new installer immediately. No code redeploy required.
+
+   The build pipeline can keep this option fresh by either:
+     - posting to /wp-json/gs/v1/desktop/release (filtered to admins)
+     - editing the option directly in wp-admin → Tools
+
+   The defaults below are returned when the option isn't set yet, so
+   the popup never renders broken even on a clean install.
+   ════════════════════════════════════════════════════════════════════ */
+
+if ( ! function_exists( 'gs_get_desktop_release_info' ) ) {
+
+    function gs_get_desktop_release_info() {
+        $stored = get_site_option( 'gs_desktop_release', array() );
+        if ( ! is_array( $stored ) ) $stored = array();
+        $defaults = array(
+            // Default to the version the build pipeline last shipped — bump
+            // here whenever a new installer goes out and the
+            // gs_desktop_release option isn't being maintained externally.
+            'version'      => '1.6.89',
+            'windows_url'  => 'https://updates.gend.me/web-builder/GenD%20Web%20Builder-Setup-1.6.89-slim93.exe',
+            'mac_url'      => '',
+            'linux_url'    => '',
+            'published_at' => '2026-05-27T15:43:00Z',
+            'sha256'       => '',
+            'channel'      => 'latest',
+        );
+        return array_merge( $defaults, $stored );
+    }
+}
+
+if ( ! function_exists( 'gs_desktop_release_register_rest' ) ) {
+
+    function gs_desktop_release_register_rest() {
+        register_rest_route( 'gs/v1', '/desktop/info', array(
+            'methods'             => 'GET',
+            'callback'            => function () {
+                return rest_ensure_response( gs_get_desktop_release_info() );
+            },
+            'permission_callback' => '__return_true',
+        ) );
+
+        // Redirect helper — bookmarkable "always latest" URL. Hits this
+        // endpoint and gets a 302 to whichever platform installer the
+        // request's Accept-Platform header (or ?platform=) names; falls
+        // back to Windows.
+        register_rest_route( 'gs/v1', '/desktop/latest', array(
+            'methods'             => 'GET',
+            'callback'            => function ( WP_REST_Request $req ) {
+                $info = gs_get_desktop_release_info();
+                $platform = strtolower( (string) $req->get_param( 'platform' ) );
+                if ( $platform === '' ) {
+                    $ua = strtolower( (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
+                    if ( strpos( $ua, 'mac' ) !== false )    $platform = 'mac';
+                    elseif ( strpos( $ua, 'linux' ) !== false ) $platform = 'linux';
+                    else                                      $platform = 'windows';
+                }
+                $key = $platform . '_url';
+                $url = ! empty( $info[ $key ] ) ? $info[ $key ] : $info['windows_url'];
+                if ( ! $url ) return new WP_Error( 'no_installer', 'No installer URL configured.', array( 'status' => 503 ) );
+                wp_redirect( $url, 302 );
+                exit;
+            },
+            'permission_callback' => '__return_true',
+        ) );
+
+        // Admin POST to update the release info — used by the build
+        // pipeline to roll the latest version forward without a code
+        // deploy. Requires manage_network so only a super-admin can
+        // change what the "Connect Your Computer" popup serves.
+        register_rest_route( 'gs/v1', '/desktop/release', array(
+            'methods'             => 'POST',
+            'callback'            => function ( WP_REST_Request $req ) {
+                $payload = $req->get_json_params();
+                if ( ! is_array( $payload ) ) $payload = $req->get_params();
+                $clean = array();
+                foreach ( array( 'version', 'windows_url', 'mac_url', 'linux_url', 'published_at', 'sha256', 'channel' ) as $k ) {
+                    if ( isset( $payload[ $k ] ) ) {
+                        $clean[ $k ] = ( $k === 'windows_url' || $k === 'mac_url' || $k === 'linux_url' )
+                            ? esc_url_raw( (string) $payload[ $k ] )
+                            : sanitize_text_field( (string) $payload[ $k ] );
+                    }
+                }
+                if ( empty( $clean ) ) return new WP_Error( 'no_payload', 'Nothing to update.', array( 'status' => 400 ) );
+                $cur = get_site_option( 'gs_desktop_release', array() );
+                if ( ! is_array( $cur ) ) $cur = array();
+                update_site_option( 'gs_desktop_release', array_merge( $cur, $clean ) );
+                return rest_ensure_response( gs_get_desktop_release_info() );
+            },
+            'permission_callback' => function () {
+                return current_user_can( 'manage_network' );
+            },
+        ) );
+    }
+    add_action( 'rest_api_init', 'gs_desktop_release_register_rest' );
+}
+
+/* ════════════════════════════════════════════════════════════════════
+   MOBILE WAITLIST — backs the iOS/Android signup form in the Get the
+   Mobile App popup. Stores entries in a site option (one row per
+   email). Logged-in users have their user_meta tagged too so we can
+   broadcast a "your beta is open" notification later without re-asking.
+   ════════════════════════════════════════════════════════════════════ */
+
+if ( ! function_exists( 'gs_cg_mobile_waitlist_ajax' ) ) {
+
+    function gs_cg_mobile_waitlist_ajax() {
+        check_ajax_referer( 'gs_membership_action', 'nonce' );
+        $email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
+        $platform = isset( $_POST['platform'] ) ? sanitize_text_field( wp_unslash( $_POST['platform'] ) ) : 'both';
+        if ( ! is_email( $email ) ) {
+            wp_send_json_error( array( 'message' => __( 'Enter a valid email.', 'gend-society' ) ) );
+        }
+        if ( ! in_array( $platform, array( 'ios', 'android', 'both' ), true ) ) $platform = 'both';
+
+        $list = get_site_option( 'gs_mobile_waitlist', array() );
+        if ( ! is_array( $list ) ) $list = array();
+        $entry = array(
+            'email'      => $email,
+            'platform'   => $platform,
+            'user_id'    => get_current_user_id(),
+            'created_at' => time(),
+            'source'     => 'compute-gas-tab',
+        );
+        // De-dupe by email: keep the latest platform preference.
+        $existing_idx = -1;
+        foreach ( $list as $i => $row ) {
+            if ( isset( $row['email'] ) && strcasecmp( $row['email'], $email ) === 0 ) {
+                $existing_idx = $i;
+                break;
+            }
+        }
+        if ( $existing_idx >= 0 ) {
+            $list[ $existing_idx ] = $entry;
+        } else {
+            $list[] = $entry;
+        }
+        update_site_option( 'gs_mobile_waitlist', $list );
+        if ( get_current_user_id() > 0 ) {
+            update_user_meta( get_current_user_id(), '_gs_mobile_waitlist', $entry );
+        }
+        wp_send_json_success( array( 'queued' => true, 'platform' => $platform ) );
+    }
+    add_action( 'wp_ajax_gs_cg_mobile_waitlist', 'gs_cg_mobile_waitlist_ajax' );
+    // Also allow logged-out signups (popular email-capture pattern) —
+    // they still need the nonce, which non-logged users won't have
+    // without a wp_create_nonce call from a public-rendered page; the
+    // tab itself is admin-gated, so in practice the user IS logged in.
+    add_action( 'wp_ajax_nopriv_gs_cg_mobile_waitlist', 'gs_cg_mobile_waitlist_ajax' );
 }

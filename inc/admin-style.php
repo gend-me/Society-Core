@@ -46,6 +46,12 @@ function gs_enqueue_admin_assets()
             ['label' => 'Wallet',       'url' => $members_base . 'member-wallet/', 'icon' => 'dashicons-money-alt'],
             ['label' => 'Messages',     'url' => $members_base . 'messages/',    'icon' => 'dashicons-email'],
         ],
+        // Connected web-app group menu — rendered across the centre of the
+        // header. Each item opens admin.php?page=gs-group-embed&tab=<slug>
+        // which renders that group section inline (not iframe). Capability-
+        // filtered server-side by gs_group_embed_menu_items().
+        'gendGroupMenu' => function_exists('gs_group_embed_menu_items') ? gs_group_embed_menu_items() : [],
+        'gendGroupName' => function_exists('gs_group_embed_group_name') ? gs_group_embed_group_name() : '',
         // Inputs the header's Login-to-GenD button needs to drive the same
         // PKCE popup flow as wp-login.php (see oauth-login.php).
         'gendOauthClientId' => function_exists('gs_oauth_client_id') ? gs_oauth_client_id() : '',
@@ -78,9 +84,104 @@ add_action('admin_enqueue_scripts', function () {
     }
 });
 
-// Hide default WP admin bar bump
+// Hide default WP admin bar bump + paint the gend.me gif background as
+// a fixed, full-bleed layer behind every wp-admin page. The image sits on
+// body::before so it stays put while the user scrolls; body::after lays a
+// radial dark overlay so text remains legible regardless of the gif frame.
+// #wpcontent / #wpbody / .wrap go transparent so the image shows through;
+// individual surfaces (cards, panels) provide their own glass blur.
+//
+// The block / site / theme editors render their own full-bleed UI and
+// would look broken with a gif behind them — exclude those screens.
 add_action('admin_head', function () {
-    echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}</style>';
+    global $pagenow;
+    $exclude_pages = array(
+        'site-editor.php',
+        'theme-editor.php',
+        'customize.php',
+        'plugin-editor.php',
+    );
+    $is_block_editor = ( $pagenow === 'post.php' || $pagenow === 'post-new.php' );
+    $skip_bg = in_array( $pagenow, $exclude_pages, true ) || $is_block_editor;
+
+    echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
+
+    if ( ! $skip_bg ) {
+        $bg_url = 'https://gend.me/wp-content/uploads/2026/03/account-background.gif';
+        // body is made `position: relative` so it acts as the stacking root
+        // for the negative-z pseudo-elements below. Pushing the bg + overlay
+        // to z-index:-2 / -1 means no other element needs a positive z-index
+        // to render above them — which avoids the chat widget (and other
+        // position:fixed UI inside #wpwrap) getting trapped under an
+        // accidental stacking context on wpwrap/wpcontent.
+        echo '
+        html { background: transparent !important; }
+        body.wp-admin { background: transparent !important; position: relative; }
+        body.wp-admin::before {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background-image: url("' . esc_url( $bg_url ) . '");
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            z-index: -2;
+            pointer-events: none;
+        }
+        body.wp-admin::after {
+            content: "";
+            position: fixed;
+            inset: 0;
+            background: radial-gradient(ellipse at top, rgba(11, 14, 20, 0.55) 0%, rgba(5, 7, 10, 0.85) 80%);
+            z-index: -1;
+            pointer-events: none;
+        }
+        body.wp-admin #wpwrap,
+        body.wp-admin #wpcontent,
+        body.wp-admin #wpbody,
+        body.wp-admin #wpbody-content,
+        body.wp-admin .wrap { background: transparent !important; }
+        body.wp-admin #wpfooter { display: none !important; }
+
+        /* Generic glass treatment for standard WP admin surfaces so
+           non-dashboard pages also feel cohesive against the gif. Pages
+           that already style their own panels (the gend.me dashboard)
+           override these further. */
+        body.wp-admin .card,
+        body.wp-admin .postbox,
+        body.wp-admin .stuffbox {
+            background: linear-gradient(180deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.65)) !important;
+            border: 1px solid rgba(255, 255, 255, 0.10) !important;
+            border-radius: 14px !important;
+            backdrop-filter: blur(20px) saturate(160%);
+            -webkit-backdrop-filter: blur(20px) saturate(160%);
+            box-shadow:
+                inset 0 1px 0 rgba(255, 255, 255, 0.06),
+                0 16px 40px rgba(0, 0, 0, 0.35) !important;
+            color: #e6edf7;
+        }
+        body.wp-admin .postbox > .postbox-header,
+        body.wp-admin .postbox h2.hndle {
+            background: transparent !important;
+            border-bottom-color: rgba(255, 255, 255, 0.06) !important;
+            color: #fff !important;
+        }
+        body.wp-admin .wp-list-table {
+            background: rgba(11, 14, 20, 0.45) !important;
+            border: 1px solid rgba(255, 255, 255, 0.08) !important;
+            border-radius: 12px !important;
+            backdrop-filter: blur(16px) saturate(150%);
+            -webkit-backdrop-filter: blur(16px) saturate(150%);
+            overflow: hidden;
+        }
+        body.wp-admin .wp-list-table thead,
+        body.wp-admin .wp-list-table tfoot { background: transparent !important; }
+        body.wp-admin .wp-list-table tr { background: transparent !important; }
+        body.wp-admin .wp-list-table tr:hover { background: rgba(255, 255, 255, 0.03) !important; }
+        ';
+    }
+
+    echo '</style>';
 });
 
 // Hide WP-admin footer text and version

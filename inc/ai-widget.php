@@ -175,16 +175,115 @@ class GS_AI_Widget {
     }
 
     public static function shortcode_wireframe( $atts ) {
+        $atts = shortcode_atts( array( 'height' => '90vh', 'width' => '100%' ), $atts, 'aipa_wireframe' );
+
+        // Regenerate-mode entry: an admin clicked Replace / Add Section /
+        // Add Page from the saved toolbar. Render the embed container with
+        // entry-step hints so the engine jumps into the right chatflow step
+        // (replace clears the saved option first; add-section/add-page
+        // pre-load context.wireframe_html via GET /gs/v1/wireframe).
+        $mode = isset( $_GET['wireframe_mode'] ) ? sanitize_key( wp_unslash( $_GET['wireframe_mode'] ) ) : '';
+        $valid_modes = array( 'replace' => 'intro', 'add-section' => 'add_section_prompt', 'add-page' => 'page_brief' );
+        if ( $mode && isset( $valid_modes[ $mode ] ) && current_user_can( 'manage_options' ) ) {
+            if ( $mode === 'replace' ) {
+                delete_option( 'aipa_wireframe_html' );
+                delete_option( 'aipa_wireframe_meta' );
+            }
+            if ( ! self::eligible() ) return '';
+            self::enqueue();
+            return sprintf(
+                '<div id="aipa-wireframe-embed" data-autostart="wireframe" data-placement="embedded" data-entry-step="%s" data-preload="%s" style="width:%s; height:%s; min-height:90vh; position:relative; display:flex; flex-direction:column;"></div>',
+                esc_attr( $valid_modes[ $mode ] ),
+                $mode === 'replace' ? '0' : '1',
+                esc_attr( $atts['width'] ),
+                esc_attr( $atts['height'] )
+            );
+        }
+
+        // Saved-render path: a wireframe already exists. Show it in a
+        // sandboxed iframe and (for admins) layer in the regenerate toolbar.
+        $saved_html = class_exists( 'GS_Wireframe_Store' )
+            ? GS_Wireframe_Store::get_html()
+            : (string) get_option( 'aipa_wireframe_html', '' );
+
+        if ( $saved_html !== '' ) {
+            return self::render_saved_wireframe( $saved_html, $atts );
+        }
+
+        // First-run path: kick off the chatflow in the embed container.
         if ( ! self::eligible() ) {
             return '';
         }
         self::enqueue();
-        $atts = shortcode_atts( array( 'height' => '90vh', 'width' => '100%' ), $atts, 'aipa_wireframe' );
         return sprintf(
             '<div id="aipa-wireframe-embed" data-autostart="wireframe" data-placement="embedded" style="width:%s; height:%s; min-height:90vh; position:relative; display:flex; flex-direction:column;"></div>',
             esc_attr( $atts['width'] ),
             esc_attr( $atts['height'] )
         );
+    }
+
+    /**
+     * Render the saved wireframe in a sandboxed iframe. Visitors see just
+     * the iframe; site admins also see a small toolbar with Replace and
+     * Add On (which expands to "Add a section" / "Add a new page").
+     *
+     * The iframe uses srcdoc so the wireframe document is self-contained
+     * and origin-isolated — its Tailwind CDN script, Google Fonts, and
+     * IntersectionObserver animations all run inside the sandbox without
+     * leaking into the host page's DOM.
+     */
+    protected static function render_saved_wireframe( $html, $atts ) {
+        $is_admin    = current_user_can( 'manage_options' );
+        $page_url    = remove_query_arg( 'wireframe_mode' );
+        $replace_url = add_query_arg( 'wireframe_mode', 'replace',     $page_url );
+        $section_url = add_query_arg( 'wireframe_mode', 'add-section', $page_url );
+        $newpage_url = add_query_arg( 'wireframe_mode', 'add-page',    $page_url );
+        // srcdoc requires the document HTML escaped for an HTML attribute —
+        // the double-quote escape is the security boundary that prevents
+        // the wireframe from breaking out of the iframe attribute.
+        $srcdoc      = esc_attr( $html );
+
+        ob_start();
+        ?>
+        <div class="aipa-wireframe-saved" style="position:relative; width:<?php echo esc_attr( $atts['width'] ); ?>; min-height:<?php echo esc_attr( $atts['height'] ); ?>; display:flex; flex-direction:column;">
+            <?php if ( $is_admin ) : ?>
+                <div class="aipa-wireframe-toolbar" style="display:flex; align-items:center; justify-content:space-between; gap:12px; padding:10px 14px; background:rgba(15,23,42,0.92); color:#e2e8f0; border-bottom:1px solid rgba(255,255,255,0.08); font:500 12px/1.4 system-ui, -apple-system, Segoe UI, sans-serif;">
+                    <span style="display:inline-flex; align-items:center; gap:6px;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/></svg>
+                        <?php esc_html_e( 'Saved wireframe', 'gend-society' ); ?>
+                    </span>
+                    <div class="aipa-wireframe-toolbar__actions" style="display:flex; gap:8px; position:relative;">
+                        <a href="<?php echo esc_url( $replace_url ); ?>"
+                           style="background:rgba(239,68,68,0.15); border:1px solid rgba(239,68,68,0.4); color:#fca5a5; padding:6px 12px; border-radius:6px; text-decoration:none; font-size:12px;"
+                           onclick="return confirm('<?php echo esc_js( __( 'Discard the current wireframe and start over?', 'gend-society' ) ); ?>');">
+                            <?php esc_html_e( 'Regenerate (Replace)', 'gend-society' ); ?>
+                        </a>
+                        <div class="aipa-wireframe-addon" style="position:relative;">
+                            <button type="button"
+                                    class="aipa-wireframe-addon__trigger"
+                                    style="background:rgba(99,102,241,0.18); border:1px solid rgba(99,102,241,0.45); color:#a5b4fc; padding:6px 12px; border-radius:6px; cursor:pointer; font-size:12px;"
+                                    onclick="var m=this.nextElementSibling; m.style.display=m.style.display==='block'?'none':'block';">
+                                <?php esc_html_e( 'Regenerate (Add On) ▾', 'gend-society' ); ?>
+                            </button>
+                            <div class="aipa-wireframe-addon__menu" style="display:none; position:absolute; right:0; top:calc(100% + 6px); background:#0f172a; border:1px solid rgba(255,255,255,0.12); border-radius:8px; min-width:200px; padding:4px; z-index:10; box-shadow:0 12px 32px rgba(0,0,0,0.4);">
+                                <a href="<?php echo esc_url( $section_url ); ?>" style="display:block; padding:8px 12px; color:#e2e8f0; text-decoration:none; border-radius:5px; font-size:12px;" onmouseover="this.style.background='rgba(99,102,241,0.18)'" onmouseout="this.style.background='transparent'">
+                                    <?php esc_html_e( 'Add a section', 'gend-society' ); ?>
+                                </a>
+                                <a href="<?php echo esc_url( $newpage_url ); ?>" style="display:block; padding:8px 12px; color:#e2e8f0; text-decoration:none; border-radius:5px; font-size:12px;" onmouseover="this.style.background='rgba(99,102,241,0.18)'" onmouseout="this.style.background='transparent'">
+                                    <?php esc_html_e( 'Add a new page', 'gend-society' ); ?>
+                                </a>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            <?php endif; ?>
+            <iframe class="aipa-wireframe-saved__frame"
+                    srcdoc="<?php echo $srcdoc; // already esc_attr'd above ?>"
+                    sandbox="allow-scripts allow-same-origin allow-popups"
+                    style="flex:1; width:100%; min-height:<?php echo esc_attr( $atts['height'] ); ?>; border:0; background:#fff; display:block;"></iframe>
+        </div>
+        <?php
+        return (string) ob_get_clean();
     }
 
     public static function shortcode_media_chat( $atts ) {

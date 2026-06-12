@@ -14,10 +14,12 @@
         var base = data.gendProfileUrl || (hub + '/members/me/');
         if (base.charAt(base.length - 1) !== '/') base += '/';
 
-        // Self-contained fallback menu so the header always shows the
-        // gend.me profile nav even if the server localize didn't run /
-        // was clobbered. Mirrors the gend.me frontend sidebar.
-        var menu = (data && Array.isArray(data.gendProfileMenu) && data.gendProfileMenu.length)
+        // Profile nav (App Projects / Connections / Wallet / Messages) — these
+        // used to live across the centre of the bar; they now collapse behind
+        // the avatar on the far right and stagger in as a dropdown. Keep the
+        // self-contained fallback so the menu renders even if the server
+        // localize didn't run / was clobbered.
+        var profileMenu = (data && Array.isArray(data.gendProfileMenu) && data.gendProfileMenu.length)
             ? data.gendProfileMenu
             : [
                 { label: 'App Projects', url: base + 'groups/',       icon: 'dashicons-screenoptions' },
@@ -25,31 +27,101 @@
                 { label: 'Wallet',       url: base + 'member-wallet/', icon: 'dashicons-money-alt' },
                 { label: 'Messages',     url: base + 'messages/',     icon: 'dashicons-email' }
               ];
+
+        // Connected web-app group menu — fills the centre of the bar. Each
+        // item opens a wp-admin page that embeds that group section inline.
+        // Server-provided + capability-filtered (gs_group_embed_menu_items).
+        var groupMenu = (data && Array.isArray(data.gendGroupMenu)) ? data.gendGroupMenu : [];
+        var groupName = (data && data.gendGroupName) ? String(data.gendGroupName) : '';
+
         var profileUrl = base;
         var avatarUrl  = (data && data.gendAvatarUrl)  ? data.gendAvatarUrl  : '';
         var userName   = (data && data.userName)       ? data.userName       : 'Profile';
+        var logoutUrl  = (data && data.logoutUrl)      ? data.logoutUrl      : '';
+        var here       = window.location.href;
 
-        var pills = '';
-        for (var i = 0; i < menu.length; i++) {
-            var item = menu[i] || {};
-            var icon = item.icon
-                ? '<span class="dashicons ' + escapeHtml(item.icon) + ' gs-profile-nav-icon" aria-hidden="true"></span>'
+        // ── Centre: connected group menu ──────────────────────────────
+        var groupLinks = '';
+        for (var g = 0; g < groupMenu.length; g++) {
+            var gi = groupMenu[g] || {};
+            var gIcon = gi.icon
+                ? '<span class="dashicons ' + escapeHtml(gi.icon) + ' gs-group-nav-icon" aria-hidden="true"></span>'
                 : '';
-            pills +=
-                '<a href="' + escapeHtml(item.url) + '" class="gs-profile-nav-item" target="_blank" rel="noopener">' +
-                    icon +
-                    '<span class="pill-content">' + escapeHtml(item.label) + '</span>' +
+            // Mark the active item when the current URL targets this tab.
+            var isActive = gi.slug && here.indexOf('page=gs-group-embed') !== -1 && here.indexOf('tab=' + gi.slug) !== -1;
+            groupLinks +=
+                '<a href="' + escapeHtml(gi.url) + '" class="gs-group-nav-item' + (isActive ? ' is-active' : '') + '">' +
+                    gIcon +
+                    '<span class="pill-content">' + escapeHtml(gi.label) + '</span>' +
                 '</a>';
         }
+        var groupNav = groupLinks
+            ? '<nav class="nav-central nav-central--group" aria-label="Connected web app">' + groupLinks + '</nav>'
+            : '<nav class="nav-central nav-central--group" aria-hidden="true"></nav>';
+
+        // ── Right: avatar → animated dropdown of profile items ─────────
+        var dropItems = '';
+        for (var i = 0; i < profileMenu.length; i++) {
+            var item = profileMenu[i] || {};
+            var icon = item.icon
+                ? '<span class="dashicons ' + escapeHtml(item.icon) + ' gs-pd-icon" aria-hidden="true"></span>'
+                : '';
+            dropItems +=
+                '<a href="' + escapeHtml(item.url) + '" class="gs-pd-item" role="menuitem" target="_blank" rel="noopener">' +
+                    icon +
+                    '<span>' + escapeHtml(item.label) + '</span>' +
+                    '<span class="gs-pd-arrow dashicons dashicons-arrow-right-alt2" aria-hidden="true"></span>' +
+                '</a>';
+        }
+        var logoutItem = logoutUrl
+            ? '<a href="' + escapeHtml(logoutUrl) + '" class="gs-pd-item gs-pd-logout" role="menuitem">' +
+                '<span class="dashicons dashicons-exit gs-pd-icon" aria-hidden="true"></span>' +
+                '<span>Log Out</span>' +
+              '</a>'
+            : '';
+
+        var cluster =
+            '<div class="gs-profile-cluster">' +
+                '<button type="button" class="gs-profile-avatar-btn" id="gs-profile-toggle" aria-haspopup="true" aria-expanded="false" aria-controls="gs-profile-dropdown" aria-label="Open profile menu">' +
+                    '<img src="' + escapeHtml(avatarUrl) + '" alt="' + escapeHtml(userName) + '" class="gs-profile-avatar-img">' +
+                    '<span class="gs-profile-avatar-ring" aria-hidden="true"></span>' +
+                '</button>' +
+                '<div class="gs-profile-dropdown" id="gs-profile-dropdown" role="menu" aria-label="Profile menu">' +
+                    '<div class="gs-pd-head">' +
+                        '<img src="' + escapeHtml(avatarUrl) + '" alt="" class="gs-pd-head-avatar">' +
+                        '<div class="gs-pd-head-meta">' +
+                            '<span class="gs-pd-head-name">' + escapeHtml(userName) + '</span>' +
+                            '<a href="' + escapeHtml(profileUrl) + '" class="gs-pd-head-link" target="_blank" rel="noopener">View gend.me profile</a>' +
+                        '</div>' +
+                    '</div>' +
+                    '<div class="gs-pd-items">' + dropItems + logoutItem + '</div>' +
+                '</div>' +
+            '</div>';
 
         return '' +
-            '<a href="' + escapeHtml(profileUrl) + '" class="gs-profile-avatar-link" target="_blank" rel="noopener" aria-label="Open my gend.me profile">' +
-                '<img src="' + escapeHtml(avatarUrl) + '" alt="' + escapeHtml(userName) + '" class="gs-profile-avatar-img">' +
-            '</a>' +
-            '<nav class="nav-central nav-central--profile">' + pills + '</nav>' +
+            groupNav +
+            cluster +
             '<div class="visit-site-slot">' +
                 '<a href="/" class="btn-visit-site" target="_blank" rel="noopener">View Site</a>' +
             '</div>';
+    }
+
+    // Wire the avatar → dropdown. The staggered "menu builds itself"
+    // entrance is pure CSS (per-item animation-delay) that replays every
+    // time `.is-open` is added because the items go display:none → block.
+    function bindProfileDropdown() {
+        var btn = document.getElementById('gs-profile-toggle');
+        var dd  = document.getElementById('gs-profile-dropdown');
+        if (!btn || !dd) return;
+
+        function open()  { dd.classList.add('is-open');    btn.setAttribute('aria-expanded', 'true');  }
+        function close() { dd.classList.remove('is-open');  btn.setAttribute('aria-expanded', 'false'); }
+        function toggle() { dd.classList.contains('is-open') ? close() : open(); }
+
+        btn.addEventListener('click', function (e) { e.stopPropagation(); toggle(); });
+        dd.addEventListener('click', function (e) { e.stopPropagation(); });
+        document.addEventListener('click', function () { close(); });
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
     }
 
     function buildDefaultHeader() {
@@ -261,6 +333,7 @@
 
     document.addEventListener('DOMContentLoaded', function () {
         injectHeader();
+        bindProfileDropdown();
         attach3DHover();
         markActive();
         enhanceSubmenus();

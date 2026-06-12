@@ -1,0 +1,258 @@
+{
+  "slug": "wireframe",
+  "version": 7,
+  "name": "Wireframe & Brand Builder",
+  "description": "Complete brand identity + site architecture pipeline: elevator pitch → brand DNA → site structure → wireframe generation → full site build with pages, templates, posts, products, and emails.",
+  "status": "active",
+  "deploy_modes": ["widget", "shortcode", "standalone"],
+  "persona": {
+    "name": "Leo",
+    "role": "Senior UI/UX Engineer & Brand Architect",
+    "tone": "precise, technical, outcome-focused",
+    "avatar": null
+  },
+  "triggers": {
+    "pages": ["wireframe", "page-builder"],
+    "shortcode": "leo_wireframe",
+    "user_roles": ["administrator", "editor", "shop_manager", "member"],
+    "show_once": false,
+    "delay_ms": 0
+  },
+  "steps": {
+    "intro": {
+      "order": 1,
+      "type": "message",
+      "prompt": "Systems are live. I'm **Leo**, your AI Architect.\n\nI'll guide you through a complete build — from brand DNA extraction through to a fully deployed site with pages, templates, and content. Every decision is calculated to maximize authority and conversion.\n\nLet's begin.",
+      "next": "elevator_pitch"
+    },
+    "elevator_pitch": {
+      "order": 2,
+      "type": "free_text",
+      "prompt": "**Phase 1: Identity Discovery**\n\nGive me your **Elevator Pitch**. What are we building, and who is it for?",
+      "save_to_profile": "wireframe_elevator_pitch",
+      "next": "brand_name"
+    },
+    "brand_name": {
+      "order": 3,
+      "type": "free_text",
+      "prompt": "**What is the name of your application or site?**\n\nIf you have a tagline, add it after a pipe — for example: `Lumina | The Future of Clean Energy`",
+      "save_to_profile": "wireframe_brand_name",
+      "next": "logo_upload"
+    },
+    "logo_upload": {
+      "order": 4,
+      "type": "asset_upload",
+      "prompt": "**Phase 1: Visual Signature**\n\nUpload your **Site Logo** — I will extract your Brand DNA (colors, typography, geometry) directly from your mark.",
+      "accept": "image/*",
+      "context_key": "logo",
+      "analyze_brand": true,
+      "skip_label": "Skip — I don't have a logo yet",
+      "save_to_profile": null,
+      "next": "app_icon_upload"
+    },
+    "app_icon_upload": {
+      "order": 5,
+      "type": "asset_upload",
+      "prompt": "Now upload your **App Icon** (browser tab / mobile home screen). Square format, ideally 512×512px.",
+      "accept": "image/*",
+      "context_key": "app_icon",
+      "analyze_brand": false,
+      "skip_label": "Skip — I'll add one later",
+      "save_to_profile": null,
+      "next": "tone_select"
+    },
+    "tone_select": {
+      "order": 6,
+      "type": "message",
+      "prompt": "**Phase 2: Theme Architecture**\n\nIdentity locked. Now we define the environmental tone — how should your application *feel* to your users?",
+      "options": [
+        { "label": "Minimalist", "value": "Minimalist", "next": "palette_review" },
+        { "label": "Authority",  "value": "Authority",  "next": "palette_review" },
+        { "label": "Disruptor",  "value": "Disruptor",  "next": "palette_review" },
+        { "label": "Playful",    "value": "Playful",    "next": "palette_review" }
+      ],
+      "save_to_profile": "wireframe_tone"
+    },
+    "palette_review": {
+      "order": 7,
+      "type": "color_palette",
+      "prompt": "**Step 1: The Brand Palette**\n\nCore chromatic engine extracted from your logo DNA. Click any swatch to adjust, then lock it in.",
+      "save_to_profile": null,
+      "next": "typography_review"
+    },
+    "typography_review": {
+      "order": 8,
+      "type": "typography_review",
+      "prompt": "**Step 2: Typography Stack**\n\nFont selections extracted from your logo's typographic signature. Adjust any element, then approve.",
+      "save_to_profile": null,
+      "next": "style_system"
+    },
+    "style_system": {
+      "order": 9,
+      "type": "style_system",
+      "prompt": "**Step 3: Visual Style System**\n\nChoose the design language applied to ALL blocks on your site. Each scheme uses your exact brand colours and fonts — changing border radius, shadows, glass effects, and layout feel everywhere.\n\n✦ Your selection is written directly into WordPress Global Styles and will be visible in **Site Editor → Styles** immediately after you apply it.",
+      "save_to_profile": "wireframe_style_system",
+      "next": "animation_style"
+    },
+    "animation_style": {
+      "order": 10,
+      "type": "animation_style",
+      "prompt": "**Step 4: Motion & Interaction**\n\nHow should your site feel as visitors scroll through it? Your choice adds entrance animations and interactive effects to every block section.",
+      "save_to_profile": "site_animation_level",
+      "next": "site_description"
+    },
+    "site_description": {
+      "order": 10,
+      "type": "free_text",
+      "prompt": "Tell me about **{{context.brand_name}}** — what it does, who it serves, and what sets it apart. One or two sentences is enough.",
+      "save_to_profile": "wireframe_business_description",
+      "next": "site_structure_ai"
+    },
+    "site_structure_ai": {
+      "order": 11,
+      "type": "ai_generated",
+      "prompt": "You are a professional web strategist.\n\nBusiness: {{context.site_description}}\nBrand name: {{context.brand_name}}\nElevator pitch: {{context.elevator_pitch}}\nBrand tone: {{context.tone_select}}\n\nReturn ONLY valid JSON — no markdown fences, no explanation, no extra text:\n{\n  \"siteName\": \"exact brand name here\",\n  \"elevatorPitch\": \"one sentence\",\n  \"description\": \"business description\",\n  \"pages\": [\n    {\n      \"name\": \"Home\",\n      \"slug\": \"home\",\n      \"inMenu\": true,\n      \"sections\": [\n        {\"type\": \"hero\", \"heading\": \"Benefit-driven headline\", \"subheading\": \"Supporting copy\"},\n        {\"type\": \"features\", \"heading\": \"Features\", \"items\": [\"Feature 1\", \"Feature 2\", \"Feature 3\"]}\n      ]\n    }\n  ],\n  \"recommendBlog\": false,\n  \"blogCategories\": [\"Category 1\", \"Category 2\", \"Category 3\", \"Category 4\"],\n  \"blogPosts\": {\"Category 1\": [\"Post title 1\", \"Post title 2\", \"Post title 3\"]},\n  \"recommendStore\": false,\n  \"productCategories\": [\"Category 1\", \"Category 2\", \"Category 3\"],\n  \"products\": {\"Category 1\": [\"Product 1\", \"Product 2\", \"Product 3\"]}\n}\n\nRules:\n- Include 4-6 pages specific to this business\n- recommendBlog = true when the business clearly publishes content (news, guides, education, media)\n- recommendStore = true when the business clearly sells products or services\n- ALWAYS populate blogCategories with 4-6 relevant categories specific to this business\n- ALWAYS populate blogPosts with 3 post titles per category specific to this business\n- ALWAYS populate productCategories with 3-4 relevant product categories specific to this business\n- ALWAYS populate products with 3 product names per category specific to this business\n- Section types: hero, features, about, services, gallery, testimonials, cta, contact, pricing, team, faq, featured_products, featured_blog\n- All copy must be specific to the business — zero generic placeholders\n- blogPosts: object where each key is a category name and value is array of post title strings\n- products: object where each key is a product category name and value is array of product name strings",
+      "save_to_profile": null,
+      "next": "site_structure_confirm"
+    },
+    "site_structure_confirm": {
+      "order": 12,
+      "type": "site_confirm",
+      "prompt": "**Blueprint is live.**\n\nI've staged your Cornerstone Pages and the specific Page Sections required to move a user through your funnel. **Architectural Control:** You now have the Master View. You can Add, Delete, or Reorder any page or section to perfectly align with your vision.",
+      "next": "architecture_ready"
+    },
+    "architecture_ready": {
+      "order": 13,
+      "type": "message",
+      "prompt": "Your site architecture is locked. What would you like to do next?",
+      "options": [
+        { "label": "Build My Site",          "value": "build",     "next": "build_execute" },
+        { "label": "Wireframe a page first", "value": "wireframe", "next": "page_brief" },
+        { "label": "Done for now",           "value": "done",      "next": "wireframe_done" }
+      ]
+    },
+    "page_brief": {
+      "order": 13,
+      "type": "free_text",
+      "prompt": "**Phase 4: Wireframe Generation**\n\nSite structure locked. Now let's wireframe a specific page in high fidelity.\n\nWhat page are we building? Describe its purpose and main goal — or just say **homepage** to generate a full landing page.",
+      "save_to_profile": "wireframe_page_brief",
+      "next": "style_direction"
+    },
+    "style_direction": {
+      "order": 14,
+      "type": "message",
+      "prompt": "What design direction fits the brand?",
+      "options": [
+        { "label": "Dark / Glassmorphism",         "value": "dark_glass",    "next": "animation_level" },
+        { "label": "Clean / Minimal / Light",      "value": "clean_minimal", "next": "animation_level" },
+        { "label": "Bold / Colorful / Energetic",  "value": "bold_vibrant",  "next": "animation_level" },
+        { "label": "Corporate / Professional",     "value": "corporate",     "next": "animation_level" },
+        { "label": "Luxury / Premium / Editorial", "value": "luxury",        "next": "animation_level" },
+        { "label": "Futuristic / Tech / Neon",     "value": "futuristic",    "next": "animation_level" }
+      ],
+      "save_to_profile": "wireframe_style"
+    },
+    "animation_level": {
+      "order": 15,
+      "type": "message",
+      "prompt": "How interactive and animated should it feel?",
+      "options": [
+        { "label": "Static — clean, no motion",         "value": "none",      "next": "sections_confirm" },
+        { "label": "Subtle — fade-ins and slides",      "value": "subtle",    "next": "sections_confirm" },
+        { "label": "Rich — scroll-triggered, parallax", "value": "rich",      "next": "sections_confirm" },
+        { "label": "Immersive — 3D and full motion",    "value": "immersive", "next": "sections_confirm" }
+      ],
+      "save_to_profile": "wireframe_animation_level"
+    },
+    "sections_confirm": {
+      "order": 16,
+      "type": "ai_generated",
+      "prompt": "Create a self-contained HTML wireframe for this page using the EXACT brand identity below.\n\nPage: {{context.page_brief}}\nBusiness: {{context.brand_name}} | Industry: {{profile.industry}}\nSite name: {{site_name}}\n\nBRAND COLORS (use these exact hex values — do NOT substitute with Tailwind palette names):\n  Primary:    {{context.brand_dna.colors.primary}}\n  Text:       {{context.brand_dna.colors.text}}\n  Background: {{context.brand_dna.colors.background}}\n  Heading:    {{context.brand_dna.colors.heading}}\n  Caption:    {{context.brand_dna.colors.caption}}\n  Button BG:  {{context.brand_dna.colors.button_bg}}\n  Button Text:{{context.brand_dna.colors.button_text}}\n  Link:       {{context.brand_dna.colors.link}}\n\nBRAND TYPOGRAPHY (load these exact fonts from Google Fonts — use them everywhere):\n  Headings: {{context.brand_dna.typography.elements.heading}}\n  Body:     {{context.brand_dna.typography.elements.text}}\n  Buttons:  {{context.brand_dna.typography.elements.button}}\n\nVISUAL STYLE: {{context.style_system}}\n  glassmorphism: semi-transparent cards with backdrop-blur, frosted glass overlays, soft gradient backgrounds using brand primary\n  neo_brutalism: bold 2-3px black borders, flat brand primary fills, offset box-shadows, stark contrast\n  clay_morphism: large border-radius (24px+), pastel brand tints, multi-layer inner+outer shadows, 3D puffy feel\n  minimalism: generous whitespace, hairline rules, brand primary used sparingly as accent only\n  skeuomorphism: gradients simulating depth, inset shadows on inputs/cards, subtle textures, realistic button bevels\n  liquid_glass: high-opacity blur layers, iridescent brand-primary→complementary gradient overlays, fluid organic shapes\n\nANIMATION: {{context.animation_level}}\n  none: static\n  subtle: IntersectionObserver fade-in + translateY(30px)→0 over 0.7s\n  rich: subtle + staggered 100/200/300ms delays + parallax hero bg on scroll\n  immersive: rich + CSS 3D card hover (perspective 1000px, rotateX/rotateY on mousemove) + animated gradient border on CTA\n\nRETURN ONLY a complete <!DOCTYPE html> document. No markdown fences.\n\nTECH: Tailwind CDN + Google Fonts import for both brand fonts. prefers-reduced-motion resets all animation. Image placeholders = CSS gradient divs using brand primary (no real URLs).\n\nSECTIONS (5-7 most relevant for this page type from):\nhero | features-grid | about | services | gallery | testimonials | cta | pricing | team | faq | contact | footer\n\nRULES:\n- Use brand hex values directly in style= attributes and Tailwind arbitrary values like bg-[{{context.brand_dna.colors.primary}}]\n- Hero background uses brand primary color (or a gradient from it)\n- All CTA buttons use brand button_bg / button_text colors\n- All headings use brand heading font with brand heading color\n- Body text uses brand text font with brand text color\n- Sections alternate between brand background color and a very light tint of primary\n- COPY: All headlines benefit-driven and specific to {{profile.industry}}. Use {{site_name}} in nav/footer. Zero lorem ipsum.",
+      "save_to_profile": null,
+      "next": "wireframe_review"
+    },
+    "wireframe_review": {
+      "order": 17,
+      "type": "wireframe_preview",
+      "prompt": "Here is your wireframe. Review it below:",
+      "options": [
+        { "label": "Looks great — save it",    "value": "save",        "next": "section_add_or_done" },
+        { "label": "Tweak the style / colors", "value": "restyle",     "next": "restyle_prompt" },
+        { "label": "Add a specific section",   "value": "add_section", "next": "add_section_prompt" },
+        { "label": "Regenerate completely",    "value": "regenerate",  "next": "sections_confirm" }
+      ]
+    },
+    "restyle_prompt": {
+      "order": 18,
+      "type": "free_text",
+      "prompt": "Describe the style change you want — e.g. make the hero darker, change accent to orange, add more whitespace.",
+      "save_to_profile": null,
+      "next": "restyle_apply"
+    },
+    "restyle_apply": {
+      "order": 19,
+      "type": "ai_generated",
+      "prompt": "Apply this style change to the existing wireframe HTML.\n\nExisting HTML:\n{{context.wireframe_html}}\n\nChange: {{context.restyle_request}}\n\nReturn ONLY the complete updated HTML document — no explanation, no code fences.",
+      "save_to_profile": null,
+      "next": "wireframe_review"
+    },
+    "add_section_prompt": {
+      "order": 18,
+      "type": "free_text",
+      "prompt": "Describe the section to add — e.g. video embed after the hero, or team bios with 4 people.",
+      "save_to_profile": null,
+      "next": "add_section_apply"
+    },
+    "add_section_apply": {
+      "order": 19,
+      "type": "ai_generated",
+      "prompt": "Add this section to the existing wireframe HTML.\n\nExisting HTML:\n{{context.wireframe_html}}\n\nSection to add: {{context.add_section_request}}\nStyle: {{context.style_direction}}\nAnimation: {{context.animation_level}}\n\nInsert in the most logical position. Return ONLY the complete updated HTML — no explanation, no code fences.",
+      "save_to_profile": null,
+      "next": "wireframe_review"
+    },
+    "section_add_or_done": {
+      "order": 20,
+      "type": "message",
+      "prompt": "Wireframe saved! What would you like to do next?",
+      "options": [
+        { "label": "Wireframe another page",   "value": "another",  "next": "page_brief" },
+        { "label": "Build My Site",            "value": "build",    "next": "build_execute" },
+        { "label": "Write blog content",       "value": "blog",     "next": "blog_handoff" },
+        { "label": "Build out product pages",  "value": "products", "next": "product_handoff" },
+        { "label": "Done for now",             "value": "done",     "next": "wireframe_done" }
+      ]
+    },
+    "blog_handoff": {
+      "order": 21,
+      "type": "flow_switch",
+      "target_flow": "blog-manager",
+      "prompt": "Switching to Blog Manager to generate content for this page..."
+    },
+    "product_handoff": {
+      "order": 21,
+      "type": "flow_switch",
+      "target_flow": "store-architect",
+      "prompt": "Switching to Store Architect to build your product pages..."
+    },
+    "build_execute": {
+      "order": 21,
+      "type": "site_build",
+      "prompt": "Building your site now — creating pages, templates, navigation, and content...",
+      "next": "build_complete"
+    },
+    "build_complete": {
+      "order": 22,
+      "type": "completion",
+      "prompt": "Your site has been successfully deployed.\n\nAll pages, theme templates, navigation, and content have been created and published. Return to this flow any time to wireframe additional pages or update your brand settings.",
+      "actions": []
+    },
+    "wireframe_done": {
+      "order": 21,
+      "type": "completion",
+      "prompt": "Your wireframes and brand assets are saved in the Leo Library. Access them any time from your dashboard.\n\nWhen you're ready to build — come back and choose **Build My Site** to deploy everything.",
+      "actions": []
+    }
+  },
+  "knowledge_bases": [],
+  "system_prompt_template": "You are Leo, a senior UI/UX engineer and brand architect for {{site_name}}.\n\nYou build complete, production-ready HTML wireframes using Tailwind CSS, modern CSS, and vanilla JavaScript. You also generate structured JSON site architectures for WordPress site builds.\n\nUser brand context:\n- Business: {{profile.project_description}}\n- Industry: {{profile.industry}}\n- Project type: {{profile.project_type}}\n- Brand name: {{context.brand_name}}\n- Brand tone: {{context.tone_select}}\n- License type: {{context.license_select}}\n- Primary color: {{context.brand_dna.colors.primary}}\n- Heading font: {{context.brand_dna.typography.elements.heading}}\n- Body font: {{context.brand_dna.typography.elements.text}}\n\nHard rules:\n1. Return ONLY valid HTML for wireframe steps — no explanation, no markdown, no code fences unless explicitly asked\n2. Return ONLY valid JSON for site structure steps — no explanation, no markdown fences\n3. Every wireframe is fully self-contained (all CSS and JS inline or via CDN)\n4. Never use broken image URLs — use CSS gradient placeholder divs only\n5. Always include Tailwind CDN and Google Fonts matching brand DNA\n6. Every section is responsive down to 320px viewport\n7. All animation code includes prefers-reduced-motion media query fallback\n8. Use semantic HTML5 elements: header, nav, main, section, footer\n9. All copy is relevant to the user industry and project — zero lorem ipsum"
+}

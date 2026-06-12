@@ -1084,8 +1084,8 @@ function gs_member_groups_tabs_open() {
     .gs-member-groups-tab {
         display: inline-flex;
         align-items: center;
-        gap: 8px;
-        padding: 12px 22px;
+        gap: 10px;
+        padding: 12px 18px;
         background: transparent;
         border: none;
         border-bottom: 2px solid transparent;
@@ -1100,11 +1100,134 @@ function gs_member_groups_tabs_open() {
         margin-bottom: -1px;
     }
     .gs-member-groups-tab:hover {
-        color: rgba(255,255,255,0.75);
+        color: rgba(255,255,255,0.85);
     }
     .gs-member-groups-tab.is-active {
         color: #b608c9;
         border-bottom-color: #b608c9;
+    }
+
+    /* ── Futuristic icon chip on each tab ─────────────────────────────────
+       Matches the primary-nav + subnav chip style: glass plate, currentColor
+       SVG with glow, magenta-glow on active, blue lift on hover. Each chip
+       powers on with a stagger using --gs-tab-i. */
+    .gs-tab-icon {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.025);
+        border: 1px solid rgba(255,255,255,0.09);
+        color: currentColor;
+        flex-shrink: 0;
+        transition:
+            color 0.25s ease,
+            background 0.25s ease,
+            border-color 0.25s ease,
+            transform 0.25s cubic-bezier(0.22,1,0.36,1),
+            box-shadow 0.25s ease;
+        opacity: 0;
+        transform: scale(0.5) rotate(-10deg);
+        animation: gsTabIconPower 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+        animation-delay: calc(0.15s + var(--gs-tab-i, 0) * 0.07s);
+    }
+    .gs-tab-icon svg {
+        width: 14px;
+        height: 14px;
+        display: block;
+        filter: drop-shadow(0 0 4px currentColor);
+        opacity: 0.92;
+    }
+    @keyframes gsTabIconPower {
+        to { opacity: 1; transform: none; }
+    }
+    /* Scan-line sweep on power-on */
+    .gs-tab-icon::before {
+        content: "";
+        position: absolute;
+        inset: 0;
+        border-radius: inherit;
+        background: linear-gradient(115deg,
+            transparent 0%,
+            transparent 35%,
+            rgba(137,194,224,0.35) 50%,
+            transparent 65%,
+            transparent 100%);
+        background-size: 220% 100%;
+        background-position: 220% 0;
+        pointer-events: none;
+        opacity: 0;
+        animation: gsTabIconScan 0.9s ease-out forwards;
+        animation-delay: calc(0.35s + var(--gs-tab-i, 0) * 0.07s);
+    }
+    @keyframes gsTabIconScan {
+        0%   { opacity: 0;   background-position:  220% 0; }
+        20%  { opacity: 0.85; }
+        100% { opacity: 0;   background-position: -120% 0; }
+    }
+    /* Hover lift — blue */
+    .gs-member-groups-tab:hover .gs-tab-icon {
+        color: #89C2E0;
+        border-color: rgba(137,194,224,0.45);
+        background: rgba(137,194,224,0.08);
+        transform: translateY(-1px);
+        box-shadow: 0 0 12px rgba(137,194,224,0.22);
+    }
+    /* Active — magenta glow + beacon */
+    .gs-member-groups-tab.is-active .gs-tab-icon {
+        color: #b608c9;
+        background: rgba(182,8,201,0.12);
+        border-color: rgba(182,8,201,0.45);
+        box-shadow:
+            0 0 16px rgba(182,8,201,0.32),
+            inset 0 0 6px rgba(182,8,201,0.20);
+    }
+    .gs-member-groups-tab.is-active .gs-tab-icon::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #b608c9;
+        box-shadow: 0 0 6px #b608c9;
+        animation: gsTabBeacon 1.6s ease-in-out infinite;
+    }
+    @keyframes gsTabBeacon {
+        0%, 100% { opacity: 0.35; transform: scale(0.8); }
+        50%      { opacity: 1;    transform: scale(1.15); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .gs-tab-icon,
+        .gs-tab-icon::before,
+        .gs-tab-icon::after {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+        }
+    }
+
+    /* Activity panel — iframe of /activity/?gdc_tab_only=1.
+       The chrome stripper (gdc_tab_only_strip_chrome in this file) hides
+       the surrounding profile header / nav so only the activity stream
+       renders. Sizing is large enough to feel inline without an obvious
+       scrollbar; "Load More" inside the iframe extends content as needed. */
+    .gs-activity-tab-frame {
+        display: block;
+        width: 100%;
+        min-height: 80vh;
+        height: 80vh;
+        border: 0;
+        background: transparent;
+        border-radius: 12px;
+        overflow: hidden;
+    }
+    .gs-member-groups-panel[data-gs-panel="activity"].is-active {
+        padding: 0;
     }
 
     .gs-member-groups-panel { display: none; }
@@ -1234,7 +1357,8 @@ function gs_member_groups_tabs_open() {
                     data-gs-panel="memberships"
                     role="tab"
                     aria-selected="true">
-                <?php esc_html_e( 'Memberships', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('memberships') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Memberships', 'gend-society' ); ?></span>
             </button>
             <?php endif; ?>
             <button type="button"
@@ -1242,14 +1366,24 @@ function gs_member_groups_tabs_open() {
                     data-gs-panel="groups"
                     role="tab"
                     aria-selected="<?php echo $gs_show_memberships ? 'false' : 'true'; ?>">
-                <?php esc_html_e( 'Groups', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('groups') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Groups', 'gend-society' ); ?></span>
             </button>
             <button type="button"
                     class="gs-member-groups-tab"
                     data-gs-panel="projects"
                     role="tab"
                     aria-selected="false">
-                <?php esc_html_e( 'My Projects', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('projects') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'My Projects', 'gend-society' ); ?></span>
+            </button>
+            <button type="button"
+                    class="gs-member-groups-tab"
+                    data-gs-panel="activity"
+                    role="tab"
+                    aria-selected="false">
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('overview') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Activity', 'gend-society' ); ?></span>
             </button>
         </div>
 
@@ -1310,6 +1444,31 @@ function gs_member_groups_tabs_close() {
             }
             ?>
         </div><!-- /panel:projects -->
+
+        <div class="gs-member-groups-panel" data-gs-panel="activity" role="tabpanel">
+            <?php
+            // Embed the displayed user's existing /activity/ page in an iframe.
+            // Rendering the activity loop inline produced unstyled entries — BP
+            // and Youzify CSS targets the full #buddypress > .youzify > #activity-
+            // stream > ul.activity-list ancestor chain and the post-comment AJAX
+            // handlers expect that DOM context. The iframe inherits the same
+            // page chrome the dedicated /activity/ tab uses, so styling and JS
+            // (like, comment, load-more) all work without any divergence.
+            // gdc_tab_only=1 is a query flag our wp_footer hook reads to strip
+            // the page header/footer/sidebar so only the activity stream shows.
+            if ( $displayed_user_id > 0 ) {
+                $activity_slug = function_exists( 'bp_get_activity_slug' ) ? bp_get_activity_slug() : 'activity';
+                $activity_url  = bp_displayed_user_domain() . $activity_slug . '/';
+                $activity_url  = add_query_arg( 'gdc_tab_only', '1', $activity_url );
+                ?>
+                <iframe class="gs-activity-tab-frame"
+                        src="<?php echo esc_url( $activity_url ); ?>"
+                        title="<?php esc_attr_e( 'Activity', 'gend-society' ); ?>"
+                        loading="lazy"></iframe>
+                <?php
+            }
+            ?>
+        </div><!-- /panel:activity -->
 
     </div><!-- /.gs-member-groups-wrap -->
 
@@ -1416,6 +1575,70 @@ function gs_member_groups_tabs_close() {
     <?php
 }
 
+// ─── ?gdc_tab_only=1 — strip page chrome when a member page is iframed ───────
+// Used by the App Projects "Activity" tab: the panel iframes /activity/ with
+// ?gdc_tab_only=1, and the page renders only the activity stream (no header,
+// no profile nav, no footer, no cover). Keeps the iframe lightweight and
+// avoids duplicate profile chrome inside a chrome-having parent.
+add_filter( 'body_class', 'gdc_tab_only_body_class' );
+function gdc_tab_only_body_class( $classes ) {
+    if ( ! empty( $_GET['gdc_tab_only'] ) ) {
+        $classes[] = 'gdc-tab-only';
+    }
+    return $classes;
+}
+
+add_action( 'wp_head', 'gdc_tab_only_strip_chrome', 999 );
+function gdc_tab_only_strip_chrome() {
+    if ( empty( $_GET['gdc_tab_only'] ) ) return;
+    ?>
+    <style id="gdc-tab-only-strip">
+        body.gdc-tab-only #wpadminbar,
+        body.gdc-tab-only .gdc-profile-uplink,
+        body.gdc-tab-only #gdc-profile-nav,
+        body.gdc-tab-only .gdc-profile-nav,
+        body.gdc-tab-only #main-3d-header,
+        body.gdc-tab-only .header-anchor-wrap,
+        body.gdc-tab-only header.site-header,
+        body.gdc-tab-only .site-header,
+        body.gdc-tab-only #masthead,
+        body.gdc-tab-only footer.site-footer,
+        body.gdc-tab-only .site-footer,
+        body.gdc-tab-only #colophon,
+        body.gdc-tab-only .youzify-sidebar-column,
+        body.gdc-tab-only .youzify-profile-sidebar,
+        body.gdc-tab-only #youzify-profile-header,
+        body.gdc-tab-only .youzify-profile-header,
+        body.gdc-tab-only #youzify-profile-navmenu,
+        body.gdc-tab-only .youzify-profile-navmenu,
+        body.gdc-tab-only #item-header,
+        body.gdc-tab-only #object-nav,
+        body.gdc-tab-only aipa-widget {
+            display: none !important;
+        }
+        body.gdc-tab-only,
+        body.gdc-tab-only html,
+        body.gdc-tab-only #page,
+        body.gdc-tab-only #content,
+        body.gdc-tab-only main,
+        body.gdc-tab-only .youzify-content,
+        body.gdc-tab-only .youzify-page-main-content,
+        body.gdc-tab-only .youzify-main-column,
+        body.gdc-tab-only .youzify-right-sidebar-layout {
+            background: transparent !important;
+            padding: 0 !important;
+            margin: 0 !important;
+            max-width: none !important;
+            width: 100% !important;
+            display: block !important;
+            grid-template-columns: 1fr !important;
+        }
+        body.gdc-tab-only html { padding-top: 0 !important; margin-top: 0 !important; }
+        body.gdc-tab-only #buddypress { padding: 12px 14px !important; }
+    </style>
+    <?php
+}
+
 // ─── Member Profile Friends Page — Tabbed Interface ──────────────────────────
 //
 // Wraps the standard BP friends list in a two-tab layout:
@@ -1471,7 +1694,7 @@ function gs_member_friends_tabs_open() {
         margin-bottom: -1px;
     }
     .gs-member-friends-tab:hover {
-        color: rgba(255,255,255,0.75);
+        color: rgba(255,255,255,0.85);
     }
     .gs-member-friends-tab.is-active {
         color: #b608c9;
@@ -1480,6 +1703,100 @@ function gs_member_friends_tabs_open() {
 
     .gs-member-friends-panel { display: none; }
     .gs-member-friends-panel.is-active { display: block; }
+
+    /* Reuse the same futuristic chip used on the App Projects page —
+       the .gs-tab-icon rules live in member-profile-pages.php's groups
+       tabs stylesheet. We just need hover + active state selectors
+       scoped to the friends tabs (the chip class itself is identical). */
+    .gs-member-friends-tab .gs-tab-icon {
+        position: relative;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 26px;
+        height: 26px;
+        border-radius: 8px;
+        background: rgba(255,255,255,0.025);
+        border: 1px solid rgba(255,255,255,0.09);
+        color: currentColor;
+        flex-shrink: 0;
+        transition:
+            color 0.25s ease,
+            background 0.25s ease,
+            border-color 0.25s ease,
+            transform 0.25s cubic-bezier(0.22,1,0.36,1),
+            box-shadow 0.25s ease;
+        opacity: 0;
+        transform: scale(0.5) rotate(-10deg);
+        animation: gsTabIconPower 0.5s cubic-bezier(0.34,1.56,0.64,1) forwards;
+        animation-delay: calc(0.15s + var(--gs-tab-i, 0) * 0.07s);
+    }
+    .gs-member-friends-tab .gs-tab-icon svg {
+        width: 14px;
+        height: 14px;
+        display: block;
+        filter: drop-shadow(0 0 4px currentColor);
+        opacity: 0.92;
+    }
+    .gs-member-friends-tab:hover .gs-tab-icon {
+        color: #89C2E0;
+        border-color: rgba(137,194,224,0.45);
+        background: rgba(137,194,224,0.08);
+        transform: translateY(-1px);
+        box-shadow: 0 0 12px rgba(137,194,224,0.22);
+    }
+    .gs-member-friends-tab.is-active .gs-tab-icon {
+        color: #b608c9;
+        background: rgba(182,8,201,0.12);
+        border-color: rgba(182,8,201,0.45);
+        box-shadow:
+            0 0 16px rgba(182,8,201,0.32),
+            inset 0 0 6px rgba(182,8,201,0.20);
+    }
+    .gs-member-friends-tab.is-active .gs-tab-icon::after {
+        content: "";
+        position: absolute;
+        top: 3px;
+        right: 3px;
+        width: 4px;
+        height: 4px;
+        border-radius: 50%;
+        background: #b608c9;
+        box-shadow: 0 0 6px #b608c9;
+        animation: gsTabBeacon 1.6s ease-in-out infinite;
+    }
+
+    /* Per-tab stagger — applies to both groups + friends strips */
+    .gs-member-groups-tabs  .gs-member-groups-tab:nth-of-type(1)  .gs-tab-icon,
+    .gs-member-friends-tabs .gs-member-friends-tab:nth-of-type(1) .gs-tab-icon { --gs-tab-i: 0; }
+    .gs-member-groups-tabs  .gs-member-groups-tab:nth-of-type(2)  .gs-tab-icon,
+    .gs-member-friends-tabs .gs-member-friends-tab:nth-of-type(2) .gs-tab-icon { --gs-tab-i: 1; }
+    .gs-member-groups-tabs  .gs-member-groups-tab:nth-of-type(3)  .gs-tab-icon,
+    .gs-member-friends-tabs .gs-member-friends-tab:nth-of-type(3) .gs-tab-icon { --gs-tab-i: 2; }
+    .gs-member-groups-tabs  .gs-member-groups-tab:nth-of-type(4)  .gs-tab-icon,
+    .gs-member-friends-tabs .gs-member-friends-tab:nth-of-type(4) .gs-tab-icon { --gs-tab-i: 3; }
+    .gs-member-groups-tabs  .gs-member-groups-tab:nth-of-type(5)  .gs-tab-icon,
+    .gs-member-friends-tabs .gs-member-friends-tab:nth-of-type(5) .gs-tab-icon { --gs-tab-i: 4; }
+
+    /* Keyframes — also defined in the groups-tabs CSS block, but that block
+       only loads on the App Projects page. Re-declare here so the friends
+       page (which loads ONLY this stylesheet) animates its chips too.
+       Duplicate definitions are harmless — same name, same content. */
+    @keyframes gsTabIconPower {
+        to { opacity: 1; transform: none; }
+    }
+    @keyframes gsTabBeacon {
+        0%, 100% { opacity: 0.35; transform: scale(0.8); }
+        50%      { opacity: 1;    transform: scale(1.15); }
+    }
+    @media (prefers-reduced-motion: reduce) {
+        .gs-member-friends-tab .gs-tab-icon,
+        .gs-member-friends-tab .gs-tab-icon::after {
+            animation: none !important;
+            opacity: 1 !important;
+            transform: none !important;
+        }
+    }
 
     /* ── Connections page: full-width main column, hide right sidebar.
        Scoped to body.my-friends so other profile tabs are unaffected. */
@@ -1584,28 +1901,32 @@ function gs_member_friends_tabs_open() {
                     data-gs-panel="connections"
                     role="tab"
                     aria-selected="true">
-                <?php esc_html_e( 'My Connections', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('connections') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'My Connections', 'gend-society' ); ?></span>
             </button>
             <button type="button"
                     class="gs-member-friends-tab"
                     data-gs-panel="referral-sales"
                     role="tab"
                     aria-selected="false">
-                <?php esc_html_e( 'Referral Sales', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('referral-sales') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Referral Sales', 'gend-society' ); ?></span>
             </button>
             <button type="button"
                     class="gs-member-friends-tab"
                     data-gs-panel="sales-team"
                     role="tab"
                     aria-selected="false">
-                <?php esc_html_e( 'Sales Team', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('sales-team') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Sales Team', 'gend-society' ); ?></span>
             </button>
             <button type="button"
                     class="gs-member-friends-tab"
                     data-gs-panel="invite"
                     role="tab"
                     aria-selected="false">
-                <?php esc_html_e( 'Invite', 'gend-society' ); ?>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('invite') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Invite', 'gend-society' ); ?></span>
             </button>
         </div>
 

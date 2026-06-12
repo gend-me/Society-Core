@@ -375,8 +375,15 @@ add_action( 'rest_api_init', function () {
 add_filter( 'rest_authentication_errors', function ( $result ) {
     if ( ! is_wp_error( $result ) ) return $result;
     $route = isset( $_SERVER['REQUEST_URI'] ) ? (string) $_SERVER['REQUEST_URI'] : '';
-    if ( $route !== '' && strpos( $route, '/gend-society/v1/oauth/login' ) !== false ) {
-        return null;
+    if ( $route !== '' ) {
+        // OAuth code-exchange must be reachable pre-login.
+        if ( strpos( $route, '/gend-society/v1/oauth/login' ) !== false ) return null;
+        // Public Desktop release lookup — the Connect Your Computer popup
+        // + any "always-latest" bookmark links need to resolve without
+        // an auth cookie. The /release POST has its own manage_network
+        // gate inside the handler, so opening these is safe.
+        if ( strpos( $route, '/gs/v1/desktop/info'   ) !== false ) return null;
+        if ( strpos( $route, '/gs/v1/desktop/latest' ) !== false ) return null;
     }
     return $result;
 }, 99 );
