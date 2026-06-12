@@ -1,31 +1,58 @@
-/* GenD Society — Frontend Bar Script v1.0.0 */
+/* GenD Society — Frontend Bar Script v1.1.0 */
 (function () {
     'use strict';
 
     var sidebar = document.querySelector('.gs-front-sidebar');
     if (!sidebar) { return; }
 
-    var body = document.body;
-    var collapseTimer = null;
-    var EXPAND_DELAY = 0;
-    var COLLAPSE_DELAY = 700;
+    var toggle = document.getElementById('gs-float-menu');
+    var hideTimer = null;
+    var HIDE_DELAY = 350;
 
-    body.classList.add('gs-bar-active');
-
-    function expand() {
-        if (collapseTimer) { clearTimeout(collapseTimer); collapseTimer = null; }
-        sidebar.classList.add('gs-expanded');
-        body.classList.add('gs-bar-expanded');
+    function reveal() {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
+        sidebar.classList.add('gs-revealed');
+        sidebar.setAttribute('aria-hidden', 'false');
+        if (toggle) { toggle.setAttribute('aria-expanded', 'true'); }
     }
-    function collapse() {
-        collapseTimer = setTimeout(function () {
-            sidebar.classList.remove('gs-expanded');
-            body.classList.remove('gs-bar-expanded');
-        }, COLLAPSE_DELAY);
+    function hide() {
+        sidebar.classList.remove('gs-revealed');
+        sidebar.setAttribute('aria-hidden', 'true');
+        if (toggle) { toggle.setAttribute('aria-expanded', 'false'); }
+    }
+    function scheduleHide() {
+        if (hideTimer) { clearTimeout(hideTimer); }
+        hideTimer = setTimeout(hide, HIDE_DELAY);
+    }
+    function cancelHide() {
+        if (hideTimer) { clearTimeout(hideTimer); hideTimer = null; }
     }
 
-    sidebar.addEventListener('mouseenter', expand);
-    sidebar.addEventListener('mouseleave', collapse);
+    if (toggle) {
+        // Click toggles (primary interaction, also covers touch devices)
+        toggle.addEventListener('click', function (e) {
+            e.preventDefault();
+            if (sidebar.classList.contains('gs-revealed')) { hide(); }
+            else { reveal(); }
+        });
+        // Hover-intent reveal on pointer-capable devices
+        toggle.addEventListener('mouseenter', reveal);
+        toggle.addEventListener('mouseleave', scheduleHide);
+    }
+    sidebar.addEventListener('mouseenter', cancelHide);
+    sidebar.addEventListener('mouseleave', scheduleHide);
+
+    // Click outside the sidebar (and not on the toggle) closes it
+    document.addEventListener('click', function (e) {
+        if (!sidebar.classList.contains('gs-revealed')) { return; }
+        if (sidebar.contains(e.target)) { return; }
+        if (toggle && toggle.contains(e.target)) { return; }
+        hide();
+    });
+    // Esc closes
+    document.addEventListener('keydown', function (e) {
+        if (e.key === 'Escape' && sidebar.classList.contains('gs-revealed')) { hide(); }
+    });
 
     // ---- Flyout submenus ----------------------------------------
     document.querySelectorAll('.gs-sidebar-item[data-has-sub]').forEach(function (item) {
@@ -39,8 +66,12 @@
         function showFlyout() {
             if (ft) { clearTimeout(ft); }
             var rect = item.getBoundingClientRect();
+            var sbRect = sidebar.getBoundingClientRect();
             flyout.style.top = rect.top + 'px';
-            flyout.style.left = sidebar.getBoundingClientRect().right + 'px';
+            // Anchor to the right edge of the viewport so the flyout opens
+            // to the LEFT of the right-pinned sidebar (toward page center).
+            flyout.style.left = '';
+            flyout.style.right = (window.innerWidth - sbRect.left + 8) + 'px';
             flyout.style.display = 'block';
         }
         function hideFlyout() {
@@ -49,8 +80,19 @@
 
         item.addEventListener('mouseenter', showFlyout);
         item.addEventListener('mouseleave', hideFlyout);
-        flyout.addEventListener('mouseenter', function () { if (ft) clearTimeout(ft); });
-        flyout.addEventListener('mouseleave', hideFlyout);
+        // While the cursor is over the flyout, the sidebar should stay
+        // open even though the flyout lives outside the sidebar DOM (it
+        // gets appended to <body> to escape overflow:hidden). Cancel the
+        // sidebar-level hideTimer on enter and re-arm it on leave so the
+        // sidebar doesn't slide out from under the submenu.
+        flyout.addEventListener('mouseenter', function () {
+            if (ft) clearTimeout(ft);
+            cancelHide();
+        });
+        flyout.addEventListener('mouseleave', function () {
+            hideFlyout();
+            scheduleHide();
+        });
     });
 
     

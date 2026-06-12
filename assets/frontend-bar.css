@@ -14,35 +14,47 @@
     --gs-bar-muted: #7a8599;
 }
 
-/* ---- SIDEBAR CONTAINER ------------------------------------ */
+/* ---- SIDEBAR CONTAINER ------------------------------------
+   Hidden by default — slides in from the right under the top-right
+   floating menu toggle. No body-margin push, so it overlays content
+   without reflowing the page underneath it. */
 .gs-front-sidebar {
     position: fixed;
-    top: 0;
-    left: 0;
-    width: var(--gs-bar-w-collapsed);
-    height: 100vh;
-    z-index: 9999;
-    background: var(--gs-bar-bg);
-    backdrop-filter: blur(20px) saturate(160%);
-    -webkit-backdrop-filter: blur(20px) saturate(160%);
-    border-right: 1px solid var(--gs-bar-border);
-    border-radius: 0 0 14px 0;
+    top: 82px;
+    right: 12px;
+    width: var(--gs-bar-w-expanded);
+    height: calc(100vh - 94px);
+    z-index: 999990;
+    background: linear-gradient(180deg, rgba(18, 22, 32, 0.72), rgba(8, 11, 18, 0.78));
+    backdrop-filter: blur(28px) saturate(180%);
+    -webkit-backdrop-filter: blur(28px) saturate(180%);
+    border: 1px solid var(--gs-bar-border);
+    border-radius: 18px;
     display: flex;
     flex-direction: column;
     align-items: flex-start;
     padding-top: 12px;
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.45), inset 0 1px 0 rgba(255, 255, 255, 0.06);
-    transition: width .2s cubic-bezier(.4, 0, .2, 1), transform 0.6s cubic-bezier(0.22, 1, 0.36, 1), opacity 0.6s ease;
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.55),
+        0 0 0 1px rgba(255, 255, 255, 0.04),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
+    transform: translateX(calc(100% + 24px));
+    opacity: 0;
+    pointer-events: none;
+    transition:
+        transform 0.45s cubic-bezier(0.22, 1, 0.36, 1),
+        opacity 0.35s ease;
     overflow: hidden;
     perspective: 1200px;
     transform-style: preserve-3d;
     backface-visibility: hidden;
-    animation: gsSidebarEntrance 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
-.gs-front-sidebar:hover,
-.gs-front-sidebar.gs-expanded {
-    width: var(--gs-bar-w-expanded);
+.gs-front-sidebar.gs-revealed {
+    transform: translateX(0);
+    opacity: 1;
+    pointer-events: auto;
+    animation: gsSidebarEntrance 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
 }
 
 /* ---- GRADIENT STRIPE TOP ---------------------------------- */
@@ -98,8 +110,7 @@
     letter-spacing: .3px;
 }
 
-.gs-front-sidebar:hover .gs-sidebar-brand-label,
-.gs-front-sidebar.gs-expanded .gs-sidebar-brand-label {
+.gs-front-sidebar.gs-revealed .gs-sidebar-brand-label {
     opacity: 1;
 }
 
@@ -161,8 +172,8 @@
     background: rgba(182, 8, 201, 0.15) !important;
     border-color: rgba(182, 8, 201, 0.4) !important;
     color: #fff !important;
-    transform: perspective(600px) translateZ(12px) rotateY(-8deg) translateX(4px) !important;
-    box-shadow: -5px 5px 20px rgba(0,0,0,0.4);
+    transform: perspective(600px) translateZ(12px) rotateY(8deg) translateX(-4px) !important;
+    box-shadow: 5px 5px 20px rgba(0,0,0,0.4);
 }
 
 .gs-sidebar-link:hover::after {
@@ -206,8 +217,7 @@
     text-overflow: ellipsis;
 }
 
-.gs-front-sidebar:hover .gs-sidebar-label,
-.gs-front-sidebar.gs-expanded .gs-sidebar-label {
+.gs-front-sidebar.gs-revealed .gs-sidebar-label {
     opacity: 1;
     pointer-events: auto;
 }
@@ -251,86 +261,26 @@
     color: var(--gs-bar-accent);
 }
 
-/* ---- FOOTER / USER --------------------------------------- */
-.gs-sidebar-footer {
-    width: 100%;
-    padding: 8px;
-    border-top: 1px solid var(--gs-bar-border);
-    flex-shrink: 0;
-    box-sizing: border-box;
-}
-
-.gs-sidebar-user {
-    display: flex;
-    align-items: center;
-    gap: 10px;
-    padding: 8px 10px;
-    border-radius: 10px;
-    overflow: hidden;
-    text-decoration: none;
-}
-
-.gs-sidebar-avatar {
-    width: 30px;
-    height: 30px;
-    border-radius: 50%;
-    flex-shrink: 0;
-    background: linear-gradient(135deg, var(--gs-bar-magenta), var(--gs-bar-blue));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 13px;
-    font-weight: 800;
-    color: #fff;
-    overflow: hidden;
-}
-
-.gs-sidebar-avatar img {
-    width: 100%;
-    height: 100%;
-    object-fit: cover;
-}
-
-.gs-sidebar-user-info {
-    display: flex;
-    flex-direction: column;
-    overflow: hidden;
-    opacity: 0;
-    transition: opacity .15s;
-}
-
-.gs-front-sidebar:hover .gs-sidebar-user-info,
-.gs-front-sidebar.gs-expanded .gs-sidebar-user-info {
-    opacity: 1;
-}
-
-.gs-sidebar-username {
-    font-size: .78rem;
-    font-weight: 700;
-    color: var(--gs-bar-text);
-    overflow: hidden;
-    text-overflow: ellipsis;
-    white-space: nowrap;
-}
-
-.gs-sidebar-role {
-    font-size: .68rem;
-    color: var(--gs-bar-muted);
-}
-
-/* ---- FLYOUT SUBMENU -------------------------------------- */
+/* ---- FLYOUT SUBMENU --------------------------------------
+   With the sidebar pinned to the right, flyouts open to the LEFT
+   of it (toward page center). JS positions them at runtime via
+   right + top; this rule defines the default look. */
 .gs-sidebar-flyout {
     position: fixed;
-    left: var(--gs-bar-w-collapsed);
+    right: calc(var(--gs-bar-w-expanded) + 30px);
     top: 0;
-    min-width: 190px;
-    background: rgba(10, 14, 22, 0.97);
+    min-width: 200px;
+    background: linear-gradient(180deg, rgba(18, 22, 32, 0.85), rgba(8, 11, 18, 0.92));
+    backdrop-filter: blur(24px) saturate(180%);
+    -webkit-backdrop-filter: blur(24px) saturate(180%);
     border: 1px solid var(--gs-bar-border);
-    border-radius: 0 12px 12px 0;
-    padding: 6px;
+    border-radius: 14px;
+    padding: 8px;
     display: none;
     z-index: 1000001;
-    box-shadow: 8px 0 32px rgba(0, 0, 0, .5);
+    box-shadow:
+        0 24px 60px rgba(0, 0, 0, 0.55),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
 }
 
 .gs-sidebar-flyout a {
@@ -358,30 +308,286 @@
     padding: 8px 14px 4px;
 }
 
-/* ---- PAGE PUSH ------------------------------------------- */
-body.gs-bar-active {
-    margin-left: var(--gs-bar-w-collapsed) !important;
-    transition: margin-left .2s cubic-bezier(.4, 0, .2, 1);
+/* ============================================================
+   FLOATING GLASS BUTTONS — non-intrusive overlay UI
+   ============================================================ */
+
+/* ---- TOP-RIGHT MENU TOGGLE ------------------------------- */
+.gs-float-menu {
+    position: fixed;
+    top: 18px;
+    right: 18px;
+    width: 52px;
+    height: 52px;
+    z-index: 999991;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(135deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.7));
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 0;
+    overflow: hidden;
+    transition: transform .25s cubic-bezier(.2,0,0,1), box-shadow .25s ease, border-color .25s ease;
+    animation: gsFloatIn .7s cubic-bezier(0.22, 1, 0.36, 1) both .25s;
 }
 
-body.gs-bar-expanded {
-    margin-left: var(--gs-bar-w-expanded) !important;
+.gs-float-menu::before {
+    content: '';
+    position: absolute;
+    inset: -2px;
+    border-radius: 50%;
+    padding: 2px;
+    background: conic-gradient(from 0deg,
+        var(--gs-bar-magenta),
+        var(--gs-bar-blue),
+        var(--gs-bar-accent),
+        var(--gs-bar-magenta));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0.55;
+    animation: gsConicSpin 8s linear infinite;
+    pointer-events: none;
 }
 
-/* Push Frontend Sticky/Fixed Headers */
-body.gs-bar-active header,
-body.gs-bar-active .elementor-location-header,
-body.gs-bar-active [data-elementor-type="header"] {
-    left: var(--gs-bar-w-collapsed) !important;
-    width: calc(100% - var(--gs-bar-w-collapsed)) !important;
-    transition: left .2s cubic-bezier(.4, 0, .2, 1), width .2s cubic-bezier(.4, 0, .2, 1) !important;
+.gs-float-menu-glow {
+    position: absolute;
+    inset: -6px;
+    border-radius: 50%;
+    background: radial-gradient(circle at center, rgba(182, 8, 201, 0.45), transparent 65%);
+    opacity: 0;
+    transition: opacity .3s ease;
+    pointer-events: none;
 }
 
-body.gs-bar-expanded header,
-body.gs-bar-expanded .elementor-location-header,
-body.gs-bar-expanded [data-elementor-type="header"] {
-    left: var(--gs-bar-w-expanded) !important;
-    width: calc(100% - var(--gs-bar-w-expanded)) !important;
+.gs-float-menu:hover,
+.gs-float-menu[aria-expanded="true"] {
+    transform: translateY(-1px) scale(1.05);
+    border-color: rgba(182, 8, 201, 0.55);
+    box-shadow:
+        0 16px 40px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(182, 8, 201, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.gs-float-menu:hover .gs-float-menu-glow,
+.gs-float-menu[aria-expanded="true"] .gs-float-menu-glow {
+    opacity: 1;
+}
+
+.gs-float-menu-icon {
+    position: relative;
+    width: 20px;
+    height: 14px;
+    display: inline-block;
+}
+
+.gs-float-menu-icon span {
+    position: absolute;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, #fff, #d8e2ff);
+    border-radius: 2px;
+    transition: transform .35s cubic-bezier(.2,0,0,1), opacity .25s ease, top .35s cubic-bezier(.2,0,0,1);
+    box-shadow: 0 0 8px rgba(182, 8, 201, 0.4);
+}
+
+.gs-float-menu-icon span:nth-child(1) { top: 0; }
+.gs-float-menu-icon span:nth-child(2) { top: 6px; }
+.gs-float-menu-icon span:nth-child(3) { top: 12px; }
+
+.gs-float-menu[aria-expanded="true"] .gs-float-menu-icon span:nth-child(1) {
+    top: 6px;
+    transform: rotate(45deg);
+}
+
+.gs-float-menu[aria-expanded="true"] .gs-float-menu-icon span:nth-child(2) {
+    opacity: 0;
+    transform: scaleX(0);
+}
+
+.gs-float-menu[aria-expanded="true"] .gs-float-menu-icon span:nth-child(3) {
+    top: 6px;
+    transform: rotate(-45deg);
+}
+
+/* ---- BOTTOM-LEFT DOCK (profile + cart) -------------------- */
+.gs-float-dock {
+    position: fixed;
+    bottom: 18px;
+    left: 18px;
+    z-index: 999991;
+    display: flex;
+    flex-direction: column-reverse; /* profile on top of cart visually, dock anchored bottom */
+    align-items: flex-start;
+    gap: 12px;
+    pointer-events: none; /* children re-enable */
+}
+
+.gs-float-btn {
+    position: relative;
+    width: 52px;
+    height: 52px;
+    border-radius: 50%;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: linear-gradient(135deg, rgba(20, 24, 34, 0.55), rgba(11, 14, 20, 0.7));
+    backdrop-filter: blur(22px) saturate(180%);
+    -webkit-backdrop-filter: blur(22px) saturate(180%);
+    box-shadow:
+        0 12px 32px rgba(0, 0, 0, 0.45),
+        inset 0 1px 0 rgba(255, 255, 255, 0.10);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #e8edf5;
+    cursor: pointer;
+    text-decoration: none;
+    padding: 0;
+    overflow: visible;
+    transition: transform .25s cubic-bezier(.2,0,0,1), box-shadow .25s ease, border-color .25s ease;
+    pointer-events: auto;
+    animation: gsFloatIn .7s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+.gs-float-profile { animation-delay: .35s; }
+.gs-float-cart { animation-delay: .45s; }
+
+.gs-float-btn-ring {
+    position: absolute;
+    inset: -3px;
+    border-radius: 50%;
+    background: conic-gradient(from 120deg,
+        var(--gs-bar-blue),
+        var(--gs-bar-magenta),
+        var(--gs-bar-accent),
+        var(--gs-bar-blue));
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    padding: 3px;
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0;
+    transition: opacity .25s ease;
+    pointer-events: none;
+    animation: gsConicSpin 10s linear infinite;
+}
+
+.gs-float-btn:hover {
+    transform: translateY(-2px) scale(1.06);
+    border-color: rgba(110, 193, 228, 0.55);
+    box-shadow:
+        0 18px 44px rgba(0, 0, 0, 0.55),
+        0 0 28px rgba(110, 193, 228, 0.35),
+        inset 0 1px 0 rgba(255, 255, 255, 0.14);
+}
+
+.gs-float-btn:hover .gs-float-btn-ring {
+    opacity: 0.85;
+}
+
+/* Profile avatar */
+.gs-float-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    overflow: hidden;
+    background: linear-gradient(135deg, var(--gs-bar-magenta), var(--gs-bar-blue));
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    color: #fff;
+}
+
+.gs-float-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+}
+
+/* Cart */
+.gs-float-cart-icon {
+    color: #d8e2ff;
+    filter: drop-shadow(0 0 6px rgba(182, 8, 201, 0.35));
+}
+
+.gs-float-cart-count {
+    position: absolute;
+    top: -2px;
+    right: -2px;
+    min-width: 20px;
+    height: 20px;
+    padding: 0 6px;
+    border-radius: 999px;
+    background: linear-gradient(135deg, var(--gs-bar-magenta), #ff3da6);
+    color: #fff;
+    font-size: 11px;
+    font-weight: 800;
+    line-height: 20px;
+    text-align: center;
+    box-sizing: border-box;
+    box-shadow: 0 0 12px rgba(182, 8, 201, 0.55), inset 0 1px 0 rgba(255, 255, 255, 0.25);
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+}
+
+.gs-float-cart-count[hidden] { display: none !important; }
+
+/* Tooltip — only fades in on hover so it's never in the way */
+.gs-float-tooltip {
+    position: absolute;
+    left: 62px;
+    top: 50%;
+    transform: translateY(-50%) translateX(-6px);
+    background: rgba(10, 14, 22, 0.92);
+    color: #fff;
+    font-size: .72rem;
+    font-weight: 600;
+    letter-spacing: .3px;
+    padding: 6px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    white-space: nowrap;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity .2s ease, transform .25s cubic-bezier(.2,0,0,1);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+}
+
+.gs-float-btn:hover .gs-float-tooltip {
+    opacity: 1;
+    transform: translateY(-50%) translateX(0);
+}
+
+/* Reduced motion — drop the spinning conic rings and entrance animations */
+@media (prefers-reduced-motion: reduce) {
+    .gs-float-menu,
+    .gs-float-btn,
+    [data-gs-animate],
+    .gs-front-sidebar.gs-revealed { animation: none !important; }
+    .gs-float-menu::before,
+    .gs-float-btn-ring { animation: none !important; }
+}
+
+/* Spinning conic gradient ring */
+@keyframes gsConicSpin {
+    to { transform: rotate(360deg); }
+}
+
+/* Floating button entrance */
+@keyframes gsFloatIn {
+    0% { opacity: 0; transform: translateY(20px) scale(0.85); }
+    100% { opacity: 1; transform: translateY(0) scale(1); }
 }
 
 /* ---- EDIT MODAL ------------------------------------------ */
@@ -467,11 +673,11 @@ body.gs-bar-expanded [data-elementor-type="header"] {
    ADVANCED ANIMATIONS
    ============================================================ */
 
-/* 3D Sidebar Entrance */
+/* 3D Sidebar Entrance — slides in from the right */
 @keyframes gsSidebarEntrance {
     0% {
         opacity: 0;
-        transform: perspective(1200px) rotateY(-40deg) translateX(-150px) scale(0.9);
+        transform: perspective(1200px) rotateY(40deg) translateX(150px) scale(0.9);
         filter: blur(10px);
     }
     100% {
@@ -481,10 +687,10 @@ body.gs-bar-expanded [data-elementor-type="header"] {
     }
 }
 
-/* Staggered Entrance for Items */
+/* Staggered Entrance for Items — items slip in from the right */
 [data-gs-animate] {
     opacity: 0;
-    transform: translateX(-20px) translateZ(-50px);
+    transform: translateX(20px) translateZ(-50px);
     animation: gsItemEntrance 0.6s cubic-bezier(0.2, 0, 0, 1) forwards;
 }
 
