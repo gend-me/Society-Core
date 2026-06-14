@@ -1,15 +1,15 @@
 /* =============================================================================
  * GenD Society — Member Calendar (glassmorphic grid)
  *
- * Phase 26 Plan 01 — SCAFFOLD ONLY. This file establishes the design tokens and
- * collision-safe scoping. The interactive month/week/day grid styling lands in
- * Phase 26 Plan 02.
+ * Phase 26 Plan 02 — the full glass design language for the bespoke Month/Week/Day
+ * grid rendered by member-calendar.js. Reuses the glassmorphic palette + kinetic
+ * conic-gradient border + blur(25px) panels from gdc_profile_header_css
+ * (member-profile-header.php) so the calendar matches the profile-header chrome.
  *
- * COLLISION RULE (Pitfall 21): every selector MUST be scoped under
- * .gs-cal-root or .member-calendar so nothing leaks into Youzify / BuddyPress.
- *
- * Tokens reuse the EXACT glassmorphic palette from gdc_profile_header_css
- * (member-profile-header.php) so the calendar matches the profile header chrome.
+ * COLLISION RULE (Pitfall 21): EVERY selector is scoped under .gs-cal-root /
+ * .member-calendar so nothing leaks into Youzify / BuddyPress (both use aggressive
+ * !important). Animations use transform + opacity ONLY (Pitfall 20) — never
+ * top/left/width/height — and the reveal honors prefers-reduced-motion.
  * ========================================================================== */
 
 .gs-cal-root {
@@ -18,18 +18,553 @@
 	--gph-magenta: #b608c9;
 	--gph-green: #00ff88;
 
-	/* Phase 26-02 will add surface / glass / radius / spacing tokens here and
-	   build the grid on top of these three brand accents. */
+	/* Surface / glass tokens. */
+	--gcal-bg: rgba(2, 8, 23, 0.55);
+	--gcal-glass: rgba(255, 255, 255, 0.03);
+	--gcal-glass-strong: rgba(255, 255, 255, 0.06);
+	--gcal-border: rgba(137, 194, 224, 0.18);
+	--gcal-border-soft: rgba(255, 255, 255, 0.07);
+	--gcal-text: #e6eef6;
+	--gcal-muted: rgba(230, 238, 246, 0.55);
+	--gcal-radius: 16px;
+	--gcal-radius-sm: 10px;
+	--gcal-gap: 8px;
+	--gcal-blur: blur(25px);
 
 	width: 100%;
 	box-sizing: border-box;
+	color: var(--gcal-text);
+	font-family: inherit;
+	-webkit-font-smoothing: antialiased;
 }
 
-/* Respect reduced-motion: kill all calendar transitions/animations.
-   Phase 26-02 adds the actual transitions this neutralizes. */
+.gs-cal-root *,
+.gs-cal-root *::before,
+.gs-cal-root *::after {
+	box-sizing: border-box;
+}
+
+/* ── TOOLBAR ───────────────────────────────────────────────────────────── */
+.gs-cal-root .gs-cal-toolbar {
+	display: flex;
+	align-items: center;
+	justify-content: space-between;
+	flex-wrap: wrap;
+	gap: 12px;
+	padding: 14px 16px;
+	margin-bottom: 12px;
+	background: var(--gcal-glass);
+	border: 1px solid var(--gcal-border-soft);
+	border-radius: var(--gcal-radius);
+	backdrop-filter: var(--gcal-blur);
+	-webkit-backdrop-filter: var(--gcal-blur);
+}
+
+.gs-cal-root .gs-cal-nav { display: flex; gap: 6px; }
+
+.gs-cal-root .gs-cal-btn {
+	appearance: none;
+	cursor: pointer;
+	min-width: 38px;
+	padding: 8px 14px;
+	font-size: 14px;
+	font-weight: 600;
+	color: var(--gcal-text);
+	background: var(--gcal-glass-strong);
+	border: 1px solid var(--gcal-border-soft);
+	border-radius: var(--gcal-radius-sm);
+	transition: background 0.18s ease, border-color 0.18s ease, transform 0.18s ease;
+}
+.gs-cal-root .gs-cal-btn:hover {
+	background: rgba(137, 194, 224, 0.12);
+	border-color: var(--gph-blue);
+	transform: translateY(-1px);
+}
+.gs-cal-root .gs-cal-btn:active { transform: translateY(0); }
+
+.gs-cal-root .gs-cal-range {
+	flex: 1 1 auto;
+	text-align: center;
+	font-size: 18px;
+	font-weight: 700;
+	letter-spacing: 0.2px;
+	min-width: 160px;
+}
+
+/* Segmented Month / Week / Day switch. */
+.gs-cal-root .gs-cal-seg {
+	display: inline-flex;
+	padding: 3px;
+	background: var(--gcal-glass-strong);
+	border: 1px solid var(--gcal-border-soft);
+	border-radius: var(--gcal-radius-sm);
+}
+.gs-cal-root .gs-cal-seg__btn {
+	appearance: none;
+	cursor: pointer;
+	padding: 7px 16px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--gcal-muted);
+	background: transparent;
+	border: 0;
+	border-radius: 7px;
+	transition: color 0.18s ease, background 0.18s ease;
+}
+.gs-cal-root .gs-cal-seg__btn:hover { color: var(--gcal-text); }
+.gs-cal-root .gs-cal-seg__btn.is-active {
+	color: #04121f;
+	background: var(--gph-blue);
+	box-shadow: 0 2px 10px rgba(137, 194, 224, 0.35);
+}
+
+/* ── LEGEND ────────────────────────────────────────────────────────────── */
+.gs-cal-root .gs-cal-legend {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin-bottom: 14px;
+}
+.gs-cal-root .gs-cal-legend__item {
+	appearance: none;
+	cursor: pointer;
+	display: inline-flex;
+	align-items: center;
+	gap: 7px;
+	padding: 6px 12px;
+	font-size: 13px;
+	font-weight: 600;
+	color: var(--gcal-text);
+	background: var(--gcal-glass);
+	border: 1px solid var(--gcal-border-soft);
+	border-radius: 999px;
+	transition: opacity 0.18s ease, background 0.18s ease, transform 0.18s ease;
+}
+.gs-cal-root .gs-cal-legend__item:hover { transform: translateY(-1px); }
+.gs-cal-root .gs-cal-legend__swatch {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+	background: var(--swatch, var(--gph-blue));
+	box-shadow: 0 0 8px var(--swatch, var(--gph-blue));
+}
+.gs-cal-root .gs-cal-legend__item.is-hidden {
+	opacity: 0.42;
+	background: transparent;
+}
+.gs-cal-root .gs-cal-legend__item.is-hidden .gs-cal-legend__label {
+	text-decoration: line-through;
+}
+.gs-cal-root .gs-cal-legend__item.is-hidden .gs-cal-legend__swatch {
+	box-shadow: none;
+	background: var(--gcal-muted);
+}
+
+/* ── MONTH GRID ────────────────────────────────────────────────────────── */
+.gs-cal-root .gs-cal-grid--month { width: 100%; }
+
+.gs-cal-root .gs-cal-dow-row {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	gap: var(--gcal-gap);
+	margin-bottom: var(--gcal-gap);
+}
+.gs-cal-root .gs-cal-dow {
+	text-align: center;
+	font-size: 12px;
+	font-weight: 700;
+	letter-spacing: 0.6px;
+	text-transform: uppercase;
+	color: var(--gcal-muted);
+	padding: 4px 0;
+}
+
+.gs-cal-root .gs-cal-cells {
+	display: grid;
+	grid-template-columns: repeat(7, 1fr);
+	grid-auto-rows: minmax(96px, 1fr);
+	gap: var(--gcal-gap);
+}
+
+/* Glass cell with a kinetic conic-gradient border (reused conic idiom). */
+.gs-cal-root .gs-cal-cell {
+	position: relative;
+	z-index: 0;
+	padding: 6px 7px;
+	min-height: 96px;
+	border-radius: var(--gcal-radius-sm);
+	background: var(--gcal-glass);
+	border: 1px solid var(--gcal-border-soft);
+	backdrop-filter: var(--gcal-blur);
+	-webkit-backdrop-filter: var(--gcal-blur);
+	overflow: hidden;
+}
+/* Spinning conic light track — only revealed on hover/today to stay cheap. */
+.gs-cal-root .gs-cal-cell::before {
+	content: "";
+	position: absolute;
+	inset: -60%;
+	z-index: -2;
+	background: conic-gradient(
+		from 0deg,
+		transparent 0%,
+		transparent 30%,
+		var(--gph-blue) 50%,
+		transparent 70%,
+		transparent 100%
+	);
+	opacity: 0;
+	animation: gsCalBorderScan 5s linear infinite;
+	transition: opacity 0.25s ease;
+}
+.gs-cal-root .gs-cal-cell::after {
+	content: "";
+	position: absolute;
+	inset: 1px;
+	z-index: -1;
+	border-radius: calc(var(--gcal-radius-sm) - 1px);
+	background: var(--gcal-bg);
+	backdrop-filter: var(--gcal-blur);
+	-webkit-backdrop-filter: var(--gcal-blur);
+}
+.gs-cal-root .gs-cal-cell:hover::before { opacity: 0.7; }
+@keyframes gsCalBorderScan {
+	from { transform: rotate(0deg); }
+	to   { transform: rotate(360deg); }
+}
+
+.gs-cal-root .gs-cal-cell.is-adjacent { opacity: 0.42; }
+.gs-cal-root .gs-cal-cell.is-today {
+	border-color: var(--gph-green);
+}
+.gs-cal-root .gs-cal-cell.is-today::before { opacity: 0.6; }
+.gs-cal-root .gs-cal-cell.is-today::after {
+	box-shadow: inset 0 0 0 1px rgba(0, 255, 136, 0.4);
+}
+
+.gs-cal-root .gs-cal-cell__num {
+	font-size: 13px;
+	font-weight: 700;
+	margin-bottom: 4px;
+	color: var(--gcal-text);
+}
+.gs-cal-root .gs-cal-cell.is-today .gs-cal-cell__num {
+	color: var(--gph-green);
+}
+.gs-cal-root .gs-cal-cell__events {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+}
+
+/* ── EVENT CHIPS ───────────────────────────────────────────────────────── */
+.gs-cal-root .gs-cal-chip {
+	appearance: none;
+	cursor: pointer;
+	display: flex;
+	align-items: center;
+	gap: 5px;
+	width: 100%;
+	text-align: left;
+	padding: 3px 7px;
+	font-size: 12px;
+	line-height: 1.25;
+	color: var(--gcal-text);
+	border: 1px solid transparent;
+	border-radius: 6px;
+	overflow: hidden;
+	transition: transform 0.15s ease, background 0.15s ease;
+}
+.gs-cal-root .gs-cal-chip:hover { transform: translateX(2px); }
+.gs-cal-root .gs-cal-chip__title {
+	overflow: hidden;
+	text-overflow: ellipsis;
+	white-space: nowrap;
+}
+.gs-cal-root .gs-cal-chip__time {
+	flex: 0 0 auto;
+	font-weight: 700;
+	opacity: 0.85;
+	font-variant-numeric: tabular-nums;
+}
+
+/* All-day pill — full-width solid-accent bar. */
+.gs-cal-root .gs-cal-chip--allday {
+	background: color-mix(in srgb, var(--chip-accent) 30%, transparent);
+	border-color: var(--chip-accent);
+	font-weight: 600;
+}
+.gs-cal-root .gs-cal-chip--allday .gs-cal-chip__title { font-weight: 700; }
+
+/* Timed chip — left accent rail + glass body. */
+.gs-cal-root .gs-cal-chip--timed {
+	background: var(--gcal-glass-strong);
+	border-left: 3px solid var(--chip-accent);
+}
+.gs-cal-root .gs-cal-chip--timed .gs-cal-chip__time { color: var(--chip-accent); }
+
+.gs-cal-root .gs-cal-chip.is-cancelled { opacity: 0.5; }
+.gs-cal-root .gs-cal-chip.is-cancelled .gs-cal-chip__title { text-decoration: line-through; }
+.gs-cal-root .gs-cal-chip.is-done { opacity: 0.72; }
+
+/* ── WEEK / DAY TIME GRID ──────────────────────────────────────────────── */
+.gs-cal-root .gs-cal-grid--time { width: 100%; }
+
+.gs-cal-root .gs-cal-time-head,
+.gs-cal-root .gs-cal-allday-row {
+	display: grid;
+	grid-template-columns: 56px repeat(var(--day-cols, 7), 1fr);
+	gap: var(--gcal-gap);
+}
+.gs-cal-root .gs-cal-grid--week .gs-cal-time-head,
+.gs-cal-root .gs-cal-grid--week .gs-cal-allday-row {
+	grid-template-columns: 56px repeat(7, 1fr);
+}
+.gs-cal-root .gs-cal-grid--day .gs-cal-time-head,
+.gs-cal-root .gs-cal-grid--day .gs-cal-allday-row {
+	grid-template-columns: 56px 1fr;
+}
+
+.gs-cal-root .gs-cal-time-corner,
+.gs-cal-root .gs-cal-allday-label {
+	font-size: 11px;
+	font-weight: 700;
+	text-transform: uppercase;
+	letter-spacing: 0.5px;
+	color: var(--gcal-muted);
+	display: flex;
+	align-items: center;
+	justify-content: flex-end;
+	padding-right: 6px;
+}
+.gs-cal-root .gs-cal-time-colhead {
+	min-height: 0;
+	padding: 8px;
+	text-align: center;
+	font-size: 13px;
+	font-weight: 700;
+}
+.gs-cal-root .gs-cal-time-colhead.is-today { color: var(--gph-green); }
+
+.gs-cal-root .gs-cal-allday-row { margin: 8px 0; }
+.gs-cal-root .gs-cal-allday-slot {
+	display: flex;
+	flex-direction: column;
+	gap: 3px;
+	min-height: 26px;
+	padding: 4px;
+	background: var(--gcal-glass);
+	border: 1px solid var(--gcal-border-soft);
+	border-radius: var(--gcal-radius-sm);
+}
+
+.gs-cal-root .gs-cal-time-scroll {
+	max-height: 620px;
+	overflow-y: auto;
+	overflow-x: hidden;
+	border: 1px solid var(--gcal-border-soft);
+	border-radius: var(--gcal-radius);
+	background: var(--gcal-glass);
+	backdrop-filter: var(--gcal-blur);
+	-webkit-backdrop-filter: var(--gcal-blur);
+}
+.gs-cal-root .gs-cal-time-body {
+	display: grid;
+	grid-template-columns: 56px repeat(var(--day-cols, 7), 1fr);
+}
+
+.gs-cal-root .gs-cal-hour-rail { display: flex; flex-direction: column; }
+.gs-cal-root .gs-cal-hour-mark {
+	height: 48px;
+	font-size: 11px;
+	font-weight: 600;
+	color: var(--gcal-muted);
+	text-align: right;
+	padding: 2px 6px 0 0;
+	border-top: 1px solid var(--gcal-border-soft);
+}
+
+.gs-cal-root .gs-cal-day-col {
+	position: relative;
+	border-left: 1px solid var(--gcal-border-soft);
+}
+.gs-cal-root .gs-cal-hour-slot {
+	height: 48px;
+	border-top: 1px solid rgba(255, 255, 255, 0.04);
+}
+
+/* Absolutely-positioned timed event inside a day column. top/height are LAYOUT
+   (set once per render from data) — NOT animated, so Pitfall 20 holds. */
+.gs-cal-root .gs-cal-chip--abs {
+	position: absolute;
+	left: 4px;
+	right: 4px;
+	width: auto;
+	min-height: 18px;
+	z-index: 2;
+	flex-direction: column;
+	align-items: flex-start;
+	gap: 0;
+}
+
+/* ── POPOVER ───────────────────────────────────────────────────────────── */
+/* Ensure the root is a positioning context + does not clip the glass card. */
+.gs-cal-root { position: relative; }
+
+.gs-cal-root .gs-cal-popover {
+	position: absolute;
+	z-index: 50;
+	width: 248px;
+	max-width: calc(100% - 16px);
+	padding: 14px 16px;
+	background: var(--gcal-bg);
+	border: 1px solid var(--pop-accent, var(--gph-blue));
+	border-radius: var(--gcal-radius);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, 0.55),
+		0 0 0 1px rgba(255, 255, 255, 0.04);
+	backdrop-filter: var(--gcal-blur);
+	-webkit-backdrop-filter: var(--gcal-blur);
+	overflow: visible;
+	animation: gsCalPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+@keyframes gsCalPopIn {
+	from { opacity: 0; transform: translateY(-6px); }
+	to   { opacity: 1; transform: translateY(0); }
+}
+/* Arrow. */
+.gs-cal-root .gs-cal-popover::before {
+	content: "";
+	position: absolute;
+	top: -7px;
+	left: 22px;
+	width: 12px;
+	height: 12px;
+	background: var(--gcal-bg);
+	border-left: 1px solid var(--pop-accent, var(--gph-blue));
+	border-top: 1px solid var(--pop-accent, var(--gph-blue));
+	transform: rotate(45deg);
+}
+.gs-cal-root .gs-cal-popover__title {
+	font-size: 15px;
+	font-weight: 700;
+	padding-right: 20px;
+	margin-bottom: 6px;
+}
+.gs-cal-root .gs-cal-popover__time {
+	font-size: 13px;
+	color: var(--gcal-muted);
+	margin-bottom: 10px;
+}
+.gs-cal-root .gs-cal-popover__source {
+	display: flex;
+	align-items: center;
+	gap: 7px;
+	font-size: 13px;
+	font-weight: 600;
+	margin-bottom: 6px;
+}
+.gs-cal-root .gs-cal-popover__swatch {
+	width: 12px;
+	height: 12px;
+	border-radius: 50%;
+}
+.gs-cal-root .gs-cal-popover__status {
+	font-size: 12px;
+	color: var(--gcal-muted);
+	text-transform: capitalize;
+	margin-bottom: 12px;
+}
+.gs-cal-root .gs-cal-popover__link {
+	display: inline-block;
+	padding: 7px 14px;
+	font-size: 13px;
+	font-weight: 700;
+	color: #04121f;
+	text-decoration: none;
+	background: var(--pop-accent, var(--gph-blue));
+	border-radius: var(--gcal-radius-sm);
+	transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.gs-cal-root .gs-cal-popover__link:hover {
+	transform: translateY(-1px);
+	box-shadow: 0 6px 18px rgba(0, 0, 0, 0.4);
+}
+.gs-cal-root .gs-cal-popover__close {
+	appearance: none;
+	cursor: pointer;
+	position: absolute;
+	top: 8px;
+	right: 10px;
+	width: 24px;
+	height: 24px;
+	font-size: 18px;
+	line-height: 1;
+	color: var(--gcal-muted);
+	background: transparent;
+	border: 0;
+	border-radius: 6px;
+	transition: color 0.15s ease, background 0.15s ease;
+}
+.gs-cal-root .gs-cal-popover__close:hover {
+	color: var(--gcal-text);
+	background: var(--gcal-glass-strong);
+}
+
+/* ── STAGGER REVEAL ────────────────────────────────────────────────────── *
+ * Each grid cell carries --cell-i (set in JS). On the .gs-cal-reveal trigger
+ * the cells fade + slide up with animation-delay: calc(var(--cell-i) * 12ms).
+ * Animates ONLY transform + opacity (Pitfall 20). Cap delay so a 42-cell month
+ * finishes fast. ------------------------------------------------------------ */
+.gs-cal-root .gs-cal-cell,
+.gs-cal-root .gs-cal-time-colhead,
+.gs-cal-root .gs-cal-day-col {
+	will-change: transform, opacity;
+}
+.gs-cal-root .gs-cal-reveal .gs-cal-cell,
+.gs-cal-root .gs-cal-reveal .gs-cal-time-colhead,
+.gs-cal-root .gs-cal-reveal .gs-cal-day-col {
+	opacity: 0;
+	transform: translateY(10px);
+	animation: gsCalCellReveal 0.42s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+	animation-delay: calc(min(var(--cell-i, 0), 42) * 12ms);
+}
+@keyframes gsCalCellReveal {
+	to { opacity: 1; transform: translateY(0); }
+}
+
+/* No-anim path (reduced-motion via JS): cells fully revealed, no keyframe. */
+.gs-cal-root .gs-cal-no-anim .gs-cal-cell,
+.gs-cal-root .gs-cal-no-anim .gs-cal-time-colhead,
+.gs-cal-root .gs-cal-no-anim .gs-cal-day-col {
+	opacity: 1;
+	transform: none;
+	animation: none;
+}
+
+/* ── RESPONSIVE ────────────────────────────────────────────────────────── */
+@media (max-width: 760px) {
+	.gs-cal-root .gs-cal-toolbar { justify-content: center; }
+	.gs-cal-root .gs-cal-range { order: -1; flex-basis: 100%; }
+	.gs-cal-root .gs-cal-cells { grid-auto-rows: minmax(72px, 1fr); }
+	.gs-cal-root .gs-cal-cell { min-height: 72px; padding: 4px; }
+	.gs-cal-root .gs-cal-chip__title { font-size: 11px; }
+	.gs-cal-root .gs-cal-dow { font-size: 10px; }
+}
+
+/* ── REDUCED MOTION ────────────────────────────────────────────────────── *
+ * Kill every transition + animation inside the calendar (belt-and-braces on top
+ * of the JS .gs-cal-no-anim path). ---------------------------------------- */
 @media (prefers-reduced-motion: reduce) {
-	.gs-cal-root * {
+	.gs-cal-root *,
+	.gs-cal-root *::before,
+	.gs-cal-root *::after {
 		transition: none !important;
 		animation: none !important;
+	}
+	.gs-cal-root .gs-cal-cell,
+	.gs-cal-root .gs-cal-time-colhead,
+	.gs-cal-root .gs-cal-day-col {
+		opacity: 1 !important;
+		transform: none !important;
 	}
 }
