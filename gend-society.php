@@ -123,6 +123,23 @@ if ( file_exists( GS_DIR . 'inc/class-booking-meetings-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Booking_Meetings_REST', 'register_routes' ) );
 }
 
+// Phase 30 Plan 30-02 — Native gend video JWT minter + time-gated REST.
+// Cross-phase invariants: hand-rolled HS256 (NO third-party JWT lib), secret via
+// getenv()/wp-config.php define shim (NEVER from the options table), server-clock
+// time gate via time() vs strtotime($utc.' UTC'), register_rest_route ONLY on
+// rest_api_init. The JWT class is purely static helpers (no hook needed); only
+// the REST class binds to rest_api_init.
+// file_exists-guarded — Pitfall 1 (.no-plugin-sync hub PVC quirk): the 2 NEW
+// class files MUST be kubectl cp'd to the PVC BEFORE this entrypoint edit, or
+// every request fatals. Plan 30-04 runbook documents the deploy order.
+if ( file_exists( GS_DIR . 'inc/class-jitsi-jwt.php' ) ) {
+	require_once GS_DIR . 'inc/class-jitsi-jwt.php';
+}
+if ( file_exists( GS_DIR . 'inc/class-jitsi-rest.php' ) ) {
+	require_once GS_DIR . 'inc/class-jitsi-rest.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Jitsi_REST', 'register_routes' ) );
+}
+
 // Phase 29 Plan 03 — booking notifications (Gend_GS_Booking_Notifications, file_exists guard per Pitfall 1).
 // Subscribes to the 3 gs_booking_* action hooks fired by Plan 29-01 (public bookee
 // flow) + Plan 29-02 (host-create flow), sends 4 branded HTML emails (confirmed /
