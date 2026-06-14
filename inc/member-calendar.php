@@ -283,6 +283,56 @@ function gs_calendar_profile_screen_content() {
 		) );
 	}
 
+	// Phase 30 Plan 03 — Native gend video embed assets (VID-04 + VID-05).
+	// Loaded ONLY on the member's own calendar screen (the bp_is_my_profile gate
+	// above already enforces this). filemtime-busted single-version idiom;
+	// file_exists-guarded so a missing asset on the PVC (.no-plugin-sync,
+	// Pitfall 1) degrades to "no Join button" instead of a 404. The embed
+	// controller (gs-jitsi-embed) is event-delegated on [data-gs-jitsi-join]
+	// so the Phase 26 event-detail popover, Phase 29 confirmation, and the
+	// wallet meeting feed can all open the glassmorphic embed by rendering a
+	// button carrying that attribute.
+	$gs_jitsi_js_path  = GS_DIR . 'assets/jitsi-embed.js';
+	$gs_jitsi_css_path = GS_DIR . 'assets/jitsi-embed.css';
+	if ( file_exists( $gs_jitsi_js_path ) && file_exists( $gs_jitsi_css_path ) ) {
+		$gs_jitsi_js_ver  = GS_VERSION . '.' . filemtime( $gs_jitsi_js_path );
+		$gs_jitsi_css_ver = GS_VERSION . '.' . filemtime( $gs_jitsi_css_path );
+		wp_enqueue_script(
+			'gs-jitsi-embed',
+			GS_URL . 'assets/jitsi-embed.js',
+			array(),
+			$gs_jitsi_js_ver,
+			true
+		);
+		wp_enqueue_style(
+			'gs-jitsi-embed',
+			GS_URL . 'assets/jitsi-embed.css',
+			array(),
+			$gs_jitsi_css_ver
+		);
+		// Embed controller reads window.gsJitsiData.{restUrl,nonce,domain}.
+		// domain is filterable so a staging cluster can point at a different
+		// meet host; defaults to meet.gend.me (Plan 30-01 ingress hostname).
+		wp_localize_script( 'gs-jitsi-embed', 'gsJitsiData', array(
+			'restUrl' => esc_url_raw( rest_url( 'gs/v1' ) ),
+			'nonce'   => wp_create_nonce( 'wp_rest' ),
+			'domain'  => apply_filters( 'gs_jitsi_domain', 'meet.gend.me' ),
+		) );
+
+		// Join-button template for the JS-rendered event-detail popover.
+		// member-calendar.js builds the popover client-side; it reads this
+		// template and, for meeting events where meeting_type === 'video' AND
+		// meeting_meta.provider === 'gend', injects a button carrying the
+		// data-gs-jitsi-join="{meeting_id}" attribute the embed controller
+		// delegates on. The {{meeting_id}} token is replaced with the event's
+		// numeric id at render time (the renderer casts it via parseInt).
+		echo '<template id="gs-jitsi-join-tpl">'
+			. '<button type="button" class="gs-jitsi-join-btn" data-gs-jitsi-join="{{meeting_id}}">'
+			. esc_html__( 'Join native video meeting', 'gend-society' )
+			. '</button>'
+			. '</template>';
+	}
+
 	// Resolve the member's IANA timezone (Plan 28-02 helper — availability row
 	// first, 60s wp_cache, site-tz fallback). Single source of truth for data-tz
 	// so the renderer relabels times in the member's own zone (AVAIL-03).

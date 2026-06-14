@@ -734,6 +734,41 @@
 			pop.appendChild(link);
 		}
 
+		// Phase 30: native gend video Join button. Only for meeting events whose
+		// meeting_type is 'video' AND meeting_meta.provider === 'gend'. The button
+		// carries data-gs-jitsi-join="{meeting_id}" so the jitsi-embed.js delegated
+		// click handler opens the glassmorphic embed (which then time-gates + mints
+		// the JWT server-side via /jitsi-jwt). The numeric meeting id is read from
+		// ev.meeting_id when present, falling back to the trailing digits of ev.id
+		// (e.g. 'mt-meet-301' -> 301). The template lives in #gs-jitsi-join-tpl
+		// (printed by member-calendar.php only when the embed assets enqueued).
+		(function () {
+			if (!ev || (ev.source !== 'meetings' && ev.source !== 'mtg')) { return; }
+			var mmeta = ev.meeting_meta || {};
+			var mtype = ev.meeting_type || mmeta.type || '';
+			var provider = mmeta.provider || ev.provider || '';
+			if (mtype !== 'video' || provider !== 'gend') { return; }
+			var mid = parseInt(ev.meeting_id, 10);
+			if (!mid || mid < 1) {
+				var m = String(ev.id || '').match(/(\d+)\s*$/);
+				mid = m ? parseInt(m[1], 10) : 0;
+			}
+			if (!mid || mid < 1) { return; }
+			var joinBtn;
+			var tpl = document.getElementById('gs-jitsi-join-tpl');
+			if (tpl && tpl.content && tpl.content.firstElementChild) {
+				joinBtn = tpl.content.firstElementChild.cloneNode(true);
+				joinBtn.setAttribute('data-gs-jitsi-join', String(mid));
+			} else {
+				joinBtn = document.createElement('button');
+				joinBtn.type = 'button';
+				joinBtn.className = 'gs-jitsi-join-btn';
+				joinBtn.setAttribute('data-gs-jitsi-join', String(mid));
+				joinBtn.textContent = 'Join native video meeting';
+			}
+			pop.appendChild(joinBtn);
+		})();
+
 		// Close button.
 		var close = document.createElement('button');
 		close.type = 'button';
