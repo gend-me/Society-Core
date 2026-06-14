@@ -90,13 +90,16 @@ if ( empty( $missing ) ) {
  * ============================================================ */
 $routes      = rest_get_server()->get_routes();
 $route_keys  = array_keys( $routes );
+// Note: $ anchors use the /m (multiline) flag so they match end-of-LINE in the
+// newline-joined route blob (not end-of-string). The bare /meetings route key is
+// exactly "/gs/v1/calendar/meetings" with no trailing segment.
 $want_routes = array(
-	'#/gs/v1/calendar/public/\(\?P<share_token>\[A-Za-z0-9\]\{43\}\)/slots#',
-	'#/gs/v1/calendar/public/\(\?P<share_token>\[A-Za-z0-9\]\{43\}\)/book#',
-	'#/gs/v1/calendar/meetings$#',
-	'#/gs/v1/calendar/share-token/rotate#',
-	'#/gs/v1/calendar/meetings/\(\?P<id>\\\\d\+\)/ics#',
-	'#/gs/v1/calendar/ics/\(\?P<share_token>\[A-Za-z0-9\]\{43\}\)#',
+	'#/gs/v1/calendar/public/\(\?P<share_token>\[A-Za-z0-9\]\{43\}\)/slots$#m',
+	'#/gs/v1/calendar/public/\(\?P<share_token>\[A-Za-z0-9\]\{43\}\)/book$#m',
+	'#/gs/v1/calendar/meetings$#m',
+	'#/gs/v1/calendar/share-token/rotate$#m',
+	'#/gs/v1/calendar/meetings/\(\?P<id>\\\\d\+\)/ics$#m',
+	'#/gs/v1/calendar/ics/\(\?P<share_token>\[A-Za-z0-9\]\{43\}\)$#m',
 );
 $blob = implode( "\n", $route_keys );
 $missing_routes = array();
