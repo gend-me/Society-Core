@@ -1,0 +1,35 @@
+/* =============================================================================
+ * GenD Society — Member Calendar (glassmorphic grid)
+ *
+ * Phase 26 Plan 01 — SCAFFOLD ONLY. This file establishes the design tokens and
+ * collision-safe scoping. The interactive month/week/day grid styling lands in
+ * Phase 26 Plan 02.
+ *
+ * COLLISION RULE (Pitfall 21): every selector MUST be scoped under
+ * .gs-cal-root or .member-calendar so nothing leaks into Youzify / BuddyPress.
+ *
+ * Tokens reuse the EXACT glassmorphic palette from gdc_profile_header_css
+ * (member-profile-header.php) so the calendar matches the profile header chrome.
+ * ========================================================================== */
+
+.gs-cal-root {
+	/* Glassmorphic design tokens — reused verbatim from gdc_profile_header_css. */
+	--gph-blue: #89C2E0;
+	--gph-magenta: #b608c9;
+	--gph-green: #00ff88;
+
+	/* Phase 26-02 will add surface / glass / radius / spacing tokens here and
+	   build the grid on top of these three brand accents. */
+
+	width: 100%;
+	box-sizing: border-box;
+}
+
+/* Respect reduced-motion: kill all calendar transitions/animations.
+   Phase 26-02 adds the actual transitions this neutralizes. */
+@media (prefers-reduced-motion: reduce) {
+	.gs-cal-root * {
+		transition: none !important;
+		animation: none !important;
+	}
+}
