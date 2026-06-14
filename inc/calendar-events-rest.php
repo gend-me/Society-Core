@@ -163,12 +163,7 @@ class Gend_GS_Calendar_Events_REST {
 		catch ( \Throwable $e ) { $tz = wp_timezone_string() ?: 'UTC'; }
 
 		if ( class_exists( 'Gend_GS_Availability_REST' ) ) {
-			wp_cache_set(
-				Gend_GS_Availability_REST::tz_cache_key( $user_id ),
-				$tz,
-				Gend_GS_Availability_REST::CACHE_GROUP,
-				Gend_GS_Availability_REST::CACHE_TTL
-			);
+			wp_cache_set( Gend_GS_Availability_REST::tz_cache_key( $user_id ), $tz, Gend_GS_Availability_REST::CACHE_GROUP, Gend_GS_Availability_REST::CACHE_TTL );
 		}
 		return $tz;
 	}
