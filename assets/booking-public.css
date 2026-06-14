@@ -1,0 +1,194 @@
+/**
+ * Phase 29-04 — Public booking page styles.
+ *
+ * Glassmorphic standalone screen that matches the Phase 26 aesthetic.
+ * Used by /calendar-book/{share_token} — NOT inside any WP theme.
+ *
+ * Includes the load-bearing .gs-honeypot rule (visually hidden, never
+ * tab-reachable) — humans never see it, bots auto-fill it and Plan 29-01's
+ * server-side hp_email check fake-200s them with no DB write.
+ */
+
+*,
+*::before,
+*::after { box-sizing: border-box; }
+
+html,
+body {
+  margin: 0;
+  padding: 0;
+  min-height: 100vh;
+  font-family: system-ui, -apple-system, "Segoe UI", sans-serif;
+  color: #fff;
+  background: radial-gradient(ellipse at top, #1a0b2e 0%, #0a0518 50%, #050208 100%);
+  background-attachment: fixed;
+}
+
+.gs-booking-root {
+  display: flex;
+  align-items: flex-start;
+  justify-content: center;
+  min-height: 100vh;
+  padding: 32px 16px;
+}
+
+.gs-booking-card {
+  position: relative;
+  max-width: 600px;
+  width: 100%;
+  background: linear-gradient(135deg, rgba(255, 255, 255, 0.10), rgba(255, 255, 255, 0.04));
+  -webkit-backdrop-filter: blur(25px);
+  backdrop-filter: blur(25px);
+  border-radius: 20px;
+  padding: 32px;
+  box-shadow: 0 16px 64px rgba(0, 0, 0, 0.5);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gs-booking-card::before {
+  content: '';
+  position: absolute;
+  inset: -1px;
+  border-radius: 20px;
+  padding: 1px;
+  background: conic-gradient(from 0deg, #00d9ff, #ff00aa, #ffd700, #00d9ff);
+  -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  pointer-events: none;
+  opacity: 0.6;
+}
+
+.gs-booking-card h1 {
+  margin: 0 0 8px 0;
+  font-size: 24px;
+  font-weight: 600;
+}
+
+.gs-tz-line {
+  margin: 0 0 24px 0;
+  opacity: 0.7;
+  font-size: 13px;
+}
+
+.gs-booking-card label {
+  display: block;
+  margin-bottom: 14px;
+  font-size: 14px;
+}
+
+.gs-booking-card label > span {
+  display: block;
+  margin-bottom: 4px;
+  opacity: 0.85;
+}
+
+.gs-booking-card input,
+.gs-booking-card select,
+.gs-booking-card textarea {
+  width: 100%;
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font: inherit;
+}
+
+.gs-booking-card input:focus,
+.gs-booking-card select:focus,
+.gs-booking-card textarea:focus {
+  outline: none;
+  border-color: #00d9ff;
+  box-shadow: 0 0 0 2px rgba(0, 217, 255, 0.25);
+}
+
+.gs-booking-card textarea {
+  min-height: 80px;
+  resize: vertical;
+}
+
+.gs-slot-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+  gap: 8px;
+  margin: 16px 0 24px 0;
+  max-height: 320px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.gs-slot {
+  padding: 10px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  cursor: pointer;
+  font-size: 13px;
+  text-align: left;
+  font: inherit;
+}
+
+.gs-slot:hover {
+  background: rgba(0, 0, 0, 0.5);
+  border-color: rgba(0, 217, 255, 0.5);
+}
+
+.gs-slot-picked {
+  background: linear-gradient(135deg, rgba(0, 217, 255, 0.4), rgba(255, 0, 170, 0.4));
+  border-color: #00d9ff;
+}
+
+.gs-booking-submit {
+  width: 100%;
+  padding: 14px;
+  border-radius: 10px;
+  border: 0;
+  background: linear-gradient(135deg, #00d9ff, #ff00aa);
+  color: #fff;
+  font-weight: 600;
+  cursor: pointer;
+  font-size: 16px;
+  margin-top: 8px;
+}
+
+.gs-booking-submit:hover {
+  filter: brightness(1.1);
+}
+
+.gs-booking-confirmed h1 {
+  color: #4ade80;
+}
+
+.gs-booking-confirmed a {
+  color: #00d9ff;
+}
+
+.gs-error {
+  color: #fca5a5;
+}
+
+/* ─── HONEYPOT — visually hidden, never tab-reachable ─────────────────── */
+.gs-honeypot {
+  position: absolute !important;
+  left: -9999px !important;
+  width: 1px !important;
+  height: 1px !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  overflow: hidden;
+}
+
+@media (max-width: 600px) {
+  .gs-booking-card { padding: 20px; }
+  .gs-booking-card h1 { font-size: 20px; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .gs-booking-card {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+}
