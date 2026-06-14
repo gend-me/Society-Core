@@ -94,6 +94,15 @@ if ( file_exists( GS_DIR . 'inc/class-availability-schema.php' ) ) {
 	Gend_GS_Availability_Schema::init();
 }
 
+// Member calendar — Availability REST handler (Phase 28-02).
+// Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
+// Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
+// file_exists-guarded — Pitfall 1 (.no-plugin-sync hub PVC quirk).
+if ( file_exists( GS_DIR . 'inc/class-availability-rest.php' ) ) {
+	require_once GS_DIR . 'inc/class-availability-rest.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Availability_REST', 'register_routes' ) );
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
