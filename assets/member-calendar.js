@@ -270,6 +270,7 @@
 		chip.style.setProperty('--chip-accent', ev.color);
 		chip.setAttribute('data-source', ev.source);
 		chip.setAttribute('data-event-id', ev.id);
+		chip.setAttribute('aria-haspopup', 'dialog');
 		if (ev.status === 'cancelled') { chip.classList.add('is-cancelled'); }
 		if (ev.status === 'done') { chip.classList.add('is-done'); }
 
@@ -346,12 +347,40 @@
 		return bar;
 	};
 
-	/* ---- Legend (Task 2 wires toggle behaviour; placeholder host here) ----- */
+	/* ---- Legend + per-source show/hide toggles (CAL-06) -------------------- */
 	Calendar.prototype.makeLegend = function () {
-		// Replaced by the interactive legend in Task 2; returns an empty host so
-		// Task 1 renders standalone.
+		var self = this;
 		var row = document.createElement('div');
 		row.className = 'gs-cal-legend';
+		row.setAttribute('role', 'group');
+		row.setAttribute('aria-label', 'Event source filters');
+
+		Object.keys(GS_CAL_SOURCES).forEach(function (src) {
+			var meta = GS_CAL_SOURCES[src];
+			var hidden = !!self.state.hiddenSources[src];
+
+			var btn = document.createElement('button');
+			btn.type = 'button';
+			btn.className = 'gs-cal-legend__item' + (hidden ? ' is-hidden' : '');
+			btn.setAttribute('data-source', src);
+			// aria-pressed = "is this layer shown?" (true when visible).
+			btn.setAttribute('aria-pressed', hidden ? 'false' : 'true');
+			btn.style.setProperty('--swatch', meta.color);
+
+			var swatch = document.createElement('span');
+			swatch.className = 'gs-cal-legend__swatch';
+			swatch.setAttribute('aria-hidden', 'true');
+			btn.appendChild(swatch);
+
+			var label = document.createElement('span');
+			label.className = 'gs-cal-legend__label';
+			label.textContent = meta.label;
+			btn.appendChild(label);
+
+			btn.addEventListener('click', function () { self.toggleSource(src); });
+			row.appendChild(btn);
+		});
+
 		return row;
 	};
 
@@ -538,9 +567,143 @@
 		}
 	};
 
-	/* ---- Popover (filled in Task 2) --------------------------------------- */
-	Calendar.prototype.openPopover = function () { /* Task 2 */ };
-	Calendar.prototype.closePopover = function () { /* Task 2 */ };
+	/* ---- Event detail popover (CAL-04) ------------------------------------ */
+
+	/** Human time range; "All day" + date-only label for all_day (Pitfall 13). */
+	Calendar.prototype.timeRangeLabel = function (ev) {
+		var tz = this.tz;
+		if (ev.all_day) {
+			return 'All day · ' +
+				fmt(tz, { weekday: 'short', month: 'short', day: 'numeric' })
+					.format(new Date(ev.start));
+		}
+		var sd = new Date(ev.start);
+		var dateStr = fmt(tz, { weekday: 'short', month: 'short', day: 'numeric' }).format(sd);
+		var startStr = timeLabel(sd, tz);
+		if (ev.end) {
+			return dateStr + ' · ' + startStr + ' – ' + timeLabel(new Date(ev.end), tz);
+		}
+		return dateStr + ' · ' + startStr;
+	};
+
+	Calendar.prototype.openPopover = function (ev, anchor) {
+		var self = this;
+		this.closePopover();
+
+		var pop = document.createElement('div');
+		pop.className = 'gs-cal-popover';
+		pop.setAttribute('role', 'dialog');
+		pop.setAttribute('aria-label', 'Event details');
+		pop.style.setProperty('--pop-accent', ev.color);
+
+		var meta = GS_CAL_SOURCES[ev.source] || { label: ev.source, color: ev.color };
+
+		// Title.
+		var title = document.createElement('div');
+		title.className = 'gs-cal-popover__title';
+		title.textContent = ev.title;
+		pop.appendChild(title);
+
+		// Time range.
+		var time = document.createElement('div');
+		time.className = 'gs-cal-popover__time';
+		time.textContent = this.timeRangeLabel(ev);
+		pop.appendChild(time);
+
+		// Source row (swatch + label).
+		var srcRow = document.createElement('div');
+		srcRow.className = 'gs-cal-popover__source';
+		var sw = document.createElement('span');
+		sw.className = 'gs-cal-popover__swatch';
+		sw.style.background = meta.color;
+		sw.setAttribute('aria-hidden', 'true');
+		srcRow.appendChild(sw);
+		var srcLabel = document.createElement('span');
+		srcLabel.textContent = meta.label;
+		srcRow.appendChild(srcLabel);
+		pop.appendChild(srcRow);
+
+		// Status.
+		var status = document.createElement('div');
+		status.className = 'gs-cal-popover__status';
+		status.textContent = 'Status: ' + ev.status;
+		pop.appendChild(status);
+
+		// View-source link (href via property, never innerHTML).
+		if (ev.url) {
+			var link = document.createElement('a');
+			link.className = 'gs-cal-popover__link';
+			link.textContent = 'View source';
+			link.href = ev.url;
+			link.rel = 'noopener';
+			pop.appendChild(link);
+		}
+
+		// Close button.
+		var close = document.createElement('button');
+		close.type = 'button';
+		close.className = 'gs-cal-popover__close';
+		close.setAttribute('aria-label', 'Close');
+		close.textContent = '×';
+		close.addEventListener('click', function () { self.closePopover(); });
+		pop.appendChild(close);
+
+		this.root.appendChild(pop);
+		this._popover = pop;
+		this._popAnchor = anchor;
+		this._positionPopover(pop, anchor);
+
+		// Outside-click + Esc closers (bound once, removed on close).
+		this._onDocClick = function (e) {
+			if (pop.contains(e.target) || (anchor && anchor.contains(e.target))) { return; }
+			self.closePopover();
+		};
+		this._onKey = function (e) {
+			if (e.key === 'Escape') { self.closePopover(); }
+		};
+		// Defer so the originating click doesn't immediately close it.
+		setTimeout(function () {
+			document.addEventListener('click', self._onDocClick, true);
+			document.addEventListener('keydown', self._onKey, true);
+		}, 0);
+
+		close.focus();
+	};
+
+	/** Anchor the popover near its chip, kept inside the root's bounds. */
+	Calendar.prototype._positionPopover = function (pop, anchor) {
+		if (!anchor) { return; }
+		var rootBox = this.root.getBoundingClientRect();
+		var aBox = anchor.getBoundingClientRect();
+		var top = aBox.bottom - rootBox.top + 8;
+		var left = aBox.left - rootBox.left;
+		// Clamp horizontally so it doesn't overflow the root.
+		var maxLeft = this.root.clientWidth - pop.offsetWidth - 8;
+		if (left > maxLeft) { left = Math.max(8, maxLeft); }
+		if (left < 8) { left = 8; }
+		pop.style.top = top + 'px';
+		pop.style.left = left + 'px';
+	};
+
+	Calendar.prototype.closePopover = function () {
+		if (this._onDocClick) {
+			document.removeEventListener('click', this._onDocClick, true);
+			this._onDocClick = null;
+		}
+		if (this._onKey) {
+			document.removeEventListener('keydown', this._onKey, true);
+			this._onKey = null;
+		}
+		if (this._popover && this._popover.parentNode) {
+			this._popover.parentNode.removeChild(this._popover);
+		}
+		if (this._popAnchor && this._popAnchor.focus) {
+			// Return focus to the chip for keyboard users.
+			try { this._popAnchor.focus(); } catch (e) {}
+		}
+		this._popover = null;
+		this._popAnchor = null;
+	};
 
 	/* ---------------------------------------------------------------------------
 	 * Mount
