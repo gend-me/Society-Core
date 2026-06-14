@@ -46,6 +46,10 @@
 
 	var DAY_MS = 86400000;
 
+	/* Phase 28-03 — availability overlay cache, keyed by view|from|to. Busted by
+	 * the 'gs:availability-changed' event after a Save in the settings panel. */
+	var _overlayCache = { key: '', data: null };
+
 	/* ---------------------------------------------------------------------------
 	 * Timezone-aware helpers — ALL display formatting flows through Intl with the
 	 * configured timeZone, never the browser's local zone.
@@ -534,11 +538,102 @@
 	};
 
 	Calendar.prototype.renderWeek = function () {
-		return this.renderTimeGrid(this.weekDays());
+		var days = this.weekDays();
+		var el = this.renderTimeGrid(days);
+		var bounds = this._dayBounds(days);
+		this.renderOverlays('week', bounds.fromIso, bounds.toIso, days);
+		return el;
 	};
 	Calendar.prototype.renderDay = function () {
 		var c = this.state.cursor;
-		return this.renderTimeGrid([new Date(c.getFullYear(), c.getMonth(), c.getDate())]);
+		var days = [new Date(c.getFullYear(), c.getMonth(), c.getDate())];
+		var el = this.renderTimeGrid(days);
+		var bounds = this._dayBounds(days);
+		this.renderOverlays('day', bounds.fromIso, bounds.toIso, days);
+		return el;
+	};
+
+	/* ---- Phase 28-03: availability overlays (working hours + blocked time) -- */
+
+	/**
+	 * Compute the UTC ISO [from, to) bounds that cover the visible days. We pad to
+	 * the start of the first day and the start of the day AFTER the last day in
+	 * the configured tz, so the server's half-open expansion covers every column.
+	 */
+	Calendar.prototype._dayBounds = function (days) {
+		// Day-key (YYYY-MM-DD in the configured tz) of first + last visible day.
+		var firstKey = dayKeyInTz(days[0], this.tz);
+		var lastDate = days[days.length - 1];
+		// Move to the next calendar day so the range is half-open and inclusive of the last day.
+		var afterLast = new Date(lastDate.getTime() + DAY_MS);
+		var afterKey = dayKeyInTz(afterLast, this.tz);
+		// Use midnight-UTC of those local day-keys as ISO bounds. A slight tz skew
+		// here is harmless — the server expands each local day independently and the
+		// renderer matches overlays to columns by local day-key, not by raw bounds.
+		return { fromIso: firstKey + 'T00:00:00Z', toIso: afterKey + 'T00:00:00Z' };
+	};
+
+	/**
+	 * Fetch (or reuse cached) overlays for the range and render them as background
+	 * bars on the time grid. Skips Month view (overlays live on the time grid only).
+	 */
+	Calendar.prototype.renderOverlays = function (viewName, fromIso, toIso, days) {
+		if (viewName !== 'week' && viewName !== 'day') { return; }
+		var key = viewName + '|' + fromIso + '|' + toIso;
+		var self = this;
+		var renderIntoGrid = function (data) {
+			var grid = self.root.querySelector('.gs-cal-time-body'); // Plan 26-02 day-column container
+			if (!grid) { return; }
+			// Clear any prior overlays.
+			grid.querySelectorAll('.gs-cal-overlay').forEach(function (n) { n.remove(); });
+			// Map each visible day-key to its column element (day columns are ordered).
+			var cols = grid.querySelectorAll('.gs-cal-day-col');
+			var colByKey = {};
+			(days || []).forEach(function (d, i) {
+				if (cols[i]) { colByKey[dayKeyInTz(d, self.tz)] = cols[i]; }
+			});
+			// Render working_hours (green) THEN blocked (red) so red stripes sit on top.
+			(data.working_hours || []).forEach(function (o) { self._renderOverlayBar(colByKey, o, 'working'); });
+			(data.blocked_ranges || []).forEach(function (o) { self._renderOverlayBar(colByKey, o, 'blocked'); });
+		};
+		if (_overlayCache.key === key && _overlayCache.data) {
+			renderIntoGrid(_overlayCache.data);
+			return;
+		}
+		var url = ((window.wpApiSettings && window.wpApiSettings.root) || '/wp-json/').replace(/\/$/, '')
+			+ '/gs/v1/calendar/overlays?from=' + encodeURIComponent(fromIso) + '&to=' + encodeURIComponent(toIso);
+		fetch(url, {
+			credentials: 'same-origin',
+			headers: (window.gsAvailNonce || (window.wpApiSettings && window.wpApiSettings.nonce))
+				? { 'X-WP-Nonce': (window.gsAvailNonce || window.wpApiSettings.nonce) } : {}
+		}).then(function (r) { return r.json(); }).then(function (data) {
+			if (!data || data.code) { return; } // WP_Error envelope => skip silently
+			_overlayCache.key = key; _overlayCache.data = data;
+			renderIntoGrid(data);
+		}).catch(function () { /* silent — overlays are decorative */ });
+	};
+
+	/**
+	 * Render a single overlay bar inside the correct day column. Uses the same
+	 * percentage placement as timed chips: top = minutesFromMidnight/1440, height
+	 * = duration/1440 (both in the configured tz so DST-correct y-positions hold).
+	 */
+	Calendar.prototype._renderOverlayBar = function (colByKey, overlay, kind) {
+		var start = new Date(overlay.start_utc);
+		var end = new Date(overlay.end_utc);
+		if (isNaN(start.getTime()) || isNaN(end.getTime())) { return; }
+		var dayKey = dayKeyInTz(start, this.tz);
+		var col = colByKey[dayKey];
+		if (!col) { return; } // overlay falls outside the visible columns
+		var startMins = this._minutesInTz(start);
+		var endMins = this._minutesInTz(end);
+		// Same-day clamp: if the overlay crosses midnight in the configured tz, cap at end-of-day.
+		if (endMins <= startMins) { endMins = 1440; }
+		var bar = document.createElement('div');
+		bar.className = 'gs-cal-overlay gs-cal-overlay-' + kind;
+		bar.style.top = (startMins / 1440 * 100) + '%';
+		bar.style.height = (Math.max(8, endMins - startMins) / 1440 * 100) + '%';
+		col.appendChild(bar);
 	};
 
 	/* ---- Master render ----------------------------------------------------- */
@@ -713,7 +808,24 @@
 		if (!root) { return; }
 		var cal = new Calendar(root);
 		root.__gsCal = cal;     // expose for debugging / Phase 27 hand-off
+		window.__gsCalendar = cal; // Phase 28-03 — handle for the availability-changed listener
 		cal.render();
+	});
+
+	/* Phase 28-03 — when the settings panel saves, re-read the configured tz from
+	 * #gs-calendar-app[data-tz] (the panel updates it on save), bust the overlay
+	 * cache, and re-render the current view so new working-hours/blocked overlays
+	 * (and any tz relabel) appear without a page reload. */
+	window.addEventListener('gs:availability-changed', function () {
+		_overlayCache.key = ''; _overlayCache.data = null; // bust cache
+		var cal = window.__gsCalendar;
+		if (cal && typeof cal.render === 'function') {
+			var root = cal.root || document.getElementById('gs-calendar-app');
+			if (root && root.dataset && root.dataset.tz) { cal.tz = root.dataset.tz; }
+			cal.render();
+		} else {
+			location.reload(); // graceful fallback — should not trigger when controller is mounted
+		}
 	});
 
 })();

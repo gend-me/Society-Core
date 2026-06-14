@@ -215,10 +215,31 @@ function gs_calendar_profile_screen_content() {
 	wp_enqueue_style( 'gs-member-calendar', GS_URL . 'assets/member-calendar.css', [], $css_ver );
 	wp_enqueue_script( 'gs-member-calendar', GS_URL . 'assets/member-calendar.js', [], $js_ver, true );
 
+	// Phase 28-03: the availability Settings panel + overlay styles. Depend on
+	// gs-member-calendar so they load after the calendar controller. filemtime-
+	// busted single-version idiom (file_exists-guarded so a missing asset degrades).
+	$avail_css_path = GS_DIR . 'assets/availability-settings.css';
+	$avail_js_path  = GS_DIR . 'assets/availability-settings.js';
+	$avail_css_ver  = GS_VERSION . ( file_exists( $avail_css_path ) ? '.' . filemtime( $avail_css_path ) : '' );
+	$avail_js_ver   = GS_VERSION . ( file_exists( $avail_js_path ) ? '.' . filemtime( $avail_js_path ) : '' );
+	wp_enqueue_style( 'gs-availability-settings', GS_URL . 'assets/availability-settings.css', array( 'gs-member-calendar' ), $avail_css_ver );
+	wp_enqueue_script( 'gs-availability-settings', GS_URL . 'assets/availability-settings.js', array( 'gs-member-calendar' ), $avail_js_ver, true );
+	wp_localize_script( 'gs-availability-settings', 'gsAvailNonce', wp_create_nonce( 'wp_rest' ) );
+
+	// Resolve the member's IANA timezone (Plan 28-02 helper — availability row
+	// first, 60s wp_cache, site-tz fallback). Single source of truth for data-tz
+	// so the renderer relabels times in the member's own zone (AVAIL-03).
+	$gs_member_tz = class_exists( 'Gend_GS_Calendar_Events_REST' )
+		? Gend_GS_Calendar_Events_REST::get_member_timezone( get_current_user_id() )
+		: ( wp_timezone_string() ?: 'UTC' );
+
 	// Calendar root. 26-02's JS mounts the grid into #gs-calendar-app and reads
-	// data-tz (site timezone this phase; per-member tz arrives Phase 28). The
-	// grid is JS-rendered — do NOT render it in PHP.
-	echo '<div id="gs-calendar-app" class="gs-cal-root" data-tz="' . esc_attr( wp_timezone_string() ) . '"></div>';
+	// data-tz (now the member's IANA tz per Plan 28-02/28-03). The grid is
+	// JS-rendered — do NOT render it in PHP. The #gs-avail-settings sibling is the
+	// Phase 28-03 settings-panel mount point.
+	echo '<div id="gs-calendar-app" class="gs-cal-root" data-tz="' . esc_attr( $gs_member_tz ) . '">'
+		. '<div id="gs-avail-settings"></div>'
+		. '</div>';
 
 	// Guarantee the .member-calendar body class is present so the CSS above
 	// applies, even if a theme/Youzify body_class path drops it. This screen
