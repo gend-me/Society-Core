@@ -82,6 +82,18 @@ if ( file_exists( GS_DIR . 'inc/calendar-events-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Calendar_Events_REST', 'register_routes' ) );
 }
 
+// Member calendar — Availability + Meetings schema installer (Phase 28-01).
+// Installs BOTH wp_gs_member_availability + wp_gs_member_meetings via ONE
+// version-gated dbDelta routine, multisite-aware (existing blogs via activation
+// site-loop + future blogs via wp_initialize_site + self-heal via init pri 5).
+// file_exists-guarded — the hub PVC .no-plugin-sync quirk means the include
+// file MUST be kubectl cp'd to the PVC BEFORE this entrypoint edit, or every
+// request fatals. See 28-03 runbook (inherits from 27-02 runbook).
+if ( file_exists( GS_DIR . 'inc/class-availability-schema.php' ) ) {
+	require_once GS_DIR . 'inc/class-availability-schema.php';
+	Gend_GS_Availability_Schema::init();
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
