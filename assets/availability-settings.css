@@ -1,0 +1,113 @@
+/* gend-society — Availability Settings Panel (Phase 28-03)
+   All styles scoped to .gs-cal-root .gs-avail-settings (Pitfall 21 — Youzify collisions). */
+
+.gs-cal-root .gs-avail-settings {
+    margin-top: 24px;
+    padding: 20px 24px;
+    background: rgba(255, 255, 255, 0.06);
+    backdrop-filter: blur(25px);
+    -webkit-backdrop-filter: blur(25px);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 16px;
+    color: var(--gph-fg, #fff);
+    position: relative;
+    overflow: hidden;
+}
+
+.gs-cal-root .gs-avail-settings::before {
+    content: '';
+    position: absolute; inset: 0;
+    border-radius: 16px;
+    padding: 1px;
+    background: conic-gradient(from 0deg, transparent, rgba(165, 180, 252, 0.3), transparent);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor; mask-composite: exclude;
+    pointer-events: none;
+}
+
+.gs-cal-root .gs-avail-title {
+    margin: 0 0 12px 0; font-size: 18px; font-weight: 600;
+}
+.gs-cal-root .gs-avail-subtitle {
+    margin: 16px 0 8px 0; font-size: 14px; font-weight: 600; opacity: 0.85;
+}
+.gs-cal-root .gs-avail-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
+.gs-cal-root .gs-avail-row label { font-size: 12px; opacity: 0.75; }
+.gs-cal-root .gs-avail-tz input[type="text"] {
+    background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+    color: inherit; padding: 8px 10px; font-size: 13px; min-width: 240px;
+}
+
+/* Working-hour grid */
+.gs-cal-root .gs-avail-wh-grid { display: flex; flex-direction: column; gap: 8px; }
+.gs-cal-root .gs-avail-day-row {
+    display: grid; grid-template-columns: 60px 1fr; gap: 12px; align-items: center;
+    padding: 8px; background: rgba(0,0,0,0.12); border-radius: 8px;
+}
+.gs-cal-root .gs-avail-day-label { font-weight: 600; opacity: 0.85; }
+.gs-cal-root .gs-avail-ranges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.gs-cal-root .gs-avail-range { display: inline-flex; gap: 4px; align-items: center; padding: 4px 6px; background: rgba(165,180,252,0.10); border-radius: 6px; }
+.gs-cal-root .gs-avail-range input[type="time"] {
+    background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.10); border-radius: 4px;
+    color: inherit; padding: 2px 4px; font-size: 12px;
+}
+.gs-cal-root .gs-avail-range-rm, .gs-cal-root .gs-avail-br-rm {
+    background: transparent; border: none; color: rgba(248,113,113,0.85); font-size: 14px;
+    cursor: pointer; padding: 0 4px; line-height: 1;
+}
+.gs-cal-root .gs-avail-add-range, .gs-cal-root .gs-avail-add-br {
+    background: rgba(165,180,252,0.18); border: 1px solid rgba(165,180,252,0.32);
+    color: inherit; border-radius: 6px; padding: 4px 8px; font-size: 12px; cursor: pointer;
+}
+
+/* Blocked ranges */
+.gs-cal-root .gs-avail-blocked { display: flex; flex-direction: column; gap: 8px; }
+.gs-cal-root .gs-avail-br-list { display: flex; flex-direction: column; gap: 6px; }
+.gs-cal-root .gs-avail-br-row {
+    display: grid; grid-template-columns: 1fr 1fr 1fr auto; gap: 8px; align-items: center;
+    padding: 6px 8px; background: rgba(248,113,113,0.08); border-radius: 6px;
+}
+.gs-cal-root .gs-avail-br-row input[type="datetime-local"],
+.gs-cal-root .gs-avail-br-row input[type="text"] {
+    background: rgba(0,0,0,0.20); border: 1px solid rgba(255,255,255,0.10); border-radius: 4px;
+    color: inherit; padding: 4px 6px; font-size: 12px;
+}
+
+/* Save row */
+.gs-cal-root .gs-avail-actions { margin-top: 16px; display: flex; gap: 12px; align-items: center; }
+.gs-cal-root .gs-avail-save {
+    background: linear-gradient(135deg, rgba(165,180,252,0.35), rgba(99,102,241,0.45));
+    color: #fff; border: 1px solid rgba(165,180,252,0.45);
+    border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+}
+.gs-cal-root .gs-avail-status { font-size: 12px; opacity: 0.85; }
+
+@media (max-width: 760px) {
+    .gs-cal-root .gs-avail-day-row { grid-template-columns: 50px 1fr; }
+    .gs-cal-root .gs-avail-br-row { grid-template-columns: 1fr; }
+}
+
+/* ─── Calendar grid overlays (rendered by member-calendar.js renderOverlays()) ─── */
+.gs-cal-root .gs-cal-overlay {
+    position: absolute; left: 0; right: 0;
+    pointer-events: none;
+    z-index: 1; /* below event chips (which sit at z-index 2+) */
+}
+.gs-cal-root .gs-cal-overlay-working {
+    background: rgba(74, 222, 128, 0.14); /* light green */
+    border-top: 1px dashed rgba(74, 222, 128, 0.35);
+    border-bottom: 1px dashed rgba(74, 222, 128, 0.35);
+}
+.gs-cal-root .gs-cal-overlay-blocked {
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(248, 113, 113, 0.18),
+        rgba(248, 113, 113, 0.18) 6px,
+        rgba(248, 113, 113, 0.30) 6px,
+        rgba(248, 113, 113, 0.30) 12px
+    );
+}
+@media (prefers-reduced-motion: reduce) {
+    /* No animation on overlays anyway, but kill any transitions we might add later */
+    .gs-cal-root .gs-cal-overlay { transition: none !important; }
+}
