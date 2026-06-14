@@ -74,6 +74,14 @@ if ( file_exists( GS_DIR . 'inc/member-calendar.php' ) ) {
 	require_once GS_DIR . 'inc/member-calendar.php';
 }
 
+// CALENDAR REST events aggregation (Phase 27). file_exists-guarded — hub PVC
+// .no-plugin-sync means the include file must be kubectl cp'd to the PVC
+// BEFORE this entrypoint edit, or every request fatals. See 27-02 runbook.
+if ( file_exists( GS_DIR . 'inc/calendar-events-rest.php' ) ) {
+	require_once GS_DIR . 'inc/calendar-events-rest.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Calendar_Events_REST', 'register_routes' ) );
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
