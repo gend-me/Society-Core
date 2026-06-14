@@ -32,6 +32,129 @@ function gdc_enqueue_profile_header_styles() {
     wp_add_inline_style( 'gdc-profile-header', gdc_profile_header_css() );
 }
 
+// ─── Wallet Top-Up purchase handler ──────────────────────────────────────────
+// The three header Top-Up popups navigate (GET) to /?gdc_topup=<kind>… . We run
+// on template_redirect — a FRONTEND request where WooCommerce's cart IS loaded
+// (admin-post.php is admin context and never loads the cart, which is why a POST
+// there lands on an empty checkout). We add the right product, then redirect to
+// the normal WooCommerce checkout so the buyer pays with any configured gateway.
+//   tasks → sales-team "Task Credit Top-up" product, qty = credits (grants `tasks`)
+//   ai    → leo aipa-credits product (grants AI Builder Tokens)
+//   dgen  → contracts-and-payments DGEN product (credits `transact` 1:1)
+add_action( 'template_redirect', 'gdc_handle_wallet_topup_purchase' );
+function gdc_handle_wallet_topup_purchase() {
+    if ( empty( $_GET['gdc_topup'] ) ) return;
+    $kind = sanitize_key( wp_unslash( $_GET['gdc_topup'] ) );
+    if ( ! in_array( $kind, [ 'tasks', 'ai', 'dgen' ], true ) ) return;
+
+    if ( ! is_user_logged_in() ) { auth_redirect(); exit; }
+    if ( empty( $_GET['_n'] ) || ! wp_verify_nonce( wp_unslash( $_GET['_n'] ), 'gdc_topup' ) ) {
+        wp_die( esc_html__( 'Security check failed — please reopen the Top Up panel and try again.', 'gend-society' ) );
+    }
+    if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
+        wp_safe_redirect( home_url( '/' ) ); exit;
+    }
+
+    $amount = isset( $_GET['amount'] ) ? round( (float) wp_unslash( $_GET['amount'] ), 2 ) : 0.0;
+    $qty    = isset( $_GET['qty'] ) ? absint( wp_unslash( $_GET['qty'] ) ) : 0;
+    $back   = wp_get_referer() ?: home_url( '/' );
+
+    WC()->cart->empty_cart();
+
+    if ( 'tasks' === $kind ) {
+        $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 );
+        $n = max( 1, $qty );
+        if ( ! $extra_pid ) { wp_safe_redirect( $back ); exit; }
+        $rate = 50.0;
+        if ( class_exists( 'ST_Contract_Settings' ) ) {
+            $cs   = ST_Contract_Settings::get();
+            $rate = (float) ( $cs['credit_value'] ?? 50.0 );
+        }
+        // qty = number of task credits; price each at the per-credit rate.
+        WC()->cart->add_to_cart( $extra_pid, $n, 0, [], [ 'gdc_topup_unit_price' => $rate, 'gdc_topup_kind' => 'tasks' ] );
+
+    } elseif ( 'ai' === $kind ) {
+        if ( ! class_exists( 'AIPA_Commerce' ) ) { wp_safe_redirect( $back ); exit; }
+        $amt = max( 1, $amount );
+        $pid = AIPA_Commerce::ensure_product();
+        if ( ! $pid ) { wp_safe_redirect( $back ); exit; }
+        // leo's own before_calculate_totals prices this from aipa_credit_amount.
+        WC()->cart->add_to_cart( $pid, 1, 0, [], [ 'aipa_credit_amount' => $amt ] );
+
+    } elseif ( 'dgen' === $kind ) {
+        if ( ! class_exists( 'Gend_CP_DGEN_TopUp' ) ) { wp_safe_redirect( $back ); exit; }
+        $amt = max( 1, $amount );
+        $pid = Gend_CP_DGEN_TopUp::ensure_product();
+        if ( ! $pid ) { wp_safe_redirect( $back ); exit; }
+        // Gend_CP_DGEN_TopUp prices + persists + credits from this cart key.
+        WC()->cart->add_to_cart( $pid, 1, 0, [], [ Gend_CP_DGEN_TopUp::CART_KEY => $amt ] );
+    }
+
+    $checkout_url = wc_get_checkout_url();
+    if ( ! empty( $_GET['gdc_embed'] ) ) {
+        $checkout_url = add_query_arg( 'gdc_embed', '1', $checkout_url );
+    }
+    wp_safe_redirect( $checkout_url );
+    exit;
+}
+
+// When the checkout is loaded inside the Top-Up popup iframe (?gdc_embed=1),
+// strip the theme header/footer/admin-bar/chat-widget so only the checkout
+// payment form shows. Scoped strictly to that query flag — never affects normal
+// page loads.
+add_filter( 'show_admin_bar', 'gdc_topup_embed_hide_admin_bar' );
+function gdc_topup_embed_hide_admin_bar( $show ) {
+    return empty( $_GET['gdc_embed'] ) ? $show : false;
+}
+add_action( 'wp_enqueue_scripts', 'gdc_topup_embed_checkout_css', 100 );
+function gdc_topup_embed_checkout_css() {
+    if ( empty( $_GET['gdc_embed'] ) ) return;
+    $css = '
+        html { margin-top: 0 !important; }
+        body { background: #0a0f1a !important; padding: 16px !important; }
+        #wpadminbar, header, footer, #masthead, #colophon, .site-header, .site-footer,
+        .youzify-mobile-nav, .gs-frontend-bar, aipa-widget, #gdc-profile-nav { display: none !important; }
+        .woocommerce, .wc-block-checkout, .wp-block-woocommerce-checkout { background: transparent !important; }
+    ';
+    wp_register_style( 'gdc-embed-checkout', false, [], GS_VERSION );
+    wp_enqueue_style( 'gdc-embed-checkout' );
+    wp_add_inline_style( 'gdc-embed-checkout', $css );
+}
+
+// Price the task-credit top-up line at the per-credit rate (sales-team's own
+// price override only registers inside its AJAX path; we add the product
+// ourselves so we must set the price too). Other kinds are priced by their
+// owning plugin's callback.
+add_action( 'woocommerce_before_calculate_totals', 'gdc_topup_price_task_credits', 20 );
+function gdc_topup_price_task_credits( $cart ) {
+    if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
+    if ( ! is_object( $cart ) || ! method_exists( $cart, 'get_cart' ) ) return;
+    foreach ( $cart->get_cart() as $item ) {
+        if ( ! empty( $item['gdc_topup_unit_price'] ) && isset( $item['data'] ) && is_object( $item['data'] ) ) {
+            $item['data']->set_price( (float) $item['gdc_topup_unit_price'] );
+        }
+    }
+}
+
+// Auto-complete the digital top-up orders on payment so credits grant instantly
+// (leo's AI-credit grant only fires on `completed`; virtual orders otherwise sit
+// at `processing`). tasks + DGEN grant on payment_complete already but are
+// idempotent, so completing them too is safe.
+add_filter( 'woocommerce_payment_complete_order_status', 'gdc_topup_autocomplete', 10, 3 );
+function gdc_topup_autocomplete( $status, $order_id, $order ) {
+    if ( ! is_a( $order, 'WC_Order' ) ) return $status;
+    $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 );
+    foreach ( $order->get_items() as $item ) {
+        $product = $item->get_product();
+        $sku     = $product ? $product->get_sku() : '';
+        $pid     = (int) $item->get_product_id();
+        if ( 'aipa-credits' === $sku || 'gend-dgen-topup' === $sku || ( $extra_pid && $pid === $extra_pid ) ) {
+            return 'completed';
+        }
+    }
+    return $status;
+}
+
 // ─── Profile nav icons ────────────────────────────────────────────────────────
 // Returns a futuristic, dashboard-style SVG icon for a given BP/Youzify nav slug.
 // All icons share a unified 24×24 viewBox + currentColor stroke so they inherit
@@ -52,6 +175,7 @@ function gdc_get_profile_nav_icon( $slug ) {
         'wallets'           => 'member-wallet',
         'notification'      => 'notifications',
         'notify'            => 'notifications',
+        'member-calendar'   => 'calendar',
     ];
     if ( isset( $alias[ $key ] ) ) $key = $alias[ $key ];
 
@@ -64,6 +188,8 @@ function gdc_get_profile_nav_icon( $slug ) {
         'files'         => '<rect x="3" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2"/>',
         // App Projects (Groups) — isometric cube stack
         'groups'        => '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>',
+        // Calendar — month grid: framed page, header bar, day dots
+        'calendar'      => '<rect x="3" y="4.5" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/><circle cx="8" cy="13" r="1"/><circle cx="12" cy="13" r="1"/><circle cx="16" cy="13" r="1"/><circle cx="8" cy="17" r="1"/><circle cx="12" cy="17" r="1"/>',
         // Connections (Friends) — linked nodes triangle
         'friends'       => '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7.5" x2="11" y2="15.5"/><line x1="16" y1="7.5" x2="13" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/>',
         // Messages — chat node with signal pips
@@ -182,18 +308,21 @@ function gdc_render_profile_header() {
             'value'   => number_format( $task_credits ),
             'color'   => 'var(--gph-magenta)',
             'stagger' => 2,
+            'topup'   => 'tasks',
         ],
         [
             'label'   => 'AI Builder Tokens',
             'value'   => number_format( $ai_tokens, 1 ),
             'color'   => 'var(--gph-blue)',
             'stagger' => 3,
+            'topup'   => 'ai',
         ],
         [
             'label'   => '🇨🇦 DGEN Balance',
             'value'   => number_format( $dgen_balance ),
             'color'   => 'var(--gph-green)',
             'stagger' => 4,
+            'topup'   => 'dgen',
         ],
         [
             'label'   => '🇨🇦 Store Credits',
@@ -202,6 +331,26 @@ function gdc_render_profile_header() {
             'stagger' => 5,
         ],
     ], $user_id );
+
+    // ── Top-Up wiring ───────────────────────────────────────────────────────
+    // Top-Up buttons render only on the viewer's OWN profile (you top up your
+    // own wallet). Each card's button launches its own surface:
+    //   tasks → the sales-team [task_balance_checkout] modal (pick task qty /
+    //           upgrade retainer) — reused verbatim via a hidden trigger.
+    //   ai    → a futuristic popup → the existing aipa_buy_credits payment flow.
+    //   dgen  → a futuristic DGEN sales page → the new gend_buy_dgen checkout.
+    $task_topup_pid = 0;
+    if ( class_exists( 'ST_Contract_Settings' ) ) {
+        $cs_topup       = ST_Contract_Settings::get();
+        $task_topup_pid = (int) ( $cs_topup['retainer_product_id'] ?? 0 );
+    }
+    // Which top-up surfaces are actually wired up on this install.
+    $topup_enabled = [
+        'tasks' => ( $task_topup_pid > 0 ),
+        'ai'    => class_exists( 'AIPA_Commerce' ),
+        // DGEN purchase is hub-only; the product/credit hook lives in C&P.
+        'dgen'  => class_exists( 'Gend_CP_DGEN_TopUp' ),
+    ];
 
     // ── Linked application row ────────────────────────────────────────────────
     $memberships_url = home_url( '/my-account/memberships/' );
@@ -272,20 +421,10 @@ function gdc_render_profile_header() {
                           ? (array) youzify_get_profile_primary_nav() : [];
 
     // Apply requested society stylings modifications to the nav array
-    $files_item  = null;
-    $files_index = -1;
-
     foreach ( $nav_items as $index => $item ) {
         // Change "Groups" to "App Projects"
         if ( $item->slug === 'groups' && strpos( $item->name, 'App Projects' ) === false ) {
             $item->name = str_replace( 'Groups', 'App Projects', $item->name );
-        }
-
-        // Change "Files" to "Portfolio"
-        if ( ( $item->slug === 'files' || $item->slug === 'bp-files' || strpos( strip_tags( $item->name ), 'Files' ) !== false ) && strpos( $item->name, 'Portfolio' ) === false ) {
-            $item->name = str_replace( 'Files', 'Portfolio', $item->name );
-            $files_item  = $item;
-            $files_index = $index;
         }
     }
 
@@ -303,16 +442,21 @@ function gdc_render_profile_header() {
         }
         if ( $item->slug === 'activity' ) {
             unset( $nav_items[ $index ] );
+            continue;
+        }
+        // Remove the "Files"/"Portfolio" (media) tab — its sub-tabs now live
+        // under the Overview tab. The underlying media component/route stays
+        // registered so the Overview Media iframe (/media/?gdc_tab_only=1) still
+        // resolves; we only drop the visible nav entry.
+        if ( $item->slug === 'files' || $item->slug === 'bp-files' || $item->slug === 'media'
+             || strpos( strip_tags( $item->name ), 'Files' ) !== false
+             || strpos( strip_tags( $item->name ), 'Portfolio' ) !== false ) {
+            unset( $nav_items[ $index ] );
         }
     }
 
-    if ( $files_item && $files_index !== -1 && isset( $nav_items[ $files_index ] ) ) {
-        unset( $nav_items[ $files_index ] );
-        $nav_items = array_values( $nav_items ); // Re-index
-        array_splice( $nav_items, 1, 0, [ $files_item ] );
-    } else {
-        $nav_items = array_values( $nav_items ); // Re-index
-    }
+    // Portfolio (Files/media) tab removed above — just re-index.
+    $nav_items = array_values( $nav_items );
 
     // ── Re-add Messages & Settings — Youzify hides these via youzify_profile_hidden_tabs()
     // but our custom header needs them. Pull them back from the raw BP nav.
@@ -516,7 +660,10 @@ function gdc_render_profile_header() {
 
                 <!-- Balance grid -->
                 <div class="gdc-balance-grid">
-                    <?php foreach ( $balances as $b ) : ?>
+                    <?php foreach ( $balances as $b ) :
+                        $b_topup = ( $is_own_profile && ! empty( $b['topup'] ) && ! empty( $topup_enabled[ $b['topup'] ] ) )
+                            ? $b['topup'] : '';
+                    ?>
                     <div class="gdc-kbx gdc-stagger-<?php echo (int) $b['stagger']; ?>"
                          style="--kbx-color: <?php echo esc_attr( $b['color'] ); ?>">
                         <div class="gdc-node-content">
@@ -524,6 +671,17 @@ function gdc_render_profile_header() {
                             <div class="gdc-node-value" style="color: <?php echo esc_attr( $b['color'] ); ?>">
                                 <?php echo esc_html( $b['value'] ); ?>
                             </div>
+                            <?php if ( $b_topup ) : ?>
+                            <button type="button"
+                                    class="gdc-topup-btn gdc-topup-btn--<?php echo esc_attr( $b_topup ); ?>"
+                                    data-gdc-topup="<?php echo esc_attr( $b_topup ); ?>"
+                                    style="--gph-accent: <?php echo esc_attr( $b['color'] ); ?>;">
+                                <span class="gdc-topup-btn__plus" aria-hidden="true">
+                                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                                </span>
+                                <span class="gdc-topup-btn__label">Top Up</span>
+                            </button>
+                            <?php endif; ?>
                         </div>
                     </div>
                     <?php endforeach; ?>
@@ -563,6 +721,247 @@ function gdc_render_profile_header() {
         <?php endif; ?>
 
     </section>
+
+    <?php if ( $is_own_profile ) :
+        $gdc_task_credit_rate = 50.0;
+        if ( class_exists( 'ST_Contract_Settings' ) ) {
+            $cs_rate              = ST_Contract_Settings::get();
+            $gdc_task_credit_rate = (float) ( $cs_rate['credit_value'] ?? 50.0 );
+        }
+    ?>
+    <!-- ── Top-Up popups ───────────────────────────────────────────────────
+         Each header Top-Up button opens a futuristic popup to pick an amount,
+         then navigates (GET) to gdc_handle_wallet_topup_purchase (template_
+         redirect) which adds the right product to the cart and sends the buyer
+         to the normal WooCommerce checkout (any configured store gateway).    -->
+    <script id="gdc-topup">
+    (function () {
+        if ( window.__gdcTopupBound ) return;
+        window.__gdcTopupBound = true;
+
+        var CFG = <?php echo wp_json_encode( [
+            'tasks'       => ! empty( $topup_enabled['tasks'] ),
+            'ai'          => ! empty( $topup_enabled['ai'] ),
+            'dgen'        => ! empty( $topup_enabled['dgen'] ),
+            'sym'         => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$',
+            'taskBalance' => (float) $task_credits,
+            'aiBalance'   => (float) $ai_tokens,
+            'dgenBalance' => (float) $dgen_balance,
+            'creditValue' => (float) $gdc_task_credit_rate,
+            'retainerUrl' => ( $task_topup_pid && function_exists( 'get_permalink' ) ) ? ( get_permalink( $task_topup_pid ) ?: '' ) : '',
+            'buyUrl'      => home_url( '/' ),
+            'nonce'       => wp_create_nonce( 'gdc_topup' ),
+        ] ); ?>;
+
+        // Build the purchase-handler URL. The handler (template_redirect) adds the
+        // product to the cart and 302s to the WooCommerce checkout — we load that
+        // chain inside an iframe so the real payment form renders IN the popup.
+        function buyUrlFor(kind, params) {
+            var u = CFG.buyUrl + (CFG.buyUrl.indexOf('?') === -1 ? '?' : '&') +
+                'gdc_topup=' + encodeURIComponent(kind) + '&_n=' + encodeURIComponent(CFG.nonce) + '&gdc_embed=1';
+            for (var k in params) { if (params.hasOwnProperty(k)) u += '&' + k + '=' + encodeURIComponent(params[k]); }
+            return u;
+        }
+        var ACCENT = { tasks: 'var(--gph-magenta)', ai: 'var(--gph-blue)', dgen: 'var(--gph-green)' };
+
+        // Swap the popup for an embedded secure-checkout view (real WC checkout
+        // with live payment methods, same-origin iframe).
+        function goCheckout(kind, params) {
+            var url = buyUrlFor(kind, params);
+            var accent = ACCENT[kind] || 'var(--gph-blue)';
+            var d = el('div', 'gdc-tp-dialog gdc-tp-dialog--checkout');
+            d.style.setProperty('--gph-accent', accent);
+            d.appendChild(el('div', 'gdc-tp-scan'));
+            var close = el('button', 'gdc-tp-close', '&times;');
+            close.type = 'button'; close.setAttribute('aria-label', 'Close');
+            close.addEventListener('click', closeOverlay);
+            d.appendChild(close);
+            var bar = el('div', 'gdc-tp-cobar', '<span class="gdc-tp-cobar__dot"></span> Secure Checkout');
+            d.appendChild(bar);
+            var loading = el('div', 'gdc-tp-loading', '<div class="gdc-tp-spinner"></div><p>Preparing your secure checkout&hellip;</p>');
+            d.appendChild(loading);
+            var frame = el('iframe', 'gdc-tp-frame');
+            frame.setAttribute('title', 'Secure checkout');
+            frame.setAttribute('allow', 'payment *');
+            frame.addEventListener('load', function () { loading.style.display = 'none'; frame.classList.add('is-loaded'); });
+            frame.src = url;
+            d.appendChild(frame);
+            var fb = el('div', 'gdc-tp-foot', 'Trouble loading? <a href="' + url + '" target="_blank" rel="noopener">Open checkout in a new tab &rarr;</a>');
+            d.appendChild(fb);
+            mount(d, accent);
+        }
+
+        // ── Helpers ──────────────────────────────────────────────────────
+        function el(tag, cls, html) {
+            var n = document.createElement(tag);
+            if (cls) n.className = cls;
+            if (html != null) n.innerHTML = html;
+            return n;
+        }
+        function fmt(n) {
+            return (Math.round(n * 100) / 100).toLocaleString(undefined, { maximumFractionDigits: 2 });
+        }
+        function closeOverlay() {
+            var o = document.getElementById('gdc-topup-overlay');
+            if (o) { o.classList.add('is-closing'); setTimeout(function(){ o.remove(); }, 220); }
+            document.removeEventListener('keydown', onEsc);
+        }
+        function onEsc(e) { if (e.key === 'Escape') closeOverlay(); }
+
+        // Mounts a dialog node inside a fresh body-portaled overlay.
+        function mount(dialog, accent) {
+            closeOverlay();
+            var overlay = el('div');
+            overlay.id = 'gdc-topup-overlay';
+            overlay.className = 'gdc-tp-overlay';
+            if (accent) overlay.style.setProperty('--gph-accent', accent);
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) closeOverlay(); });
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            // Force reflow so the entrance transition runs.
+            void overlay.offsetWidth;
+            overlay.classList.add('is-open');
+            document.addEventListener('keydown', onEsc);
+        }
+
+        // Builds the shared dialog shell. `rows` is an array of HTMLElements that
+        // animate in one after another ("builds itself").
+        function dialog(accent, rows) {
+            var d = el('div', 'gdc-tp-dialog');
+            d.style.setProperty('--gph-accent', accent);
+            var scan = el('div', 'gdc-tp-scan'); d.appendChild(scan);
+            var close = el('button', 'gdc-tp-close', '&times;');
+            close.type = 'button';
+            close.setAttribute('aria-label', 'Close');
+            close.addEventListener('click', closeOverlay);
+            d.appendChild(close);
+            rows.forEach(function (r, i) {
+                r.classList.add('gdc-tp-row');
+                r.style.setProperty('--i', i);
+                d.appendChild(r);
+            });
+            return d;
+        }
+
+        // Amount selector shared by the AI + DGEN popups. Returns {node, get}.
+        function amountField(picks, unit, onChange) {
+            var wrap = el('div', 'gdc-tp-amount');
+            var chips = el('div', 'gdc-tp-chips');
+            var custom = el('input', 'gdc-tp-custom');
+            custom.type = 'number'; custom.min = '1'; custom.step = '1';
+            custom.placeholder = 'Custom amount';
+            var state = { val: picks[1] || picks[0] || 50 };
+
+            function select(v) {
+                state.val = v;
+                Array.prototype.forEach.call(chips.children, function (c) {
+                    c.classList.toggle('is-active', parseFloat(c.dataset.v) === v);
+                });
+                if (parseFloat(custom.value) !== v) custom.value = '';
+                onChange && onChange(state.val);
+            }
+            picks.forEach(function (v) {
+                var c = el('button', 'gdc-tp-chip', fmt(v) + ' <small>' + unit + '</small>');
+                c.type = 'button'; c.dataset.v = v;
+                c.addEventListener('click', function () { select(v); });
+                chips.appendChild(c);
+            });
+            custom.addEventListener('input', function () {
+                var v = parseFloat(custom.value);
+                if (!isNaN(v) && v > 0) {
+                    state.val = v;
+                    Array.prototype.forEach.call(chips.children, function (c) { c.classList.remove('is-active'); });
+                    onChange && onChange(state.val);
+                }
+            });
+            wrap.appendChild(chips);
+            wrap.appendChild(custom);
+            // default selection
+            setTimeout(function () { select(state.val); }, 0);
+            return { node: wrap, get: function () { return state.val; } };
+        }
+
+        function cta(label, accent, onClick) {
+            var b = el('button', 'gdc-tp-cta', '<span>' + label + '</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><line x1="5" y1="12" x2="19" y2="12"/><polyline points="12 5 19 12 12 19"/></svg>');
+            b.type = 'button';
+            b.addEventListener('click', onClick);
+            return b;
+        }
+
+        // ── AI Builder Tokens ──────────────────────────────────────────────
+        function openAI() {
+            var head = el('div', 'gdc-tp-head',
+                '<span class="gdc-tp-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c1.5.5 3 1.8 3 4a4 4 0 0 1-1 2.6A4 4 0 0 1 16 22H8a4 4 0 0 1-2-7.4A4 4 0 0 1 5 12c0-2.2 1.5-3.5 3-4a4 4 0 0 1 4-4z"/><circle cx="9" cy="11" r="1" fill="currentColor"/><circle cx="15" cy="11" r="1" fill="currentColor"/></svg></span>' +
+                '<div><h2>Top Up AI Builder Tokens</h2><p class="gdc-tp-tag">Fuel every build, edit, and generation with more tokens.</p></div>');
+            var bal = el('div', 'gdc-tp-balance', 'Current balance &middot; <strong>' + fmt(CFG.aiBalance) + '</strong> tokens');
+            var amtLabel = el('div', 'gdc-tp-label', 'How many tokens would you like?');
+            var totalRow = el('div', 'gdc-tp-total', '');
+            function paint(v) { totalRow.innerHTML = 'Total <strong>' + CFG.sym + fmt(v) + '</strong> <small>' + CFG.sym + '1.00 / token</small>'; }
+            var amt = amountField([500, 1000, 2500, 5000], 'tok', paint);
+            var go = cta('Continue to Secure Checkout', 'var(--gph-blue)', function () {
+                goCheckout('ai', { amount: Math.max(1, Math.round(amt.get())) });
+            });
+            var foot = el('div', 'gdc-tp-foot', 'Secure checkout &middot; billed in CAD &middot; tokens credited instantly on payment.');
+            mount(dialog('var(--gph-blue)', [head, bal, amtLabel, amt.node, totalRow, go, foot]), 'var(--gph-blue)');
+        }
+
+        // ── DGEN Balance — sales page ───────────────────────────────────────
+        function openDGEN() {
+            var head = el('div', 'gdc-tp-head',
+                '<span class="gdc-tp-badge">&#127464;&#127462;</span>' +
+                '<div><h2>Buy DGEN</h2><p class="gdc-tp-tag">Your in-network currency. <strong>1 DGEN = ' + CFG.sym + '1.00 CAD.</strong></p></div>');
+            var bal = el('div', 'gdc-tp-balance', 'Current balance &middot; <strong>' + fmt(CFG.dgenBalance) + '</strong> DGEN');
+            var benefits = el('div', 'gdc-tp-benefits',
+                '<div class="gdc-tp-benefit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><line x1="5" y1="19" x2="19" y2="5"/></svg><span><strong>0% transaction fees</strong>Spend DGEN anywhere on the network, fee-free.</span></div>' +
+                '<div class="gdc-tp-benefit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-5 4 4 8-9"/><polyline points="14 7 21 7 21 14"/></svg><span><strong>Earns Hold-Accelerator interest</strong>Held DGEN accrues yDGEN yield automatically.</span></div>' +
+                '<div class="gdc-tp-benefit"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="8" width="18" height="12" rx="2"/><path d="M7 8V6a5 5 0 0 1 10 0v2"/></svg><span><strong>Unlocks Fund Token investing</strong>Use DGEN to buy Fund Tokens and profit-share.</span></div>');
+            var amtLabel = el('div', 'gdc-tp-label', 'Buy as many DGEN as you like');
+            var totalRow = el('div', 'gdc-tp-total', '');
+            function paint(v) { totalRow.innerHTML = 'Total <strong>' + CFG.sym + fmt(v) + '</strong> <small>' + fmt(v) + ' DGEN</small>'; }
+            var amt = amountField([50, 100, 250, 500, 1000], 'DGEN', paint);
+            var go = cta('Continue to Secure Checkout', 'var(--gph-green)', function () {
+                goCheckout('dgen', { amount: Math.max(1, Math.round(amt.get())) });
+            });
+            var foot = el('div', 'gdc-tp-foot', 'Pay with card, crypto, or any store gateway &middot; DGEN credited on payment.');
+            mount(dialog('var(--gph-green)', [head, bal, benefits, amtLabel, amt.node, totalRow, go, foot]), 'var(--gph-green)');
+        }
+
+        // ── Task Credits — pick how many credits to buy (or upgrade retainer) ─
+        function openTasks() {
+            var rate = CFG.creditValue || 50;
+            var head = el('div', 'gdc-tp-head',
+                '<span class="gdc-tp-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M21 12v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2h11"/></svg></span>' +
+                '<div><h2>Top Up Task Credits</h2><p class="gdc-tp-tag">On-demand dev support — 1 credit covers one request (CSS / code / feature, up to 30 min).</p></div>');
+            var bal = el('div', 'gdc-tp-balance', 'Current balance &middot; <strong>' + fmt(CFG.taskBalance) + '</strong> credits');
+            var amtLabel = el('div', 'gdc-tp-label', 'How many task credits would you like?');
+            var totalRow = el('div', 'gdc-tp-total', '');
+            function paint(v) { totalRow.innerHTML = 'Total <strong>' + CFG.sym + fmt(v * rate) + '</strong> <small>' + fmt(v) + ' &times; ' + CFG.sym + fmt(rate) + '</small>'; }
+            var amt = amountField([1, 5, 10, 25], 'credits', paint);
+            var go = cta('Continue to Secure Checkout', 'var(--gph-magenta)', function () {
+                goCheckout('tasks', { qty: Math.max(1, Math.round(amt.get())) });
+            });
+            var rows = [head, bal, amtLabel, amt.node, totalRow, go];
+            if (CFG.retainerUrl) {
+                var alt = el('div', 'gdc-tp-alt', 'Prefer a monthly plan? <a href="' + CFG.retainerUrl + '">Upgrade your retainer &rarr;</a>');
+                rows.push(alt);
+            }
+            rows.push(el('div', 'gdc-tp-foot', 'Secure checkout &middot; credits added to your wallet on payment.'));
+            mount(dialog('var(--gph-magenta)', rows), 'var(--gph-magenta)');
+        }
+
+        // ── Delegate clicks from the header buttons ─────────────────────────
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest && e.target.closest('[data-gdc-topup]');
+            if (!btn) return;
+            e.preventDefault();
+            var kind = btn.getAttribute('data-gdc-topup');
+            if (kind === 'tasks' && CFG.tasks) return openTasks();
+            if (kind === 'ai' && CFG.ai) return openAI();
+            if (kind === 'dgen' && CFG.dgen) return openDGEN();
+        });
+    }());
+    </script>
+    <?php endif; ?>
 
     <!-- ── Sub-nav icon injector ───────────────────────────────────────────
          BP's sub-navs (Friendships/Requests, Inbox/Sent/Compose, General/
@@ -1731,6 +2130,408 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
     border: 1px dashed rgba(255,255,255,0.1) !important;
     border-radius: 12px;
     color: #64748b !important;
+}
+
+/* ══════════════════════════════════════════════════════════════════════════
+   TOP-UP — card buttons + futuristic "builds itself" popups
+   ══════════════════════════════════════════════════════════════════════════ */
+
+/* Visually-hidden launch hosts (task-checkout trigger + POST forms). Kept in
+   the DOM + programmatically clickable; never shown. */
+.gdc-topup-hidden-host {
+    position: absolute !important;
+    width: 1px; height: 1px;
+    margin: -1px; padding: 0; border: 0;
+    overflow: hidden; clip: rect(0 0 0 0); clip-path: inset(50%);
+    white-space: nowrap;
+}
+
+/* ── Card "Top Up" button — powers on a beat after its card ─────────────── */
+.gdc-topup-btn {
+    margin-top: 14px;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 7px 15px 7px 11px;
+    border-radius: 999px;
+    border: 1px solid var(--gph-accent, var(--gph-blue));
+    background: rgba(255,255,255,0.04);
+    color: var(--gph-accent, var(--gph-blue));
+    cursor: pointer;
+    font-family: "Inter", sans-serif;
+    font-size: 0.62rem;
+    font-weight: 900;
+    line-height: 1;
+    letter-spacing: 1.3px;
+    text-transform: uppercase;
+    transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s, background 0.25s, color 0.2s;
+    opacity: 0;
+    transform: translateY(10px) scale(0.94);
+    animation: gdcTpBtnIn 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards;
+}
+@keyframes gdcTpBtnIn { to { opacity: 1; transform: none; } }
+/* Stagger each button to land just after its card has slid in. */
+.gdc-stagger-2 .gdc-topup-btn { animation-delay: 1.00s; }
+.gdc-stagger-3 .gdc-topup-btn { animation-delay: 1.15s; }
+.gdc-stagger-4 .gdc-topup-btn { animation-delay: 1.30s; }
+.gdc-topup-btn:hover {
+    background: var(--gph-accent, var(--gph-blue));
+    color: #06080d;
+    transform: translateY(-2px);
+    box-shadow: 0 10px 26px -8px var(--gph-accent, var(--gph-blue)),
+                0 0 16px -4px var(--gph-accent, var(--gph-blue));
+}
+.gdc-topup-btn:active { transform: translateY(0) scale(0.97); }
+.gdc-topup-btn__plus { display: inline-flex; }
+.gdc-topup-btn__plus svg { width: 12px; height: 12px; display: block; }
+
+/* ── Overlay ─────────────────────────────────────────────────────────────── */
+.gdc-tp-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 2147483646;            /* above the floating AI chat bubble */
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    background: rgba(2,6,14,0.78);
+    -webkit-backdrop-filter: blur(8px);
+    backdrop-filter: blur(8px);
+    opacity: 0;
+    transition: opacity 0.22s ease;
+    font-family: "Inter", sans-serif;
+}
+.gdc-tp-overlay.is-open { opacity: 1; }
+.gdc-tp-overlay.is-closing { opacity: 0; }
+
+/* ── Dialog — slides + scales in; children stagger after it ─────────────── */
+.gdc-tp-dialog {
+    --gph-accent: #89C2E0;
+    position: relative;
+    width: min(460px, 100%);
+    max-height: 92vh;
+    overflow-y: auto;
+    padding: 30px 28px 24px;
+    border-radius: 24px;
+    border: 1px solid rgba(255,255,255,0.08);
+    background: linear-gradient(165deg, #0d1320 0%, #080b12 100%);
+    box-shadow: 0 40px 120px rgba(0,0,0,0.6),
+                0 0 0 1px rgba(255,255,255,0.03),
+                inset 0 1px 0 rgba(255,255,255,0.04);
+    color: #e2e8f0;
+    opacity: 0;
+    transform: translateY(24px) scale(0.96);
+    transition: transform 0.42s cubic-bezier(0.16,1,0.3,1), opacity 0.42s ease;
+}
+.gdc-tp-overlay.is-open .gdc-tp-dialog { opacity: 1; transform: none; }
+.gdc-tp-dialog::before {
+    content: "";
+    position: absolute;
+    inset: 0;
+    border-radius: 24px;
+    pointer-events: none;
+    box-shadow: inset 0 0 60px -30px var(--gph-accent);
+}
+/* Top edge scan-line that sweeps on open */
+.gdc-tp-scan {
+    position: absolute;
+    left: 12px; right: 12px; top: 0;
+    height: 2px;
+    border-radius: 0 0 4px 4px;
+    background: linear-gradient(90deg, transparent, var(--gph-accent), transparent);
+    opacity: 0;
+    transform: scaleX(0.2);
+    transform-origin: center;
+    animation: gdcTpScan 1.1s ease-out 0.15s forwards;
+}
+@keyframes gdcTpScan {
+    0%   { opacity: 0; transform: scaleX(0.2); }
+    35%  { opacity: 1; }
+    100% { opacity: 0.55; transform: scaleX(1); }
+}
+.gdc-tp-close {
+    position: absolute;
+    top: 12px; right: 14px;
+    width: 30px; height: 30px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 50%;
+    border: 1px solid rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.05);
+    color: #94a3b8;
+    font-size: 20px; line-height: 1;
+    cursor: pointer;
+    transition: background 0.2s, color 0.2s, transform 0.2s;
+    z-index: 2;
+}
+.gdc-tp-close:hover { background: rgba(255,255,255,0.1); color: #fff; transform: rotate(90deg); }
+
+/* Each stacked row reveals in sequence — the dialog "builds itself". */
+.gdc-tp-row {
+    opacity: 0;
+    transform: translateY(14px);
+    animation: gdcTpRowIn 0.5s cubic-bezier(0.22,1,0.36,1) forwards;
+    animation-delay: calc(0.18s + var(--i, 0) * 0.08s);
+}
+@keyframes gdcTpRowIn { to { opacity: 1; transform: none; } }
+
+/* Head */
+.gdc-tp-head {
+    display: flex;
+    gap: 14px;
+    align-items: flex-start;
+    padding-right: 30px;
+}
+.gdc-tp-head h2 { margin: 0; font-size: 1.15rem; font-weight: 900; color: #fff; }
+.gdc-tp-tag { margin: 5px 0 0; font-size: 0.78rem; color: #94a3b8; line-height: 1.4; }
+.gdc-tp-tag strong { color: var(--gph-accent); }
+.gdc-tp-badge {
+    flex-shrink: 0;
+    width: 46px; height: 46px;
+    display: flex; align-items: center; justify-content: center;
+    border-radius: 14px;
+    border: 1px solid var(--gph-accent);
+    background: rgba(255,255,255,0.04);
+    color: var(--gph-accent);
+    font-size: 22px;
+    box-shadow: inset 0 0 16px -6px var(--gph-accent), 0 0 18px -8px var(--gph-accent);
+}
+.gdc-tp-badge svg { width: 24px; height: 24px; }
+
+/* Current-balance strip */
+.gdc-tp-balance {
+    margin-top: 16px;
+    font-family: monospace;
+    font-size: 0.7rem;
+    letter-spacing: 0.5px;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.gdc-tp-balance strong { color: #e2e8f0; font-size: 0.92rem; }
+
+/* Benefit list (DGEN sales page) */
+.gdc-tp-benefits { margin-top: 16px; display: flex; flex-direction: column; gap: 10px; }
+.gdc-tp-benefit {
+    display: flex;
+    gap: 12px;
+    align-items: flex-start;
+    padding: 11px 13px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.06);
+    background: rgba(255,255,255,0.025);
+}
+.gdc-tp-benefit svg { width: 18px; height: 18px; flex-shrink: 0; margin-top: 1px; color: var(--gph-accent); }
+.gdc-tp-benefit span { display: flex; flex-direction: column; font-size: 0.74rem; color: #94a3b8; line-height: 1.45; }
+.gdc-tp-benefit strong { margin-bottom: 2px; color: #fff; font-size: 0.8rem; font-weight: 800; }
+
+/* Amount selector */
+.gdc-tp-label {
+    margin: 18px 0 10px;
+    font-size: 0.7rem;
+    font-weight: 800;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #cbd5e1;
+}
+.gdc-tp-chips { display: flex; flex-wrap: wrap; gap: 8px; }
+.gdc-tp-chip {
+    flex: 1 1 auto;
+    min-width: 68px;
+    padding: 11px 10px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1);
+    background: rgba(255,255,255,0.03);
+    color: #e2e8f0;
+    font-size: 0.85rem;
+    font-weight: 800;
+    cursor: pointer;
+    transition: border-color 0.18s, background 0.18s, transform 0.15s, box-shadow 0.2s;
+}
+.gdc-tp-chip small {
+    display: block;
+    margin-top: 3px;
+    font-size: 0.55rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.gdc-tp-chip:hover { border-color: var(--gph-accent); transform: translateY(-1px); }
+.gdc-tp-chip.is-active {
+    border-color: var(--gph-accent);
+    background: rgba(255,255,255,0.06);
+    color: #fff;
+    box-shadow: inset 0 0 0 1px var(--gph-accent), 0 6px 18px -8px var(--gph-accent);
+}
+.gdc-tp-chip.is-active small { color: var(--gph-accent); }
+.gdc-tp-custom {
+    margin-top: 10px;
+    width: 100%;
+    box-sizing: border-box;
+    padding: 11px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255,255,255,0.1) !important;
+    background: rgba(255,255,255,0.03) !important;
+    color: #fff !important;
+    font-size: 0.9rem;
+    font-weight: 700;
+}
+.gdc-tp-custom:focus { outline: none; border-color: var(--gph-accent) !important; }
+
+/* Total strip */
+.gdc-tp-total {
+    margin-top: 16px;
+    padding: 13px 16px;
+    display: flex;
+    align-items: baseline;
+    gap: 8px;
+    border-radius: 12px;
+    border: 1px dashed rgba(255,255,255,0.12);
+    background: rgba(255,255,255,0.03);
+    font-family: monospace;
+    font-size: 0.72rem;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #64748b;
+}
+.gdc-tp-total strong { font-family: "Inter", sans-serif; font-size: 1.5rem; letter-spacing: 0; color: #fff; }
+.gdc-tp-total small { margin-left: auto; font-size: 0.66rem; text-transform: none; color: #64748b; }
+
+/* Primary CTA */
+.gdc-tp-cta {
+    margin-top: 18px;
+    width: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 10px;
+    padding: 15px 20px;
+    border: 0;
+    border-radius: 14px;
+    background: var(--gph-accent);
+    color: #06080d;
+    font-family: "Inter", sans-serif;
+    font-size: 0.82rem;
+    font-weight: 900;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    cursor: pointer;
+    box-shadow: 0 12px 30px -10px var(--gph-accent);
+    transition: transform 0.18s, box-shadow 0.25s, filter 0.2s;
+}
+.gdc-tp-cta svg { width: 18px; height: 18px; transition: transform 0.2s; }
+.gdc-tp-cta:hover { transform: translateY(-2px); filter: brightness(1.08); box-shadow: 0 18px 40px -12px var(--gph-accent); }
+.gdc-tp-cta:hover svg { transform: translateX(4px); }
+.gdc-tp-cta:active { transform: translateY(0); }
+
+.gdc-tp-foot {
+    margin-top: 14px;
+    text-align: center;
+    font-size: 0.66rem;
+    letter-spacing: 0.3px;
+    color: #475569;
+}
+.gdc-tp-alt {
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid rgba(255,255,255,0.07);
+    text-align: center;
+    font-size: 0.74rem;
+    color: #64748b;
+}
+.gdc-tp-alt a {
+    color: var(--gph-accent);
+    font-weight: 800;
+    text-decoration: none;
+    white-space: nowrap;
+}
+.gdc-tp-alt a:hover { text-decoration: underline; }
+
+/* ── Embedded secure-checkout view (iframe inside the popup) ─────────────── */
+.gdc-tp-dialog--checkout {
+    width: min(1080px, 100%);
+    height: min(90vh, 920px);
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.gdc-tp-cobar {
+    flex: 0 0 auto;
+    display: flex;
+    align-items: center;
+    gap: 9px;
+    padding: 15px 20px;
+    font-size: 0.7rem;
+    font-weight: 900;
+    letter-spacing: 1.6px;
+    text-transform: uppercase;
+    color: #cbd5e1;
+    border-bottom: 1px solid rgba(255,255,255,0.07);
+    background: rgba(255,255,255,0.02);
+}
+.gdc-tp-cobar__dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--gph-accent);
+    box-shadow: 0 0 10px var(--gph-accent);
+    animation: gdcNavBeacon 1.6s ease-in-out infinite;
+}
+.gdc-tp-frame {
+    flex: 1 1 auto;
+    width: 100%;
+    border: 0;
+    background: #0a0f1a;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+.gdc-tp-frame.is-loaded { opacity: 1; }
+.gdc-tp-loading {
+    position: absolute;
+    inset: 52px 0 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 16px;
+    color: #64748b;
+    font-size: 0.8rem;
+    letter-spacing: 0.5px;
+}
+.gdc-tp-spinner {
+    width: 38px; height: 38px;
+    border-radius: 50%;
+    border: 3px solid rgba(255,255,255,0.1);
+    border-top-color: var(--gph-accent);
+    animation: gdcTpSpin 0.8s linear infinite;
+}
+@keyframes gdcTpSpin { to { transform: rotate(360deg); } }
+.gdc-tp-dialog--checkout .gdc-tp-foot {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 10px 20px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gdc-tp-dialog--checkout .gdc-tp-foot a { color: var(--gph-accent); font-weight: 700; text-decoration: none; }
+.gdc-tp-dialog--checkout .gdc-tp-foot a:hover { text-decoration: underline; }
+
+@media (max-width: 480px) {
+    .gdc-tp-dialog { padding: 26px 20px 20px; border-radius: 20px; }
+    .gdc-tp-dialog--checkout { padding: 0; height: 92vh; }
+    .gdc-tp-head h2 { font-size: 1.05rem; }
+}
+
+/* Honor reduced-motion */
+@media (prefers-reduced-motion: reduce) {
+    .gdc-topup-btn,
+    .gdc-tp-row,
+    .gdc-tp-scan,
+    .gdc-tp-dialog,
+    .gdc-tp-overlay {
+        animation: none !important;
+        transition: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+    }
 }
 ';
 }

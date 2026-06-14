@@ -67,6 +67,13 @@ require_once GS_DIR . 'inc/member-profile-pages.php';
 // Member profile header (terminal-style header + nav bar)
 require_once GS_DIR . 'inc/member-profile-header.php';
 
+// Member calendar (CALENDAR primary-nav tab + glass grid). file_exists-guarded:
+// the hub PVC .no-plugin-sync quirk means the include file must be kubectl cp'd
+// to the PVC BEFORE this entrypoint edit, or every request fatals. See 26-03 runbook.
+if ( file_exists( GS_DIR . 'inc/member-calendar.php' ) ) {
+	require_once GS_DIR . 'inc/member-calendar.php';
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
@@ -77,6 +84,8 @@ foreach ( array(
     'inc/profile-invite-oauth.php',
     'inc/profile-invite-settings.php',
     'inc/profile-portfolio.php',
+    'inc/profile-resume.php',
+    'inc/profile-contracts.php',
 ) as $gs_optional_file ) {
     if ( file_exists( GS_DIR . $gs_optional_file ) ) {
         require_once GS_DIR . $gs_optional_file;
