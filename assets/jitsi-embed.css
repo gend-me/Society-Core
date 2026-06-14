@@ -1,0 +1,275 @@
+/*!
+ * gend-society — Native gend video embed glassmorphic shell (Phase 30 / Plan 30-03 / VID-04).
+ *
+ * EVERY rule is scoped under .gs-jitsi-modal so the embed never collides with
+ * Youzify / BuddyPress global resets or forced-priority rules (Pitfall 21).
+ *
+ * Design language mirrors schedule-meeting.css + the Phase 26 calendar popover:
+ *  - backdrop-filter blur on the BACKDROP layer (never the clipped card)
+ *  - kinetic conic-gradient border via ::before pseudo + mask compositing
+ *  - @media (prefers-reduced-motion) disables motion AND the GPU-heavy blur
+ *  - @media (max-width: 600px) collapses to a full-bleed sheet on phones
+ *
+ * Body variants of .gs-jitsi-body:
+ *  .gs-jitsi-lobby        — countdown card on 403 too_early (+ initial connecting)
+ *  .gs-jitsi-iframe-host  — fills the shell with the Jitsi iframe on 200
+ *  .gs-jitsi-fallback     — graceful error card with a Try Again button
+ */
+
+.gs-jitsi-modal {
+    position: fixed;
+    inset: 0;
+    z-index: 999990;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba( 8, 12, 22, 0.55 );
+    backdrop-filter: blur( 12px );
+    -webkit-backdrop-filter: blur( 12px );
+    padding: 24px;
+    box-sizing: border-box;
+    animation: gsJitsiFadeIn 200ms ease-out;
+}
+
+@keyframes gsJitsiFadeIn {
+    from { opacity: 0; }
+    to   { opacity: 1; }
+}
+
+.gs-jitsi-modal .gs-jitsi-shell {
+    position: relative;
+    width: 100%;
+    max-width: 1200px;
+    height: 100%;
+    max-height: 800px;
+    border-radius: 16px;
+    background: linear-gradient( 135deg, rgba( 18, 24, 40, 0.85 ), rgba( 28, 38, 60, 0.85 ) );
+    box-shadow:
+        0 24px 80px rgba( 0, 0, 0, 0.55 ),
+        0 0 0 1px rgba( 255, 255, 255, 0.08 );
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+    box-sizing: border-box;
+}
+
+/* Kinetic conic-gradient border — same ::before mask idiom as schedule-meeting.css */
+.gs-jitsi-modal .gs-jitsi-shell::before {
+    content: "";
+    position: absolute;
+    inset: -1px;
+    border-radius: inherit;
+    padding: 1px;
+    background: conic-gradient( from 0deg, #5d8bff, #b46cff, #ff6ec7, #5d8bff );
+    -webkit-mask:
+        linear-gradient( #fff 0 0 ) content-box,
+        linear-gradient( #fff 0 0 );
+            mask:
+        linear-gradient( #fff 0 0 ) content-box,
+        linear-gradient( #fff 0 0 );
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    pointer-events: none;
+    animation: gsJitsiSpin 9s linear infinite;
+}
+
+@keyframes gsJitsiSpin {
+    to { transform: rotate( 1turn ); }
+}
+
+.gs-jitsi-modal .gs-jitsi-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    z-index: 2;
+    background: rgba( 255, 255, 255, 0.10 );
+    border: 1px solid rgba( 255, 255, 255, 0.15 );
+    color: #fff;
+    width: 36px;
+    height: 36px;
+    border-radius: 50%;
+    font-size: 24px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background-color 150ms ease;
+}
+
+.gs-jitsi-modal .gs-jitsi-close:hover {
+    background: rgba( 255, 255, 255, 0.20 );
+}
+
+.gs-jitsi-modal .gs-jitsi-close:focus-visible {
+    outline: 2px solid #b8d4ff;
+    outline-offset: 2px;
+}
+
+.gs-jitsi-modal .gs-jitsi-body {
+    flex: 1 1 auto;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    color: #f0f4ff;
+    min-height: 0; /* let the iframe fill instead of overflowing */
+    box-sizing: border-box;
+}
+
+/* ---- Lobby state (initial connecting + 403 too_early countdown) ---- */
+.gs-jitsi-modal .gs-jitsi-lobby {
+    flex-direction: column;
+    text-align: center;
+    padding: 48px 32px;
+    gap: 16px;
+}
+
+.gs-jitsi-modal .gs-jitsi-lobby-heading {
+    font-size: 24px;
+    font-weight: 600;
+    margin: 0;
+    color: #ffffff;
+}
+
+.gs-jitsi-modal .gs-jitsi-lobby-countdown {
+    font-size: 56px;
+    font-weight: 700;
+    font-variant-numeric: tabular-nums;
+    letter-spacing: 0.02em;
+    color: #b8d4ff;
+    text-shadow: 0 0 24px rgba( 93, 139, 255, 0.40 );
+    margin: 8px 0;
+}
+
+.gs-jitsi-modal .gs-jitsi-lobby-msg {
+    font-size: 14px;
+    opacity: 0.75;
+    max-width: 480px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+.gs-jitsi-modal .gs-jitsi-lobby-hint {
+    font-size: 13px;
+    opacity: 0.55;
+    max-width: 420px;
+    line-height: 1.5;
+    margin: 0;
+}
+
+/* ---- Iframe host state (Jitsi runtime fills the shell) ---- */
+.gs-jitsi-modal .gs-jitsi-iframe-host {
+    align-items: stretch;
+    justify-content: stretch;
+    padding: 0;
+}
+
+.gs-jitsi-modal .gs-jitsi-iframe-host iframe {
+    width: 100%;
+    height: 100%;
+    border: 0;
+    display: block;
+    background: #0a0e18;
+}
+
+/* ---- Fallback state (graceful error card) ---- */
+.gs-jitsi-modal .gs-jitsi-fallback {
+    flex-direction: column;
+    text-align: center;
+    padding: 48px 32px;
+    gap: 16px;
+}
+
+.gs-jitsi-modal .gs-jitsi-fallback h2 {
+    font-size: 22px;
+    margin: 0;
+    color: #ffd0d0;
+}
+
+.gs-jitsi-modal .gs-jitsi-fallback p {
+    font-size: 14px;
+    max-width: 520px;
+    line-height: 1.5;
+    margin: 0;
+    opacity: 0.85;
+}
+
+.gs-jitsi-modal .gs-jitsi-fallback-code {
+    font-family: 'JetBrains Mono', 'SFMono-Regular', Consolas, monospace;
+    font-size: 12px;
+    opacity: 0.55;
+}
+
+.gs-jitsi-modal .gs-jitsi-retry {
+    background: linear-gradient( 135deg, #5d8bff, #b46cff );
+    border: 0;
+    color: #fff;
+    padding: 10px 24px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.gs-jitsi-modal .gs-jitsi-retry:hover {
+    transform: translateY( -1px );
+    box-shadow: 0 6px 20px rgba( 93, 139, 255, 0.35 );
+}
+
+.gs-jitsi-modal .gs-jitsi-retry:focus-visible {
+    outline: 2px solid #b8d4ff;
+    outline-offset: 2px;
+}
+
+/* ---- Join button (rendered on calendar popover / confirmation / wallet feed) ---- */
+.gs-jitsi-join-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    background: linear-gradient( 135deg, #5d8bff, #b46cff );
+    border: 0;
+    color: #fff;
+    padding: 9px 18px;
+    border-radius: 8px;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: transform 150ms ease, box-shadow 150ms ease;
+}
+
+.gs-jitsi-join-btn:hover {
+    transform: translateY( -1px );
+    box-shadow: 0 6px 20px rgba( 93, 139, 255, 0.35 );
+}
+
+/* ---- Mobile: full-bleed sheet ---- */
+@media ( max-width: 600px ) {
+    .gs-jitsi-modal {
+        padding: 0;
+    }
+    .gs-jitsi-modal .gs-jitsi-shell {
+        max-width: 100%;
+        max-height: 100%;
+        border-radius: 0;
+    }
+    .gs-jitsi-modal .gs-jitsi-lobby-countdown {
+        font-size: 40px;
+    }
+    .gs-jitsi-modal .gs-jitsi-lobby {
+        padding: 32px 20px;
+    }
+}
+
+/* ---- a11y + perf: kill motion AND the GPU-heavy backdrop blur ---- */
+@media ( prefers-reduced-motion: reduce ) {
+    .gs-jitsi-modal {
+        animation: none;
+        backdrop-filter: none;
+        -webkit-backdrop-filter: none;
+    }
+    .gs-jitsi-modal .gs-jitsi-shell::before {
+        animation: none;
+    }
+    .gs-jitsi-modal .gs-jitsi-retry:hover,
+    .gs-jitsi-join-btn:hover {
+        transform: none;
+    }
+}
