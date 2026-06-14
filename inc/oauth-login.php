@@ -384,6 +384,14 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
         // gate inside the handler, so opening these is safe.
         if ( strpos( $route, '/gs/v1/desktop/info'   ) !== false ) return null;
         if ( strpos( $route, '/gs/v1/desktop/latest' ) !== false ) return null;
+        // Member Calendar public booking (Phase 29) — a shared booking link
+        // and the subscribable ICS feed must be reachable by logged-out
+        // bookees / external calendar apps. Every handler self-gates on a
+        // 43-char share_token or cancel_token, so opening these is safe.
+        // NOTE: the AUTHED single-download /gs/v1/calendar/meetings/{id}/ics
+        // is deliberately NOT allow-listed (it stays cookie-gated).
+        if ( strpos( $route, '/gs/v1/calendar/public/' ) !== false ) return null;
+        if ( strpos( $route, '/gs/v1/calendar/ics/'    ) !== false ) return null;
     }
     return $result;
 }, 99 );
