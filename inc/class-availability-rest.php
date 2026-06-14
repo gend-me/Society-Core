@@ -47,6 +47,17 @@ class Gend_GS_Availability_REST {
                 ),
             ),
         ) );
+
+        // Plan 28-03: expanded overlays for a date range (working hours + blocked ranges in UTC).
+        register_rest_route( self::NS, '/calendar/overlays', array(
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => array( __CLASS__, 'handle_overlays' ),
+            'permission_callback' => array( __CLASS__, 'permission_check' ),
+            'args'                => array(
+                'from' => array( 'required' => true, 'type' => 'string' ),
+                'to'   => array( 'required' => true, 'type' => 'string' ),
+            ),
+        ) );
     }
 
     public static function permission_check() : bool {
@@ -237,5 +248,150 @@ class Gend_GS_Availability_REST {
 
     public static function tz_cache_key( int $user_id ) : string {
         return 'tz_' . $user_id;
+    }
+
+    /**
+     * GET /calendar/overlays?from=&to=
+     * Returns expanded overlays for the date range in UTC ISO format.
+     *
+     * Response:
+     * {
+     *   "member_tz": "America/Toronto",
+     *   "working_hours": [
+     *     {"start_utc": "2026-06-15T13:00:00Z", "end_utc": "2026-06-15T21:00:00Z", "kind": "working"}
+     *   ],
+     *   "blocked_ranges": [
+     *     {"start_utc": "2026-06-14T13:00:00Z", "end_utc": "2026-06-14T16:00:00Z", "kind": "blocked", "reason": "doctor"}
+     *   ]
+     * }
+     */
+    public static function handle_overlays( WP_REST_Request $req ) {
+        // Pitfall 7: identity ALWAYS server-side; ?user= IGNORED.
+        $user_id = (int) get_current_user_id();
+        if ( $user_id <= 0 ) {
+            return new WP_Error( 'gs_avail_no_user', 'login required', array( 'status' => 401 ) );
+        }
+
+        $from_iso = trim( (string) $req->get_param( 'from' ) );
+        $to_iso   = trim( (string) $req->get_param( 'to' ) );
+        if ( $from_iso === '' || $to_iso === '' ) {
+            return new WP_Error( 'gs_avail_bad_range', 'from and to required (ISO 8601)', array( 'status' => 400 ) );
+        }
+
+        $ts_from = strtotime( $from_iso );
+        $ts_to   = strtotime( $to_iso );
+        if ( ! $ts_from || ! $ts_to || $ts_from >= $ts_to ) {
+            return new WP_Error( 'gs_avail_bad_range', 'from must be < to', array( 'status' => 400 ) );
+        }
+
+        // Cap range to 90 days to keep payloads bounded (Pitfall 22 — unbounded expansion).
+        if ( ( $ts_to - $ts_from ) > ( 90 * 86400 ) ) {
+            return new WP_Error( 'gs_avail_range_too_large', 'range > 90 days', array( 'status' => 400 ) );
+        }
+
+        $member_tz = class_exists( 'Gend_GS_Calendar_Events_REST' )
+            ? Gend_GS_Calendar_Events_REST::get_member_timezone( $user_id )
+            : ( wp_timezone_string() ?: 'UTC' );
+
+        $result = self::expand_overlays( $user_id, $from_iso, $to_iso, $member_tz );
+        $result['member_tz'] = $member_tz;
+        return rest_ensure_response( $result );
+    }
+
+    /**
+     * DST-safe overlay expansion (Pitfall 5 + Pitfall 12).
+     *
+     * Working hours expansion:
+     *   - Iterate dates from $from to $to (half-open [from, to)) in the MEMBER tz
+     *   - For each date, look up weekday key (mon..sun) in working_hours_json
+     *   - For each {start: 'HH:MM', end: 'HH:MM'} window on that weekday:
+     *     - Build the LOCAL datetime via DateTime::createFromFormat('Y-m-d H:i', ..., new DateTimeZone($member_tz))
+     *       — this is the DST-correct path: 9 AM stays 9 AM across DST flips
+     *     - Convert to UTC via setTimezone(new DateTimeZone('UTC')) + format('Y-m-d\TH:i:s\Z')
+     *
+     * Blocked ranges expansion:
+     *   - blocked_ranges_json already stores UTC ISO; just filter by intersection with [from, to)
+     *
+     * @return array{working_hours: array, blocked_ranges: array}
+     */
+    public static function expand_overlays( int $user_id, string $from_iso, string $to_iso, string $member_tz ) : array {
+        global $wpdb;
+        $table = Gend_GS_Availability_Schema::table_availability();
+        $row = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM {$table} WHERE user_id = %d LIMIT 1", $user_id ), ARRAY_A );
+
+        $out = array( 'working_hours' => array(), 'blocked_ranges' => array() );
+        if ( ! $row ) { return $out; }
+
+        // Validate tz once (defensive — Plan 28-02 validates on PUT, but DB rows could be hand-edited).
+        try { $tz = new DateTimeZone( $member_tz ); }
+        catch ( \Throwable $e ) { $tz = new DateTimeZone( 'UTC' ); }
+        $utc = new DateTimeZone( 'UTC' );
+
+        // ─── Working hours: expand weekly recurring windows in MEMBER tz ─────
+        $wh = json_decode( (string) $row['working_hours_json'], true );
+        if ( is_array( $wh ) ) {
+            // Iterate days in member's tz, NOT UTC — half-open [from, to)
+            $cursor = new DateTime( $from_iso, $utc );
+            $cursor->setTimezone( $tz );
+            $end_cursor = new DateTime( $to_iso, $utc );
+            $end_cursor->setTimezone( $tz );
+
+            // Snap cursor back to 00:00 of its local date so we don't miss the start day.
+            $cursor->setTime( 0, 0, 0 );
+
+            $weekday_map = array( 1 => 'mon', 2 => 'tue', 3 => 'wed', 4 => 'thu', 5 => 'fri', 6 => 'sat', 7 => 'sun' );
+            $safety_iters = 0;
+            while ( $cursor < $end_cursor && $safety_iters < 365 ) { // 1 year hard safety cap on top of 90d input cap
+                $safety_iters++;
+                $weekday_num = (int) $cursor->format( 'N' ); // ISO-8601: 1=Mon..7=Sun
+                $weekday_key = $weekday_map[ $weekday_num ] ?? null;
+                $date_str    = $cursor->format( 'Y-m-d' );
+                if ( $weekday_key && ! empty( $wh[ $weekday_key ] ) && is_array( $wh[ $weekday_key ] ) ) {
+                    foreach ( $wh[ $weekday_key ] as $range ) {
+                        $s = isset( $range['start'] ) ? (string) $range['start'] : '';
+                        $e = isset( $range['end'] )   ? (string) $range['end']   : '';
+                        if ( ! preg_match( '/^\d{2}:\d{2}$/', $s ) || ! preg_match( '/^\d{2}:\d{2}$/', $e ) ) { continue; }
+
+                        // DST-safe: build the LOCAL datetime in member tz, then convert to UTC.
+                        // DateTime::createFromFormat with explicit tz argument honors DST for that date.
+                        $start_local = DateTime::createFromFormat( 'Y-m-d H:i', $date_str . ' ' . $s, $tz );
+                        $end_local   = DateTime::createFromFormat( 'Y-m-d H:i', $date_str . ' ' . $e, $tz );
+                        if ( ! $start_local || ! $end_local ) { continue; }
+                        $start_local->setTimezone( $utc );
+                        $end_local->setTimezone( $utc );
+                        $out['working_hours'][] = array(
+                            'start_utc' => $start_local->format( 'Y-m-d\TH:i:s\Z' ),
+                            'end_utc'   => $end_local->format( 'Y-m-d\TH:i:s\Z' ),
+                            'kind'      => 'working',
+                        );
+                    }
+                }
+                $cursor->modify( '+1 day' );
+            }
+        }
+
+        // ─── Blocked ranges: filter by intersection (no expansion — stored as UTC) ─
+        $br = json_decode( (string) $row['blocked_ranges_json'], true );
+        if ( is_array( $br ) ) {
+            $ts_from = strtotime( $from_iso );
+            $ts_to   = strtotime( $to_iso );
+            foreach ( $br as $r ) {
+                if ( ! is_array( $r ) ) { continue; }
+                $s = (string) ( $r['start_utc'] ?? '' );
+                $e = (string) ( $r['end_utc'] ?? '' );
+                $ts_s = strtotime( $s ); $ts_e = strtotime( $e );
+                if ( ! $ts_s || ! $ts_e || $ts_s >= $ts_e ) { continue; }
+                // Intersect half-open [from, to)
+                if ( $ts_e <= $ts_from || $ts_s >= $ts_to ) { continue; }
+                $out['blocked_ranges'][] = array(
+                    'start_utc' => $s,
+                    'end_utc'   => $e,
+                    'kind'      => 'blocked',
+                    'reason'    => (string) ( $r['reason'] ?? '' ),
+                );
+            }
+        }
+
+        return $out;
     }
 }
