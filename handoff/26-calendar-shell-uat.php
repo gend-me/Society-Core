@@ -38,20 +38,36 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit( 1 );
 }
 
-$gs_uat_pass = 0;
-$gs_uat_fail = 0;
-$gs_uat_skip = 0;
+/**
+ * Shared pass/fail/skip accumulator.
+ *
+ * NOTE: `wp eval-file` wraps the file body in a function, so a top-level
+ * `$gs_uat_pass = 0;` is a LOCAL of that wrapper, while a helper's
+ * `global $gs_uat_pass;` binds to the (empty) true global scope — the two never
+ * meet and the tally always read 0/0. Holding the counters in a function-static
+ * array makes the accumulator independent of caller scope, so the tally is
+ * accurate whether run via `wp eval-file`, `wp eval`, or `php`.
+ *
+ * @param string|null $op    'pass' | 'fail' | 'skip' to increment, or null to read.
+ * @return array{pass:int,fail:int,skip:int} Current tally (always returned).
+ */
+function gs_uat_tally( $op = null ) {
+	static $t = [ 'pass' => 0, 'fail' => 0, 'skip' => 0 ];
+	if ( $op !== null && isset( $t[ $op ] ) ) {
+		$t[ $op ]++;
+	}
+	return $t;
+}
 
 /**
- * Emit a PASS/FAIL/SKIP line and tally it.
+ * Emit a PASS/FAIL line and tally it.
  */
 function gs_uat_check( $label, $ok, $detail = '' ) {
-	global $gs_uat_pass, $gs_uat_fail;
 	if ( $ok ) {
-		$gs_uat_pass++;
+		gs_uat_tally( 'pass' );
 		echo "[PASS] {$label}";
 	} else {
-		$gs_uat_fail++;
+		gs_uat_tally( 'fail' );
 		echo "[FAIL] {$label}";
 	}
 	if ( $detail !== '' ) {
@@ -61,8 +77,7 @@ function gs_uat_check( $label, $ok, $detail = '' ) {
 }
 
 function gs_uat_skip( $label, $detail = '' ) {
-	global $gs_uat_skip;
-	$gs_uat_skip++;
+	gs_uat_tally( 'skip' );
 	echo "[SKIP] {$label}";
 	if ( $detail !== '' ) {
 		echo " — {$detail}";
@@ -253,8 +268,9 @@ echo "\n";
  * SUMMARY
  * ------------------------------------------------------------------------- */
 echo "==============================================================\n";
-echo " RESULT: {$gs_uat_pass} passed, {$gs_uat_fail} failed, {$gs_uat_skip} skipped\n";
-if ( $gs_uat_fail === 0 ) {
+$gs_uat_totals = gs_uat_tally();
+echo " RESULT: {$gs_uat_totals['pass']} passed, {$gs_uat_totals['fail']} failed, {$gs_uat_totals['skip']} skipped\n";
+if ( $gs_uat_totals['fail'] === 0 ) {
 	echo " ALL CHECKS PASSED\n";
 } else {
 	echo " SOME CHECKS FAILED\n";
