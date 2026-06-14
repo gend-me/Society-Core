@@ -187,12 +187,89 @@ class Gend_GS_Calendar_Source_Meetings {
 	}
 
 	/**
-	 * Defensive empty return — should never be invoked while is_available()
-	 * returns false. Kept for the case where a Phase 28/29 migration creates
-	 * the table mid-request before this class is updated.
+	 * Read real meetings (Phase 29 Plan 01 — was stub returning []).
+	 *
+	 * Member-scoping (MEET-05): member is HOST or member-GUEST.
+	 *   WHERE (member_id = %d OR guest_user_id = %d)
+	 * Status filter: only 'booked' rows (cancelled meetings drop off the calendar).
+	 * Time bounds: half-open [from, to) on starts_at_utc (Pitfall D/12).
+	 *
+	 * UTC discipline: starts_at_utc / ends_at_utc are stored as MySQL DATETIME in true UTC
+	 * (writer is handle_book in class-booking-public-rest.php which builds via
+	 * DateTimeImmutable + DateTimeZone('UTC')). Output ISO Z via direct string transform
+	 * (Pitfall 5 — NEVER strtotime+gmdate which would double-shift on non-UTC server).
+	 *
+	 * Owner-vs-shared title discipline (Pitfall 8):
+	 *   - HOST sees guest's name (it's their meeting)
+	 *   - member-GUEST sees generic title (don't leak host name in title)
+	 *
+	 * LOCKED 11-field event-object contract (Plan 26-02 / Plan 27-01) preserved verbatim:
+	 *   {id, source, type, title, start, end, all_day, color, status, url, busy}
+	 *
+	 * Query budget: 1 query (was 0 for stub; total ensemble ≤6 preserved).
+	 *
+	 * @param int    $user_id
+	 * @param string $from_utc  MySQL DATETIME (Y-m-d H:i:s) — Phase 27 normalized format
+	 * @param string $to_utc    MySQL DATETIME (Y-m-d H:i:s)
 	 */
 	public function read_events( int $user_id, string $from_utc, string $to_utc ) : array {
-		return array();
+		if ( ! $this->is_available() ) { return array(); }
+
+		global $wpdb;
+		$tbl = Gend_GS_Availability_Schema::table_meetings();
+
+		// Plan 27 normalizes from/to into 'Y-m-d H:i:s' MySQL DATETIME via parse_iso_to_utc().
+		// Accept that shape verbatim; if the caller passes ISO 8601 (Plan 29 booking
+		// compute_open_slots does), do a defensive direct string transform.
+		$from_mysql = str_replace( array( 'T', 'Z' ), array( ' ', '' ), $from_utc );
+		$to_mysql   = str_replace( array( 'T', 'Z' ), array( ' ', '' ), $to_utc );
+
+		// MEET-05: member is HOST or member-GUEST. Only booked rows.
+		// Pitfall D/12: half-open `>=` / `<` on starts_at_utc.
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, member_id, guest_user_id, guest_name, starts_at_utc, ends_at_utc, meeting_type, status
+			   FROM {$tbl}
+			  WHERE status = 'booked'
+			    AND starts_at_utc >= %s
+			    AND starts_at_utc <  %s
+			    AND ( member_id = %d OR guest_user_id = %d )",
+			$from_mysql, $to_mysql, $user_id, $user_id
+		), ARRAY_A );
+
+		if ( ! $rows ) { return array(); }
+
+		$events = array();
+		foreach ( $rows as $r ) {
+			$role  = ( (int) $r['member_id'] === $user_id ) ? 'host' : 'guest';
+			$title_prefix = ucfirst( (string) $r['meeting_type'] );
+			// Owner-vs-shared title discipline (Pitfall 8).
+			$title = $role === 'host'
+				? $title_prefix . ' meeting with ' . (string) $r['guest_name']
+				: $title_prefix . ' meeting';
+			$events[] = array(
+				'id'      => 'mtg-' . (int) $r['id'],
+				'source'  => 'mtg',
+				'type'    => 'meeting',
+				'title'   => $title,
+				'start'   => str_replace( ' ', 'T', (string) $r['starts_at_utc'] ) . 'Z',
+				'end'     => str_replace( ' ', 'T', (string) $r['ends_at_utc'] )   . 'Z',
+				'all_day' => false,
+				'color'   => '--gph-green',
+				'status'  => (string) $r['status'],
+				'url'     => '',
+				'busy'    => true,
+			);
+		}
+		return $events;
+	}
+
+	/**
+	 * Phase 29 booking adapter alias — Gend_GS_Booking_Public_REST::compute_open_slots()
+	 * calls $mtg->events() per plan spec; route_events() registry calls $adapter->read_events().
+	 * Single delegation keeps the LOCKED contract in one place.
+	 */
+	public function events( int $user_id, string $from_iso, string $to_iso ) : array {
+		return $this->read_events( $user_id, $from_iso, $to_iso );
 	}
 }
 
