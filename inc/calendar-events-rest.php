@@ -148,5 +148,173 @@ class Gend_GS_Calendar_Source_Meetings {
 	}
 }
 
-// Gend_GS_Calendar_Source_Projects defined below in Task 2 (same file per
-// RESEARCH §Recommended File Structure — small adapters co-locate cleanly).
+/**
+ * Projects adapter — reads member-assigned tasks, milestone due dates, and
+ * project est-completion dates from wp_pm_* tables.
+ *
+ * Member-scoping (Pitfall 8 / AGG-06): JOIN through wp_pm_assignees.assigned_to,
+ * NEVER wp_pm_tasks.user_id (the latter is task-author, not assignee). Pattern
+ * copied verbatim from class-pm-tasks.php:73-86.
+ *
+ * Timezone discipline (Pitfall A / Pitfall 5): pm_* sources are date-only naive
+ * (`<input type="date">` → sanitize_text_field → MySQL timestamp storing
+ * 'YYYY-MM-DD 00:00:00' with NO tz semantics). Every event emitted via
+ * to_event_all_day() with synthetic UTC bounds — NEVER tz-converted.
+ *
+ * Query budget (Pitfall 8): ≤ 3 data queries per call:
+ *   Q1 — tasks via assignees JOIN + projects JOIN (project_title free)
+ *   Q2a — milestones via boards + meta IN(...) batch
+ *   Q2b — project est_completion via projects IN(...) batch
+ * Total with bm + mtg = ≤ 6 (mtg has 0 data queries; bm has 2 per RESEARCH).
+ */
+class Gend_GS_Calendar_Source_Projects {
+
+	public function is_available() : bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'pm_tasks';
+		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+	}
+
+	public function read_events( int $user_id, string $from_utc, string $to_utc ) : array {
+		global $wpdb;
+
+		$t = $wpdb->prefix . 'pm_tasks';
+		$a = $wpdb->prefix . 'pm_assignees';
+		$p = $wpdb->prefix . 'pm_projects';
+		$b = $wpdb->prefix . 'pm_boards';
+		$m = $wpdb->prefix . 'pm_meta';
+
+		// pm_* is date-only; compare on the YYYY-MM-DD prefix.
+		$from_date = substr( $from_utc, 0, 10 );
+		$to_date   = substr( $to_utc,   0, 10 );
+
+		// ---- Q1: tasks via assignee JOIN (Pitfall 8 / Pitfall B mitigation) ----
+		// JOIN key MUST be wp_pm_assignees.assigned_to — pattern copied from
+		// class-pm-tasks.php:73-86. project_title comes free via LEFT JOIN
+		// (no separate per-row lookup → Pitfall E mitigation).
+		$tasks = $wpdb->get_results( $wpdb->prepare(
+			"SELECT t.id, t.title, t.start_at, t.due_date, t.status, t.project_id,
+			        p.title AS project_title
+			 FROM {$t} AS t
+			 INNER JOIN {$a} AS asg ON asg.task_id = t.id AND asg.assigned_to = %d
+			 LEFT  JOIN {$p} AS p   ON p.id = t.project_id
+			 WHERE ( DATE(t.due_date) BETWEEN %s AND %s )
+			    OR ( DATE(t.start_at) BETWEEN %s AND %s )
+			 ORDER BY t.due_date ASC
+			 LIMIT 500",
+			$user_id, $from_date, $to_date, $from_date, $to_date
+		) );
+
+		// ---- Q2a/Q2b: milestones + project est_completion (batched IN(...)) ----
+		// Both queries gate on the member's actual project set (derived from Q1
+		// task assignments), so a member who isn't assigned to any tasks in this
+		// project also doesn't see its milestones — strict assignee-scoping.
+		$project_ids         = array_unique( array_filter( wp_list_pluck( $tasks, 'project_id' ) ) );
+		$milestones          = array();
+		$project_completions = array();
+
+		if ( ! empty( $project_ids ) ) {
+			$ids_in = implode( ',', array_map( 'absint', $project_ids ) );
+
+			// Q2a: milestones — boards type='milestone' + pm_meta due_date.
+			$milestones = $wpdb->get_results( $wpdb->prepare(
+				"SELECT b.id, b.title, b.project_id, p.title AS project_title,
+				        mm.meta_value AS due_date
+				 FROM {$b} AS b
+				 INNER JOIN {$m} AS mm
+				    ON mm.entity_id = b.id
+				   AND mm.entity_type = 'milestone'
+				   AND mm.meta_key = 'due_date'
+				 LEFT JOIN {$p} AS p ON p.id = b.project_id
+				 WHERE b.type = 'milestone'
+				   AND b.project_id IN ({$ids_in})
+				   AND DATE(mm.meta_value) BETWEEN %s AND %s
+				 LIMIT 200",
+				$from_date, $to_date
+			) );
+
+			// Q2b: project est_completion_date.
+			$project_completions = $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, title, est_completion_date
+				 FROM {$p}
+				 WHERE id IN ({$ids_in})
+				   AND est_completion_date IS NOT NULL
+				   AND DATE(est_completion_date) BETWEEN %s AND %s
+				 LIMIT 200",
+				$from_date, $to_date
+			) );
+		}
+
+		$events = array();
+
+		foreach ( $tasks as $row ) {
+			// Skip null / zero-date sentinels (wedevs-PM can write these on partial updates).
+			if ( empty( $row->due_date ) || $row->due_date === '0000-00-00 00:00:00' ) { continue; }
+			$events[] = $this->to_event_all_day(
+				'pm-task-' . (int) $row->id,
+				'task',
+				(string) $row->title . ' (' . (string) $row->project_title . ')',
+				(string) $row->due_date,
+				'',                          // url '' → popover hides "View source" (deferred per RESEARCH §Open Q1)
+				(string) $row->status
+			);
+		}
+
+		foreach ( $milestones as $row ) {
+			$events[] = $this->to_event_all_day(
+				'pm-milestone-' . (int) $row->id,
+				'milestone',
+				(string) $row->title . ' — milestone (' . (string) $row->project_title . ')',
+				(string) $row->due_date,
+				'',
+				''
+			);
+		}
+
+		foreach ( $project_completions as $row ) {
+			$events[] = $this->to_event_all_day(
+				'pm-project-' . (int) $row->id,
+				'project',
+				(string) $row->title . ' — est. completion',
+				(string) $row->est_completion_date,
+				'',
+				''
+			);
+		}
+
+		return $events;
+	}
+
+	/**
+	 * Pitfall A / Pitfall 5 mitigation: pm_* sources store DATE-ONLY naive strings.
+	 * Synthetic UTC bounds preserve cell-correctness across viewer tz — the frontend
+	 * (Plan 26-02 `dayKeyInTz`) correctly buckets all-day events spanning a full UTC
+	 * day to the same calendar cell regardless of viewer offset.
+	 *
+	 * Returns the LOCKED Phase 26 Plan 02 11-field event-object contract verbatim.
+	 */
+	private function to_event_all_day(
+		string $id,
+		string $type,
+		string $title,
+		string $date_str,
+		string $url,
+		string $status
+	) : array {
+		// Strip any '00:00:00' tail the MySQL timestamp column appends.
+		$date = substr( $date_str, 0, 10 );
+		return array(
+			'id'      => $id,
+			'source'  => 'pm',
+			'type'    => $type,
+			'title'   => $title,
+			'start'   => $date . 'T00:00:00Z',
+			'end'     => $date . 'T23:59:59Z',
+			'all_day' => true,
+			'color'   => '',          // frontend applies --gph-blue (pm) default
+			'status'  => $status,
+			'url'     => $url,
+			'busy'    => true,        // Phase 28/29 subtracts from booking slots (Pitfall 14)
+		);
+	}
+}
