@@ -226,6 +226,63 @@ function gs_calendar_profile_screen_content() {
 	wp_enqueue_script( 'gs-availability-settings', GS_URL . 'assets/availability-settings.js', array( 'gs-member-calendar' ), $avail_js_ver, true );
 	wp_localize_script( 'gs-availability-settings', 'gsAvailNonce', wp_create_nonce( 'wp_rest' ) );
 
+	// Phase 29 Plan 02 — Schedule Meeting modal assets (BOOK-10 + MEET-01..04).
+	// Loaded ONLY on the member's own calendar screen (bp_is_my_profile gate above
+	// already enforces this). filemtime-busted single-version idiom; file_exists-
+	// guarded so a missing asset on the PVC (.no-plugin-sync, Pitfall 1) degrades
+	// to "no Schedule button" instead of a 404.
+	$sched_js_path  = GS_DIR . 'assets/schedule-meeting.js';
+	$sched_css_path = GS_DIR . 'assets/schedule-meeting.css';
+	if ( file_exists( $sched_js_path ) ) {
+		$sched_js_ver  = GS_VERSION . '.' . filemtime( $sched_js_path );
+		$sched_css_ver = GS_VERSION . ( file_exists( $sched_css_path ) ? '.' . filemtime( $sched_css_path ) : '' );
+		wp_enqueue_script(
+			'gs-schedule-meeting',
+			GS_URL . 'assets/schedule-meeting.js',
+			array( 'gs-member-calendar' ),
+			$sched_js_ver,
+			true
+		);
+		wp_enqueue_style(
+			'gs-schedule-meeting',
+			GS_URL . 'assets/schedule-meeting.css',
+			array( 'gs-member-calendar' ),
+			$sched_css_ver
+		);
+
+		// Read named_durations from the calling user's booking_settings_json
+		// (defensive — empty array if no row yet OR schema column missing).
+		$gs_named_durations = array();
+		if ( class_exists( 'Gend_GS_Availability_Schema' ) && function_exists( 'get_current_user_id' ) ) {
+			global $wpdb;
+			$gs_tbl = Gend_GS_Availability_Schema::table_availability();
+			// SHOW COLUMNS gracefully degrades if booking_settings_json column
+			// hasn't been installed on this blog yet (29-05 runbook adds it).
+			$gs_has_col = (bool) $wpdb->get_var( $wpdb->prepare(
+				"SHOW COLUMNS FROM {$gs_tbl} LIKE %s",
+				'booking_settings_json'
+			) );
+			if ( $gs_has_col ) {
+				$gs_row = $wpdb->get_row( $wpdb->prepare(
+					"SELECT booking_settings_json FROM {$gs_tbl} WHERE user_id = %d",
+					get_current_user_id()
+				) );
+				if ( $gs_row && ! empty( $gs_row->booking_settings_json ) ) {
+					$gs_settings = (array) json_decode( $gs_row->booking_settings_json, true );
+					if ( ! empty( $gs_settings['named_durations'] ) && is_array( $gs_settings['named_durations'] ) ) {
+						$gs_named_durations = $gs_settings['named_durations'];
+					}
+				}
+			}
+		}
+
+		wp_localize_script( 'gs-schedule-meeting', 'gsScheduleData', array(
+			'restUrl'        => esc_url_raw( rest_url( 'gs/v1/' ) ),
+			'nonce'          => wp_create_nonce( 'wp_rest' ),
+			'namedDurations' => $gs_named_durations,
+		) );
+	}
+
 	// Resolve the member's IANA timezone (Plan 28-02 helper — availability row
 	// first, 60s wp_cache, site-tz fallback). Single source of truth for data-tz
 	// so the renderer relabels times in the member's own zone (AVAIL-03).

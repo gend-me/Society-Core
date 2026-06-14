@@ -41,9 +41,11 @@ class Gend_GS_Availability_REST {
                 'callback'            => array( __CLASS__, 'handle_put' ),
                 'permission_callback' => array( __CLASS__, 'permission_check' ),
                 'args'                => array(
-                    'timezone'        => array( 'required' => false, 'type' => 'string', 'default' => 'UTC' ),
-                    'working_hours'   => array( 'required' => false, 'type' => 'object' ),
-                    'blocked_ranges'  => array( 'required' => false, 'type' => 'array' ),
+                    'timezone'         => array( 'required' => false, 'type' => 'string', 'default' => 'UTC' ),
+                    'working_hours'    => array( 'required' => false, 'type' => 'object' ),
+                    'blocked_ranges'   => array( 'required' => false, 'type' => 'array' ),
+                    // Plan 29-02: booking_settings_json — limits + named durations + per-type defaults.
+                    'booking_settings' => array( 'required' => false, 'type' => 'object' ),
                 ),
             ),
         ) );
@@ -85,13 +87,22 @@ class Gend_GS_Availability_REST {
                 'has_row'        => false,
             ) );
         }
+        // Plan 29-02: decode booking_settings_json if column present (graceful — older
+        // rows pre-29-02 won't have the column, so guard via array_key_exists).
+        $booking_settings = array();
+        if ( array_key_exists( 'booking_settings_json', $row ) ) {
+            $bs_raw = json_decode( (string) $row['booking_settings_json'], true );
+            if ( is_array( $bs_raw ) ) { $booking_settings = $bs_raw; }
+        }
+
         return rest_ensure_response( array(
-            'user_id'        => (int) $row['user_id'],
-            'timezone'       => (string) $row['timezone'],
-            'working_hours'  => self::decode_object_or_default( $row['working_hours_json'] ),
-            'blocked_ranges' => self::decode_array_or_default( $row['blocked_ranges_json'] ),
-            'share_token'    => (string) $row['share_token'],
-            'has_row'        => true,
+            'user_id'          => (int) $row['user_id'],
+            'timezone'         => (string) $row['timezone'],
+            'working_hours'    => self::decode_object_or_default( $row['working_hours_json'] ),
+            'blocked_ranges'   => self::decode_array_or_default( $row['blocked_ranges_json'] ),
+            'share_token'      => (string) $row['share_token'],
+            'booking_settings' => $booking_settings,
+            'has_row'          => true,
         ) );
     }
 
@@ -109,19 +120,27 @@ class Gend_GS_Availability_REST {
         $tz_raw            = $req->get_param( 'timezone' );
         $working_hours_raw = $req->get_param( 'working_hours' );
         $blocked_raw       = $req->get_param( 'blocked_ranges' );
+        // Plan 29-02: booking_settings_json — accepts limits + named_durations + per-type defaults.
+        $booking_settings_raw = $req->get_param( 'booking_settings' );
 
         // Coalesce nulls to safe defaults — never trust REST schema to do it.
         $tz             = is_string( $tz_raw ) && $tz_raw !== '' ? trim( $tz_raw ) : 'UTC';
         $working_hours  = is_array( $working_hours_raw ) || is_object( $working_hours_raw ) ? (array) $working_hours_raw : array();
         $blocked_ranges = is_array( $blocked_raw ) ? $blocked_raw : array();
+        $booking_settings_payload = is_array( $booking_settings_raw ) || is_object( $booking_settings_raw )
+            ? (array) $booking_settings_raw
+            : array();
 
         // Pitfall 5: validate IANA tz via new DateTimeZone() — throws on invalid (including offsets like "+05:00").
         $tz_err = self::validate_timezone( $tz );
         if ( $tz_err ) { return $tz_err; }
 
         // Sanitize working_hours + blocked_ranges (defensive — never trust client JSON shape).
-        $working_hours_clean  = self::sanitize_working_hours( $working_hours );
-        $blocked_ranges_clean = self::sanitize_blocked_ranges( $blocked_ranges );
+        $working_hours_clean   = self::sanitize_working_hours( $working_hours );
+        $blocked_ranges_clean  = self::sanitize_blocked_ranges( $blocked_ranges );
+        // Plan 29-02: sanitize booking_settings (5 fields + named_durations array, URL allowlist for default_video_url).
+        $booking_settings_clean = self::sanitize_booking_settings( $booking_settings_payload );
+        $booking_settings_json  = wp_json_encode( $booking_settings_clean );
 
         // Read existing row to preserve share_token on subsequent saves.
         $existing = self::read_row( $user_id );
@@ -136,21 +155,24 @@ class Gend_GS_Availability_REST {
         }
 
         // UPSERT via INSERT … ON DUPLICATE KEY UPDATE — atomic on UNIQUE idx_user_id (Plan 28-01).
+        // Plan 29-02 adds booking_settings_json to INSERT cols + ON DUPLICATE KEY UPDATE clause.
         global $wpdb;
         $table = Gend_GS_Availability_Schema::table_availability();
         $wpdb->query( $wpdb->prepare(
             "INSERT INTO {$table}
-                 (user_id, timezone, working_hours_json, blocked_ranges_json, share_token, created_at_ts, updated_at_ts)
-             VALUES (%d, %s, %s, %s, %s, %d, %d)
+                 (user_id, timezone, working_hours_json, blocked_ranges_json, booking_settings_json, share_token, created_at_ts, updated_at_ts)
+             VALUES (%d, %s, %s, %s, %s, %s, %d, %d)
              ON DUPLICATE KEY UPDATE
-                 timezone            = VALUES(timezone),
-                 working_hours_json  = VALUES(working_hours_json),
-                 blocked_ranges_json = VALUES(blocked_ranges_json),
-                 updated_at_ts       = VALUES(updated_at_ts)",
+                 timezone              = VALUES(timezone),
+                 working_hours_json    = VALUES(working_hours_json),
+                 blocked_ranges_json   = VALUES(blocked_ranges_json),
+                 booking_settings_json = VALUES(booking_settings_json),
+                 updated_at_ts         = VALUES(updated_at_ts)",
             $user_id,
             $tz,
             wp_json_encode( $working_hours_clean ),
             wp_json_encode( $blocked_ranges_clean ),
+            $booking_settings_json,
             $share_token,
             $created_at,
             $now
@@ -159,7 +181,86 @@ class Gend_GS_Availability_REST {
         // Cache-bust the member tz (Phase 27 integration — Plan 28-02 §key_links).
         wp_cache_delete( self::tz_cache_key( $user_id ), self::CACHE_GROUP );
 
-        return self::handle_get( $req ); // canonical read after write
+        // Canonical read after write — handle_get echoes booking_settings back to caller.
+        return self::handle_get( $req );
+    }
+
+    /**
+     * Plan 29-02 — sanitize booking_settings_json payload.
+     *
+     * Validated fields:
+     *   - min_notice_minutes   int 0..10080  (7 days max)
+     *   - buffer_minutes       int 0..240    (4 hours max)
+     *   - max_bookings_per_day int 1..50
+     *   - default_video_provider enum zoom|meet|teams|webex|gend
+     *   - default_video_url    funneled through Gend_GS_Booking_Meetings_REST::sanitize_meeting_meta_with_allowlist
+     *                          (Pitfall 16 — same allowlist as host-side meeting creates)
+     *   - named_durations      array of {label string 1-40, minutes in [15,30,45,60,90,120]}, cap 12 items
+     *
+     * Unknown keys silently dropped. Invalid values silently dropped (silent-drop policy
+     * keeps the PUT useful even when one field is bad — UI surfaces a "video URL invalid"
+     * hint elsewhere when default_video_url comes back missing).
+     */
+    private static function sanitize_booking_settings( array $payload ) : array {
+        $clean = array();
+
+        if ( isset( $payload['min_notice_minutes'] ) ) {
+            $n = (int) $payload['min_notice_minutes'];
+            $clean['min_notice_minutes'] = max( 0, min( 10080, $n ) );
+        }
+
+        if ( isset( $payload['buffer_minutes'] ) ) {
+            $n = (int) $payload['buffer_minutes'];
+            $clean['buffer_minutes'] = max( 0, min( 240, $n ) );
+        }
+
+        if ( isset( $payload['max_bookings_per_day'] ) ) {
+            $n = (int) $payload['max_bookings_per_day'];
+            $clean['max_bookings_per_day'] = max( 1, min( 50, $n ) );
+        }
+
+        if ( isset( $payload['default_video_provider'] ) ) {
+            $p = sanitize_text_field( (string) $payload['default_video_provider'] );
+            if ( in_array( $p, array( 'zoom', 'meet', 'teams', 'webex', 'gend' ), true ) ) {
+                $clean['default_video_provider'] = $p;
+            }
+        }
+
+        if ( isset( $payload['default_video_url'] ) && $payload['default_video_url'] !== '' ) {
+            // Funnel through the SAME URL allowlist as host-side meeting creates (Pitfall 16).
+            // Defensive lazy require — class_exists guard so PUT still works during partial deploys.
+            if ( class_exists( 'Gend_GS_Booking_Meetings_REST' ) ) {
+                $url = esc_url_raw( (string) $payload['default_video_url'] );
+                $provider_for_check = isset( $clean['default_video_provider'] ) ? $clean['default_video_provider'] : 'zoom';
+                if ( $provider_for_check === 'gend' ) { $provider_for_check = 'zoom'; } // URL allowlist only for external
+                $meta = Gend_GS_Booking_Meetings_REST::sanitize_meeting_meta_with_allowlist(
+                    'video',
+                    array( 'provider' => $provider_for_check, 'room_url' => $url ),
+                    (int) get_current_user_id()
+                );
+                if ( ! is_wp_error( $meta ) && isset( $meta['room_url'] ) ) {
+                    $clean['default_video_url'] = $meta['room_url'];
+                }
+                // Silently drop disallowed URLs — UI surfaces an "invalid URL" hint via missing key.
+            }
+        }
+
+        if ( isset( $payload['named_durations'] ) && is_array( $payload['named_durations'] ) ) {
+            $dur_clean       = array();
+            $allowed_minutes = array( 15, 30, 45, 60, 90, 120 );
+            foreach ( $payload['named_durations'] as $d ) {
+                if ( ! is_array( $d ) ) { continue; }
+                $label = isset( $d['label'] )   ? sanitize_text_field( (string) $d['label'] ) : '';
+                $mins  = isset( $d['minutes'] ) ? (int) $d['minutes'] : 0;
+                if ( $label === '' || strlen( $label ) > 40 ) { continue; }
+                if ( ! in_array( $mins, $allowed_minutes, true ) ) { continue; }
+                $dur_clean[] = array( 'label' => $label, 'minutes' => $mins );
+                if ( count( $dur_clean ) >= 12 ) { break; } // cap UI noise
+            }
+            $clean['named_durations'] = $dur_clean;
+        }
+
+        return $clean;
     }
 
     /** Pitfall 5 — IANA only; offsets/abbreviations rejected. */
