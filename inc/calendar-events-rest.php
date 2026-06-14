@@ -73,9 +73,10 @@ class Gend_GS_Calendar_Events_REST {
 		}
 
 		// Adapter classes are co-located in this file (per RESEARCH §Recommended File Structure).
-		// 'bm' wires in Plan 27-02.
+		// Order is purely for readability — events are globally sorted by start ISO via usort below.
 		$adapters = array(
 			'pm'  => new Gend_GS_Calendar_Source_Projects(),
+			'bm'  => new Gend_GS_Calendar_Source_BlogManager(),   // ← Plan 27-02 Task 1
 			'mtg' => new Gend_GS_Calendar_Source_Meetings(),
 		);
 
@@ -316,5 +317,163 @@ class Gend_GS_Calendar_Source_Projects {
 			'url'     => $url,
 			'busy'    => true,        // Phase 28/29 subtracts from booking slots (Pitfall 14)
 		);
+	}
+}
+
+/**
+ * BlogManager adapter — reads scheduled social posts + drip-queue items from
+ * wp_bm_social_schedule_v2 and wp_bm_drip_queue.
+ *
+ * Member-scoping (Pitfall 7 / AGG-06): WHERE user_id = %d on BOTH tables.
+ * NEVER trusts any ?user= request param — identity flows from
+ * Gend_GS_Calendar_Events_REST::route_events() via get_current_user_id().
+ *
+ * Timezone discipline (Pitfall 5 / Pitfall 13 / AGG-07): bm_* DATETIME columns
+ * store TRUE UTC (writers use gmdate(); readers use UTC_TIMESTAMP() — verified
+ * in class-bm-publisher-hub-tick.php:56-75 + class-bm-rest-composer.php:240-262).
+ * utc_to_z() therefore does a DIRECT string transform (replace space with T,
+ * append Z) — NEVER strtotime() + gmdate(), which would interpret the source
+ * string in server-tz and double-shift on any non-UTC host (the exact mistake
+ * called out in RESEARCH §Common Pitfalls + memory: project_oauth_timezone_bug).
+ *
+ * Half-open SQL range (Pitfall D / Pitfall 12): `scheduled_at >= %s AND
+ * scheduled_at < %s` (NOT BETWEEN) to prevent midnight-boundary double-count
+ * when paginating across months. Pattern from class-bm-rest-calendar.php:161.
+ *
+ * Drip status filter: only `draft_pending_approval` + `approved` surface on
+ * the calendar — `published` and `failed` are not future-planning rows.
+ *
+ * `busy: false` on EVERY bm_* event — REQUIREMENTS.md Out-of-Scope row:
+ * "Scheduled campaign posts blocking booking slots — product decision:
+ * automated posts are display-only, not attention-time." Phase 28/29
+ * availability lookup ignores these.
+ *
+ * Query budget (Pitfall 8): ≤ 2 data queries per call (Q1 social, Q2 drip
+ * — each on its own table). Combined with Projects (≤ 3) and Meetings (0) the
+ * full ensemble stays at ≤ 5 data queries plus the 3 SHOW TABLES LIKE guards.
+ *
+ * Graceful degradation (Pitfall 4): is_available() guards on
+ * wp_bm_social_schedule_v2; drip table has its OWN guard inside read_events()
+ * because a site can have social-schedule without the drip extension.
+ */
+class Gend_GS_Calendar_Source_BlogManager {
+
+	public function is_available() : bool {
+		global $wpdb;
+		$table = $wpdb->prefix . 'bm_social_schedule_v2';
+		return (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+	}
+
+	public function read_events( int $user_id, string $from_utc, string $to_utc ) : array {
+		global $wpdb;
+		$events = array();
+
+		// ---- Q1: scheduled social posts (wp_bm_social_schedule_v2) ----
+		// Pitfall 7: WHERE user_id = %d (AGG-06 member scoping).
+		// Pitfall D/12: half-open `>=` / `<` range (NOT BETWEEN).
+		$sched_table = $wpdb->prefix . 'bm_social_schedule_v2';
+		$social = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, platform, target_url, scheduled_at, status, copy_per_platform
+			 FROM {$sched_table}
+			 WHERE user_id = %d
+			   AND scheduled_at >= %s
+			   AND scheduled_at <  %s
+			 ORDER BY scheduled_at ASC
+			 LIMIT 500",
+			$user_id, $from_utc, $to_utc
+		) );
+
+		foreach ( $social as $row ) {
+			$events[] = array(
+				'id'      => 'bm-social-' . (int) $row->id,
+				'source'  => 'bm',
+				'type'    => 'social',
+				'title'   => 'Social: ' . $this->extract_first_caption(
+					$row->copy_per_platform,
+					(string) $row->platform
+				),
+				'start'   => $this->utc_to_z( (string) $row->scheduled_at ),
+				'end'     => $this->utc_to_z( (string) $row->scheduled_at ),
+				'all_day' => false,
+				'color'   => '',                  // frontend applies --gph-magenta (bm) default
+				'status'  => (string) $row->status,
+				'url'     => '',                  // per-platform permalink lookup deferred (RESEARCH §Open Q1)
+				'busy'    => false,               // display-only — REQUIREMENTS.md Out of Scope
+			);
+		}
+
+		// ---- Q2: drip queue (wp_bm_drip_queue) ----
+		// Per-table SHOW TABLES guard: sites may have social-schedule without the
+		// drip extension. Pitfall 4: drip-absent must degrade silently, not fatal.
+		$drip_table  = $wpdb->prefix . 'bm_drip_queue';
+		$drip_exists = (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $drip_table ) );
+		if ( $drip_exists ) {
+			$drip = $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, platform, scheduled_at, status, campaign_label, link_frozen
+				 FROM {$drip_table}
+				 WHERE user_id = %d
+				   AND scheduled_at >= %s
+				   AND scheduled_at <  %s
+				   AND status IN ('draft_pending_approval','approved')
+				 ORDER BY scheduled_at ASC
+				 LIMIT 500",
+				$user_id, $from_utc, $to_utc
+			) );
+			foreach ( $drip as $row ) {
+				$events[] = array(
+					'id'      => 'bm-drip-' . (int) $row->id,
+					'source'  => 'bm',
+					'type'    => 'drip',
+					'title'   => 'Drip: ' . (string) $row->campaign_label . ' (' . (string) $row->platform . ')',
+					'start'   => $this->utc_to_z( (string) $row->scheduled_at ),
+					'end'     => $this->utc_to_z( (string) $row->scheduled_at ),
+					'all_day' => false,
+					'color'   => '',
+					'status'  => (string) $row->status,
+					'url'     => '',
+					'busy'    => false,           // display-only — REQUIREMENTS.md Out of Scope
+				);
+			}
+		}
+
+		return $events;
+	}
+
+	/**
+	 * bm_* DATETIME columns store TRUE UTC. Direct string transform from
+	 * 'YYYY-MM-DD HH:MM:SS' → 'YYYY-MM-DDTHH:MM:SSZ'.
+	 *
+	 * CRITICAL: do NOT use strtotime() + gmdate() — that path interprets the
+	 * source string in the server's PHP timezone, which on any non-UTC host
+	 * (the hub had gmt_offset=-5 during the OAuth incident — memory:
+	 * project_oauth_timezone_bug) would double-shift true-UTC storage by ±N
+	 * hours. The direct string transform is correct AND fastest.
+	 */
+	private function utc_to_z( string $mysql_datetime ) : string {
+		return str_replace( ' ', 'T', $mysql_datetime ) . 'Z';
+	}
+
+	/**
+	 * Extract a human-readable caption from the per-platform JSON blob:
+	 *   {"twitter":"hello","instagram":{"text":"hi"}} → "hello" (for twitter)
+	 * Falls back to the first non-empty caption across platforms, then to the
+	 * platform name. Truncates to 60 chars with ellipsis.
+	 *
+	 * Tolerant of malformed JSON, non-string blobs, nested array shapes.
+	 */
+	private function extract_first_caption( $copy_blob, string $platform ) : string {
+		if ( ! is_string( $copy_blob ) || $copy_blob === '' ) { return $platform; }
+		$decoded = json_decode( $copy_blob, true );
+		if ( ! is_array( $decoded ) ) { return $platform; }
+		$first = $decoded[ $platform ] ?? reset( $decoded );
+		if ( is_array( $first ) ) {
+			$first = $first['text'] ?? reset( $first );
+		}
+		$first = (string) $first;
+		if ( $first === '' ) { return $platform; }
+		if ( function_exists( 'mb_strlen' ) ) {
+			return mb_strlen( $first ) > 60 ? mb_substr( $first, 0, 57 ) . '…' : $first;
+		}
+		return strlen( $first ) > 60 ? substr( $first, 0, 57 ) . '…' : $first;
 	}
 }
