@@ -226,8 +226,13 @@ class Gend_GS_Calendar_Source_Meetings {
 
 		// MEET-05: member is HOST or member-GUEST. Only booked rows.
 		// Pitfall D/12: half-open `>=` / `<` on starts_at_utc.
+		// Phase 30 Plan 03 — also SELECT meeting_meta_json so the popover renderer
+		// can decide whether to render the native gend video Join button (only
+		// when meeting_type='video' AND meta.provider='gend' AND the row has a
+		// resolved jitsi_room). Without this column the Phase 30 embed is dead
+		// code — VID-04 + VID-05 require it. Rule 3 auto-fix during plan 30-03.
 		$rows = $wpdb->get_results( $wpdb->prepare(
-			"SELECT id, member_id, guest_user_id, guest_name, starts_at_utc, ends_at_utc, meeting_type, status
+			"SELECT id, member_id, guest_user_id, guest_name, starts_at_utc, ends_at_utc, meeting_type, meeting_meta_json, status
 			   FROM {$tbl}
 			  WHERE status = 'booked'
 			    AND starts_at_utc >= %s
@@ -246,18 +251,45 @@ class Gend_GS_Calendar_Source_Meetings {
 			$title = $role === 'host'
 				? $title_prefix . ' meeting with ' . (string) $r['guest_name']
 				: $title_prefix . ' meeting';
+
+			// Phase 30 Plan 03 — surface meeting_type + a SAFE subset of meeting_meta
+			// to the popover renderer so it can conditionally render the native gend
+			// video Join button. We deliberately surface ONLY {provider, jitsi_room}
+			// and never the full meta (Pitfall 16 — phone number, in-person address,
+			// pasted external URLs are PII / XSS surfaces; the popover never needs
+			// them, and the calendar viewer may be the GUEST who shouldn't see them
+			// until confirmation). meeting_id is the integer PK the jitsi-embed.js
+			// click handler casts via parseInt.
+			$mmeta_safe = array();
+			if ( ! empty( $r['meeting_meta_json'] ) ) {
+				$decoded = json_decode( (string) $r['meeting_meta_json'], true );
+				if ( is_array( $decoded ) ) {
+					if ( isset( $decoded['provider'] ) ) {
+						$mmeta_safe['provider'] = (string) $decoded['provider'];
+					}
+					if ( isset( $decoded['jitsi_room'] ) ) {
+						$mmeta_safe['jitsi_room'] = (string) $decoded['jitsi_room'];
+					}
+				}
+			}
+
 			$events[] = array(
-				'id'      => 'mtg-' . (int) $r['id'],
-				'source'  => 'mtg',
-				'type'    => 'meeting',
-				'title'   => $title,
-				'start'   => str_replace( ' ', 'T', (string) $r['starts_at_utc'] ) . 'Z',
-				'end'     => str_replace( ' ', 'T', (string) $r['ends_at_utc'] )   . 'Z',
-				'all_day' => false,
-				'color'   => '--gph-green',
-				'status'  => (string) $r['status'],
-				'url'     => '',
-				'busy'    => true,
+				'id'           => 'mtg-' . (int) $r['id'],
+				'source'       => 'mtg',
+				'type'         => 'meeting',
+				'title'        => $title,
+				'start'        => str_replace( ' ', 'T', (string) $r['starts_at_utc'] ) . 'Z',
+				'end'          => str_replace( ' ', 'T', (string) $r['ends_at_utc'] )   . 'Z',
+				'all_day'      => false,
+				'color'        => '--gph-green',
+				'status'       => (string) $r['status'],
+				'url'          => '',
+				'busy'         => true,
+				// Phase 30 Plan 03 — additive fields (LOCKED 11-field contract
+				// preserved; these are extras the popover reads when present).
+				'meeting_id'   => (int) $r['id'],
+				'meeting_type' => (string) $r['meeting_type'],
+				'meeting_meta' => $mmeta_safe,
 			);
 		}
 		return $events;
