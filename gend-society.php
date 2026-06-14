@@ -137,6 +137,33 @@ if ( file_exists( GS_DIR . 'inc/class-booking-notifications.php' ) ) {
 	Gend_GS_Booking_Notifications::init();
 }
 
+// Phase 29 Plan 04 — ICS download + subscribable feed (Gend_GS_Booking_ICS,
+// file_exists guard per Pitfall 1). Registers TWO REST routes on rest_api_init:
+// GET /gs/v1/calendar/meetings/{id}/ics — authed single-meeting download
+// (host or member-guest); GET /gs/v1/calendar/ics/{share_token} — public
+// read-only subscribable feed for external calendar apps (Google Calendar,
+// Apple Calendar, Outlook). RFC 5545 compliant output (CRLF + 75-octet line
+// folding + TEXT escaping + VERSION/PRODID/METHOD/STATUS headers). NOTIF-03
+// + NOTIF-04 + MEET-05 download surface.
+if ( file_exists( GS_DIR . 'inc/class-booking-ics.php' ) ) {
+	require_once GS_DIR . 'inc/class-booking-ics.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Booking_ICS', 'register_routes' ) );
+}
+
+// Phase 29 Plan 04 — public booking page at /calendar-book/{share_token}
+// (Gend_GS_Booking_Public_Page, file_exists guard per Pitfall 1). Hooks
+// template_redirect at priority 5 so we intercept the URL BEFORE WP's native
+// 404 handler fires. Matches a 43-char alphanumeric share_token via preg_match
+// on REQUEST_URI (not WP rewrite rules — avoids flush_rules requirement). On
+// match: SELECTs the host via Gend_GS_Availability_Schema, renders a
+// standalone glassmorphic HTML page (NOT a theme template) that enqueues
+// booking-public.{js,css} + inlines window.gsBookingData payload, exits. init()
+// only registers an add_action so calling it eagerly here is side-effect-free.
+if ( file_exists( GS_DIR . 'inc/class-booking-public-page.php' ) ) {
+	require_once GS_DIR . 'inc/class-booking-public-page.php';
+	Gend_GS_Booking_Public_Page::init();
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
