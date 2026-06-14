@@ -123,6 +123,20 @@ if ( file_exists( GS_DIR . 'inc/class-booking-meetings-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Booking_Meetings_REST', 'register_routes' ) );
 }
 
+// Phase 29 Plan 03 — booking notifications (Gend_GS_Booking_Notifications, file_exists guard per Pitfall 1).
+// Subscribes to the 3 gs_booking_* action hooks fired by Plan 29-01 (public bookee
+// flow) + Plan 29-02 (host-create flow), sends 4 branded HTML emails (confirmed /
+// reminder / cancelled / rescheduled) via wp_mail (auto-routed through email-manager's
+// EM_Email_SMTP when active), and schedules a single-event WP-Cron reminder 15 min
+// before each meeting via wp_schedule_single_event. init() is called at include
+// time (NOT hooked to rest_api_init) because the subscribers fire on lifecycle
+// hooks that may precede rest_api_init; init() only registers add_action callbacks
+// so calling it eagerly is side-effect-free until the hooks themselves fire.
+if ( file_exists( GS_DIR . 'inc/class-booking-notifications.php' ) ) {
+	require_once GS_DIR . 'inc/class-booking-notifications.php';
+	Gend_GS_Booking_Notifications::init();
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
