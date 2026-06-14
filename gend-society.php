@@ -112,6 +112,17 @@ if ( file_exists( GS_DIR . 'inc/class-booking-public-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Booking_Public_REST', 'register_routes' ) );
 }
 
+// Phase 29 Plan 02 — authed meetings REST (Gend_GS_Booking_Meetings_REST, file_exists guard per Pitfall 1).
+// Registers 4 authed routes on gs/v1: GET /calendar/meetings, POST /calendar/meetings
+// (Schedule Meeting modal), POST /calendar/meetings/{id}/cancel (host-cancel),
+// POST /calendar/share-token/rotate. URL allowlist enforcement for external video
+// providers (Pitfall 16) lives here. Loaded AFTER 29-01 so the Plan 29-02
+// availability PUT can lazy-call Gend_GS_Booking_Meetings_REST::sanitize_meeting_meta_with_allowlist.
+if ( file_exists( GS_DIR . 'inc/class-booking-meetings-rest.php' ) ) {
+	require_once GS_DIR . 'inc/class-booking-meetings-rest.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Booking_Meetings_REST', 'register_routes' ) );
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
