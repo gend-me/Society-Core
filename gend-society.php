@@ -103,6 +103,15 @@ if ( file_exists( GS_DIR . 'inc/class-availability-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Availability_REST', 'register_routes' ) );
 }
 
+// Phase 29 Plan 01 — public booking REST (Gend_GS_Booking_Public_REST, file_exists guard per Pitfall 1).
+// Registers gs/v1/calendar/public/{share_token}/slots + /book + meeting cancel/reschedule
+// routes for the public booking flow (bookee may be logged-out). Atomic FOR UPDATE
+// double-book prevention + per-IP/per-token rate limit + honeypot hardening live here.
+if ( file_exists( GS_DIR . 'inc/class-booking-public-rest.php' ) ) {
+	require_once GS_DIR . 'inc/class-booking-public-rest.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Booking_Public_REST', 'register_routes' ) );
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
