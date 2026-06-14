@@ -78,6 +78,7 @@ if ( strlen( $first_token ) === 43 ) {
 }
 
 // ─── Assert 3: PUT idempotency — same payload twice = same row + same token ─
+// Proves the handle_put() INSERT ... ON DUPLICATE KEY UPDATE path is atomic on UNIQUE idx_user_id.
 $resp2 = rest_do_request( $req );
 $data2 = $resp2->get_data();
 $row_count = (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$table} WHERE user_id = %d", $test_user_id ) );
