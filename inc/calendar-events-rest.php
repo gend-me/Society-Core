@@ -103,6 +103,7 @@ class Gend_GS_Calendar_Events_REST {
 		return rest_ensure_response( array(
 			'sources_available' => $sources_available,
 			'events'            => $events,
+			'member_tz'         => self::get_member_timezone( $user_id ), // Plan 28-02 — Phase 27 integration
 		) );
 	}
 
@@ -119,6 +120,57 @@ class Gend_GS_Calendar_Events_REST {
 		if ( $iso === '' ) { return null; }
 		$ts = strtotime( $iso );
 		return $ts ? gmdate( 'Y-m-d H:i:s', $ts ) : null;
+	}
+
+	/**
+	 * Resolve member's IANA timezone — Plan 28-02 integration.
+	 *
+	 * Reads wp_gs_member_availability.timezone first (60s wp_cache via Gend_GS_Availability_REST
+	 * cache group), falls back to wp_timezone_string() if the member has no availability row.
+	 *
+	 * Site tz fallback preserves existing behavior for members who never opened the calendar
+	 * settings UI — Pitfall 5 mitigation (never null, never invalid IANA).
+	 *
+	 * @param int $user_id
+	 * @return string IANA timezone name (e.g. 'America/Toronto', 'UTC')
+	 */
+	public static function get_member_timezone( int $user_id ) : string {
+		// Defensive: bad user_id → site fallback.
+		if ( $user_id <= 0 ) { return wp_timezone_string() ?: 'UTC'; }
+
+		// Cache check first — same group + key as Gend_GS_Availability_REST writes/invalidates.
+		if ( class_exists( 'Gend_GS_Availability_REST' ) ) {
+			$cache_key = Gend_GS_Availability_REST::tz_cache_key( $user_id );
+			$cached    = wp_cache_get( $cache_key, Gend_GS_Availability_REST::CACHE_GROUP );
+			if ( is_string( $cached ) && $cached !== '' ) { return $cached; }
+		}
+
+		// Table-existence guard (Pitfall 4 / graceful degradation — Plan 28-01 may not have run yet on this blog).
+		global $wpdb;
+		$table = $wpdb->prefix . 'gs_member_availability';
+		$table_exists = (bool) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $table ) );
+		if ( ! $table_exists ) { return wp_timezone_string() ?: 'UTC'; }
+
+		$tz = $wpdb->get_var( $wpdb->prepare(
+			"SELECT timezone FROM {$table} WHERE user_id = %d LIMIT 1",
+			$user_id
+		) );
+		if ( ! is_string( $tz ) || $tz === '' ) {
+			$tz = wp_timezone_string() ?: 'UTC';
+		}
+		// Validate stored value is parseable (defensive — DB row could have been hand-edited).
+		try { new DateTimeZone( $tz ); }
+		catch ( \Throwable $e ) { $tz = wp_timezone_string() ?: 'UTC'; }
+
+		if ( class_exists( 'Gend_GS_Availability_REST' ) ) {
+			wp_cache_set(
+				Gend_GS_Availability_REST::tz_cache_key( $user_id ),
+				$tz,
+				Gend_GS_Availability_REST::CACHE_GROUP,
+				Gend_GS_Availability_REST::CACHE_TTL
+			);
+		}
+		return $tz;
 	}
 }
 
