@@ -164,6 +164,24 @@ class Gend_GS_Availability_REST {
 
     /** Pitfall 5 — IANA only; offsets/abbreviations rejected. */
     public static function validate_timezone( string $tz ) {
+        // PHP's new DateTimeZone() ACCEPTS numeric offsets ("+05:00", "-0800") and
+        // some abbreviations ("EST") — but storing an offset breaks DST-safe overlay
+        // expansion (Pitfall 5/12). Require a true IANA identifier: must be in the
+        // canonical timezone_identifiers_list(). 'UTC' is allowed explicitly (it is
+        // in the list, but guard belt-and-braces).
+        $tz = trim( $tz );
+        if ( $tz === '' ) {
+            return new WP_Error( 'gs_avail_bad_tz', 'empty timezone', array( 'status' => 400, 'rejected' => $tz ) );
+        }
+        $iana = timezone_identifiers_list();
+        if ( $tz !== 'UTC' && ! in_array( $tz, $iana, true ) ) {
+            return new WP_Error(
+                'gs_avail_bad_tz',
+                sprintf( 'invalid IANA timezone: %s', $tz ),
+                array( 'status' => 400, 'rejected' => $tz )
+            );
+        }
+        // Final constructor check (defensive — should always pass for list members).
         try {
             new DateTimeZone( $tz );
             return null; // valid
