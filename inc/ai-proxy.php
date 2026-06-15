@@ -233,6 +233,21 @@ class GS_AI_Proxy {
         );
     }
 
+    /**
+     * Public accessor for the resolved OAuth client. The AI WIDGET must
+     * AUTHORIZE with the exact same client_id (and hub) that this proxy will
+     * later EXCHANGE the code with — if the authorize step uses one client
+     * (e.g. gend-society's GDC_OAUTH_CLIENT_ID constant, XuyL…) and the
+     * exchange uses another (e.g. the aipa_oauth_client_id site option,
+     * W1MTC…), WP-OAuth Server rejects the redemption with invalid_grant
+     * ("code invalid for the client"): observed as "click Sign in → popup
+     * shows Authorizing… → closes → user still anonymous, no login."
+     * ai-widget.php reads this so both halves stay in lockstep.
+     */
+    public static function widget_oauth_client() {
+        return self::aipa_client();
+    }
+
     public static function route_oauth_status( WP_REST_Request $request ) {
         $uid       = get_current_user_id();
         $connected = $uid && get_user_meta( $uid, 'gend_oauth_token', true ) !== '';

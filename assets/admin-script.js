@@ -211,7 +211,7 @@
                     response_type: 'code',
                     client_id: clientId,
                     redirect_uri: hubUrl + '/oauth-bridge/',
-                    scope: 'basic',
+                    scope: 'profile', // standard scope; 'basic' retired (clients whitelist 'profile')
                     state: state,
                     code_challenge: p.challenge,
                     code_challenge_method: 'S256'

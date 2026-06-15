@@ -275,13 +275,14 @@ function gs_oauth_render_login_page() {
                     response_type:         'code',
                     client_id:             clientId,
                     redirect_uri:          hubUrl + '/oauth-bridge/',
-                    // WP-OAuth Server only knows 'basic' out of the box;
-                    // 'read', 'profile', 'email' would need to be registered
-                    // under WP-OAuth → Scopes first. Basic is enough — the
-                    // /oauth/me userinfo endpoint returns the user's email
-                    // + display_name regardless, and that's all we need to
-                    // match the local wp_users row.
-                    scope:                 'basic',
+                    // Request 'profile' — the standard scope the GenD Core
+                    // (and Container Sites Login / Leo) WP-OAuth clients
+                    // whitelist. 'basic' is being retired: a client scoped to
+                    // 'profile' only returns invalid_scope for 'basic' at
+                    // /authorize. The /oauth/me userinfo endpoint returns the
+                    // user's email + display_name under 'profile' too, which is
+                    // all we need to match the local wp_users row.
+                    scope:                 'profile',
                     state:                 state,
                     code_challenge:        p.challenge,
                     code_challenge_method: 'S256'

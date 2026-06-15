@@ -94,6 +94,20 @@ class GS_AI_Widget {
 
     protected static function build_config() {
         $uid = get_current_user_id();
+        // Resolve the OAuth client from the SAME place the exchange route does
+        // (GS_AI_Proxy::aipa_client) so the authorize popup and the token
+        // exchange always present the identical client_id + hub. Sourcing the
+        // authorize client from gs_oauth_client_id() while the exchange used
+        // the aipa_oauth_client_id site option produced an invalid_grant and
+        // the "popup shows Authorizing… then closes, still logged out" bug.
+        $oauth = ( class_exists( 'GS_AI_Proxy' ) && method_exists( 'GS_AI_Proxy', 'widget_oauth_client' ) )
+            ? GS_AI_Proxy::widget_oauth_client()
+            : array(
+                'id'  => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '',
+                'hub' => self::hub_base(),
+            );
+        $oauth_client_id = (string) ( $oauth['id'] ?? '' );
+        $oauth_hub_url   = untrailingslashit( (string) ( $oauth['hub'] ?? self::hub_base() ) );
         return apply_filters( 'aipa_widget_config', array(
             // Local namespace — forwarded to the hub by GS_AI_Proxy.
             'rest'              => esc_url_raw( get_rest_url( null, 'aipa/v1' ) ),
@@ -116,9 +130,9 @@ class GS_AI_Widget {
             // the hub failed with "code invalid for the client". The
             // exchange itself is forwarded to the hub via the aipa/v1
             // catch-all (POST /aipa/v1/oauth/exchange).
-            'oauthClientId'     => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '',
-            'centralHubUrl'     => self::hub_base(),
-            'oauthClientID'     => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '', // alt-case alias some widget builds read
+            'oauthClientId'     => $oauth_client_id,
+            'centralHubUrl'     => $oauth_hub_url,
+            'oauthClientID'     => $oauth_client_id, // alt-case alias some widget builds read
             'icon'              => 'https://gend.me/wp-content/uploads/2025/12/Futuristic_Logo_Animation_Generation-ezgif.com-crop-1.gif',
             'leo_avatar'        => 'https://gend.me/wp-content/uploads/2025/12/Animated_Profile_Picture_At_Desk-ezgif.com-optimize.gif',
             'user_avatar'       => self::user_avatar_url(),
