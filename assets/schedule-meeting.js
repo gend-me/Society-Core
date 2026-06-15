@@ -282,4 +282,16 @@
     } else {
         ScheduleMeeting.mount();
     }
+
+    // Document-level delegate: any element with [data-gs-schedule-open] opens the
+    // same modal as the profile-icon trigger (e.g. the on-calendar "New Meeting"
+    // button rendered server-side in member-calendar.php). Guard mount() so the
+    // modalRoot exists even if the element is clicked before/independent of mount.
+    document.addEventListener('click', function (e) {
+        var t = e.target && e.target.closest ? e.target.closest('[data-gs-schedule-open]') : null;
+        if (!t) { return; }
+        e.preventDefault();
+        if (!ScheduleMeeting.modalRoot) { ScheduleMeeting.mount(); }
+        ScheduleMeeting.openModal();
+    });
 })();

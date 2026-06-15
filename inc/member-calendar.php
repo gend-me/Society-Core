@@ -352,6 +352,30 @@ function gs_calendar_profile_screen_content() {
 	// data-tz (now the member's IANA tz per Plan 28-02/28-03). The grid is
 	// JS-rendered — do NOT render it in PHP. The #gs-avail-settings sibling is the
 	// Phase 28-03 settings-panel mount point.
+	// ── On-calendar "New Meeting" action bar. Rendered in PHP OUTSIDE
+	// #gs-calendar-app (the JS owns that subtree and re-renders it, which would
+	// wipe a child button). The [data-gs-schedule-open] hook is handled by a
+	// document-level click delegate in schedule-meeting.js, opening the same
+	// modal as the profile-icon trigger. file_exists-guard the schedule asset so
+	// the button only shows when the modal script is actually deployed.
+	if ( file_exists( GS_DIR . 'assets/schedule-meeting.js' ) ) {
+		echo '<style>
+			.gs-cal-actionbar{display:flex;justify-content:flex-end;margin:0 0 14px;}
+			.gs-cal-newbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+				padding:10px 18px;border-radius:12px;border:1px solid rgba(182,8,201,.5);
+				background:linear-gradient(135deg,rgba(182,8,201,.22),rgba(182,8,201,.06));
+				color:#fff;font:700 13px/1 system-ui,sans-serif;letter-spacing:.04em;
+				text-transform:uppercase;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+				box-shadow:0 6px 18px -8px rgba(182,8,201,.6);transition:transform .15s ease,box-shadow .15s ease,background .15s ease;}
+			.gs-cal-newbtn:hover{transform:translateY(-1px);background:linear-gradient(135deg,rgba(182,8,201,.35),rgba(182,8,201,.12));box-shadow:0 10px 26px -8px rgba(182,8,201,.8);}
+			.gs-cal-newbtn span{font-size:16px;line-height:1;}
+		</style>';
+		echo '<div class="gs-cal-actionbar">'
+			. '<button type="button" class="gs-cal-newbtn" data-gs-schedule-open="1">'
+			. '<span aria-hidden="true">＋</span> New Meeting</button>'
+			. '</div>';
+	}
+
 	echo '<div id="gs-calendar-app" class="gs-cal-root" data-tz="' . esc_attr( $gs_member_tz ) . '">'
 		. '<div id="gs-avail-settings"></div>'
 		. '</div>';
