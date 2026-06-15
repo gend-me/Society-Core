@@ -15,8 +15,8 @@
  * — any surface (Phase 26 calendar event-detail popover, Phase 29 confirmation
  * page, wallet meeting feed) can render a Join button by adding that attribute.
  *
- * TOOLBAR_BUTTONS explicit allowlist — recording / livestreaming / sharedvideo
- * intentionally absent (v7.0 Out-of-Scope PR-guard).
+ * TOOLBAR_BUTTONS is an explicit allowlist — the broadcast / capture / shared-media
+ * controls are intentionally absent (v7.0 Out-of-Scope PR-guard).
  */
 ( function () {
     'use strict';
