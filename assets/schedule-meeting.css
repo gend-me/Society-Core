@@ -22,12 +22,22 @@
     display: flex;
 }
 
+/* Defensive box-sizing so padded native controls (datetime-local, select) never
+ * push past the card and create a horizontal scrollbar (Phase 31 Change 3). */
+.gs-schedule-modal *,
+.gs-schedule-modal *::before,
+.gs-schedule-modal *::after {
+    box-sizing: border-box;
+}
+
 .gs-schedule-card {
     position: relative;
     max-width: 520px;
     width: calc(100% - 32px);
     max-height: calc(100vh - 64px);
     overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
     background: linear-gradient(135deg, rgba(255, 255, 255, 0.12), rgba(255, 255, 255, 0.06));
     backdrop-filter: blur(25px);
     -webkit-backdrop-filter: blur(25px);
@@ -89,8 +99,10 @@
 }
 
 .gs-schedule-form input,
-.gs-schedule-form select {
+.gs-schedule-form select,
+.gs-schedule-form textarea {
     width: 100%;
+    max-width: 100%;
     padding: 8px 10px;
     border-radius: 8px;
     border: 1px solid rgba(255, 255, 255, 0.2);
@@ -98,6 +110,25 @@
     color: #fff;
     box-sizing: border-box;
     font-size: 14px;
+}
+
+/* Constrain all form controls (incl. buttons) so none overflow horizontally.
+ * Buttons keep their own visual styling — this only caps their width + box model. */
+.gs-schedule-form input,
+.gs-schedule-form select,
+.gs-schedule-form textarea,
+.gs-schedule-form button {
+    max-width: 100%;
+    box-sizing: border-box;
+}
+
+/* Calendar-picker hint under the slot-start field. */
+.gs-schedule-hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 12px;
+    opacity: 0.7;
+    font-style: italic;
 }
 
 .gs-schedule-form input:focus,

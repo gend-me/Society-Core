@@ -41,7 +41,7 @@
     }
 
     var ScheduleMeeting = {
-        state: { open: false, type: 'video', duration: 30, mounted: false },
+        state: { open: false, type: 'video', duration: 30, mounted: false, prefillStart: '' },
         modalRoot: null,
         metaContainer: null,
 
@@ -83,14 +83,19 @@
             document.body.appendChild(this.modalRoot);
         },
 
-        openModal: function () {
+        // openModal accepts an optional 'YYYY-MM-DDTHH:MM' local datetime string
+        // (emitted by the calendar's gs:schedule-open event when a day/slot is
+        // clicked). When present, render() seeds the slot-start field with it.
+        openModal: function (prefillStart) {
             this.state.open = true;
+            this.state.prefillStart = (typeof prefillStart === 'string') ? prefillStart : '';
             this.render();
             this.modalRoot.setAttribute('aria-hidden', 'false');
         },
 
         closeModal: function () {
             this.state.open = false;
+            this.state.prefillStart = '';
             this.modalRoot.setAttribute('aria-hidden', 'true');
             this.modalRoot.innerHTML = '';
         },
@@ -141,9 +146,16 @@
             }
 
             // ─── Slot datetime picker ───
+            // The native datetime-local keeps its own calendar dropdown, but the
+            // primary way to set it is clicking a day/slot on the member calendar
+            // (which fires gs:schedule-open with a prefill). Seed the value here.
+            var slotInputAttrs = { type: 'datetime-local', name: 'slot_start_local', required: 'required' };
+            if (self.state.prefillStart) { slotInputAttrs.value = self.state.prefillStart; }
             var slotField = ce('label', {}, [
                 ce('span', { text: 'Slot start' }),
-                ce('input', { type: 'datetime-local', name: 'slot_start_local', required: 'required' })
+                ce('input', slotInputAttrs),
+                ce('span', { className: 'gs-schedule-hint',
+                             text: 'Tip: click a day or time slot on the calendar to set this automatically.' })
             ]);
 
             // ─── Guest fields ───
@@ -293,5 +305,14 @@
         e.preventDefault();
         if (!ScheduleMeeting.modalRoot) { ScheduleMeeting.mount(); }
         ScheduleMeeting.openModal();
+    });
+
+    // Calendar-as-picker: the member calendar dispatches gs:schedule-open with a
+    // { start: 'YYYY-MM-DDTHH:MM' } local datetime when a day cell / time slot is
+    // clicked. Open the modal pre-filled with that slot start. Ensure mount() ran
+    // so modalRoot exists even if the calendar is clicked before the trigger.
+    document.addEventListener('gs:schedule-open', function (e) {
+        if (!ScheduleMeeting.modalRoot) { ScheduleMeeting.mount(); }
+        ScheduleMeeting.openModal(e && e.detail && e.detail.start);
     });
 })();

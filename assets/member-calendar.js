@@ -107,6 +107,33 @@
 		return p.y + '-' + String(p.m).padStart(2, '0') + '-' + String(p.d).padStart(2, '0');
 	}
 
+	/* ---------------------------------------------------------------------------
+	 * Phase 31 — calendar-as-picker. Clicking the empty part of a day cell (Month)
+	 * or a time slot (Week/Day) opens the Schedule Meeting modal pre-filled with
+	 * that date/time, via the 'gs:schedule-open' CustomEvent the modal listens for.
+	 * The datetime is emitted as a LOCAL 'YYYY-MM-DDTHH:MM' string (no Z) so it
+	 * drops straight into the <input type="datetime-local"> field.
+	 * ------------------------------------------------------------------------- */
+
+	/** Dispatch the schedule-open event with a local 'YYYY-MM-DDTHH:MM' start. */
+	function dispatchScheduleOpen(localStart) {
+		document.dispatchEvent(new CustomEvent('gs:schedule-open', {
+			detail: { start: localStart }
+		}));
+	}
+
+	/**
+	 * Build a 'YYYY-MM-DDTHH:MM' local datetime-local string for a calendar day
+	 * (as seen in the configured tz) at the given hour:minute. We take the day-key
+	 * (already tz-correct) and append the chosen wall-clock time — the user picks
+	 * the slot they SEE, so the wall-clock hour is exactly what they intend.
+	 */
+	function localDateTimeForDay(date, tz, hour, minute) {
+		var key = dayKeyInTz(date, tz); // YYYY-MM-DD in the configured tz
+		return key + 'T' + String(hour || 0).padStart(2, '0') + ':' +
+			String(minute || 0).padStart(2, '0');
+	}
+
 	/** Formatted time, e.g. "2:30 PM", in the configured tz. */
 	function timeLabel(date, tz) {
 		return fmt(tz, { hour: 'numeric', minute: '2-digit' }).format(date);
@@ -511,6 +538,20 @@
 			if (date.getMonth() !== cursorMonth) { cell.classList.add('is-adjacent'); }
 			if (dayKeyInTz(date, tz) === todayKey) { cell.classList.add('is-today'); }
 
+			// Phase 31 — make the day cell a meeting picker. data-gs-date holds the
+			// tz-correct day-key; clicking the EMPTY part (not an event chip) opens
+			// the Schedule Meeting modal pre-filled with this date at 09:00 local.
+			var dayKey = dayKeyInTz(date, tz);
+			cell.setAttribute('data-gs-date', dayKey);
+			cell.classList.add('gs-cal-cell--clickable');
+			cell.title = 'Click to schedule a meeting';
+			cell.addEventListener('click', function (e) {
+				// Event chips open their own popover (they stopPropagation), but guard
+				// anyway: ignore clicks that originate on/inside a chip.
+				if (e.target && e.target.closest && e.target.closest('.gs-cal-chip')) { return; }
+				dispatchScheduleOpen(localDateTimeForDay(date, tz, 9, 0));
+			});
+
 			var num = document.createElement('div');
 			num.className = 'gs-cal-cell__num';
 			num.textContent = fmt(tz, { day: 'numeric' }).format(date);
@@ -594,11 +635,24 @@
 			var col = document.createElement('div');
 			col.className = 'gs-cal-day-col';
 			col.style.setProperty('--cell-i', ci);
-			for (var hh = 0; hh < 24; hh++) {
-				var slot = document.createElement('div');
-				slot.className = 'gs-cal-hour-slot';
-				col.appendChild(slot);
-			}
+			(function (dayDate) {
+				for (var hh = 0; hh < 24; hh++) {
+					var slot = document.createElement('div');
+					slot.className = 'gs-cal-hour-slot gs-cal-cell--clickable';
+					// Phase 31 — clicking a time slot opens the Schedule Meeting modal
+					// pre-filled with this day at this slot's wall-clock hour:00.
+					var slotLocal = localDateTimeForDay(dayDate, tz, hh, 0);
+					slot.setAttribute('data-gs-datetime', slotLocal);
+					slot.title = 'Click to schedule a meeting';
+					(function (localStart) {
+						slot.addEventListener('click', function (e) {
+							if (e.target && e.target.closest && e.target.closest('.gs-cal-chip')) { return; }
+							dispatchScheduleOpen(localStart);
+						});
+					})(slotLocal);
+					col.appendChild(slot);
+				}
+			})(d);
 			self.eventsForDay(d).forEach(function (ev) {
 				if (ev.all_day) { return; }
 				var sd = new Date(ev.start);
