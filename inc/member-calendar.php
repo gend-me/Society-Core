@@ -215,6 +215,14 @@ function gs_calendar_profile_screen_content() {
 	wp_enqueue_style( 'gs-member-calendar', GS_URL . 'assets/member-calendar.css', [], $css_ver );
 	wp_enqueue_script( 'gs-member-calendar', GS_URL . 'assets/member-calendar.js', [], $js_ver, true );
 
+	// Phase 27 wire-up: feed the calendar JS the REST base + a wp_rest nonce so it
+	// can GET gs/v1/calendar/events (cookie-authed own events => X-WP-Nonce header).
+	// member-calendar.js reads window.gsCalendarData.{restUrl,nonce}; absent => mock.
+	wp_localize_script( 'gs-member-calendar', 'gsCalendarData', array(
+		'restUrl' => esc_url_raw( rest_url( 'gs/v1/' ) ),
+		'nonce'   => wp_create_nonce( 'wp_rest' ),
+	) );
+
 	// Phase 28-03: the availability Settings panel + overlay styles. Depend on
 	// gs-member-calendar so they load after the calendar controller. filemtime-
 	// busted single-version idiom (file_exists-guarded so a missing asset degrades).

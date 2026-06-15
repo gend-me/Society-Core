@@ -46,6 +46,20 @@
 
 	var DAY_MS = 86400000;
 
+	/* The gs/v1/calendar/events adapters tag rows with the short source codes
+	 * pm/bm/mtg. The renderer (GS_CAL_SOURCES, legend toggles, eventsForDay filter)
+	 * keys on the long names projects/campaigns/meetings. Map short→long on ingest
+	 * so legend show/hide + source swatch resolve — without touching the event shape
+	 * or any render function. Long names pass through unchanged. */
+	var GS_SOURCE_ALIAS = {
+		pm: 'projects',  projects:  'projects',
+		bm: 'campaigns', campaigns: 'campaigns',
+		mtg: 'meetings', meetings:  'meetings'
+	};
+	function normalizeSource(src) {
+		return GS_SOURCE_ALIAS[src] || src;
+	}
+
 	/* Phase 28-03 — availability overlay cache, keyed by view|from|to. Busted by
 	 * the 'gs:availability-changed' event after a Save in the settings panel. */
 	var _overlayCache = { key: '', data: null };
@@ -173,13 +187,89 @@
 		this.tz = resolveTz(root);
 		this.reduced = window.matchMedia &&
 			window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+		// Phase 27 wire-up: when the REST localize (gsCalendarData) is present we
+		// drive the grid from live events (start empty, fetch fills it). buildMockEvents
+		// remains ONLY as a dev-safety fallback when the localize is absent.
+		this._hasRest = !!(window.gsCalendarData && window.gsCalendarData.restUrl);
 		this.state = {
 			view: 'month',
 			cursor: new Date(),
 			hiddenSources: {},          // { projects:true } => hidden
-			events: buildMockEvents()
+			events: this._hasRest ? [] : buildMockEvents()
 		};
+		// Track the last-fetched range so navigation within it doesn't re-hit the
+		// server, and so a failed fetch degrades to whatever we already have.
+		this._fetchedFrom = null;
+		this._fetchedTo = null;
 	}
+
+	/* ---------------------------------------------------------------------------
+	 * Phase 27 — live events fetch. GETs the gs/v1/calendar/events aggregation
+	 * endpoint (cookie-authed; needs X-WP-Nonce) for [fromISO, toISO), maps the
+	 * normalized rows into this.state.events (already the locked shape), then
+	 * re-renders. Handles both a bare array and an {events:[...]} envelope. On any
+	 * failure it leaves the current events untouched (graceful, never throws).
+	 * ------------------------------------------------------------------------- */
+	Calendar.prototype.fetchEvents = function (fromISO, toISO) {
+		if (!this._hasRest) { return; }
+		var self = this;
+		var base = String(window.gsCalendarData.restUrl).replace(/\/$/, '');
+		var url = base + '/calendar/events?from=' + encodeURIComponent(fromISO) +
+			'&to=' + encodeURIComponent(toISO);
+		var nonce = window.gsCalendarData.nonce || '';
+		fetch(url, {
+			credentials: 'same-origin',
+			headers: nonce ? { 'X-WP-Nonce': nonce } : {}
+		}).then(function (r) {
+			return r.ok ? r.json() : null;
+		}).then(function (data) {
+			if (!data) { return; }                 // non-2xx => keep current events
+			if (data.code && !Array.isArray(data)) { return; } // WP_Error envelope
+			var list = Array.isArray(data) ? data
+				: (data && Array.isArray(data.events) ? data.events : null);
+			if (!list) { return; }                 // unexpected shape => keep current
+			// Normalize source codes (pm/bm/mtg → projects/campaigns/meetings) so the
+			// legend filter + color map resolve. Default missing color from the source.
+			list.forEach(function (ev) {
+				if (ev && ev.source) {
+					ev.source = normalizeSource(ev.source);
+					if (!ev.color && GS_CAL_SOURCES[ev.source]) {
+						ev.color = GS_CAL_SOURCES[ev.source].color;
+					}
+				}
+			});
+			self.state.events = list;
+			self._fetchedFrom = fromISO;
+			self._fetchedTo = toISO;
+			self.render();
+		}).catch(function () { /* silent — keep current events on network error */ });
+	};
+
+	/**
+	 * The wide [from, to) range to fetch for the current cursor: covers the
+	 * cursor's month padded by a full month on each side, so month/week/day
+	 * navigation within ±1 month re-uses the cached set without a refetch.
+	 */
+	Calendar.prototype._fetchRange = function () {
+		var c = this.state.cursor;
+		var from = new Date(c.getFullYear(), c.getMonth() - 1, 1, 0, 0, 0);
+		var to = new Date(c.getFullYear(), c.getMonth() + 2, 1, 0, 0, 0);
+		return { fromISO: from.toISOString(), toISO: to.toISOString(),
+			fromMs: from.getTime(), toMs: to.getTime() };
+	};
+
+	/** Fetch only if the cursor moved outside the last-fetched window. */
+	Calendar.prototype.ensureEvents = function (force) {
+		if (!this._hasRest) { return; }
+		var r = this._fetchRange();
+		if (!force && this._fetchedFrom && this._fetchedTo) {
+			var have = new Date(this._fetchedFrom).getTime();
+			var haveTo = new Date(this._fetchedTo).getTime();
+			var cursorMs = this.state.cursor.getTime();
+			if (cursorMs >= have && cursorMs < haveTo) { return; } // still covered
+		}
+		this.fetchEvents(r.fromISO, r.toISO);
+	};
 
 	/** Visible events for the active view (filtered by hidden sources). */
 	Calendar.prototype.visibleEvents = function () {
@@ -195,10 +285,12 @@
 		else { c.setDate(c.getDate() + dir); }
 		this.state.cursor = c;
 		this.render();
+		this.ensureEvents();
 	};
 	Calendar.prototype.goToday = function () {
 		this.state.cursor = new Date();
 		this.render();
+		this.ensureEvents();
 	};
 	Calendar.prototype.setView = function (view) {
 		if (this.state.view === view) { return; }
@@ -845,6 +937,10 @@
 		root.__gsCal = cal;     // expose for debugging / Phase 27 hand-off
 		window.__gsCalendar = cal; // Phase 28-03 — handle for the availability-changed listener
 		cal.render();
+		// Phase 27 — populate from the live events endpoint for the visible range.
+		// No-op (renders empty) until the fetch resolves; falls back to mock data
+		// only when gsCalendarData is absent (handled in the constructor).
+		cal.ensureEvents(true);
 	});
 
 	/* Phase 28-03 — when the settings panel saves, re-read the configured tz from
@@ -858,6 +954,7 @@
 			var root = cal.root || document.getElementById('gs-calendar-app');
 			if (root && root.dataset && root.dataset.tz) { cal.tz = root.dataset.tz; }
 			cal.render();
+			cal.ensureEvents(true); // re-pull live events too (availability edits can shift meetings)
 		} else {
 			location.reload(); // graceful fallback — should not trigger when controller is mounted
 		}

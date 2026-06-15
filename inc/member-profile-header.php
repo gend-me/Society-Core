@@ -523,8 +523,13 @@ function gdc_render_profile_header() {
                              class="gdc-avatar">
                         <h1 class="gdc-identity-name"><?php echo esc_html( $display_name ); ?></h1>
                         <p class="gdc-identity-auth">AUTHORIZATION: <?php echo esc_html( $auth_label ); ?></p>
-                        <?php if ( $msg_url || $friend_text ) : ?>
-                        <div class="gdc-identity-actions">
+                        <?php
+                        // Always render the actions row (carrying the id schedule-meeting.js
+                        // targets FIRST) so the "Schedule Meeting" button can mount by the
+                        // avatar on the member's OWN calendar/profile too — not only when the
+                        // Message/Connect links (non-own profile) are present.
+                        ?>
+                        <div id="gs-profile-actions" class="gdc-identity-actions">
                             <?php if ( $msg_url ) : ?>
                             <a href="<?php echo esc_url( $msg_url ); ?>" class="gdc-action-btn">Message</a>
                             <?php endif; ?>
@@ -532,7 +537,6 @@ function gdc_render_profile_header() {
                             <a href="<?php echo esc_url( $friend_url ); ?>" class="gdc-action-btn gdc-action-btn--connect"><?php echo esc_html( $friend_text ); ?></a>
                             <?php endif; ?>
                         </div>
-                        <?php endif; ?>
                     </div>
                 </div>
             </div>
