@@ -37,6 +37,10 @@ require_once GS_DIR . 'inc/dashboard-remote-membership.php';
 // on the BP-group Feature Suite tab via gdc_get_container_active_plugins.
 require_once GS_DIR . 'inc/feature-state-reporter.php';
 require_once GS_DIR . 'inc/dashboard-hosting.php';
+// Media-storage plan panel for the blog-manager Media tab (Phase 33). Loads
+// AFTER dashboard-hosting.php + dashboard-remote-membership.php so its helper
+// functions + the gs_membership_refresh AJAX action are already defined.
+require_once GS_DIR . 'inc/media-storage-panel.php';
 require_once GS_DIR . 'inc/feature-cards.php';
 require_once GS_DIR . 'inc/pages/dashboard.php';
 // Connected web-app group menu → embedded (inline, not iframe) tab pages.

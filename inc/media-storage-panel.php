@@ -162,3 +162,104 @@ function gs_media_storage_panel_render() {
 		return;
 	}
 }
+
+add_action( 'admin_enqueue_scripts', 'gs_media_storage_panel_enqueue' );
+
+/**
+ * Enqueue a self-contained, screen-scoped (blog-manager only) popup handler.
+ *
+ * The live upgrade-popup JS (dashboard-remote-membership.php:830-857) is
+ * closure-scoped to the dashboard render — its memberUrl/nonce/ajaxAction are
+ * NOT in scope on the blog-manager admin screen, so it cannot be reused as-is.
+ * This ships a tiny standalone copy of the same flow.
+ *
+ * @param string $hook_suffix Current admin page hook.
+ */
+function gs_media_storage_panel_enqueue( $hook_suffix ) {
+	// Screen gate IDENTICAL to GMO (class-gmo-admin-subtab.php:44-50).
+	$is_bm = is_string( $hook_suffix )
+		&& ( strpos( $hook_suffix, 'blog-manager' ) !== false
+			|| ( isset( $_GET['page'] ) && $_GET['page'] === 'blog-manager' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+	if ( ! $is_bm ) {
+		return;
+	}
+	if ( ! current_user_can( 'edit_posts' ) ) {
+		return;
+	}
+
+	$ver = defined( 'GS_VERSION' ) ? GS_VERSION : (string) filemtime( __FILE__ );
+
+	wp_register_script( 'gs-media-storage-panel', false, array(), $ver, true );
+	wp_localize_script(
+		'gs-media-storage-panel',
+		'GS_MEDIA_STORAGE',
+		array(
+			'ajaxUrl' => admin_url( 'admin-ajax.php' ),
+			// MUST match gs_membership_ajax_authorize()'s check_ajax_referer('gs_membership_action','nonce').
+			'nonce'   => wp_create_nonce( 'gs_membership_action' ),
+		)
+	);
+	wp_add_inline_script( 'gs-media-storage-panel', gs_media_storage_panel_inline_js() );
+	wp_enqueue_script( 'gs-media-storage-panel' );
+}
+
+/**
+ * Standalone vanilla-JS popup handler. Mirrors dashboard-remote-membership.php
+ * :830-857 but self-contained (no dependency on the dashboard IIFE).
+ *
+ * @return string
+ */
+function gs_media_storage_panel_inline_js() {
+	return <<<'JS'
+(function () {
+	function refreshAndReload() {
+		var cfg = window.GS_MEDIA_STORAGE || {};
+		if (!cfg.ajaxUrl) { setTimeout(function () { location.reload(); }, 600); return; }
+		fetch(cfg.ajaxUrl, {
+			method: 'POST',
+			credentials: 'same-origin',
+			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+			body: 'action=gs_membership_refresh&nonce=' + encodeURIComponent(cfg.nonce || '')
+		}).then(function () {
+			setTimeout(function () { location.reload(); }, 600);
+		}).catch(function () {
+			setTimeout(function () { location.reload(); }, 600);
+		});
+	}
+
+	function init() {
+		var btn = document.querySelector('[data-gs-mship="upgrade-plan"][data-resource="media"]');
+		if (!btn) { return; }
+		btn.addEventListener('click', function () {
+			var memberUrl = btn.getAttribute('data-gs-member-url') || '';
+			if (!memberUrl) { return; }
+			var w = 920, h = 760;
+			var x = (window.screen.width - w) / 2;
+			var y = (window.screen.height - h) / 2;
+			var popup = window.open(
+				memberUrl + '?ui=embed&group=hosting',
+				'gs_mship_upgrade',
+				'width=' + w + ',height=' + h + ',left=' + x + ',top=' + y
+			);
+			if (!popup) { return; }
+			var watchdog = setInterval(function () {
+				if (popup.closed) { clearInterval(watchdog); refreshAndReload(); }
+			}, 600);
+			window.addEventListener('message', function onMsg(ev) {
+				if (!ev.data || ev.data.type !== 'gs_membership_changed') { return; }
+				window.removeEventListener('message', onMsg);
+				clearInterval(watchdog);
+				try { popup.close(); } catch (e) {}
+				refreshAndReload();
+			});
+		});
+	}
+
+	if (document.readyState === 'loading') {
+		document.addEventListener('DOMContentLoaded', init);
+	} else {
+		init();
+	}
+})();
+JS;
+}
