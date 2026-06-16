@@ -256,6 +256,12 @@ require_once GS_DIR . 'inc/oauth-login.php';
 // gend.me portal handshake + support access + feature gating
 require_once GS_DIR . 'inc/portal-connect.php';
 require_once GS_DIR . 'inc/support-access.php';
+// Container-side agent provisioning rail (file_exists-guarded: the new include
+// may not have synced to the live PVC before this entrypoint — guard prevents a
+// require_once fatal that WP would punish with plugin auto-deactivation).
+if ( file_exists( GS_DIR . 'inc/agent-provision.php' ) ) {
+    require_once GS_DIR . 'inc/agent-provision.php';
+}
 require_once GS_DIR . 'inc/feature-gates.php';
 
 // AI proxy — server-side bridge to the LEO backend on the gend.me hub.
