@@ -262,6 +262,14 @@ require_once GS_DIR . 'inc/support-access.php';
 if ( file_exists( GS_DIR . 'inc/agent-provision.php' ) ) {
     require_once GS_DIR . 'inc/agent-provision.php';
 }
+// Container-side AI-agent chat reply hook (Phase 35: messages_message_sent ->
+// persona reply via hub LEO -> messages_new_message AS the agent). Same
+// file_exists guard rationale as agent-provision above: the live container
+// runs an OLDER gend-society and the include may not have synced yet — a bare
+// require_once would fatal and WP would auto-deactivate the plugin.
+if ( file_exists( GS_DIR . 'inc/agent-chat.php' ) ) {
+    require_once GS_DIR . 'inc/agent-chat.php';
+}
 require_once GS_DIR . 'inc/feature-gates.php';
 
 // AI proxy — server-side bridge to the LEO backend on the gend.me hub.
