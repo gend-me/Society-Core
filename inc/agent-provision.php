@@ -65,6 +65,12 @@ function gs_agent_register_routes() {
         'callback'            => 'gs_agent_deactivate',
         'permission_callback' => '__return_true',
     ));
+
+    register_rest_route('gs/v1', '/agent/send', array(
+        'methods'             => 'POST',
+        'callback'            => 'gs_agent_send',
+        'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
+    ));
 }
 
 /**
@@ -259,6 +265,95 @@ function gs_agent_deactivate(\WP_REST_Request $request) {
         'ok'              => true,
         'state'           => 'deactivated',
         'container_user_id' => (int) $user->ID,
+    ));
+}
+
+/**
+ * POST /gs/v1/agent/send
+ *
+ * Signed-by-hub request → send an email AS the agent, from the agent's OWN
+ * stored mailbox address. The hub operator (signature-verified) specifies the
+ * recipients/subject/body; the From is read SERVER-SIDE from the resolved
+ * agent user's stored em_inbox_address (NEVER from the payload), so there is no
+ * from-override abuse surface. A deactivated agent (_aipa_agent_disabled) is
+ * refused. This route only sends what the verified request specifies — there is
+ * NO autonomous/unprompted send.
+ *
+ * Self-contained: depends only on functions known present on this (older)
+ * container plus the email-manager send core (em_inbox_send_as), which is
+ * function_exists-guarded so a not-yet-deployed core returns 501, never fatals.
+ */
+function gs_agent_send(\WP_REST_Request $request) {
+
+    $payload = gs_agent_verify_signed_request($request);
+    if (is_wp_error($payload)) {
+        return $payload;
+    }
+
+    $slug = sanitize_title((string) ($payload['slug'] ?? ''));
+    if ($slug === '') {
+        return new \WP_Error('gs_agent_bad_slug', __('slug required', 'gend-society'), array('status' => 400));
+    }
+
+    // Resolve the user by email first; fall back to login (the
+    // vendor-app-manager fix_user_query rewrite can make get_user_by('email')
+    // return false for users lacking wp_{site_id}_capabilities meta).
+    $domain = function_exists('em_inbox_default_domain') ? (string) em_inbox_default_domain() : (string) get_option('em_inbox_default_domain', '');
+    $user   = false;
+    if ($domain !== '') {
+        $user = get_user_by('email', 'agent-' . $slug . '@' . $domain);
+    }
+    if (!$user) {
+        $user = get_user_by('login', 'agent-' . $slug);
+    }
+
+    if (!$user) {
+        // A send has no idempotent "absent" — a missing agent is an error.
+        return new \WP_Error('gs_agent_no_user', __('Agent user not found', 'gend-society'), array('status' => 404));
+    }
+
+    // Hard guard: a deactivated agent must not be able to send, even if a stale
+    // hub card lingers (MAIL-03).
+    if (get_user_meta($user->ID, '_aipa_agent_disabled', true)) {
+        return new \WP_Error('gs_agent_disabled', __('Agent is deactivated and cannot send.', 'gend-society'), array('status' => 403));
+    }
+
+    // Authoritative From: the agent's STORED mailbox address — never the payload.
+    $from = strtolower(trim((string) get_user_meta($user->ID, 'em_inbox_address', true)));
+    if ($from === '' || !is_email($from)) {
+        return new \WP_Error('gs_agent_no_address', __('Agent has no configured inbox address.', 'gend-society'), array('status' => 409));
+    }
+
+    if (!function_exists('em_inbox_send_as')) {
+        return new \WP_Error('gs_agent_no_em', __('email-manager send core not available on this site.', 'gend-society'), array('status' => 501));
+    }
+
+    $to      = $payload['to'] ?? array();
+    $subject = (string) ($payload['subject'] ?? '');
+
+    $res = em_inbox_send_as(
+        $from,
+        $to,
+        $subject,
+        array(
+            'body_html'  => (string) ($payload['body_html'] ?? ''),
+            'body_plain' => (string) ($payload['body_plain'] ?? ''),
+        ),
+        array('undo_seconds' => 0)   // synchronous, immediate relay — no UI undo on the hub side
+    );
+    if (is_wp_error($res)) {
+        return $res;   // surface validation errors (no recipient / empty body / no address)
+    }
+
+    // Ops audit trail (discretionary — not required by any MAIL requirement).
+    update_user_meta($user->ID, '_aipa_agent_last_sent_at', time());
+
+    return rest_ensure_response(array(
+        'ok'              => (bool) ($res['ok'] ?? false),
+        'from'            => $from,
+        'message_id'      => $res['message_id'] ?? null,
+        'raw_id'          => $res['raw_id'] ?? null,
+        'delivery_status' => $res['delivery_status'] ?? null,
     ));
 }
 
