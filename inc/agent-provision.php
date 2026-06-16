@@ -248,7 +248,10 @@ function gs_agent_deactivate(\WP_REST_Request $request) {
         return rest_ensure_response(array('ok' => true, 'state' => 'absent'));
     }
 
-    wp_destroy_other_sessions_for_user($user->ID);
+    // Destroy ALL of the agent's auth sessions (no core helper takes a user id —
+    // wp_destroy_other_sessions() only acts on the current user, so use the
+    // session-token manager directly for this specific account).
+    WP_Session_Tokens::get_instance($user->ID)->destroy_all();
     $user->set_role('subscriber');           // strip ai_agent; keep user for audit
     update_user_meta($user->ID, '_aipa_agent_disabled', 1);
 
