@@ -8,7 +8,8 @@
  *   - Duration picker (from member's named_durations, falls back to 15/30/60)
  *   - Per-type meta fields (address, phone+direction, provider+room_url)
  *   - Guest details (name, email, phone)
- *   - Slot datetime picker (datetime-local → UTC ISO Z at submit)
+ *   - Visual date+time picker (glassmorphic calendar grid + clock dashboard)
+ *     writing a hidden slot_start_local 'YYYY-MM-DDTHH:MM' field (→ UTC ISO Z at submit)
  *   - Submit → POST /gs/v1/calendar/meetings (X-WP-Nonce header)
  *   - On success: closes modal + dispatches CustomEvent('gs:meeting-created')
  *
@@ -44,6 +45,15 @@
         state: { open: false, type: 'video', duration: 30, mounted: false, prefillStart: '' },
         modalRoot: null,
         metaContainer: null,
+
+        // ── Visual date+time picker state ──
+        // pick.selDate: Date at local midnight of the chosen day (or null).
+        // pick.viewYear/viewMonth: the month currently displayed in the calendar grid.
+        // pick.hour (0-23) / pick.minute (0/5/.../55): the chosen time.
+        // pick.hiddenInput / pick.gridEl / pick.readoutEl / pick.clockEl / pick.titleEl:
+        //   live element refs so we can repaint without a full modal re-render.
+        pick: null,
+        MINUTE_STEP: 5,
 
         mount: function () {
             if (this.state.mounted) { return; }
@@ -145,18 +155,11 @@
                 durSel.appendChild(opt);
             }
 
-            // ─── Slot datetime picker ───
-            // The native datetime-local keeps its own calendar dropdown, but the
-            // primary way to set it is clicking a day/slot on the member calendar
-            // (which fires gs:schedule-open with a prefill). Seed the value here.
-            var slotInputAttrs = { type: 'datetime-local', name: 'slot_start_local', required: 'required' };
-            if (self.state.prefillStart) { slotInputAttrs.value = self.state.prefillStart; }
-            var slotField = ce('label', {}, [
-                ce('span', { text: 'Slot start' }),
-                ce('input', slotInputAttrs),
-                ce('span', { className: 'gs-schedule-hint',
-                             text: 'Tip: click a day or time slot on the calendar to set this automatically.' })
-            ]);
+            // ─── Visual date+time picker (replaces the old native date/time input) ───
+            // Builds a glassmorphic calendar grid + clock dashboard. Every change
+            // writes a 'YYYY-MM-DDTHH:MM' local string into the hidden
+            // slot_start_local input — the SAME field/format the submit handler reads.
+            var slotField = self.buildPicker();
 
             // ─── Guest fields ───
             var guestFields = ce('div', { className: 'gs-schedule-guest' }, [
@@ -228,6 +231,275 @@
             }
         },
 
+        // ───────────────────────── Visual date+time picker ─────────────────────────
+
+        // Parse a 'YYYY-MM-DDTHH:MM' local string into { date, hour, minute }.
+        // Returns null on anything malformed.
+        parsePrefill: function (s) {
+            if (typeof s !== 'string') { return null; }
+            var m = s.match(/^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/);
+            if (!m) { return null; }
+            var y = +m[1], mo = +m[2] - 1, d = +m[3], h = +m[4], mi = +m[5];
+            var dt = new Date(y, mo, d, 0, 0, 0, 0);
+            if (isNaN(dt.getTime())) { return null; }
+            return { date: dt, hour: h, minute: mi };
+        },
+
+        pad2: function (n) { return (n < 10 ? '0' : '') + n; },
+
+        // Local midnight for a Date (drops time component) — used for past-day compare.
+        atMidnight: function (dt) {
+            return new Date(dt.getFullYear(), dt.getMonth(), dt.getDate(), 0, 0, 0, 0);
+        },
+
+        // Snap an arbitrary minute to the nearest MINUTE_STEP (clamped 0..55).
+        snapMinute: function (mi) {
+            var step = this.MINUTE_STEP;
+            var s = Math.round(mi / step) * step;
+            if (s >= 60) { s = 60 - step; }
+            if (s < 0) { s = 0; }
+            return s;
+        },
+
+        // Build the whole picker UI and seed its state. Returns the wrapper element.
+        buildPicker: function () {
+            var self = this;
+            var now = new Date();
+
+            // Seed selection from prefill, else default to TODAY + next rounded half-hour.
+            var seed = self.parsePrefill(self.state.prefillStart);
+            var selDate, hour, minute;
+            if (seed) {
+                selDate = self.atMidnight(seed.date);
+                hour = seed.hour;
+                minute = self.snapMinute(seed.minute);
+            } else {
+                selDate = self.atMidnight(now);
+                // Next rounded half-hour from now (e.g. 14:12 → 14:30, 14:46 → 15:00).
+                var roundedMin = now.getMinutes() <= 30 ? 30 : 0;
+                hour = roundedMin === 0 ? (now.getHours() + 1) % 24 : now.getHours();
+                minute = roundedMin;
+            }
+
+            self.pick = {
+                selDate: selDate,
+                viewYear: selDate.getFullYear(),
+                viewMonth: selDate.getMonth(),
+                hour: hour,
+                minute: minute,
+                hiddenInput: null,
+                gridEl: null,
+                titleEl: null,
+                readoutEl: null,
+                clockEl: null,
+                errEl: null
+            };
+
+            // Hidden field the submit handler reads — CONTRACT: name + format unchanged.
+            var hidden = ce('input', { type: 'hidden', name: 'slot_start_local' });
+            self.pick.hiddenInput = hidden;
+
+            // ── Calendar column ──
+            var calTitle = ce('div', { className: 'gs-dtp-cal-title' });
+            self.pick.titleEl = calTitle;
+            var prevBtn = ce('button', { type: 'button', className: 'gs-dtp-nav', 'aria-label': 'Previous month',
+                                         text: '‹', onclick: function () { self.shiftMonth(-1); } });
+            var nextBtn = ce('button', { type: 'button', className: 'gs-dtp-nav', 'aria-label': 'Next month',
+                                         text: '›', onclick: function () { self.shiftMonth(1); } });
+            var calHeader = ce('div', { className: 'gs-dtp-cal-header' }, [prevBtn, calTitle, nextBtn]);
+
+            var dow = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+            var weekRow = ce('div', { className: 'gs-dtp-weekdays' });
+            for (var w = 0; w < 7; w++) { weekRow.appendChild(ce('span', { text: dow[w] })); }
+
+            var grid = ce('div', { className: 'gs-dtp-grid' });
+            self.pick.gridEl = grid;
+
+            var calCol = ce('div', { className: 'gs-dtp-cal' }, [calHeader, weekRow, grid]);
+
+            // ── Clock / time column ──
+            var readout = ce('div', { className: 'gs-dtp-readout', 'aria-live': 'polite' });
+            self.pick.readoutEl = readout;
+
+            // Analog clock face (read-only visual SVG).
+            var clockWrap = ce('div', { className: 'gs-dtp-clock' });
+            clockWrap.innerHTML = self.clockSvg();
+            self.pick.clockEl = clockWrap;
+
+            // Hour stepper.
+            var hourMinus = ce('button', { type: 'button', className: 'gs-dtp-step', 'aria-label': 'Earlier hour',
+                                           text: '−', onclick: function () { self.bumpHour(-1); } });
+            var hourPlus = ce('button', { type: 'button', className: 'gs-dtp-step', 'aria-label': 'Later hour',
+                                          text: '+', onclick: function () { self.bumpHour(1); } });
+            var hourLabel = ce('span', { className: 'gs-dtp-step-label', text: 'Hour' });
+            var hourRow = ce('div', { className: 'gs-dtp-stepper' }, [hourLabel, hourMinus, hourPlus]);
+
+            // Minute stepper (snaps to MINUTE_STEP).
+            var minMinus = ce('button', { type: 'button', className: 'gs-dtp-step', 'aria-label': 'Fewer minutes',
+                                          text: '−', onclick: function () { self.bumpMinute(-1); } });
+            var minPlus = ce('button', { type: 'button', className: 'gs-dtp-step', 'aria-label': 'More minutes',
+                                         text: '+', onclick: function () { self.bumpMinute(1); } });
+            var minLabel = ce('span', { className: 'gs-dtp-step-label', text: 'Minute' });
+            var minRow = ce('div', { className: 'gs-dtp-stepper' }, [minLabel, minMinus, minPlus]);
+
+            // Quick-picks row — one-tap common times.
+            var quick = ce('div', { className: 'gs-dtp-quick' });
+            var quickTimes = [[9, 0], [12, 0], [14, 0], [16, 0]];
+            for (var q = 0; q < quickTimes.length; q++) {
+                (function (h, mi) {
+                    quick.appendChild(ce('button', {
+                        type: 'button', className: 'gs-dtp-quick-btn',
+                        text: self.pad2(h) + ':' + self.pad2(mi),
+                        onclick: function () { self.pick.hour = h; self.pick.minute = mi; self.paintTime(); self.syncHidden(); }
+                    }));
+                })(quickTimes[q][0], quickTimes[q][1]);
+            }
+
+            var timeCol = ce('div', { className: 'gs-dtp-time' }, [
+                readout, clockWrap, hourRow, minRow,
+                ce('div', { className: 'gs-dtp-quick-label', text: 'Quick picks' }),
+                quick
+            ]);
+
+            var body = ce('div', { className: 'gs-dtp-body' }, [calCol, timeCol]);
+
+            var errEl = ce('div', { className: 'gs-dtp-err', role: 'alert' });
+            self.pick.errEl = errEl;
+
+            var wrap = ce('div', { className: 'gs-dtp' }, [
+                ce('span', { className: 'gs-dtp-label', text: 'When' }),
+                ce('span', { className: 'gs-schedule-hint', text: 'Pick a date, then a time.' }),
+                body, hidden, errEl
+            ]);
+
+            // Initial paint.
+            self.paintCalendar();
+            self.paintTime();
+            self.syncHidden();
+            return wrap;
+        },
+
+        // SVG analog clock face skeleton (hands are positioned in paintTime via CSS transform).
+        clockSvg: function () {
+            var ticks = '';
+            for (var i = 0; i < 12; i++) {
+                var a = (i / 12) * 2 * Math.PI;
+                var x1 = 50 + Math.sin(a) * 42, y1 = 50 - Math.cos(a) * 42;
+                var x2 = 50 + Math.sin(a) * 46, y2 = 50 - Math.cos(a) * 46;
+                ticks += '<line x1="' + x1.toFixed(1) + '" y1="' + y1.toFixed(1) + '" x2="' + x2.toFixed(1) +
+                         '" y2="' + y2.toFixed(1) + '" class="gs-dtp-tick"/>';
+            }
+            return '<svg viewBox="0 0 100 100" class="gs-dtp-clock-svg" aria-hidden="true">' +
+                   '<circle cx="50" cy="50" r="47" class="gs-dtp-clock-face"/>' + ticks +
+                   '<line x1="50" y1="50" x2="50" y2="26" class="gs-dtp-hand gs-dtp-hand-hour"/>' +
+                   '<line x1="50" y1="50" x2="50" y2="14" class="gs-dtp-hand gs-dtp-hand-min"/>' +
+                   '<circle cx="50" cy="50" r="3" class="gs-dtp-clock-pin"/></svg>';
+        },
+
+        shiftMonth: function (delta) {
+            var p = this.pick;
+            var d = new Date(p.viewYear, p.viewMonth + delta, 1);
+            p.viewYear = d.getFullYear();
+            p.viewMonth = d.getMonth();
+            this.paintCalendar();
+        },
+
+        bumpHour: function (delta) {
+            var p = this.pick;
+            p.hour = (p.hour + delta + 24) % 24;
+            this.paintTime();
+            this.syncHidden();
+        },
+
+        bumpMinute: function (delta) {
+            var p = this.pick;
+            var next = p.minute + delta * this.MINUTE_STEP;
+            if (next >= 60) { next = 0; this.bumpHour(0); p.hour = (p.hour + 1) % 24; }
+            else if (next < 0) { next = 60 - this.MINUTE_STEP; p.hour = (p.hour + 23) % 24; }
+            p.minute = next;
+            this.paintTime();
+            this.syncHidden();
+        },
+
+        // Repaint the day grid (month title, weekday cells, selected/today/past states).
+        paintCalendar: function () {
+            var self = this, p = this.pick;
+            var months = ['January', 'February', 'March', 'April', 'May', 'June',
+                          'July', 'August', 'September', 'October', 'November', 'December'];
+            p.titleEl.textContent = months[p.viewMonth] + ' ' + p.viewYear;
+
+            var grid = p.gridEl;
+            grid.innerHTML = '';
+
+            var first = new Date(p.viewYear, p.viewMonth, 1);
+            var lead = first.getDay(); // 0=Sun
+            var daysInMonth = new Date(p.viewYear, p.viewMonth + 1, 0).getDate();
+            var todayMid = self.atMidnight(new Date());
+            var selMid = p.selDate ? p.selDate.getTime() : -1;
+
+            // Leading blanks for alignment.
+            for (var b = 0; b < lead; b++) {
+                grid.appendChild(ce('span', { className: 'gs-dtp-day gs-dtp-day-blank' }));
+            }
+
+            for (var d = 1; d <= daysInMonth; d++) {
+                (function (day) {
+                    var cellDate = new Date(p.viewYear, p.viewMonth, day, 0, 0, 0, 0);
+                    var isPast = cellDate.getTime() < todayMid.getTime();
+                    var cls = 'gs-dtp-day';
+                    if (cellDate.getTime() === todayMid.getTime()) { cls += ' gs-dtp-day-today'; }
+                    if (selMid === cellDate.getTime()) { cls += ' gs-dtp-day-sel'; }
+                    if (isPast) { cls += ' gs-dtp-day-past'; }
+
+                    var cell = ce('button', {
+                        type: 'button',
+                        className: cls,
+                        text: String(day),
+                        'data-i': String(day) // used only for stagger delay
+                    });
+                    if (isPast) {
+                        cell.setAttribute('disabled', 'disabled');
+                        cell.setAttribute('aria-disabled', 'true');
+                    } else {
+                        cell.addEventListener('click', function () {
+                            p.selDate = cellDate;
+                            self.paintCalendar();
+                            self.syncHidden();
+                        });
+                    }
+                    // Staggered entrance delay (CSS animation; honors reduced-motion).
+                    cell.style.setProperty('--gs-dtp-i', String(day));
+                    grid.appendChild(cell);
+                })(d);
+            }
+        },
+
+        // Repaint the digital readout + analog hands from pick.hour/minute.
+        paintTime: function () {
+            var p = this.pick;
+            p.readoutEl.textContent = this.pad2(p.hour) + ':' + this.pad2(p.minute);
+            var hourHand = p.clockEl.querySelector('.gs-dtp-hand-hour');
+            var minHand = p.clockEl.querySelector('.gs-dtp-hand-min');
+            if (hourHand && minHand) {
+                var hourDeg = ((p.hour % 12) + p.minute / 60) * 30; // 360/12
+                var minDeg = p.minute * 6;                          // 360/60
+                hourHand.setAttribute('transform', 'rotate(' + hourDeg.toFixed(1) + ' 50 50)');
+                minHand.setAttribute('transform', 'rotate(' + minDeg.toFixed(1) + ' 50 50)');
+            }
+        },
+
+        // Write the combined selection into the hidden slot_start_local field.
+        // Format MUST be 'YYYY-MM-DDTHH:MM' local (no Z) — the submit contract.
+        syncHidden: function () {
+            var p = this.pick;
+            if (!p || !p.hiddenInput) { return; }
+            if (!p.selDate) { p.hiddenInput.value = ''; return; }
+            var v = p.selDate.getFullYear() + '-' + this.pad2(p.selDate.getMonth() + 1) + '-' +
+                    this.pad2(p.selDate.getDate()) + 'T' + this.pad2(p.hour) + ':' + this.pad2(p.minute);
+            p.hiddenInput.value = v;
+            if (p.errEl) { p.errEl.textContent = ''; }
+        },
+
         onSubmit: function (e, form, errBox) {
             e.preventDefault();
             errBox.textContent = '';
@@ -236,7 +508,12 @@
 
             // Convert local datetime to UTC ISO Z (strip ms).
             var slotLocal = fd.get('slot_start_local');
-            if (!slotLocal) { errBox.textContent = 'Pick a slot start'; return; }
+            if (!slotLocal) {
+                var msg = 'Pick a date and time for the meeting';
+                if (this.pick && this.pick.errEl) { this.pick.errEl.textContent = msg; }
+                errBox.textContent = msg;
+                return;
+            }
             var dt = new Date(slotLocal);
             if (isNaN(dt.getTime())) { errBox.textContent = 'Invalid slot start'; return; }
             var slotUtcIso = dt.toISOString().replace(/\.\d{3}Z$/, 'Z');

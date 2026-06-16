@@ -202,6 +202,306 @@
     background: rgba(0, 0, 0, 0.4);
 }
 
+/* ─────────────────────── Visual date+time picker (gs-dtp) ───────────────────────
+ * Glassmorphic calendar grid + clock dashboard that replaces the native
+ * datetime-local input. Brand tokens: blue #89C2E0, magenta #b608c9, green #00ff88.
+ * Side-by-side on wide modals, stacked vertically on narrow widths (no horiz scroll). */
+.gs-dtp {
+    --gph-blue: #89C2E0;
+    --gph-magenta: #b608c9;
+    --gph-green: #00ff88;
+    display: block;
+    margin-bottom: 12px;
+    max-width: 100%;
+}
+
+.gs-dtp-label {
+    display: block;
+    margin-bottom: 4px;
+    opacity: 0.85;
+    font-size: 14px;
+}
+
+.gs-dtp .gs-schedule-hint {
+    margin-bottom: 10px;
+}
+
+.gs-dtp-body {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 16px;
+    align-items: stretch;
+    max-width: 100%;
+}
+
+.gs-dtp-cal,
+.gs-dtp-time {
+    flex: 1 1 240px;
+    min-width: 0; /* allow flex children to shrink below content width — prevents overflow */
+    max-width: 100%;
+    background: linear-gradient(135deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03));
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    border-radius: 14px;
+    padding: 12px;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-sizing: border-box;
+}
+
+/* ── Calendar ── */
+.gs-dtp-cal-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+}
+
+.gs-dtp-cal-title {
+    font-weight: 600;
+    font-size: 15px;
+    letter-spacing: 0.3px;
+}
+
+.gs-dtp-nav {
+    width: 30px;
+    height: 30px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+    font-size: 18px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.gs-dtp-nav:hover {
+    background: rgba(137, 194, 224, 0.25);
+    border-color: var(--gph-blue);
+}
+
+.gs-dtp-weekdays {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 2px;
+    margin-bottom: 4px;
+}
+
+.gs-dtp-weekdays span {
+    text-align: center;
+    font-size: 11px;
+    opacity: 0.6;
+    padding: 2px 0;
+}
+
+.gs-dtp-grid {
+    display: grid;
+    grid-template-columns: repeat(7, 1fr);
+    gap: 3px;
+}
+
+.gs-dtp-day {
+    aspect-ratio: 1 / 1;
+    min-width: 0;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.04);
+    color: #fff;
+    font-size: 13px;
+    cursor: pointer;
+    padding: 0;
+    transition: background 0.15s ease, border-color 0.15s ease, transform 0.1s ease;
+    animation: gs-dtp-day-in 0.32s ease both;
+    animation-delay: calc(var(--gs-dtp-i, 0) * 12ms);
+}
+
+.gs-dtp-day-blank {
+    background: transparent;
+    border: 0;
+    cursor: default;
+    animation: none;
+}
+
+.gs-dtp-day:not(.gs-dtp-day-past):not(.gs-dtp-day-blank):hover {
+    background: rgba(137, 194, 224, 0.25);
+    border-color: var(--gph-blue);
+    transform: translateY(-1px);
+}
+
+.gs-dtp-day-today {
+    box-shadow: inset 0 0 0 1.5px rgba(0, 255, 136, 0.6);
+}
+
+.gs-dtp-day-sel {
+    background: linear-gradient(135deg, var(--gph-magenta), #d83bff);
+    border-color: #e58bff;
+    color: #fff;
+    font-weight: 700;
+    box-shadow: 0 0 12px rgba(182, 8, 201, 0.65);
+}
+
+.gs-dtp-day-sel:hover {
+    background: linear-gradient(135deg, var(--gph-magenta), #d83bff);
+}
+
+.gs-dtp-day-past {
+    opacity: 0.3;
+    cursor: not-allowed;
+    background: transparent;
+}
+
+@keyframes gs-dtp-day-in {
+    from { opacity: 0; transform: scale(0.85); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+/* ── Time / clock dashboard ── */
+.gs-dtp-time {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 10px;
+}
+
+.gs-dtp-readout {
+    font-size: 38px;
+    font-weight: 700;
+    letter-spacing: 2px;
+    font-variant-numeric: tabular-nums;
+    background: linear-gradient(135deg, var(--gph-blue), var(--gph-green));
+    -webkit-background-clip: text;
+            background-clip: text;
+    -webkit-text-fill-color: transparent;
+    line-height: 1;
+}
+
+.gs-dtp-clock {
+    width: 110px;
+    height: 110px;
+    max-width: 100%;
+}
+
+.gs-dtp-clock-svg {
+    width: 100%;
+    height: 100%;
+}
+
+.gs-dtp-clock-face {
+    fill: rgba(0, 0, 0, 0.3);
+    stroke: rgba(137, 194, 224, 0.5);
+    stroke-width: 1.5;
+}
+
+.gs-dtp-tick {
+    stroke: rgba(255, 255, 255, 0.35);
+    stroke-width: 1.5;
+    stroke-linecap: round;
+}
+
+.gs-dtp-hand {
+    stroke-linecap: round;
+    transform-origin: 50px 50px;
+    transition: transform 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.gs-dtp-hand-hour {
+    stroke: var(--gph-blue);
+    stroke-width: 4;
+}
+
+.gs-dtp-hand-min {
+    stroke: var(--gph-green);
+    stroke-width: 2.5;
+}
+
+.gs-dtp-clock-pin {
+    fill: var(--gph-magenta);
+}
+
+.gs-dtp-stepper {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    justify-content: center;
+}
+
+.gs-dtp-step-label {
+    font-size: 12px;
+    opacity: 0.7;
+    width: 48px;
+    text-align: right;
+}
+
+.gs-dtp-step {
+    width: 34px;
+    height: 34px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.gs-dtp-step:hover {
+    background: rgba(0, 255, 136, 0.2);
+    border-color: var(--gph-green);
+}
+
+.gs-dtp-quick-label {
+    font-size: 12px;
+    opacity: 0.65;
+    margin-top: 2px;
+}
+
+.gs-dtp-quick {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+    justify-content: center;
+}
+
+.gs-dtp-quick-btn {
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.18);
+    background: rgba(0, 0, 0, 0.25);
+    color: #fff;
+    font-size: 13px;
+    font-variant-numeric: tabular-nums;
+    cursor: pointer;
+    transition: background 0.15s ease, border-color 0.15s ease;
+}
+
+.gs-dtp-quick-btn:hover {
+    background: rgba(137, 194, 224, 0.25);
+    border-color: var(--gph-blue);
+}
+
+.gs-dtp-err {
+    color: #ff6b6b;
+    font-size: 13px;
+    margin-top: 6px;
+    min-height: 16px;
+}
+
+/* Stack calendar + clock vertically on narrow modal widths → never any horizontal scroll. */
+@media (max-width: 480px) {
+    .gs-dtp-body {
+        flex-direction: column;
+    }
+    .gs-dtp-cal,
+    .gs-dtp-time {
+        flex: 1 1 100%;
+    }
+    .gs-dtp-readout {
+        font-size: 32px;
+    }
+}
+
 @media (max-width: 600px) {
     .gs-schedule-card {
         padding: 16px;
@@ -216,5 +516,14 @@
     .gs-schedule-card {
         backdrop-filter: none;
         -webkit-backdrop-filter: none;
+    }
+    .gs-dtp-day {
+        animation: none;
+    }
+    .gs-dtp-hand {
+        transition: none;
+    }
+    .gs-dtp-day:not(.gs-dtp-day-past):not(.gs-dtp-day-blank):hover {
+        transform: none;
     }
 }
