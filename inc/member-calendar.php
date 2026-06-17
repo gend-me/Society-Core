@@ -376,9 +376,14 @@ function gs_calendar_profile_screen_content() {
 			. '</div>';
 	}
 
-	echo '<div id="gs-calendar-app" class="gs-cal-root" data-tz="' . esc_attr( $gs_member_tz ) . '">'
-		. '<div id="gs-avail-settings"></div>'
-		. '</div>';
+	echo '<div id="gs-calendar-app" class="gs-cal-root" data-tz="' . esc_attr( $gs_member_tz ) . '"></div>';
+
+	// Settings/Visibility panel mount — a SIBLING of #gs-calendar-app, NOT a
+	// child. The calendar JS owns #gs-calendar-app and clears/re-renders it on
+	// every view change, which would destroy a child mount (this is exactly why
+	// the availability + visibility panel never appeared). availability-settings.js
+	// fills this node; it works regardless of placement.
+	echo '<div id="gs-avail-settings" class="gs-avail-settings-mount"></div>';
 
 	// Guarantee the .member-calendar body class is present so the CSS above
 	// applies, even if a theme/Youzify body_class path drops it. This screen
