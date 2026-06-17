@@ -225,6 +225,19 @@ if ( file_exists( GS_DIR . 'inc/class-booking-public-page.php' ) ) {
 	Gend_GS_Booking_Public_Page::init();
 }
 
+// Phase 31-frontend — read-only public shared-calendar view at
+// /calendar-view/{share_token} (Gend_GS_Calendar_Public_View, file_exists guard
+// per Pitfall 1). Registers a rewrite rule (flushed once per version bump) AND a
+// template_redirect interceptor (priority 5) so the URL works even before a
+// flush propagates. Renders a STANDALONE glassmorphic shell that enqueues
+// calendar-public-view.{js,css} + inlines { restBase, token }; the JS calls the
+// token-gated /gs/v1/calendar/public/{token}/{info,events} endpoints which
+// enforce privacy server-side. init() only adds hooks — side-effect-free here.
+if ( file_exists( GS_DIR . 'inc/class-calendar-public-view.php' ) ) {
+	require_once GS_DIR . 'inc/class-calendar-public-view.php';
+	Gend_GS_Calendar_Public_View::init();
+}
+
 // Connections → Invite sub-tab (email/CSV → invite emails with affiliate URL).
 // Optional — file_exists guard so the plugin still activates when these
 // modules aren't shipped on this branch (caught in production where
