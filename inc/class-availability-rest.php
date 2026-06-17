@@ -94,6 +94,14 @@ class Gend_GS_Availability_REST {
             $bs_raw = json_decode( (string) $row['booking_settings_json'], true );
             if ( is_array( $bs_raw ) ) { $booking_settings = $bs_raw; }
         }
+        // Phase 31 — ALWAYS echo a fully-defaulted visibility object so the
+        // frontend can render current owner-controlled sharing state even when
+        // the member has never saved settings. Defaults are private/busy/all-on.
+        $booking_settings['visibility'] = self::sanitize_visibility(
+            isset( $booking_settings['visibility'] ) && is_array( $booking_settings['visibility'] )
+                ? $booking_settings['visibility']
+                : array()
+        );
 
         return rest_ensure_response( array(
             'user_id'          => (int) $row['user_id'],
@@ -260,7 +268,77 @@ class Gend_GS_Availability_REST {
             $clean['named_durations'] = $dur_clean;
         }
 
+        // Phase 31 — owner-controlled calendar visibility (nested object).
+        // Stored INSIDE booking_settings_json (no schema migration). When the
+        // client sends a visibility object we sanitize + persist it; absence
+        // leaves any previously-stored value untouched on the next read because
+        // handle_get() re-fills defaults. We only persist when the key is sent
+        // so a settings PUT that omits visibility doesn't wipe it — BUT the
+        // UPSERT replaces booking_settings_json wholesale, so the frontend PUT
+        // is expected to round-trip the full booking_settings (handle_get
+        // returns visibility, frontend echoes it back). To be safe we still
+        // persist a sanitized visibility whenever present.
+        if ( isset( $payload['visibility'] ) && is_array( $payload['visibility'] ) ) {
+            $clean['visibility'] = self::sanitize_visibility( $payload['visibility'] );
+        }
+
         return $clean;
+    }
+
+    /**
+     * Phase 31 — sanitize the owner-controlled visibility object.
+     *
+     * Shape (all keys defaulted when absent):
+     *   visibility = {
+     *     privacy : 'private'|'link'|'public'  (default 'private'),
+     *     detail  : 'full'|'busy'              (default 'busy'),
+     *     sources : { projects:bool, campaigns:bool, meetings:bool }  (default all true),
+     *     identity: { name:bool (true), avatar:bool (true), bio:bool (false), timezone:bool (true) }
+     *   }
+     *
+     * Enum values are whitelisted; unknown enum values fall back to the default.
+     * Booleans are coerced. Unknown keys are dropped. Always returns the full
+     * shape so callers (handle_get + the public endpoints) can rely on every key.
+     *
+     * @param array $raw Untrusted visibility sub-object.
+     * @return array Fully-populated, sanitized visibility object.
+     */
+    public static function sanitize_visibility( array $raw ) : array {
+        // privacy enum.
+        $privacy = isset( $raw['privacy'] ) ? (string) $raw['privacy'] : 'private';
+        if ( ! in_array( $privacy, array( 'private', 'link', 'public' ), true ) ) {
+            $privacy = 'private';
+        }
+
+        // detail enum.
+        $detail = isset( $raw['detail'] ) ? (string) $raw['detail'] : 'busy';
+        if ( ! in_array( $detail, array( 'full', 'busy' ), true ) ) {
+            $detail = 'busy';
+        }
+
+        // sources booleans — default all true.
+        $sources_raw = ( isset( $raw['sources'] ) && is_array( $raw['sources'] ) ) ? $raw['sources'] : array();
+        $sources = array(
+            'projects'  => array_key_exists( 'projects',  $sources_raw ) ? (bool) $sources_raw['projects']  : true,
+            'campaigns' => array_key_exists( 'campaigns', $sources_raw ) ? (bool) $sources_raw['campaigns'] : true,
+            'meetings'  => array_key_exists( 'meetings',  $sources_raw ) ? (bool) $sources_raw['meetings']  : true,
+        );
+
+        // identity booleans — name/avatar/timezone default true, bio default false.
+        $identity_raw = ( isset( $raw['identity'] ) && is_array( $raw['identity'] ) ) ? $raw['identity'] : array();
+        $identity = array(
+            'name'     => array_key_exists( 'name',     $identity_raw ) ? (bool) $identity_raw['name']     : true,
+            'avatar'   => array_key_exists( 'avatar',   $identity_raw ) ? (bool) $identity_raw['avatar']   : true,
+            'bio'      => array_key_exists( 'bio',      $identity_raw ) ? (bool) $identity_raw['bio']      : false,
+            'timezone' => array_key_exists( 'timezone', $identity_raw ) ? (bool) $identity_raw['timezone'] : true,
+        );
+
+        return array(
+            'privacy'  => $privacy,
+            'detail'   => $detail,
+            'sources'  => $sources,
+            'identity' => $identity,
+        );
     }
 
     /** Pitfall 5 — IANA only; offsets/abbreviations rejected. */

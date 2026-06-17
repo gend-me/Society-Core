@@ -56,6 +56,10 @@ class Gend_GS_Booking_Public_REST {
     const DEFAULT_MAX_BOOKINGS_PER_DAY = 8;
     const SLOT_GRANULARITY_MIN        = 15;
     const MAX_RANGE_DAYS              = 31;
+    // Phase 31 — public shared-calendar events range cap (wider than booking's 31d).
+    const MAX_PUBLIC_EVENTS_DAYS      = 90;
+    // Phase 31 — single neutral "busy" color for privacy-safe (detail=busy) blocks.
+    const BUSY_BLOCK_COLOR            = '--gph-grey';
 
     /**
      * Register all six public booking routes on rest_api_init.
@@ -94,6 +98,25 @@ class Gend_GS_Booking_Public_REST {
                 'notes'          => array( 'required' => false, 'type' => 'string' ),
                 'hp_email'       => array( 'required' => false, 'type' => 'string' ),
             ),
+        ) );
+
+        // 2b. Phase 31 — GET owner's normalized events for a date range (token-gated read).
+        //     Enforces owner-controlled visibility (privacy/detail/sources).
+        register_rest_route( self::NS, '/calendar/public/' . $token_re . '/events', array(
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => array( __CLASS__, 'handle_public_events' ),
+            'permission_callback' => '__return_true',
+            'args'                => array(
+                'from' => array( 'required' => true, 'type' => 'string' ),
+                'to'   => array( 'required' => true, 'type' => 'string' ),
+            ),
+        ) );
+
+        // 2c. Phase 31 — GET owner identity/info per visibility.identity (token-gated read).
+        register_rest_route( self::NS, '/calendar/public/' . $token_re . '/info', array(
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => array( __CLASS__, 'handle_public_info' ),
+            'permission_callback' => '__return_true',
         ) );
 
         // 3. GET a meeting by cancellation_token (bookee self-service fetch).
@@ -180,6 +203,216 @@ class Gend_GS_Booking_Public_REST {
         } catch ( \Throwable $e ) {
             error_log( 'GS_BOOK_FATAL handle_slots: ' . $e->getMessage() );
             return new WP_Error( 'gs_book_fatal', 'Slot computation failed', array( 'status' => 500 ) );
+        }
+    }
+
+    /**
+     * GET /calendar/public/{share_token}/events — Phase 31 token-gated shared events.
+     *
+     * Enforces owner-controlled visibility settings stored in booking_settings_json:
+     *   - privacy 'private'  → 403 (no shared view; the token alone is NOT enough)
+     *   - privacy 'link'|'public' → allowed (the 43-char token is the gate)
+     *   - sources filter → drop events whose normalized source isn't enabled
+     *   - detail 'busy'  → collapse each event to a privacy-safe generic Busy block
+     *   - detail 'full'  → return the normal normalized event shape
+     *
+     * Pitfall 7 (identity hardening): owner resolved EXCLUSIVELY from share_token.
+     * NEVER reads ?user= and NEVER calls get_current_user_id() to authorize.
+     *
+     * @param WP_REST_Request $req
+     * @return WP_REST_Response|WP_Error
+     */
+    public static function handle_public_events( WP_REST_Request $req ) {
+        try {
+            $share_token = (string) $req['share_token'];
+
+            // Rate-limit BEFORE DB work to absorb token enumeration spray.
+            if ( $e = self::rate_limit_check( 'ip:' . self::client_ip(), self::RATE_LIMIT_IP_PER_MIN ) )    { return $e; }
+            if ( $e = self::rate_limit_check( 'tok:' . $share_token,     self::RATE_LIMIT_TOKEN_PER_MIN ) ) { return $e; }
+
+            $host_user_id = self::resolve_host_by_token( $share_token );
+            if ( $host_user_id === null ) {
+                return new WP_Error( 'gs_book_token_unknown', 'Calendar link invalid or revoked', array( 'status' => 404 ) );
+            }
+
+            $vis = self::get_visibility_settings( $host_user_id );
+
+            // ENFORCE privacy — 'private' → 403 (no shared view).
+            if ( $vis['privacy'] === 'private' ) {
+                return new WP_Error( 'gs_cal_private', 'This calendar is private', array( 'status' => 403 ) );
+            }
+
+            // Validate + clamp date range (ISO 8601 UTC).
+            $from_raw = sanitize_text_field( (string) ( $req->get_param( 'from' ) ?? '' ) );
+            $to_raw   = sanitize_text_field( (string) ( $req->get_param( 'to' )   ?? '' ) );
+            try {
+                $dt_from = new DateTimeImmutable( $from_raw, new DateTimeZone( 'UTC' ) );
+                $dt_to   = new DateTimeImmutable( $to_raw,   new DateTimeZone( 'UTC' ) );
+            } catch ( \Throwable $e ) {
+                return new WP_Error( 'gs_cal_bad_range', 'Invalid from/to (ISO 8601 UTC required)', array( 'status' => 400 ) );
+            }
+            if ( $dt_from >= $dt_to ) {
+                return new WP_Error( 'gs_cal_bad_range', 'from must be < to', array( 'status' => 400 ) );
+            }
+            $diff_days = ( $dt_to->getTimestamp() - $dt_from->getTimestamp() ) / 86400;
+            if ( $diff_days > self::MAX_PUBLIC_EVENTS_DAYS ) {
+                return new WP_Error( 'gs_cal_range_too_large', 'Range > 90 days', array( 'status' => 400 ) );
+            }
+
+            // Aggregator adapters normalize from/to into 'Y-m-d H:i:s' UTC (parse_iso_to_utc shape).
+            $from_mysql = $dt_from->format( 'Y-m-d H:i:s' );
+            $to_mysql   = $dt_to->format( 'Y-m-d H:i:s' );
+
+            $member_tz = class_exists( 'Gend_GS_Calendar_Events_REST' )
+                ? Gend_GS_Calendar_Events_REST::get_member_timezone( $host_user_id )
+                : ( wp_timezone_string() ?: 'UTC' );
+
+            // Build owner's events via the SAME Phase 27 source adapters the authed
+            // endpoint uses (Projects / BlogManager / Meetings).
+            $raw_events = self::build_owner_events( $host_user_id, $from_mysql, $to_mysql );
+
+            // Map normalized source key → visibility.sources key, then filter.
+            $out = array();
+            foreach ( $raw_events as $ev ) {
+                if ( ! is_array( $ev ) || ! isset( $ev['source'] ) ) { continue; }
+                $vis_source_key = self::map_source_to_visibility( (string) $ev['source'] );
+                if ( $vis_source_key === null ) { continue; } // unknown source — drop defensively
+                if ( empty( $vis['sources'][ $vis_source_key ] ) ) { continue; } // source disabled by owner
+
+                if ( $vis['detail'] === 'busy' ) {
+                    // Privacy-safe collapse — NO real title / url / description / source leak.
+                    $out[] = array(
+                        'id'      => isset( $ev['id'] ) ? (string) $ev['id'] : '',
+                        'start'   => isset( $ev['start'] ) ? (string) $ev['start'] : '',
+                        'end'     => isset( $ev['end'] )   ? (string) $ev['end']   : '',
+                        'all_day' => ! empty( $ev['all_day'] ),
+                        'busy'    => true,
+                        'title'   => 'Busy',
+                        'source'  => 'busy',
+                        'color'   => self::BUSY_BLOCK_COLOR,
+                        'status'  => '',
+                        'url'     => '',
+                    );
+                } else {
+                    // detail === 'full' — normal normalized shape for visible sources.
+                    $out[] = array(
+                        'id'      => isset( $ev['id'] )      ? (string) $ev['id']      : '',
+                        'source'  => (string) $ev['source'],
+                        'type'    => isset( $ev['type'] )    ? (string) $ev['type']    : '',
+                        'title'   => isset( $ev['title'] )   ? (string) $ev['title']   : '',
+                        'start'   => isset( $ev['start'] )   ? (string) $ev['start']   : '',
+                        'end'     => isset( $ev['end'] )     ? (string) $ev['end']     : '',
+                        'all_day' => ! empty( $ev['all_day'] ),
+                        'color'   => isset( $ev['color'] )   ? (string) $ev['color']   : '',
+                        'status'  => isset( $ev['status'] )  ? (string) $ev['status']  : '',
+                        'url'     => isset( $ev['url'] )      ? (string) $ev['url']     : '',
+                        'busy'    => ! empty( $ev['busy'] ),
+                    );
+                }
+            }
+
+            usort( $out, function ( $a, $b ) { return strcmp( (string) $a['start'], (string) $b['start'] ); } );
+
+            return rest_ensure_response( array(
+                'events'    => $out,
+                'member_tz' => $member_tz,
+                'detail'    => $vis['detail'],
+            ) );
+        } catch ( \Throwable $e ) {
+            error_log( 'GS_CAL_FATAL handle_public_events: ' . $e->getMessage() );
+            return new WP_Error( 'gs_cal_fatal', 'Shared calendar fetch failed', array( 'status' => 500 ) );
+        }
+    }
+
+    /**
+     * GET /calendar/public/{share_token}/info — Phase 31 owner identity per visibility.identity.
+     *
+     * privacy 'private' → 403 (same gate as events). Otherwise returns ONLY the
+     * identity fields the owner enabled (name/avatar/bio/timezone), plus privacy,
+     * detail, and the sources toggles.
+     *
+     * @param WP_REST_Request $req
+     * @return WP_REST_Response|WP_Error
+     */
+    public static function handle_public_info( WP_REST_Request $req ) {
+        try {
+            $share_token = (string) $req['share_token'];
+
+            if ( $e = self::rate_limit_check( 'ip:' . self::client_ip(), self::RATE_LIMIT_IP_PER_MIN ) )    { return $e; }
+            if ( $e = self::rate_limit_check( 'tok:' . $share_token,     self::RATE_LIMIT_TOKEN_PER_MIN ) ) { return $e; }
+
+            $host_user_id = self::resolve_host_by_token( $share_token );
+            if ( $host_user_id === null ) {
+                return new WP_Error( 'gs_book_token_unknown', 'Calendar link invalid or revoked', array( 'status' => 404 ) );
+            }
+
+            $vis = self::get_visibility_settings( $host_user_id );
+            if ( $vis['privacy'] === 'private' ) {
+                return new WP_Error( 'gs_cal_private', 'This calendar is private', array( 'status' => 403 ) );
+            }
+
+            $resp = array(
+                'privacy' => $vis['privacy'],
+                'detail'  => $vis['detail'],
+                'sources' => array(
+                    'projects'  => (bool) $vis['sources']['projects'],
+                    'campaigns' => (bool) $vis['sources']['campaigns'],
+                    'meetings'  => (bool) $vis['sources']['meetings'],
+                ),
+            );
+
+            // identity.name → display_name.
+            if ( ! empty( $vis['identity']['name'] ) ) {
+                $display_name = function_exists( 'bp_core_get_user_displayname' )
+                    ? (string) bp_core_get_user_displayname( $host_user_id )
+                    : '';
+                if ( $display_name === '' ) {
+                    $u = get_userdata( $host_user_id );
+                    $display_name = $u ? (string) $u->display_name : '';
+                }
+                $resp['display_name'] = $display_name;
+            }
+
+            // identity.avatar → avatar_url.
+            if ( ! empty( $vis['identity']['avatar'] ) ) {
+                if ( function_exists( 'bp_core_fetch_avatar' ) ) {
+                    $resp['avatar_url'] = (string) bp_core_fetch_avatar( array(
+                        'item_id' => $host_user_id,
+                        'object'  => 'user',
+                        'type'    => 'full',
+                        'html'    => false,
+                    ) );
+                } else {
+                    $resp['avatar_url'] = (string) get_avatar_url( $host_user_id );
+                }
+            }
+
+            // identity.bio → bio (BP profile "Bio"/description field, fall back to user description).
+            if ( ! empty( $vis['identity']['bio'] ) ) {
+                $bio = '';
+                if ( function_exists( 'bp_get_profile_field_data' ) ) {
+                    $bio = (string) bp_get_profile_field_data( array(
+                        'field'   => 'Bio',
+                        'user_id' => $host_user_id,
+                    ) );
+                }
+                if ( $bio === '' ) {
+                    $bio = (string) get_user_meta( $host_user_id, 'description', true );
+                }
+                $resp['bio'] = wp_kses_post( $bio );
+            }
+
+            // identity.timezone → timezone (IANA).
+            if ( ! empty( $vis['identity']['timezone'] ) ) {
+                $resp['timezone'] = class_exists( 'Gend_GS_Calendar_Events_REST' )
+                    ? Gend_GS_Calendar_Events_REST::get_member_timezone( $host_user_id )
+                    : ( wp_timezone_string() ?: 'UTC' );
+            }
+
+            return rest_ensure_response( $resp );
+        } catch ( \Throwable $e ) {
+            error_log( 'GS_CAL_FATAL handle_public_info: ' . $e->getMessage() );
+            return new WP_Error( 'gs_cal_fatal', 'Shared calendar info fetch failed', array( 'status' => 500 ) );
         }
     }
 
@@ -547,6 +780,90 @@ class Gend_GS_Booking_Public_REST {
             $share_token
         ) );
         return $uid ? (int) $uid : null;
+    }
+
+    /**
+     * Phase 31 — read owner's visibility object from booking_settings_json with
+     * fully-defaulted shape. Delegates to Gend_GS_Availability_REST::sanitize_visibility()
+     * so the default/enum/coercion logic lives in ONE place.
+     *
+     * @param int $host_user_id
+     * @return array Fully-populated visibility object (privacy/detail/sources/identity).
+     */
+    private static function get_visibility_settings( int $host_user_id ) : array {
+        global $wpdb;
+        $tbl = Gend_GS_Availability_Schema::table_availability();
+        $row = $wpdb->get_row( $wpdb->prepare(
+            "SELECT booking_settings_json FROM {$tbl} WHERE user_id = %d LIMIT 1",
+            $host_user_id
+        ) );
+        $bs  = $row ? (array) json_decode( $row->booking_settings_json ?: '{}', true ) : array();
+        $vis = ( isset( $bs['visibility'] ) && is_array( $bs['visibility'] ) ) ? $bs['visibility'] : array();
+
+        if ( class_exists( 'Gend_GS_Availability_REST' ) ) {
+            return Gend_GS_Availability_REST::sanitize_visibility( $vis );
+        }
+        // Defensive fallback (partial deploy) — mirror the canonical defaults.
+        return array(
+            'privacy'  => in_array( ( $vis['privacy'] ?? 'private' ), array( 'private', 'link', 'public' ), true ) ? $vis['privacy'] : 'private',
+            'detail'   => in_array( ( $vis['detail']  ?? 'busy' ),    array( 'full', 'busy' ), true )              ? $vis['detail']  : 'busy',
+            'sources'  => array( 'projects' => true, 'campaigns' => true, 'meetings' => true ),
+            'identity' => array( 'name' => true, 'avatar' => true, 'bio' => false, 'timezone' => true ),
+        );
+    }
+
+    /**
+     * Phase 31 — build the owner's normalized events via the SAME Phase 27 source
+     * adapters the authed gs/v1/calendar/events endpoint uses (Projects / BlogManager
+     * / Meetings). Each adapter is guarded (Pitfall 4) so one throwing never blanks
+     * siblings. from/to are 'Y-m-d H:i:s' UTC (parse_iso_to_utc-normalized shape).
+     *
+     * @param int    $host_user_id
+     * @param string $from_mysql  'Y-m-d H:i:s' UTC
+     * @param string $to_mysql    'Y-m-d H:i:s' UTC
+     * @return array Normalized event objects (LOCKED Phase 26 11-field contract).
+     */
+    private static function build_owner_events( int $host_user_id, string $from_mysql, string $to_mysql ) : array {
+        $adapters = array();
+        if ( class_exists( 'Gend_GS_Calendar_Source_Projects' ) )    { $adapters[] = new Gend_GS_Calendar_Source_Projects(); }
+        if ( class_exists( 'Gend_GS_Calendar_Source_BlogManager' ) ) { $adapters[] = new Gend_GS_Calendar_Source_BlogManager(); }
+        if ( class_exists( 'Gend_GS_Calendar_Source_Meetings' ) )    { $adapters[] = new Gend_GS_Calendar_Source_Meetings(); }
+
+        $events = array();
+        foreach ( $adapters as $adapter ) {
+            try {
+                if ( ! $adapter->is_available() ) { continue; }
+                $rows = $adapter->read_events( $host_user_id, $from_mysql, $to_mysql );
+                if ( is_array( $rows ) && ! empty( $rows ) ) {
+                    $events = array_merge( $events, $rows );
+                }
+            } catch ( \Throwable $e ) {
+                error_log( '[gs_cal_public] adapter threw: ' . $e->getMessage() );
+                continue;
+            }
+        }
+        return $events;
+    }
+
+    /**
+     * Phase 31 — map a normalized event `source` key to a visibility.sources toggle key.
+     *
+     *   'pm'  (Projects)    → 'projects'
+     *   'bm'  (BlogManager) → 'campaigns'   (social/drip scheduled posts == campaigns)
+     *   'mtg' (Meetings)    → 'meetings'
+     *
+     * Returns null for unknown sources so the caller drops them defensively.
+     *
+     * @param string $source
+     * @return string|null
+     */
+    private static function map_source_to_visibility( string $source ) : ?string {
+        switch ( $source ) {
+            case 'pm':  return 'projects';
+            case 'bm':  return 'campaigns';
+            case 'mtg': return 'meetings';
+            default:    return null;
+        }
     }
 
     /**
