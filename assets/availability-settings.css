@@ -16,11 +16,13 @@
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
 }
 /* Reset theme (Youzify) typography leaking into the panel — serif headings,
-   oversized h-tags, default control fonts. */
+   oversized h-tags, default control fonts. !important to beat high-specificity
+   theme selectors (e.g. #content h4). */
 .gs-avail-settings, .gs-avail-settings * { box-sizing: border-box; }
-.gs-avail-settings h2, .gs-avail-settings h3, .gs-avail-settings strong,
-.gs-avail-settings label, .gs-avail-settings input, .gs-avail-settings select,
-.gs-avail-settings button { font-family: inherit; }
+.gs-avail-settings, .gs-avail-settings * {
+    font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
+    font-style: normal !important;
+}
 
 .gs-avail-settings::before {
     content: '';
@@ -46,15 +48,23 @@
     color: inherit; padding: 8px 10px; font-size: 13px; min-width: 240px;
 }
 
-/* Working-hour grid */
-.gs-avail-wh-grid { display: flex; flex-direction: column; gap: 8px; }
+/* Working-hour grid — desktop: 7 horizontal day columns */
+.gs-avail-wh-grid { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 10px; }
 .gs-avail-day-row {
-    display: grid; grid-template-columns: 60px 1fr; gap: 12px; align-items: center;
-    padding: 8px; background: rgba(0,0,0,0.12); border-radius: 8px;
+    display: flex; flex-direction: column; gap: 8px; align-items: stretch;
+    padding: 10px; background: rgba(0,0,0,0.12); border-radius: 10px;
 }
-.gs-avail-day-label { font-weight: 600; opacity: 0.85; }
-.gs-avail-ranges { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
-.gs-avail-range { display: inline-flex; gap: 4px; align-items: center; padding: 4px 6px; background: rgba(165,180,252,0.10); border-radius: 6px; }
+.gs-avail-day-label {
+    font-weight: 700; opacity: 0.9; font-size: 12px; text-align: center;
+    text-transform: uppercase; letter-spacing: 0.04em;
+}
+.gs-avail-ranges { display: flex; flex-direction: column; gap: 6px; align-items: stretch; }
+.gs-avail-range {
+    display: flex; flex-wrap: wrap; gap: 4px; align-items: center;
+    padding: 5px 6px; background: rgba(165,180,252,0.10); border-radius: 6px;
+}
+.gs-avail-range input[type="time"] { flex: 1 1 64px; min-width: 0; }
+.gs-avail-add-range { width: 100%; text-align: center; }
 .gs-avail-range input[type="time"] {
     background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.10); border-radius: 4px;
     color: inherit; padding: 2px 4px; font-size: 12px;
@@ -153,10 +163,17 @@
 .gs-avail-vis-share.is-private .gs-avail-share-hint { display: block; }
 .gs-avail-vis-share.is-private .gs-avail-share-box { opacity: 0.45; }
 
+/* Weekly-hours grid: 7 cols desktop → 4 → 2 → 1 as width shrinks */
+@media (max-width: 1200px) {
+    .gs-avail-wh-grid { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+}
 @media (max-width: 760px) {
-    .gs-avail-day-row { grid-template-columns: 50px 1fr; }
+    .gs-avail-wh-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
     .gs-avail-br-row { grid-template-columns: 1fr; }
     .gs-avail-seg-btn { flex: 1 1 auto; min-width: 0; }
+}
+@media (max-width: 460px) {
+    .gs-avail-wh-grid { grid-template-columns: 1fr; }
 }
 
 /* ─── Calendar grid overlays (rendered by member-calendar.js renderOverlays()) ─── */
