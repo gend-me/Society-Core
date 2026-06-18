@@ -71,6 +71,12 @@ function gs_agent_register_routes() {
         'callback'            => 'gs_agent_send',
         'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
     ));
+
+    register_rest_route('gs/v1', '/agent/run', array(
+        'methods'             => 'POST',
+        'callback'            => 'gs_agent_run',
+        'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
+    ));
 }
 
 /**
@@ -354,6 +360,162 @@ function gs_agent_send(\WP_REST_Request $request) {
         'message_id'      => $res['message_id'] ?? null,
         'raw_id'          => $res['raw_id'] ?? null,
         'delivery_status' => $res['delivery_status'] ?? null,
+    ));
+}
+
+/**
+ * POST /gs/v1/agent/run
+ *
+ * Signed-by-hub request → run a prompt AS the agent's container user through the
+ * container's hub AI path (gend-society → hub aipa/v1/ai-proxy → LEO/Vertex),
+ * using the agent's stored persona (_aipa_agent_system_prompt). The signature IS
+ * the auth (permission_callback => '__return_true'); the prompt/model come from
+ * the SIGNED payload. A deactivated agent (_aipa_agent_disabled) is refused.
+ *
+ * GRACEFUL DEGRADE: the agent container user is provisioned (Phase 32) but never
+ * OAuth-connected to gend.me, so it has no bearer → the AI call cannot be
+ * credit-attributed. Rather than fatal, we return a 402 not_connected proving
+ * the plumbing reached the AI gate (same standard as Phases 33/34/35).
+ *
+ * Self-contained on the OLDER live container: every cross-symbol call
+ * (Gend_CP_OAuth_Client, GS_AI_Proxy, em_inbox_default_domain, wp_set_current_user)
+ * is function_exists/class_exists/method_exists-guarded. Hard dependencies are
+ * core only (get_user_by, get_user_meta, wp_remote_post, get_option,
+ * wp_json_encode, rest_ensure_response) plus same-file gs_agent_verify_signed_request.
+ */
+function gs_agent_run(\WP_REST_Request $request) {
+
+    $payload = gs_agent_verify_signed_request($request);
+    if (is_wp_error($payload)) {
+        return $payload;   // 401 on missing/bad signature
+    }
+
+    $slug = sanitize_title((string) ($payload['slug'] ?? ''));
+    if ($slug === '') {
+        return new \WP_Error('gs_agent_bad_slug', __('slug required', 'gend-society'), array('status' => 400));
+    }
+
+    // Resolve the user by email first; fall back to login (the
+    // vendor-app-manager fix_user_query rewrite can make get_user_by('email')
+    // return false for users lacking wp_{site_id}_capabilities meta).
+    $domain = function_exists('em_inbox_default_domain') ? (string) em_inbox_default_domain() : (string) get_option('em_inbox_default_domain', '');
+    $user   = false;
+    if ($domain !== '') {
+        $user = get_user_by('email', 'agent-' . $slug . '@' . $domain);
+    }
+    if (!$user) {
+        $user = get_user_by('login', 'agent-' . $slug);
+    }
+
+    if (!$user) {
+        return new \WP_Error('gs_agent_no_user', __('Agent user not found', 'gend-society'), array('status' => 404));
+    }
+
+    // Hard guard: a deactivated agent must not be able to run.
+    if (get_user_meta($user->ID, '_aipa_agent_disabled', true)) {
+        return new \WP_Error('gs_agent_disabled', __('Agent is deactivated and cannot run.', 'gend-society'), array('status' => 403));
+    }
+
+    // Run inputs from the SIGNED payload.
+    $prompt = (string) ($payload['prompt'] ?? '');
+    if (trim($prompt) === '') {
+        return new \WP_Error('gs_agent_no_prompt', __('prompt required', 'gend-society'), array('status' => 400));
+    }
+    $model = (string) ($payload['model'] ?? '');
+
+    // Persona: the container-mirrored system prompt stamped at provision (Phase 32).
+    $persona = (string) get_user_meta($user->ID, '_aipa_agent_system_prompt', true);
+
+    // Run AS the agent user so any in-container session/identity is correct, then
+    // resolve THAT user's bearer.
+    if (function_exists('wp_set_current_user')) {
+        wp_set_current_user($user->ID);
+    }
+
+    $bearer = '';
+    if (class_exists('Gend_CP_OAuth_Client') && method_exists('Gend_CP_OAuth_Client', 'bearer_for')) {
+        $bearer = (string) Gend_CP_OAuth_Client::bearer_for($user->ID);
+    }
+
+    if ($bearer === '') {
+        // GRACEFUL DEGRADE: the agent user has no gend.me bearer. Prove the
+        // plumbing reached the AI gate; defer real credit attribution. NOT fatal.
+        return new \WP_REST_Response(array(
+            'ok'       => false,
+            'error'    => 'not_connected',
+            'message'  => __('Agent has no connected gend.me account for AI; cannot run on this Web App yet.', 'gend-society'),
+            'response' => '',
+            'model'    => $model,
+        ), 402);
+    }
+
+    // Call the container's hub AI path (mirror GS_AI_Proxy::route_chat, but inline
+    // — bearer()/auth_headers() are protected). Guard GS_AI_Proxy for hub_base;
+    // fall back to the stored option then gend.me so this route is self-contained
+    // even if GS_AI_Proxy is older/absent on the container.
+    $hub = (class_exists('GS_AI_Proxy') && method_exists('GS_AI_Proxy', 'hub_base'))
+        ? GS_AI_Proxy::hub_base()
+        : untrailingslashit((string) get_option('gs_gend_base_url', 'https://gend.me'));
+
+    $body = array(
+        'messages' => array(array('role' => 'user', 'content' => $prompt)),
+        'system'   => $persona,
+        'model'    => $model,
+    );
+
+    $r = wp_remote_post($hub . '/wp-json/aipa/v1/ai-proxy', array(
+        'timeout' => 60,
+        'headers' => array(
+            'Authorization' => 'Bearer ' . $bearer,
+            'X-Gend-Token'  => $bearer,
+            'Content-Type'  => 'application/json',
+        ),
+        'body'    => wp_json_encode($body),
+    ));
+    if (is_wp_error($r)) {
+        return new \WP_Error('gs_agent_run_upstream', $r->get_error_message(), array('status' => 502));
+    }
+
+    $code = (int) wp_remote_retrieve_response_code($r);
+    $raw  = (string) wp_remote_retrieve_body($r);
+    $data = json_decode($raw, true);
+
+    // Surface a 402 from the hub verbatim (insufficient credits) so the operator
+    // sees the credit gate.
+    if ($code === 402) {
+        return new \WP_REST_Response(array(
+            'ok'       => false,
+            'error'    => 'insufficient_credits',
+            'message'  => (is_array($data) && isset($data['message'])) ? $data['message'] : __('Insufficient credits.', 'gend-society'),
+            'response' => '',
+            'model'    => $model,
+        ), 402);
+    }
+    if ($code < 200 || $code >= 300) {
+        return new \WP_Error('gs_agent_run_upstream', sprintf(__('AI upstream returned %d', 'gend-society'), $code), array('status' => 502));
+    }
+
+    // Extract the assistant text best-effort (the hub proxy's shape varies).
+    $text = '';
+    if (is_array($data)) {
+        foreach (array('response', 'text', 'content') as $k) {
+            if (!empty($data[$k]) && is_string($data[$k])) {
+                $text = $data[$k];
+                break;
+            }
+        }
+        if ($text === '' && isset($data['choices'][0]['message']['content'])) {
+            $text = (string) $data['choices'][0]['message']['content'];
+        }
+    }
+
+    // Ops audit trail (mirrors gs_agent_send's last_sent_at).
+    update_user_meta($user->ID, '_aipa_agent_last_run_at', time());
+
+    return rest_ensure_response(array(
+        'ok'       => true,
+        'response' => $text,
+        'model'    => (is_array($data) && isset($data['model'])) ? $data['model'] : $model,
     ));
 }
 
