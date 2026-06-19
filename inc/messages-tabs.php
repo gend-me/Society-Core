@@ -269,7 +269,18 @@ function gs_chat_tabs_footer() {
 	$esc_url  = function_exists( 'esc_url' ) ? 'esc_url' : 'esc_attr';
 	$esc_attr = function_exists( 'esc_attr' ) ? 'esc_attr' : 'htmlspecialchars';
 	$esc_html = function_exists( 'esc_html' ) ? 'esc_html' : 'htmlspecialchars';
+
+	// Plan 43-01: REST roots + one wp_rest nonce (covers BOTH gs/v1 and psoo/v1).
+	// base_url / container host is intentionally NOT exposed.
+	$gs_chat_cfg = array(
+		'restRoot' => function_exists( 'rest_url' ) ? esc_url_raw( rest_url() ) : '',
+		'psooRoot' => function_exists( 'rest_url' ) ? esc_url_raw( rest_url( 'psoo/v1' ) ) : '',
+		'gsRoot'   => function_exists( 'rest_url' ) ? esc_url_raw( rest_url( 'gs/v1' ) ) : '',
+		'nonce'    => function_exists( 'wp_create_nonce' ) ? wp_create_nonce( 'wp_rest' ) : '',
+	);
+	$gs_chat_cfg_json = function_exists( 'wp_json_encode' ) ? wp_json_encode( $gs_chat_cfg ) : json_encode( $gs_chat_cfg );
 	?>
+	<script>window.GS_CHAT = <?php echo $gs_chat_cfg_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-encoded config. ?>;</script>
 	<template id="gs-chat-tabs-template">
 	  <nav class="gs-chat-tabs" aria-label="<?php echo $esc_attr( __( 'Chat section', 'gend-society' ) ); ?>">
 		<?php foreach ( $tabs as $slug => $meta ) : ?>
@@ -282,7 +293,61 @@ function gs_chat_tabs_footer() {
 			<?php echo $esc_html( $meta[1] ); ?>
 		</a>
 		<?php endforeach; ?>
+		<?php /* Plan 43-01: Agents-tab-only "+ Add new Agent" button. Lives inside
+			the same template/nav so it rides the existing inject/observer machinery;
+			the JS reveals it (removes [hidden]) only when the active tab is 'agents'. */ ?>
+		<button class="gs-agent-add" type="button" data-gs-agent-add hidden>
+			<span aria-hidden="true">＋</span> <?php echo $esc_html( __( 'Add new Agent', 'gend-society' ) ); ?>
+		</button>
 	  </nav>
+	</template>
+	<?php /* Plan 43-01: the agent-create popup. Two steps in one dialog —
+		(1) a group-admin Web-App picker (fetched from gs/v1/agent-admin-groups),
+		(2) the ported agent-build form. Submit POSTs to the DEPLOYED
+		psoo/v1/agents/create (over REST), then gs/v1/agent-welcome. */ ?>
+	<template id="gs-agent-popup-template">
+	  <div class="gs-agent-popup" data-gs-agent-popup role="dialog" aria-modal="true" aria-labelledby="gs-agent-popup-title">
+		<div class="gs-agent-popup__backdrop" data-gs-agent-close></div>
+		<div class="gs-agent-popup__dialog">
+		  <header class="gs-agent-popup__header">
+			<h2 id="gs-agent-popup-title"><?php echo $esc_html( __( 'Add new Agent', 'gend-society' ) ); ?></h2>
+			<button type="button" class="gs-agent-popup__close" data-gs-agent-close aria-label="<?php echo $esc_attr( __( 'Close', 'gend-society' ) ); ?>">×</button>
+		  </header>
+		  <div class="gs-agent-popup__body">
+			<?php /* Step 1 — group picker. */ ?>
+			<div class="gs-agent-step" data-gs-agent-step="group">
+			  <p class="gs-agent-popup__lead"><?php echo $esc_html( __( 'Pick a connected Web App you administer:', 'gend-society' ) ); ?></p>
+			  <div class="gs-agent-grouplist" data-gs-agent-grouplist></div>
+			  <p class="gs-agent-empty" data-gs-agent-empty hidden><?php echo $esc_html( __( 'You are not a group admin of any connected Web App.', 'gend-society' ) ); ?></p>
+			  <p class="gs-agent-status" data-gs-agent-groupstatus aria-live="polite"></p>
+			</div>
+			<?php /* Step 2 — agent-build form (ported from the projects modal). */ ?>
+			<div class="gs-agent-step" data-gs-agent-step="form" hidden>
+			  <button type="button" class="gs-agent-back" data-gs-agent-back>&larr; <?php echo $esc_html( __( 'Change group', 'gend-society' ) ); ?></button>
+			  <div class="gs-agent-field">
+				<label><?php echo $esc_html( __( 'Name', 'gend-society' ) ); ?> <span aria-hidden="true">*</span></label>
+				<input type="text" data-agent-field="name" placeholder="<?php echo $esc_attr( __( 'e.g. Aria', 'gend-society' ) ); ?>" autocomplete="off" />
+			  </div>
+			  <div class="gs-agent-field">
+				<label><?php echo $esc_html( __( 'Personality', 'gend-society' ) ); ?></label>
+				<textarea data-agent-field="system_prompt" rows="4" placeholder="<?php echo $esc_attr( __( 'Describe how this agent should behave, its tone, and what it helps with.', 'gend-society' ) ); ?>"></textarea>
+			  </div>
+			  <div class="gs-agent-field">
+				<label><?php echo $esc_html( __( 'Model', 'gend-society' ) ); ?></label>
+				<input type="text" data-agent-field="default_model" placeholder="<?php echo $esc_attr( __( 'Default model', 'gend-society' ) ); ?>" autocomplete="off" />
+			  </div>
+			  <div class="gs-agent-field">
+				<label><?php echo $esc_html( __( 'Avatar URL', 'gend-society' ) ); ?></label>
+				<input type="url" data-agent-field="avatar" placeholder="https://" autocomplete="off" />
+			  </div>
+			  <div class="gs-agent-actions">
+				<p class="gs-agent-status" data-gs-agent-status aria-live="polite"></p>
+				<button type="button" class="gs-agent-submit" data-gs-agent-submit><?php echo $esc_html( __( 'Create Agent', 'gend-society' ) ); ?></button>
+			  </div>
+			</div>
+		  </div>
+		</div>
+	  </div>
 	</template>
 	<script>
 	(function () {
@@ -343,6 +408,18 @@ function gs_chat_tabs_footer() {
 				a.classList.toggle('is-active', on);
 				a.setAttribute('aria-current', on ? 'page' : 'false');
 			}
+			revealAddButton(nav);
+		}
+
+		// Plan 43-01: show the "+ Add new Agent" button ONLY on the Agents tab.
+		function revealAddButton(nav) {
+			var btn = (nav && nav.querySelector('[data-gs-agent-add]')) || document.querySelector('.gs-chat-tabs [data-gs-agent-add]');
+			if (!btn) return;
+			if (activeTabFromUrl() === 'agents') {
+				btn.removeAttribute('hidden');
+			} else {
+				btn.setAttribute('hidden', '');
+			}
 		}
 
 		// Inject the nav before the BP subnav, exactly once. Mirrors the
@@ -386,6 +463,189 @@ function gs_chat_tabs_footer() {
 			// active pill from the new URL.
 			window.addEventListener('popstate', function () {
 				applyActive(document.querySelector('.gs-chat-tabs'));
+			});
+
+			// Plan 43-01: the "+ Add new Agent" popup. Delegated click (the button
+			// is injected/re-injected by tryInject) so we bind once on document.
+			wireAgentPopup();
+		}
+
+		/* ---- Plan 43-01: Add-new-Agent popup (group picker -> build form -> create -> welcome) ---- */
+		function wireAgentPopup() {
+			var cfg = window.GS_CHAT || {};
+			var popupEl = null;        // the live .gs-agent-popup node (injected once)
+			var chosenGroupId = null;
+
+			function injectPopup() {
+				if (popupEl && document.body.contains(popupEl)) return popupEl;
+				var tpl = document.getElementById('gs-agent-popup-template');
+				if (!tpl) return null;
+				var frag = tpl.content.cloneNode(true);
+				document.body.appendChild(frag);
+				popupEl = document.querySelector('.gs-agent-popup');
+				bindPopup(popupEl);
+				return popupEl;
+			}
+
+			function setStatus(node, msg, kind) {
+				if (!node) return;
+				node.textContent = msg || '';
+				node.className = 'gs-agent-status' + (kind ? (' is-' + kind) : '');
+			}
+
+			function showStep(root, step) {
+				var steps = root.querySelectorAll('[data-gs-agent-step]');
+				for (var i = 0; i < steps.length; i++) {
+					var on = (steps[i].getAttribute('data-gs-agent-step') === step);
+					if (on) { steps[i].removeAttribute('hidden'); } else { steps[i].setAttribute('hidden', ''); }
+				}
+			}
+
+			function closePopup() {
+				if (popupEl) popupEl.classList.remove('is-open');
+			}
+
+			function openPopup() {
+				var root = injectPopup();
+				if (!root) return;
+				chosenGroupId = null;
+				root.classList.add('is-open');
+				showStep(root, 'group');
+				setStatus(root.querySelector('[data-gs-agent-status]'), '', '');
+				loadGroups(root);
+			}
+
+			function loadGroups(root) {
+				var list = root.querySelector('[data-gs-agent-grouplist]');
+				var empty = root.querySelector('[data-gs-agent-empty]');
+				var gstatus = root.querySelector('[data-gs-agent-groupstatus]');
+				if (list) list.innerHTML = '';
+				if (empty) empty.setAttribute('hidden', '');
+				setStatus(gstatus, 'Loading your Web Apps…', 'info');
+
+				if (!cfg.gsRoot) { setStatus(gstatus, 'Configuration missing.', 'error'); return; }
+
+				fetch(cfg.gsRoot + '/agent-admin-groups', {
+					method: 'GET',
+					credentials: 'same-origin',
+					headers: { 'X-WP-Nonce': cfg.nonce || '' }
+				})
+					.then(function (res) { if (!res.ok) { throw new Error('request_failed'); } return res.json(); })
+					.then(function (data) {
+						setStatus(gstatus, '', '');
+						var groups = (data && data.groups) || [];
+						if (!groups.length) {
+							if (empty) empty.removeAttribute('hidden');
+							return;
+						}
+						for (var i = 0; i < groups.length; i++) {
+							(function (g) {
+								var btn = document.createElement('button');
+								btn.type = 'button';
+								btn.className = 'gs-agent-group';
+								btn.setAttribute('data-group-id', String(g.group_id));
+								btn.textContent = g.name || ('Group ' + g.group_id);
+								btn.addEventListener('click', function () {
+									chosenGroupId = parseInt(g.group_id, 10) || null;
+									var items = list.querySelectorAll('.gs-agent-group');
+									for (var k = 0; k < items.length; k++) { items[k].classList.remove('is-selected'); }
+									btn.classList.add('is-selected');
+									showStep(root, 'form');
+									setStatus(root.querySelector('[data-gs-agent-status]'), '', '');
+								});
+								list.appendChild(btn);
+							})(groups[i]);
+						}
+					})
+					.catch(function () { setStatus(gstatus, 'Could not load your Web Apps.', 'error'); });
+			}
+
+			function fieldValue(root, key) {
+				var node = root.querySelector('[data-agent-field="' + key + '"]');
+				return node ? (node.value || '').trim() : '';
+			}
+
+			function createAgent(root) {
+				var status = root.querySelector('[data-gs-agent-status]');
+				var submit = root.querySelector('[data-gs-agent-submit]');
+				var name = fieldValue(root, 'name');
+				if (!name) { setStatus(status, 'Give the agent a name first.', 'warning'); return; }
+				if (!chosenGroupId) { setStatus(status, 'Pick a group first.', 'warning'); showStep(root, 'group'); return; }
+				if (!cfg.psooRoot) { setStatus(status, 'Configuration missing.', 'error'); return; }
+
+				var body = {
+					group_id: chosenGroupId,
+					name: name,
+					system_prompt: fieldValue(root, 'system_prompt'),
+					default_model: fieldValue(root, 'default_model'),
+					avatar: fieldValue(root, 'avatar'),
+					run_target: 'webapp',
+					target_ref: String(chosenGroupId)
+				};
+
+				if (submit) submit.disabled = true;
+				setStatus(status, 'Creating agent…', 'info');
+
+				// REUSE the DEPLOYED projects route over REST — same fetch options as
+				// psoo-group-members.js:1277-1285 (POST, same-origin, X-WP-Nonce, JSON).
+				fetch(cfg.psooRoot + '/agents/create', {
+					method: 'POST',
+					credentials: 'same-origin',
+					headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce || '' },
+					body: JSON.stringify(body)
+				})
+					.then(function (res) { if (!res.ok) { throw new Error('request_failed'); } return res.json(); })
+					.then(function (data) {
+						if (data && data.provision && data.provision.error) {
+							// Non-fatal: the hub roster agent exists even if the
+							// container mailbox could not be provisioned.
+							setStatus(status, 'Agent created, container mailbox could not be provisioned: ' + data.provision.error, 'warning');
+						} else {
+							setStatus(status, 'Agent created.', 'success');
+						}
+						var agentId = data && data.hub_user_id ? parseInt(data.hub_user_id, 10) : 0;
+						// Best-effort welcome thread so the agent appears in the Agents tab.
+						var done = function () {
+							window.setTimeout(function () {
+								closePopup();
+								try {
+									var u = new URL(location.href);
+									u.searchParams.set('gs_chat_tab', 'agents');
+									location.href = u.toString();
+								} catch (e) { location.reload(); }
+							}, 900);
+						};
+						if (agentId > 0 && cfg.gsRoot) {
+							fetch(cfg.gsRoot + '/agent-welcome', {
+								method: 'POST',
+								credentials: 'same-origin',
+								headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': cfg.nonce || '' },
+								body: JSON.stringify({ agent_user_id: agentId })
+							}).then(done, done);
+						} else {
+							done();
+						}
+					})
+					.catch(function () { setStatus(status, 'Could not create the agent.', 'error'); })
+					.finally(function () { if (submit) submit.disabled = false; });
+			}
+
+			function bindPopup(root) {
+				if (!root) return;
+				root.addEventListener('click', function (e) {
+					var t = e.target;
+					if (t.closest('[data-gs-agent-close]')) { closePopup(); return; }
+					if (t.closest('[data-gs-agent-back]')) { showStep(root, 'group'); return; }
+					if (t.closest('[data-gs-agent-submit]')) { createAgent(root); return; }
+				});
+			}
+
+			// Delegated: the add button is injected/re-injected into the nav.
+			document.addEventListener('click', function (e) {
+				var btn = e.target && e.target.closest ? e.target.closest('[data-gs-agent-add]') : null;
+				if (!btn) return;
+				e.preventDefault();
+				openPopup();
 			});
 		}
 
