@@ -61,3 +61,265 @@
     font-size: 16px;
     line-height: 1;
 }
+
+/* ============================================================
+ * Plan 43-01 — "+ Add new Agent" button + agent-create popup.
+ * Own .gs-agent- prefix; tokens consistent with the .gs-chat-
+ * pill strip above and email-manager's inbox-bp-tabs.css so it
+ * visually matches the Messages page. The Phase-42 pill styles
+ * above are untouched.
+ * ============================================================ */
+
+/* The Agents-tab-only action button (sits at the end of the pill row). */
+.gs-agent-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    margin-left: auto;
+    padding: 10px 18px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(182, 8, 201, 0.32);
+    transition: transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                filter 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gs-agent-add:hover {
+    transform: translateY(-1px);
+    filter: brightness(1.06);
+    box-shadow: 0 6px 18px rgba(182, 8, 201, 0.40);
+}
+
+.gs-agent-add[hidden] {
+    display: none;
+}
+
+/* ---- Popup overlay (hidden until .is-open) ---- */
+.gs-agent-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.gs-agent-popup.is-open {
+    display: flex;
+}
+
+.gs-agent-popup__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 6, 18, 0.62);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.gs-agent-popup__dialog {
+    position: relative;
+    width: 100%;
+    max-width: 480px;
+    max-height: 88vh;
+    overflow: auto;
+    background: #1b1626;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    border-radius: 18px;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+    color: #f3f0fa;
+}
+
+.gs-agent-popup__header {
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 20px 22px 12px;
+}
+
+.gs-agent-popup__header h2 {
+    margin: 0;
+    font-size: 18px;
+    font-weight: 700;
+}
+
+.gs-agent-popup__close {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.gs-agent-popup__close:hover {
+    background: rgba(255, 255, 255, 0.10);
+}
+
+.gs-agent-popup__body {
+    padding: 6px 22px 22px;
+}
+
+.gs-agent-popup__lead {
+    margin: 0 0 12px;
+    font-size: 13px;
+    opacity: 0.82;
+}
+
+/* ---- Step 1: group list ---- */
+.gs-agent-grouplist {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gs-agent-group {
+    display: block;
+    width: 100%;
+    text-align: left;
+    padding: 12px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.gs-agent-group:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.20);
+}
+
+.gs-agent-group.is-selected {
+    border-color: transparent;
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.32) 0%, rgba(110, 193, 228, 0.32) 100%);
+}
+
+.gs-agent-empty {
+    margin: 8px 0 0;
+    font-size: 13px;
+    opacity: 0.78;
+}
+
+/* ---- Step 2: form fields ---- */
+.gs-agent-back {
+    margin: 0 0 12px;
+    padding: 0;
+    border: none;
+    background: none;
+    color: #6ec1e4;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.gs-agent-back:hover {
+    text-decoration: underline;
+}
+
+.gs-agent-field {
+    margin-bottom: 14px;
+}
+
+.gs-agent-field label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.gs-agent-field input,
+.gs-agent-field textarea,
+.gs-agent-field select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.gs-agent-field textarea {
+    resize: vertical;
+    min-height: 84px;
+}
+
+.gs-agent-field input:focus,
+.gs-agent-field textarea:focus,
+.gs-agent-field select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+/* ---- Actions + status ---- */
+.gs-agent-actions {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    margin-top: 18px;
+}
+
+.gs-agent-submit {
+    flex: 0 0 auto;
+    padding: 11px 22px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+    color: #fff;
+    font-size: 14px;
+    font-weight: 600;
+    cursor: pointer;
+    box-shadow: 0 4px 14px rgba(182, 8, 201, 0.32);
+}
+
+.gs-agent-submit:hover {
+    filter: brightness(1.06);
+}
+
+.gs-agent-submit:disabled {
+    opacity: 0.6;
+    cursor: default;
+}
+
+.gs-agent-status {
+    margin: 0;
+    flex: 1 1 auto;
+    font-size: 13px;
+    min-height: 1em;
+}
+
+.gs-agent-status.is-info {
+    color: #6ec1e4;
+}
+
+.gs-agent-status.is-success {
+    color: #57d38c;
+}
+
+.gs-agent-status.is-warning {
+    color: #e6b450;
+}
+
+.gs-agent-status.is-error {
+    color: #ff6b6b;
+}
