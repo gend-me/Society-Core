@@ -432,3 +432,188 @@ function gs_chat_tabs_enqueue() {
 if ( function_exists( 'add_action' ) ) {
 	add_action( 'wp_enqueue_scripts', 'gs_chat_tabs_enqueue', 20 );
 }
+
+/* =========================================================================
+ * Plan 43-01 — "Add new Agent" on the Agents tab.
+ *
+ * Two self-contained gend-society REST routes that power an in-context
+ * agent-create popup on the hub member Messages page. The agent is created
+ * by REUSING the already-deployed projects route POST psoo/v1/agents/create
+ * over HTTP from the browser (Task 2) — there is NO cross-plugin PHP call
+ * here (that would risk an undefined-symbol fatal that php -l cannot catch,
+ * and WP auto-deactivates a plugin that fatals — project_wp_fatal_auto_deactivation).
+ *
+ *   gs/v1/agent-admin-groups (GET)  -> the caller's OWN groups where they are
+ *                                      a group admin AND that are linked to a
+ *                                      Web App (container). The picker uses the
+ *                                      SAME predicate (groups_is_user_admin) the
+ *                                      create gate uses, so picker and gate agree.
+ *   gs/v1/agent-welcome      (POST) -> auto-start a BuddyPress welcome thread to
+ *                                      a freshly-created agent so it appears in
+ *                                      the Agents-tab conversation list (Decision D1).
+ *
+ * SELF-CONTAINED / FATAL-SAFE: every BuddyPress / gdc / agent symbol is
+ * function_exists/is_wp_error-guarded so an absent dependency degrades
+ * (empty list / ok:false) instead of fataling. All users resolved BY ID
+ * (never get_user_by('email') — broken via vendor-app-manager's fix_user_query).
+ * ========================================================================= */
+
+/**
+ * GET gs/v1/agent-admin-groups — the caller's group-admin Web-App groups.
+ *
+ * Returns ONLY the current user's own groups (permission = is_user_logged_in),
+ * filtered to those where they are a GROUP ADMIN and that resolve to a linked
+ * Web App container. base_url is NEVER returned (mirror projects' deliberate
+ * omission — avoid leaking the container host client-side).
+ *
+ * @return WP_REST_Response { ok:true, groups:[ {group_id,name,is_webapp} ] }
+ */
+function gs_rest_agent_admin_groups() {
+	$uid  = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+	$rows = array();
+
+	if ( $uid <= 0 ) {
+		return rest_ensure_response( array( 'ok' => true, 'groups' => $rows ) );
+	}
+
+	$gids = array();
+	if ( function_exists( 'groups_get_user_groups' ) ) {
+		$ug = groups_get_user_groups( $uid );
+		if ( is_array( $ug ) && ! empty( $ug['groups'] ) && is_array( $ug['groups'] ) ) {
+			$gids = array_map( 'intval', $ug['groups'] );
+		}
+	}
+
+	foreach ( array_unique( $gids ) as $gid ) {
+		$gid = (int) $gid;
+		if ( $gid <= 0 ) {
+			continue;
+		}
+		// GROUP ADMIN only — the SAME predicate the create route's gate uses.
+		if ( ! function_exists( 'groups_is_user_admin' ) || ! groups_is_user_admin( $uid, $gid ) ) {
+			continue;
+		}
+
+		// Web-App-linked? gdc_resolve_install_for_group is vendor-app-manager —
+		// guard it; a WP_Error means NOT a Web App.
+		$is_webapp = false;
+		if ( function_exists( 'gdc_resolve_install_for_group' ) ) {
+			$c         = gdc_resolve_install_for_group( $gid );
+			$is_webapp = ! is_wp_error( $c );
+		}
+
+		// RECOMMENDED FILTER: only surface Web-App-linked groups — a non-Web-App
+		// group has no container, so run_target=webapp would 409 on create. The
+		// is_webapp flag is still computed so the empty-state can explain.
+		if ( ! $is_webapp ) {
+			continue;
+		}
+
+		$name = 'Group ' . $gid;
+		if ( function_exists( 'groups_get_group' ) ) {
+			$g = groups_get_group( $gid );
+			if ( $g && ! empty( $g->name ) ) {
+				$name = $g->name;
+			}
+		}
+
+		$rows[] = array(
+			'group_id'  => $gid,
+			'name'      => $name,
+			'is_webapp' => $is_webapp,
+		);
+	}
+
+	return rest_ensure_response( array( 'ok' => true, 'groups' => $rows ) );
+}
+
+/**
+ * POST gs/v1/agent-welcome — auto-start a welcome thread to a new agent.
+ *
+ * Sends a BuddyPress message from the caller to the freshly-created agent so a
+ * thread exists and the agent shows in the Agents-tab conversation list. The
+ * Phase-35 agent-reply hook then answers. Degrades (ok:false) — never fatals —
+ * when messaging is unavailable.
+ *
+ * @param WP_REST_Request $req agent_user_id (required positive agent user id).
+ * @return WP_REST_Response
+ */
+function gs_rest_agent_welcome( $req ) {
+	$agent_id = (int) $req->get_param( 'agent_user_id' );
+	if ( $agent_id <= 0 ) {
+		return new WP_Error( 'gs_agent_welcome_bad_id', 'A valid agent_user_id is required.', array( 'status' => 400 ) );
+	}
+
+	// Resolve agent BY ID only (gs_user_is_agent is ID-only). 400 if not an agent.
+	if ( ! function_exists( 'gs_user_is_agent' ) || ! gs_user_is_agent( $agent_id ) ) {
+		return new WP_Error( 'gs_agent_welcome_not_agent', 'That user is not an agent.', array( 'status' => 400 ) );
+	}
+
+	// Degrade (never fatal) if BuddyPress messaging is inactive.
+	if ( ! function_exists( 'messages_new_message' ) ) {
+		return rest_ensure_response( array( 'ok' => false, 'skipped' => 'messages_inactive' ) );
+	}
+
+	$sender = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+	if ( $sender <= 0 ) {
+		return new WP_Error( 'gs_agent_welcome_no_sender', 'Could not resolve the current user.', array( 'status' => 400 ) );
+	}
+
+	$tid = messages_new_message( array(
+		'sender_id'  => $sender,
+		'recipients' => array( $agent_id ),
+		'subject'    => 'Welcome',
+		'content'    => "Welcome aboard! Please introduce yourself and tell me how you can help.",
+	) );
+
+	if ( is_wp_error( $tid ) ) {
+		return rest_ensure_response( array( 'ok' => false, 'error' => $tid->get_error_message() ) );
+	}
+	if ( ! $tid ) {
+		return rest_ensure_response( array( 'ok' => false, 'error' => 'message_not_sent' ) );
+	}
+
+	return rest_ensure_response( array( 'ok' => true, 'thread_id' => (int) $tid ) );
+}
+
+/**
+ * Register the two Plan 43-01 routes. is_user_logged_in permission — each route
+ * only ever acts on the caller's OWN data (their admin groups / their own
+ * outgoing welcome message), so an authed cookie/nonce request is sufficient and
+ * passes the hub's pri-99 REST auth gate the same way wp/v2 authed requests do.
+ */
+function gs_rest_register_agent_create_routes() {
+	if ( ! function_exists( 'register_rest_route' ) ) {
+		return;
+	}
+	register_rest_route(
+		'gs/v1',
+		'/agent-admin-groups',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'gs_rest_agent_admin_groups',
+			'permission_callback' => function () {
+				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
+			},
+		)
+	);
+	register_rest_route(
+		'gs/v1',
+		'/agent-welcome',
+		array(
+			'methods'             => 'POST',
+			'callback'            => 'gs_rest_agent_welcome',
+			'permission_callback' => function () {
+				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
+			},
+			'args'                => array(
+				'agent_user_id' => array(
+					'required' => true,
+				),
+			),
+		)
+	);
+}
+if ( function_exists( 'add_action' ) ) {
+	add_action( 'rest_api_init', 'gs_rest_register_agent_create_routes' );
+}
