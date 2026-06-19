@@ -283,6 +283,13 @@ if ( file_exists( GS_DIR . 'inc/agent-provision.php' ) ) {
 if ( file_exists( GS_DIR . 'inc/agent-chat.php' ) ) {
     require_once GS_DIR . 'inc/agent-chat.php';
 }
+// v8.2 Phase 42 — Members/Agents/Projects chat tabs (server-side thread prune).
+// Loaded AFTER agent-chat.php because it reuses gs_user_is_agent(). file_exists-
+// guarded: hub PVC .no-plugin-sync quirk means a missing file must degrade, not
+// fatal (a bare require_once would fatal and WP would auto-deactivate the plugin).
+if ( file_exists( GS_DIR . 'inc/messages-tabs.php' ) ) {
+    require_once GS_DIR . 'inc/messages-tabs.php';
+}
 require_once GS_DIR . 'inc/feature-gates.php';
 
 // AI proxy — server-side bridge to the LEO backend on the gend.me hub.
