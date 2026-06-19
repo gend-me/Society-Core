@@ -1,6 +1,6 @@
 <?php
 /**
- * Davinci Architect AI — group admin tab giving the web-app owner a single
+ * Davinci AI — group admin tab giving the web-app owner a single
  * pane of glass over ALL AI spend on their connected web app.
  *
  * Four sections:
@@ -191,17 +191,17 @@ function gs_davinci_save_api_costs_ajax() {
 if ( class_exists( 'BP_Group_Extension' ) ) :
 
     /**
-     * Davinci Architect AI — AI-spend command centre for the web app owner.
+     * Davinci AI — AI-spend command centre for the web app owner.
      */
     class GS_Group_Tab_Davinci_AI extends BP_Group_Extension {
         public function __construct() {
             parent::init( array(
                 'slug'              => 'davinci-ai',
-                'name'              => __( 'Davinci Architect AI', 'gend-society' ),
+                'name'              => __( 'Davinci AI', 'gend-society' ),
                 // Sits at the very end of the group nav — after Compute Gas (80).
                 'nav_item_position' => 200,
                 'show_tab'          => 'anyone',
-                'nav_item_name'     => __( 'Davinci Architect AI', 'gend-society' ),
+                'nav_item_name'     => __( 'Davinci AI', 'gend-society' ),
                 'display_hook'      => 'groups_custom_group_boxes',
                 'template_file'     => 'groups/single/plugins',
             ) );
@@ -363,7 +363,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                     <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" aria-hidden="true"><path d="M12 2 2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
                     <?php esc_html_e( 'AI Spend Command', 'gend-society' ); ?>
                 </span>
-                <h2><?php esc_html_e( 'Davinci Architect AI', 'gend-society' ); ?></h2>
+                <h2><?php esc_html_e( 'Davinci AI', 'gend-society' ); ?></h2>
                 <p><?php esc_html_e( 'A complete overview of every dollar of AI spend on your connected web app — Leo content tokens, autonomous agents, third-party AI integrations, and on-chain compute gas, all in one place.', 'gend-society' ); ?></p>
             </div>
             <a class="gs-dv-btn gs-dv-btn--sm" href="#gs-dv-sec-leo" style="align-self:center;"><?php esc_html_e( 'Jump to Leo Tokens', 'gend-society' ); ?></a>
