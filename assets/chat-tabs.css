@@ -1,0 +1,63 @@
+/* ============================================================
+ * gend-society — Members / Agents / Projects chat tab nav
+ * (Phase 42-02). Glass-pill strip injected ABOVE the BP
+ * messages subnav (Inbox/Starred/Sent), BELOW email-manager's
+ * Email/Chat/Direct-Messages strip. Own-prefixed (.gs-chat-tabs)
+ * so we never couple to email-manager's CSS lifecycle. Tokens
+ * copied from email-manager/assets/inbox-bp-tabs.css to match
+ * the active gradient (#b608c9 -> #6ec1e4).
+ *
+ * Visual order top -> bottom:
+ *   [Email | Chat | Direct Messages]   (email-manager strip)
+ *   [Members | Agents | Projects]      (this nav)
+ *   [Inbox | Starred | Sent | ...]     (BP subnav)
+ *   thread list
+ * ============================================================ */
+
+.gs-chat-tabs {
+    display: flex;
+    gap: 8px;
+    padding: 0 0 14px;
+    margin: 0 0 18px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gs-chat-tab {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 22px;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    color: inherit;
+    text-decoration: none;
+    font-size: 14px;
+    font-weight: 600;
+    line-height: 1.2;
+    cursor: pointer;
+    transition: background 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                transform 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+}
+
+.gs-chat-tab:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+    transform: translateY(-1px);
+    color: inherit;
+}
+
+.gs-chat-tab.is-active {
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+    border-color: transparent;
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(182, 8, 201, 0.32);
+}
+
+.gs-chat-tab-icon {
+    font-size: 16px;
+    line-height: 1;
+}
