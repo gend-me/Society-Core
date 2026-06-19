@@ -63,6 +63,13 @@ add_action( 'bp_include', function () {
     if ( ! class_exists( 'BP_Group_Extension' ) ) return;
     require_once GS_DIR . 'inc/group-feature-suite.php';
     require_once GS_DIR . 'inc/group-app-tabs.php';
+    // Davinci Architect AI — AI-spend overview tab. Loaded AFTER
+    // group-app-tabs.php so its shared helpers (gs_group_tabs_user_has_access,
+    // gs_compute_gas_resolve_state) are defined. file_exists-guarded per the
+    // hub PVC .no-plugin-sync quirk (kubectl cp the file before this edit).
+    if ( file_exists( GS_DIR . 'inc/group-davinci-ai-tab.php' ) ) {
+        require_once GS_DIR . 'inc/group-davinci-ai-tab.php';
+    }
 } );
 
 // Member profile pages (per-user CPT + BuddyPress embed)
