@@ -54,7 +54,8 @@
             privacy: 'private',
             detail: 'busy',
             sources: { projects: true, campaigns: true, meetings: true },
-            identity: { name: true, avatar: true, bio: false, timezone: true }
+            identity: { name: true, avatar: true, bio: false, timezone: true },
+            members: []
         };
     }
 
@@ -63,6 +64,22 @@
         v = (v && typeof v === 'object') ? v : {};
         var src = (v.sources && typeof v.sources === 'object') ? v.sources : {};
         var id  = (v.identity && typeof v.identity === 'object') ? v.identity : {};
+        // members arrive from GET as [{id,name,avatar_url}] objects; keep that
+        // shape (de-duped by id, valid ids only) so we can render chips.
+        var members = [];
+        if (Array.isArray(v.members)) {
+            var seen = {};
+            v.members.forEach(function (m) {
+                var id2 = m && typeof m === 'object' ? parseInt(m.id, 10) : parseInt(m, 10);
+                if (!id2 || seen[id2]) { return; }
+                seen[id2] = true;
+                members.push({
+                    id: id2,
+                    name: (m && m.name) ? String(m.name) : ('User #' + id2),
+                    avatar_url: (m && m.avatar_url) ? String(m.avatar_url) : ''
+                });
+            });
+        }
         return {
             privacy: (v.privacy === 'link' || v.privacy === 'public') ? v.privacy : d.privacy,
             detail:  (v.detail === 'full') ? 'full' : 'busy',
@@ -76,8 +93,23 @@
                 avatar:   id.avatar   !== undefined ? !!id.avatar   : d.identity.avatar,
                 bio:      id.bio      !== undefined ? !!id.bio      : d.identity.bio,
                 timezone: id.timezone !== undefined ? !!id.timezone : d.identity.timezone
-            }
+            },
+            members: members
         };
+    }
+
+    /* Member-search REST base (sibling of the availability endpoint). */
+    var MEMBER_SEARCH = REST.replace(/\/availability$/, '/members/search');
+
+    function searchMembers(term) {
+        var url = MEMBER_SEARCH + '?q=' + encodeURIComponent(term);
+        return fetch(url, {
+            method: 'GET',
+            credentials: 'same-origin',
+            headers: NONCE ? { 'X-WP-Nonce': NONCE } : {}
+        }).then(function (r) { return r.ok ? r.json() : []; })
+          .then(function (j) { return Array.isArray(j) ? j : []; })
+          .catch(function () { return []; });
     }
 
     function homeBase() {
@@ -404,6 +436,9 @@
         idRow.appendChild(idGrid);
         wrap.appendChild(idRow);
 
+        // Share with specific members (Phase 42).
+        wrap.appendChild(buildMembersSection(vis.members || []));
+
         // Share link row.
         var linkRow = el('div', { class: 'gs-avail-vis-row gs-avail-vis-share' });
         linkRow.appendChild(el('label', { class: 'gs-avail-vis-label', text: 'Share link' }));
@@ -435,6 +470,113 @@
 
         reflectPrivacy(wrap);
         return wrap;
+    }
+
+    /* ---- Share-with-specific-members (Phase 42) ---------------------------- */
+
+    // Builds the member-search section: debounced AJAX search input + results
+    // dropdown + selected chips. Selected members are tracked on the section
+    // node's _members array (read back by serializeMembers on save).
+    function buildMembersSection(initial) {
+        var wrap = el('div', { class: 'gs-avail-vis-row gs-avail-members', 'data-field': 'members' });
+        wrap.appendChild(el('label', { class: 'gs-avail-vis-label', text: 'Share with specific members' }));
+        wrap.appendChild(el('p', { class: 'gs-avail-members-help',
+            text: 'These members can view your calendar even when privacy is Private.' }));
+
+        // Live selection state lives on the node.
+        var selected = [];
+        var seen = {};
+        (Array.isArray(initial) ? initial : []).forEach(function (m) {
+            var id = m && typeof m === 'object' ? parseInt(m.id, 10) : parseInt(m, 10);
+            if (!id || seen[id]) { return; }
+            seen[id] = true;
+            selected.push({ id: id, name: (m && m.name) ? String(m.name) : ('User #' + id), avatar_url: (m && m.avatar_url) ? String(m.avatar_url) : '' });
+        });
+        wrap._members = selected;
+
+        var searchWrap = el('div', { class: 'gs-avail-members-search' });
+        var input = el('input', {
+            type: 'text', class: 'gs-avail-members-input',
+            placeholder: 'Search members by name…', autocomplete: 'off'
+        });
+        var dropdown = el('div', { class: 'gs-avail-members-dropdown', 'aria-hidden': 'true' });
+        searchWrap.appendChild(input);
+        searchWrap.appendChild(dropdown);
+        wrap.appendChild(searchWrap);
+
+        var chips = el('div', { class: 'gs-avail-members-chips' });
+        wrap.appendChild(chips);
+
+        function renderChips() {
+            chips.textContent = '';
+            wrap._members.forEach(function (m) {
+                var chip = el('span', { class: 'gs-avail-member-chip' });
+                if (m.avatar_url) { chip.appendChild(el('img', { class: 'gs-avail-member-chip__av', src: m.avatar_url, alt: '' })); }
+                chip.appendChild(el('span', { class: 'gs-avail-member-chip__name', text: m.name }));
+                var rm = el('button', { type: 'button', class: 'gs-avail-member-chip__rm', 'aria-label': 'Remove', text: '×' });
+                rm.addEventListener('click', function () {
+                    wrap._members = wrap._members.filter(function (x) { return x.id !== m.id; });
+                    renderChips();
+                });
+                chip.appendChild(rm);
+                chips.appendChild(chip);
+            });
+        }
+
+        function closeDropdown() {
+            dropdown.textContent = '';
+            dropdown.setAttribute('aria-hidden', 'true');
+        }
+
+        function addMember(m) {
+            if (!m || !m.id) { return; }
+            if (wrap._members.some(function (x) { return x.id === m.id; })) { return; } // no dupes
+            wrap._members.push({ id: m.id, name: m.name || ('User #' + m.id), avatar_url: m.avatar_url || '' });
+            renderChips();
+            input.value = '';
+            closeDropdown();
+            input.focus();
+        }
+
+        function renderResults(results) {
+            dropdown.textContent = '';
+            if (!results.length) { closeDropdown(); return; }
+            results.forEach(function (m) {
+                var id = parseInt(m.id, 10);
+                if (!id) { return; }
+                var opt = el('button', { type: 'button', class: 'gs-avail-members-opt' });
+                if (wrap._members.some(function (x) { return x.id === id; })) { opt.classList.add('is-selected'); }
+                if (m.avatar_url) { opt.appendChild(el('img', { class: 'gs-avail-members-opt__av', src: m.avatar_url, alt: '' })); }
+                opt.appendChild(el('span', { class: 'gs-avail-members-opt__name', text: m.name || ('User #' + id) }));
+                opt.addEventListener('click', function () { addMember({ id: id, name: m.name, avatar_url: m.avatar_url }); });
+                dropdown.appendChild(opt);
+            });
+            dropdown.setAttribute('aria-hidden', 'false');
+        }
+
+        var debounceTimer = null;
+        input.addEventListener('input', function () {
+            var term = input.value.trim();
+            if (debounceTimer) { clearTimeout(debounceTimer); }
+            if (term.length < 2) { closeDropdown(); return; }
+            debounceTimer = setTimeout(function () {
+                searchMembers(term).then(renderResults);
+            }, 250);
+        });
+        // Close the dropdown on outside click.
+        document.addEventListener('click', function (e) {
+            if (!searchWrap.contains(e.target)) { closeDropdown(); }
+        });
+
+        renderChips();
+        return wrap;
+    }
+
+    // Read the selected member IDs from the section node (sent on save as {id}).
+    function serializeMembers(panel) {
+        var wrap = panel.querySelector('[data-field="members"]');
+        if (!wrap || !Array.isArray(wrap._members)) { return []; }
+        return wrap._members.map(function (m) { return { id: m.id }; });
     }
 
     function buildCheck(id, key, label, checked) {
@@ -485,7 +627,8 @@
                 avatar:   !!identity.avatar,
                 bio:      !!identity.bio,
                 timezone: !!identity.timezone
-            }
+            },
+            members: serializeMembers(panel)
         };
     }
 

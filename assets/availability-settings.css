@@ -258,3 +258,61 @@
     /* No animation on overlays anyway, but kill any transitions we might add later */
     .gs-cal-root .gs-cal-overlay { transition: none !important; }
 }
+
+/* ─── Share with specific members (Phase 42) ──────────────────────────────── */
+.gs-avail-members { position: relative; }
+.gs-avail-members-help {
+    margin: 2px 0 8px; font-size: 12px; line-height: 1.4;
+    color: rgba(255,255,255,0.62);
+}
+.gs-avail-members-search { position: relative; }
+.gs-avail-members-input {
+    width: 100%; box-sizing: border-box;
+    padding: 9px 12px; border-radius: 8px;
+    background: rgba(0,0,0,0.22); border: 1px solid rgba(255,255,255,0.14);
+    color: #fff; font-size: 13px; outline: none;
+}
+.gs-avail-members-input:focus { border-color: rgba(129,140,248,0.65); }
+.gs-avail-members-input::placeholder { color: rgba(255,255,255,0.40); }
+
+.gs-avail-members-dropdown {
+    position: absolute; top: calc(100% + 4px); left: 0; right: 0; z-index: 30;
+    max-height: 260px; overflow-y: auto;
+    background: rgba(20,20,32,0.92); border: 1px solid rgba(255,255,255,0.14);
+    border-radius: 10px; box-shadow: 0 16px 40px -12px rgba(0,0,0,0.7);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    padding: 4px;
+}
+.gs-avail-members-dropdown[aria-hidden="true"] { display: none; }
+.gs-avail-members-opt {
+    display: flex; align-items: center; gap: 9px; width: 100%;
+    padding: 7px 9px; border: 0; border-radius: 8px; cursor: pointer;
+    background: transparent; color: #fff; font-size: 13px; text-align: left;
+}
+.gs-avail-members-opt:hover { background: rgba(129,140,248,0.18); }
+.gs-avail-members-opt.is-selected { opacity: 0.5; }
+.gs-avail-members-opt__av {
+    width: 26px; height: 26px; border-radius: 50%; object-fit: cover; flex: 0 0 auto;
+}
+.gs-avail-members-opt__name { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.gs-avail-members-chips {
+    display: flex; flex-wrap: wrap; gap: 8px; margin-top: 10px;
+}
+.gs-avail-member-chip {
+    display: inline-flex; align-items: center; gap: 7px;
+    padding: 4px 6px 4px 4px; border-radius: 999px; max-width: 100%;
+    background: rgba(99,102,241,0.18); border: 1px solid rgba(129,140,248,0.40);
+    color: #fff; font-size: 12px;
+}
+.gs-avail-member-chip__av {
+    width: 22px; height: 22px; border-radius: 50%; object-fit: cover; flex: 0 0 auto;
+}
+.gs-avail-member-chip__name {
+    overflow: hidden; text-overflow: ellipsis; white-space: nowrap; max-width: 160px;
+}
+.gs-avail-member-chip__rm {
+    border: 0; background: transparent; color: rgba(255,255,255,0.7);
+    cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px;
+}
+.gs-avail-member-chip__rm:hover { color: #fff; }

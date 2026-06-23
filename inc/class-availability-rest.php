@@ -60,6 +60,87 @@ class Gend_GS_Availability_REST {
                 'to'   => array( 'required' => true, 'type' => 'string' ),
             ),
         ) );
+
+        // Phase 42 — member search for the Visibility "share with specific members"
+        // picker. Logged-in only. Returns up to 10 [{id,name,avatar_url}] matching
+        // the display-name/login term, excluding the current user.
+        register_rest_route( self::NS, '/calendar/members/search', array(
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => array( __CLASS__, 'handle_member_search' ),
+            'permission_callback' => array( __CLASS__, 'permission_check' ),
+            'args'                => array(
+                'q' => array( 'required' => false, 'type' => 'string' ),
+            ),
+        ) );
+    }
+
+    /**
+     * Phase 42 — GET /calendar/members/search?q=<term>
+     *
+     * Searches WP/BP users by display name (and login/nicename). Prefers
+     * bp_core_get_users(search_terms) when BuddyPress is active; otherwise a
+     * WP_User_Query with a '*term*' search on display_name/user_login/nicename.
+     *
+     * IMPORTANT: we DO NOT search by user_email — that would hit the
+     * vendor-app-manager fix_user_query email-rewrite gotcha (it rewrites
+     * `WHERE user_email` queries to require a per-site capabilities meta, which
+     * silently zeroes results for super-admins). Name/login search dodges it.
+     *
+     * Returns up to 10 [{id,name,avatar_url}], excluding the current user.
+     * q < 2 chars (after sanitize) → empty array.
+     *
+     * @param WP_REST_Request $req
+     * @return WP_REST_Response
+     */
+    public static function handle_member_search( WP_REST_Request $req ) {
+        $current = (int) get_current_user_id();
+        $q = sanitize_text_field( (string) ( $req->get_param( 'q' ) ?? '' ) );
+        $q = trim( $q );
+        if ( mb_strlen( $q ) < 2 ) {
+            return rest_ensure_response( array() );
+        }
+
+        $ids = array();
+
+        // Prefer BuddyPress alphabetical search (respects BP display-name field).
+        if ( function_exists( 'bp_core_get_users' ) ) {
+            $res = bp_core_get_users( array(
+                'search_terms' => $q,
+                'per_page'     => 20, // over-fetch so we can drop self + cap at 10
+                'page'         => 1,
+                'type'         => 'alphabetical',
+            ) );
+            if ( is_array( $res ) && ! empty( $res['users'] ) ) {
+                foreach ( $res['users'] as $u ) {
+                    $uid = isset( $u->ID ) ? (int) $u->ID : ( isset( $u->id ) ? (int) $u->id : 0 );
+                    if ( $uid > 0 ) { $ids[] = $uid; }
+                }
+            }
+        }
+
+        // Fallback (or BP returned nothing) — WP_User_Query on name/login only.
+        if ( empty( $ids ) ) {
+            $uq = new WP_User_Query( array(
+                'search'         => '*' . $q . '*',
+                'search_columns' => array( 'display_name', 'user_login', 'user_nicename' ),
+                'number'         => 20,
+                'fields'         => 'ID',
+                'orderby'        => 'display_name',
+                'order'          => 'ASC',
+            ) );
+            foreach ( (array) $uq->get_results() as $uid ) {
+                $uid = (int) $uid;
+                if ( $uid > 0 ) { $ids[] = $uid; }
+            }
+        }
+
+        // Drop self + de-dupe, then cap at 10 and resolve to chip objects.
+        $ids = array_values( array_filter( array_unique( $ids ), function ( $id ) use ( $current ) {
+            return (int) $id !== $current;
+        } ) );
+        $ids = array_slice( $ids, 0, 10 );
+
+        return rest_ensure_response( self::resolve_member_objects( $ids ) );
     }
 
     public static function permission_check() : bool {
@@ -100,6 +181,14 @@ class Gend_GS_Availability_REST {
         $booking_settings['visibility'] = self::sanitize_visibility(
             isset( $booking_settings['visibility'] ) && is_array( $booking_settings['visibility'] )
                 ? $booking_settings['visibility']
+                : array()
+        );
+        // Phase 42 — resolve the stored member IDs into [{id,name,avatar_url}]
+        // objects so the Visibility modal can render existing chips. Storage stays
+        // int[]; only the GET echo carries the resolved objects.
+        $booking_settings['visibility']['members'] = self::resolve_member_objects(
+            isset( $booking_settings['visibility']['members'] ) && is_array( $booking_settings['visibility']['members'] )
+                ? $booking_settings['visibility']['members']
                 : array()
         );
 
@@ -293,15 +382,22 @@ class Gend_GS_Availability_REST {
      *     privacy : 'private'|'link'|'public'  (default 'private'),
      *     detail  : 'full'|'busy'              (default 'busy'),
      *     sources : { projects:bool, campaigns:bool, meetings:bool }  (default all true),
-     *     identity: { name:bool (true), avatar:bool (true), bio:bool (false), timezone:bool (true) }
+     *     identity: { name:bool (true), avatar:bool (true), bio:bool (false), timezone:bool (true) },
+     *     members : [ int, ... ]  (Phase 42 — allowed-viewer user IDs; stored as ints)
      *   }
      *
      * Enum values are whitelisted; unknown enum values fall back to the default.
      * Booleans are coerced. Unknown keys are dropped. Always returns the full
      * shape so callers (handle_get + the public endpoints) can rely on every key.
      *
+     * The `members` field is STORED as an array of positive ints (the allowed
+     * viewer user IDs). It accepts either an array of ints OR an array of {id}
+     * objects (the frontend round-trips chip objects); 0/invalid are dropped,
+     * the list is de-duped and capped at 200. handle_get() resolves these ints
+     * into [{id,name,avatar_url}] objects for chip rendering.
+     *
      * @param array $raw Untrusted visibility sub-object.
-     * @return array Fully-populated, sanitized visibility object.
+     * @return array Fully-populated, sanitized visibility object (members = int[]).
      */
     public static function sanitize_visibility( array $raw ) : array {
         // privacy enum.
@@ -333,12 +429,80 @@ class Gend_GS_Availability_REST {
             'timezone' => array_key_exists( 'timezone', $identity_raw ) ? (bool) $identity_raw['timezone'] : true,
         );
 
+        // Phase 42 — allowed-viewer member IDs. Accept ints OR {id} objects;
+        // drop 0/invalid, de-dupe, cap at 200. Stored as int[].
+        $members = self::sanitize_member_ids(
+            ( isset( $raw['members'] ) && is_array( $raw['members'] ) ) ? $raw['members'] : array()
+        );
+
         return array(
             'privacy'  => $privacy,
             'detail'   => $detail,
             'sources'  => $sources,
             'identity' => $identity,
+            'members'  => $members,
         );
+    }
+
+    /**
+     * Phase 42 — coerce a raw members array into a clean array of positive,
+     * de-duped, capped (<=200) user IDs. Accepts entries that are either scalar
+     * ints/strings OR {id} objects (the frontend chips round-trip as objects).
+     *
+     * @param array $raw
+     * @return int[]
+     */
+    public static function sanitize_member_ids( array $raw ) : array {
+        $ids = array();
+        foreach ( $raw as $entry ) {
+            $id = 0;
+            if ( is_array( $entry ) ) {
+                $id = isset( $entry['id'] ) ? (int) $entry['id'] : 0;
+            } elseif ( is_object( $entry ) ) {
+                $id = isset( $entry->id ) ? (int) $entry->id : 0;
+            } else {
+                $id = (int) $entry;
+            }
+            if ( $id > 0 ) { $ids[] = $id; }
+        }
+        $ids = array_values( array_unique( $ids ) );
+        if ( count( $ids ) > 200 ) { $ids = array_slice( $ids, 0, 200 ); }
+        return $ids;
+    }
+
+    /**
+     * Phase 42 — resolve an array of user IDs into chip objects for the frontend:
+     * [ { id:int, name:string, avatar_url:string }, ... ]. Skips IDs with no
+     * userdata (deleted members). Name via bp_core_get_user_displayname, avatar
+     * via bp_core_fetch_avatar(html=false) → get_avatar_url fallback.
+     *
+     * @param int[] $ids
+     * @return array<int,array{id:int,name:string,avatar_url:string}>
+     */
+    public static function resolve_member_objects( array $ids ) : array {
+        $out = array();
+        foreach ( $ids as $id ) {
+            $id = (int) $id;
+            if ( $id <= 0 ) { continue; }
+            $u = get_userdata( $id );
+            if ( ! $u ) { continue; } // deleted member — drop silently
+            $name = function_exists( 'bp_core_get_user_displayname' )
+                ? (string) bp_core_get_user_displayname( $id )
+                : '';
+            if ( $name === '' ) { $name = (string) $u->display_name; }
+            if ( function_exists( 'bp_core_fetch_avatar' ) ) {
+                $avatar = (string) bp_core_fetch_avatar( array(
+                    'item_id' => $id,
+                    'object'  => 'user',
+                    'type'    => 'thumb',
+                    'html'    => false,
+                ) );
+            } else {
+                $avatar = (string) get_avatar_url( $id );
+            }
+            $out[] = array( 'id' => $id, 'name' => $name, 'avatar_url' => $avatar );
+        }
+        return $out;
     }
 
     /** Pitfall 5 — IANA only; offsets/abbreviations rejected. */

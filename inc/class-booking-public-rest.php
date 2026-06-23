@@ -119,6 +119,30 @@ class Gend_GS_Booking_Public_REST {
             'permission_callback' => '__return_true',
         ) );
 
+        // 2d. Phase 42 — AUTHED shared view of an owner's calendar for a SELECTED
+        //     member. permission_callback enforces: logged-in AND (self OR in the
+        //     owner's visibility.members allow-list). Reuses build_owner_events +
+        //     visibility filtering — same envelope shapes as the public endpoints.
+        register_rest_route( self::NS, '/calendar/shared/(?P<owner_id>\d+)/events', array(
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => array( __CLASS__, 'handle_shared_events' ),
+            'permission_callback' => array( __CLASS__, 'shared_permission_check' ),
+            'args'                => array(
+                'owner_id' => array( 'required' => true, 'type' => 'integer' ),
+                'from'     => array( 'required' => true, 'type' => 'string' ),
+                'to'       => array( 'required' => true, 'type' => 'string' ),
+            ),
+        ) );
+
+        register_rest_route( self::NS, '/calendar/shared/(?P<owner_id>\d+)/info', array(
+            'methods'             => WP_REST_Server::READABLE,
+            'callback'            => array( __CLASS__, 'handle_shared_info' ),
+            'permission_callback' => array( __CLASS__, 'shared_permission_check' ),
+            'args'                => array(
+                'owner_id' => array( 'required' => true, 'type' => 'integer' ),
+            ),
+        ) );
+
         // 3. GET a meeting by cancellation_token (bookee self-service fetch).
         register_rest_route( self::NS, '/calendar/public/meeting/' . $cancel_re, array(
             'methods'             => WP_REST_Server::READABLE,
@@ -764,6 +788,219 @@ class Gend_GS_Booking_Public_REST {
             'starts_at_utc' => self::format_iso_z( $new_starts ),
             'ends_at_utc'   => self::format_iso_z( $new_ends ),
         ) );
+    }
+
+    // ─── Phase 42 — authed shared-view (selected-member) handlers ────────────
+
+    /**
+     * Permission gate for the authed shared-calendar routes.
+     *
+     * Authorized when the request is logged-in AND EITHER:
+     *   - current user === owner_id (own calendar), OR
+     *   - current user is in the owner's visibility.members allow-list.
+     *
+     * Returns a 403 WP_Error (not a bare false) so non-members get a clear
+     * "forbidden" rather than the generic REST cookie-auth 401.
+     *
+     * @param WP_REST_Request $req
+     * @return true|WP_Error
+     */
+    public static function shared_permission_check( WP_REST_Request $req ) {
+        if ( ! is_user_logged_in() ) {
+            return new WP_Error( 'gs_cal_login', 'Login required', array( 'status' => 401 ) );
+        }
+        $current  = (int) get_current_user_id();
+        $owner_id = (int) $req['owner_id'];
+        if ( $owner_id <= 0 ) {
+            return new WP_Error( 'gs_cal_bad_owner', 'Invalid owner', array( 'status' => 400 ) );
+        }
+        if ( $current === $owner_id ) {
+            return true; // own calendar — always allowed.
+        }
+        if ( self::is_shared_member( $owner_id, $current ) ) {
+            return true;
+        }
+        return new WP_Error( 'gs_cal_forbidden', 'You do not have access to this calendar', array( 'status' => 403 ) );
+    }
+
+    /**
+     * Phase 42 — true if $viewer_id is in $owner_id's visibility.members allow-list.
+     *
+     * @param int $owner_id
+     * @param int $viewer_id
+     * @return bool
+     */
+    private static function is_shared_member( int $owner_id, int $viewer_id ) : bool {
+        if ( $owner_id <= 0 || $viewer_id <= 0 ) { return false; }
+        $vis     = self::get_visibility_settings( $owner_id );
+        $members = ( isset( $vis['members'] ) && is_array( $vis['members'] ) ) ? $vis['members'] : array();
+        foreach ( $members as $m ) {
+            if ( (int) $m === $viewer_id ) { return true; }
+        }
+        return false;
+    }
+
+    /**
+     * GET /calendar/shared/{owner_id}/events?from=&to= — authed selected-member view.
+     *
+     * Authorization handled by shared_permission_check. Honors the owner's
+     * detail + sources visibility (privacy is NOT a gate here — selected members
+     * bypass privacy by design). Same envelope as handle_public_events.
+     *
+     * @param WP_REST_Request $req
+     * @return WP_REST_Response|WP_Error
+     */
+    public static function handle_shared_events( WP_REST_Request $req ) {
+        try {
+            $owner_id = (int) $req['owner_id'];
+
+            $vis = self::get_visibility_settings( $owner_id );
+
+            $from_raw = sanitize_text_field( (string) ( $req->get_param( 'from' ) ?? '' ) );
+            $to_raw   = sanitize_text_field( (string) ( $req->get_param( 'to' )   ?? '' ) );
+            try {
+                $dt_from = new DateTimeImmutable( $from_raw, new DateTimeZone( 'UTC' ) );
+                $dt_to   = new DateTimeImmutable( $to_raw,   new DateTimeZone( 'UTC' ) );
+            } catch ( \Throwable $e ) {
+                return new WP_Error( 'gs_cal_bad_range', 'Invalid from/to (ISO 8601 UTC required)', array( 'status' => 400 ) );
+            }
+            if ( $dt_from >= $dt_to ) {
+                return new WP_Error( 'gs_cal_bad_range', 'from must be < to', array( 'status' => 400 ) );
+            }
+            $diff_days = ( $dt_to->getTimestamp() - $dt_from->getTimestamp() ) / 86400;
+            if ( $diff_days > self::MAX_PUBLIC_EVENTS_DAYS ) {
+                return new WP_Error( 'gs_cal_range_too_large', 'Range > 90 days', array( 'status' => 400 ) );
+            }
+
+            $from_mysql = $dt_from->format( 'Y-m-d H:i:s' );
+            $to_mysql   = $dt_to->format( 'Y-m-d H:i:s' );
+
+            $member_tz = class_exists( 'Gend_GS_Calendar_Events_REST' )
+                ? Gend_GS_Calendar_Events_REST::get_member_timezone( $owner_id )
+                : ( wp_timezone_string() ?: 'UTC' );
+
+            $raw_events = self::build_owner_events( $owner_id, $from_mysql, $to_mysql );
+
+            $out = array();
+            foreach ( $raw_events as $ev ) {
+                if ( ! is_array( $ev ) || ! isset( $ev['source'] ) ) { continue; }
+                $vis_source_key = self::map_source_to_visibility( (string) $ev['source'] );
+                if ( $vis_source_key === null ) { continue; }
+                if ( empty( $vis['sources'][ $vis_source_key ] ) ) { continue; }
+
+                if ( $vis['detail'] === 'busy' ) {
+                    $out[] = array(
+                        'id'      => isset( $ev['id'] ) ? (string) $ev['id'] : '',
+                        'start'   => isset( $ev['start'] ) ? (string) $ev['start'] : '',
+                        'end'     => isset( $ev['end'] )   ? (string) $ev['end']   : '',
+                        'all_day' => ! empty( $ev['all_day'] ),
+                        'busy'    => true,
+                        'title'   => 'Busy',
+                        'source'  => 'busy',
+                        'color'   => self::BUSY_BLOCK_COLOR,
+                        'status'  => '',
+                        'url'     => '',
+                    );
+                } else {
+                    $out[] = array(
+                        'id'      => isset( $ev['id'] )      ? (string) $ev['id']      : '',
+                        'source'  => (string) $ev['source'],
+                        'type'    => isset( $ev['type'] )    ? (string) $ev['type']    : '',
+                        'title'   => isset( $ev['title'] )   ? (string) $ev['title']   : '',
+                        'start'   => isset( $ev['start'] )   ? (string) $ev['start']   : '',
+                        'end'     => isset( $ev['end'] )     ? (string) $ev['end']     : '',
+                        'all_day' => ! empty( $ev['all_day'] ),
+                        'color'   => isset( $ev['color'] )   ? (string) $ev['color']   : '',
+                        'status'  => isset( $ev['status'] )  ? (string) $ev['status']  : '',
+                        'url'     => isset( $ev['url'] )      ? (string) $ev['url']     : '',
+                        'busy'    => ! empty( $ev['busy'] ),
+                    );
+                }
+            }
+
+            usort( $out, function ( $a, $b ) { return strcmp( (string) $a['start'], (string) $b['start'] ); } );
+
+            return rest_ensure_response( array(
+                'events'    => $out,
+                'member_tz' => $member_tz,
+                'detail'    => $vis['detail'],
+            ) );
+        } catch ( \Throwable $e ) {
+            error_log( 'GS_CAL_FATAL handle_shared_events: ' . $e->getMessage() );
+            return new WP_Error( 'gs_cal_fatal', 'Shared calendar fetch failed', array( 'status' => 500 ) );
+        }
+    }
+
+    /**
+     * GET /calendar/shared/{owner_id}/info — authed selected-member identity/info.
+     *
+     * Authorization handled by shared_permission_check. Returns ONLY the identity
+     * fields the owner enabled, plus detail + sources. Same shape as
+     * handle_public_info (minus the privacy gate).
+     *
+     * @param WP_REST_Request $req
+     * @return WP_REST_Response|WP_Error
+     */
+    public static function handle_shared_info( WP_REST_Request $req ) {
+        try {
+            $owner_id = (int) $req['owner_id'];
+            $vis = self::get_visibility_settings( $owner_id );
+
+            $resp = array(
+                'detail'  => $vis['detail'],
+                'sources' => array(
+                    'projects'  => (bool) $vis['sources']['projects'],
+                    'campaigns' => (bool) $vis['sources']['campaigns'],
+                    'meetings'  => (bool) $vis['sources']['meetings'],
+                ),
+            );
+
+            if ( ! empty( $vis['identity']['name'] ) ) {
+                $display_name = function_exists( 'bp_core_get_user_displayname' )
+                    ? (string) bp_core_get_user_displayname( $owner_id )
+                    : '';
+                if ( $display_name === '' ) {
+                    $u = get_userdata( $owner_id );
+                    $display_name = $u ? (string) $u->display_name : '';
+                }
+                $resp['display_name'] = $display_name;
+            }
+            if ( ! empty( $vis['identity']['avatar'] ) ) {
+                if ( function_exists( 'bp_core_fetch_avatar' ) ) {
+                    $resp['avatar_url'] = (string) bp_core_fetch_avatar( array(
+                        'item_id' => $owner_id,
+                        'object'  => 'user',
+                        'type'    => 'full',
+                        'html'    => false,
+                    ) );
+                } else {
+                    $resp['avatar_url'] = (string) get_avatar_url( $owner_id );
+                }
+            }
+            if ( ! empty( $vis['identity']['bio'] ) ) {
+                $bio = '';
+                if ( function_exists( 'bp_get_profile_field_data' ) ) {
+                    $bio = (string) bp_get_profile_field_data( array(
+                        'field'   => 'Bio',
+                        'user_id' => $owner_id,
+                    ) );
+                }
+                if ( $bio === '' ) {
+                    $bio = (string) get_user_meta( $owner_id, 'description', true );
+                }
+                $resp['bio'] = wp_kses_post( $bio );
+            }
+            if ( ! empty( $vis['identity']['timezone'] ) ) {
+                $resp['timezone'] = class_exists( 'Gend_GS_Calendar_Events_REST' )
+                    ? Gend_GS_Calendar_Events_REST::get_member_timezone( $owner_id )
+                    : ( wp_timezone_string() ?: 'UTC' );
+            }
+
+            return rest_ensure_response( $resp );
+        } catch ( \Throwable $e ) {
+            error_log( 'GS_CAL_FATAL handle_shared_info: ' . $e->getMessage() );
+            return new WP_Error( 'gs_cal_fatal', 'Shared calendar info fetch failed', array( 'status' => 500 ) );
+        }
     }
 
     // ─── Private helpers ────────────────────────────────────────────────────

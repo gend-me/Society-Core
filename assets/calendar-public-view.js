@@ -25,6 +25,27 @@
 	var TOKEN = String(DATA.token || '');
 	var DAY_MS = 86400000;
 
+	/* Phase 42 — authed SHARED mode: when an ownerId (+nonce) is supplied the
+	 * viewer fetches the AUTHED /calendar/shared/{ownerId}/{info,events} routes
+	 * with the logged-in cookie + X-WP-Nonce instead of the logged-OUT token
+	 * routes. Selected members view the owner's calendar on the profile tab. */
+	var OWNER_ID = (DATA.ownerId != null) ? parseInt(DATA.ownerId, 10) : 0;
+	var NONCE = String(DATA.nonce || '');
+	var SHARED = (OWNER_ID > 0);
+
+	/* Build the info/events URLs for whichever mode is active. */
+	function infoUrl() {
+		return SHARED
+			? REST + '/calendar/shared/' + OWNER_ID + '/info'
+			: REST + '/calendar/public/' + encodeURIComponent(TOKEN) + '/info';
+	}
+	function eventsUrl(fromISO, toISO) {
+		var base = SHARED
+			? REST + '/calendar/shared/' + OWNER_ID + '/events'
+			: REST + '/calendar/public/' + encodeURIComponent(TOKEN) + '/events';
+		return base + '?from=' + encodeURIComponent(fromISO) + '&to=' + encodeURIComponent(toISO);
+	}
+
 	/* --gph-* design tokens → concrete colors (mirrors member-calendar.css :root).
 	 * The events API returns colors as '--gph-*' token NAMES; resolve to hex. */
 	var GPH = {
@@ -89,7 +110,10 @@
 
 	/* ---- REST ------------------------------------------------------------- */
 	function getJSON(url) {
-		return fetch(url, { credentials: 'omit' }).then(function (r) {
+		var opts = SHARED
+			? { credentials: 'same-origin', headers: NONCE ? { 'X-WP-Nonce': NONCE } : {} }
+			: { credentials: 'omit' };
+		return fetch(url, opts).then(function (r) {
 			return r.json().then(
 				function (j) { return { ok: r.ok, status: r.status, body: j }; },
 				function () { return { ok: r.ok, status: r.status, body: null }; }
@@ -110,7 +134,7 @@
 
 	Viewer.prototype.start = function () {
 		var self = this;
-		getJSON(REST + '/calendar/public/' + encodeURIComponent(TOKEN) + '/info').then(function (res) {
+		getJSON(infoUrl()).then(function (res) {
 			if (res.status === 403) { return self.renderCard('This calendar is private.', 'Its owner has not shared it publicly.'); }
 			if (res.status === 404) { return self.renderCard('Calendar not found.', 'This share link is invalid or has been revoked.'); }
 			if (!res.ok || !res.body || typeof res.body !== 'object') {
@@ -141,8 +165,7 @@
 		var r = this.monthRange();
 		var key = r.fromISO + '|' + r.toISO;
 		if (!force && key === this._fetchedKey) { return; }
-		var url = REST + '/calendar/public/' + encodeURIComponent(TOKEN) + '/events'
-			+ '?from=' + encodeURIComponent(r.fromISO) + '&to=' + encodeURIComponent(r.toISO);
+		var url = eventsUrl(r.fromISO, r.toISO);
 		getJSON(url).then(function (res) {
 			if (!res.ok || !res.body) { return; } // keep current events; privacy already handled by info
 			var body = res.body;
@@ -312,7 +335,7 @@
 	function init() {
 		var root = document.getElementById('gs-calview-root');
 		if (!root) { return; }
-		if (!TOKEN) { return; }
+		if (!TOKEN && !SHARED) { return; }
 		new Viewer(root).start();
 	}
 	if (document.readyState === 'loading') {

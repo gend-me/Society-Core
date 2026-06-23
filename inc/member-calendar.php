@@ -92,8 +92,18 @@ function gs_calendar_profile_screen() {
  * container that 26-02's JS mounts into, and the per-tab asset enqueue.
  */
 function gs_calendar_profile_screen_content() {
-	// Only show on the current user's own profile this phase.
+	// On someone ELSE'S profile: render a READ-ONLY calendar IF the logged-in
+	// viewer is in the displayed owner's visibility.members allow-list (Phase 42
+	// "share with specific members"). Otherwise keep the private message. The
+	// owner's own view (bp_is_my_profile) falls through unchanged below.
 	if ( ! bp_is_my_profile() ) {
+		$gs_owner_id  = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
+		$gs_viewer_id = (int) get_current_user_id();
+		if ( $gs_viewer_id > 0 && $gs_owner_id > 0
+			&& gs_calendar_viewer_is_shared_member( $gs_owner_id, $gs_viewer_id ) ) {
+			gs_calendar_render_shared_view( $gs_owner_id );
+			return;
+		}
 		echo '<p>' . esc_html__( 'This calendar is private.', 'gend-society' ) . '</p>';
 		return;
 	}
@@ -360,7 +370,7 @@ function gs_calendar_profile_screen_content() {
 	// the button only shows when the modal script is actually deployed.
 	if ( file_exists( GS_DIR . 'assets/schedule-meeting.js' ) ) {
 		echo '<style>
-			.gs-cal-actionbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;margin:0 0 14px;}
+			.gs-cal-actionbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;margin:18px 0 14px;}
 			.gs-cal-newbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
 				padding:10px 18px;border-radius:12px;border:1px solid rgba(182,8,201,.5);
 				background:linear-gradient(135deg,rgba(182,8,201,.22),rgba(182,8,201,.06));
@@ -406,6 +416,104 @@ function gs_calendar_profile_screen_content() {
 	// Guarantee the .member-calendar body class is present so the CSS above
 	// applies, even if a theme/Youzify body_class path drops it. This screen
 	// only renders on the calendar tab, so adding the class here is scoped.
+	echo '<script>(function(){var b=document.body;if(b){b.classList.add("member-calendar");}})();</script>';
+}
+
+/**
+ * Phase 42 — is $viewer_id in $owner_id's visibility.members allow-list?
+ *
+ * Reads booking_settings_json.visibility.members directly (no REST) and runs it
+ * through the canonical sanitizer so the int[] shape matches the REST path.
+ * Defensive: returns false if the schema/class is missing (partial deploy).
+ *
+ * @param int $owner_id
+ * @param int $viewer_id
+ * @return bool
+ */
+function gs_calendar_viewer_is_shared_member( $owner_id, $viewer_id ) {
+	$owner_id  = (int) $owner_id;
+	$viewer_id = (int) $viewer_id;
+	if ( $owner_id <= 0 || $viewer_id <= 0 ) { return false; }
+	if ( ! class_exists( 'Gend_GS_Availability_Schema' ) || ! class_exists( 'Gend_GS_Availability_REST' ) ) {
+		return false;
+	}
+	global $wpdb;
+	$tbl = Gend_GS_Availability_Schema::table_availability();
+	$row = $wpdb->get_row( $wpdb->prepare(
+		"SELECT booking_settings_json FROM {$tbl} WHERE user_id = %d LIMIT 1",
+		$owner_id
+	) );
+	if ( ! $row || empty( $row->booking_settings_json ) ) { return false; }
+	$bs  = (array) json_decode( $row->booking_settings_json, true );
+	$vis = ( isset( $bs['visibility'] ) && is_array( $bs['visibility'] ) ) ? $bs['visibility'] : array();
+	$clean   = Gend_GS_Availability_REST::sanitize_visibility( $vis );
+	$members = ( isset( $clean['members'] ) && is_array( $clean['members'] ) ) ? $clean['members'] : array();
+	return in_array( $viewer_id, array_map( 'intval', $members ), true );
+}
+
+/**
+ * Phase 42 — render the read-only shared calendar of $owner_id for an authorized
+ * selected member. Reuses the calendar-public-view.{js,css} viewer pointed at the
+ * AUTHED /gs/v1/calendar/shared/{owner_id}/{info,events} endpoints (cookie +
+ * nonce). Privacy bypass is intentional: membership was already verified.
+ *
+ * @param int $owner_id
+ */
+function gs_calendar_render_shared_view( $owner_id ) {
+	$owner_id = (int) $owner_id;
+
+	// Reuse the calendar root full-width strip styles already emitted above by
+	// scoping to .member-calendar (BP adds that body class for this slug).
+	$css_path = GS_DIR . 'assets/calendar-public-view.css';
+	$js_path  = GS_DIR . 'assets/calendar-public-view.js';
+	if ( ! file_exists( $js_path ) ) {
+		echo '<p>' . esc_html__( 'This calendar is private.', 'gend-society' ) . '</p>';
+		return;
+	}
+	$css_ver = GS_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
+	$js_ver  = GS_VERSION . '.' . filemtime( $js_path );
+	if ( file_exists( $css_path ) ) {
+		wp_enqueue_style( 'gs-calendar-public-view', GS_URL . 'assets/calendar-public-view.css', array(), $css_ver );
+	}
+
+	// Light width strip for the shared (non-owner) view: collapse the Youzify
+	// two-column grid + sidebar so the calendar gets full width, but KEEP the
+	// owner's profile header/nav intact (this is another member's profile — the
+	// viewer still needs the profile nav). Deliberately NOT the owner-view shell
+	// strip, which hides #item-nav / profile-navmenu.
+	echo '<style>
+		.member-calendar .youzify-right-sidebar-layout,
+		.member-calendar .youzify-left-sidebar-layout {
+			display: block !important; grid-template-columns: 1fr !important; grid-gap: 0 !important;
+		}
+		.member-calendar .youzify-sidebar-column,
+		.member-calendar .youzify-sidebar,
+		.member-calendar .yz-sidebar-column,
+		.member-calendar .youzify-profile-sidebar,
+		.member-calendar #secondary { display: none !important; }
+		.member-calendar .youzify-main-column,
+		.member-calendar .youzify-content,
+		.member-calendar .yz-main-column,
+		.member-calendar #primary {
+			width: 100% !important; flex: 0 0 100% !important; max-width: 100% !important;
+		}
+		.gs-cal-root { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
+	</style>';
+	wp_enqueue_script( 'gs-calendar-public-view', GS_URL . 'assets/calendar-public-view.js', array(), $js_ver, true );
+
+	// Authed shared mode: ownerId + nonce switch the viewer to the /shared/ routes.
+	wp_localize_script( 'gs-calendar-public-view', 'gsCalViewData', array(
+		'restBase' => esc_url_raw( rest_url( 'gs/v1/' ) ),
+		'ownerId'  => $owner_id,
+		'nonce'    => wp_create_nonce( 'wp_rest' ),
+	) );
+
+	echo '<div id="gs-calview-root" class="gs-calview-root gs-cal-root">'
+		. '<div class="gs-calview-loading">' . esc_html__( 'Loading calendar…', 'gend-society' ) . '</div>'
+		. '</div>';
+
+	// Ensure the .member-calendar body class is present so the full-width strip
+	// CSS applies (this branch returns before the owner-path emits its <script>).
 	echo '<script>(function(){var b=document.body;if(b){b.classList.add("member-calendar");}})();</script>';
 }
 
