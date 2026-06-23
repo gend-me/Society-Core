@@ -55,6 +55,22 @@
         pick: null,
         MINUTE_STEP: 5,
 
+        // IntersectionObserver for staggered on-scroll entrance reveals.
+        // Re-created each render() (the body is rebuilt); disconnected first so we
+        // never leak observers across opens.
+        revealObserver: null,
+
+        // Inline SVG icons for the three meeting-type buttons. Hand-authored,
+        // currentColor, ~28px viewBox. Wrapped in a <span> so we can inject HTML.
+        typeIcons: {
+            // Location / map-pin.
+            in_person: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M12 21.5c4.5-4.2 7-7.7 7-11a7 7 0 1 0-14 0c0 3.3 2.5 6.8 7 11z"/><circle cx="12" cy="10.5" r="2.6"/></svg>',
+            // Phone handset.
+            phone: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6.5 3.5h3l1.4 4-2 1.4a12 12 0 0 0 5.2 5.2l1.4-2 4 1.4v3a2 2 0 0 1-2.2 2A16.5 16.5 0 0 1 4.5 5.7 2 2 0 0 1 6.5 3.5z"/></svg>',
+            // Video camera.
+            video: '<svg viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><rect x="3" y="6.5" width="12" height="11" rx="2.2"/><path d="M15 10.5l5-3v9l-5-3z"/></svg>'
+        },
+
         mount: function () {
             if (this.state.mounted) { return; }
             this.state.mounted = true;
@@ -107,6 +123,8 @@
             this.state.open = false;
             this.state.prefillStart = '';
             this.modalRoot.setAttribute('aria-hidden', 'true');
+            // Tear down the reveal observer so we never leak across opens.
+            if (this.revealObserver) { this.revealObserver.disconnect(); this.revealObserver = null; }
             this.modalRoot.innerHTML = '';
         },
 
@@ -125,25 +143,36 @@
                                           onclick: function () { self.closeModal(); } });
             var title    = ce('h2', { className: 'gs-schedule-title', text: 'Schedule a meeting' });
 
-            // ─── Meeting-type radio group ───
-            var typeFieldset = ce('fieldset', { className: 'gs-schedule-types' });
-            typeFieldset.appendChild(ce('legend', { text: 'Meeting type' }));
+            // ─── Meeting-type icon buttons ───
+            // Three large glassmorphic <button>s (icon-over-label) replace the plain
+            // radio set. aria-pressed reflects the active type; clicking selects the
+            // type, repaints the selected state, and refreshes the per-type meta.
+            var typeFieldset = ce('div', { className: 'gs-schedule-types', role: 'group', 'aria-label': 'Meeting type' });
+            typeFieldset.appendChild(ce('span', { className: 'gs-schedule-types-legend', text: 'Meeting type' }));
             var types = [
                 { value: 'in_person', label: 'In person' },
                 { value: 'phone',     label: 'Phone' },
                 { value: 'video',     label: 'Video' }
             ];
+            var typeBtnRow = ce('div', { className: 'gs-schedule-types-row' });
+            self._typeButtons = [];
             for (var ti = 0; ti < types.length; ti++) {
                 (function (t) {
-                    var id = 'gs-type-' + t.value;
-                    var radio = ce('input', {
-                        type: 'radio', name: 'gs-type', id: id, value: t.value,
-                        onchange: function () { self.state.type = t.value; self.renderTypeFields(); }
-                    });
-                    if (t.value === self.state.type) { radio.setAttribute('checked', 'checked'); }
-                    typeFieldset.appendChild(ce('label', { 'for': id }, [radio, ' ' + t.label]));
+                    var isSel = (t.value === self.state.type);
+                    var iconSpan = ce('span', { className: 'gs-schedule-type-icon' });
+                    iconSpan.innerHTML = self.typeIcons[t.value] || '';
+                    var btn = ce('button', {
+                        type: 'button',
+                        className: 'gs-schedule-type-btn' + (isSel ? ' is-selected' : ''),
+                        'aria-pressed': isSel ? 'true' : 'false',
+                        'data-type': t.value,
+                        onclick: function () { self.selectType(t.value); }
+                    }, [iconSpan, ce('span', { className: 'gs-schedule-type-label', text: t.label })]);
+                    self._typeButtons.push(btn);
+                    typeBtnRow.appendChild(btn);
                 })(types[ti]);
             }
+            typeFieldset.appendChild(typeBtnRow);
 
             // ─── Duration picker from named_durations (BOOK-08) ───
             var durSel = ce('select', { className: 'gs-schedule-duration', name: 'duration_min',
@@ -177,20 +206,87 @@
             var submitBtn = ce('button', { className: 'gs-schedule-submit', type: 'submit', text: 'Create meeting' });
             var errBox    = ce('div',    { className: 'gs-schedule-error',  role: 'alert' });
 
+            // ─── Desktop multi-column layout ───
+            // Top: meeting-type buttons span full width.
+            // LEFT column: the date+time picker.
+            // RIGHT column: duration + guest fields + per-type meta.
+            // Bottom: submit + error span full width. Collapses to one column < 900px.
+            var durBlock = ce('label', { className: 'gs-schedule-block' },
+                              [ce('span', { text: 'Duration' }), durSel]);
+
+            var leftCol  = ce('div', { className: 'gs-schedule-col gs-schedule-col-left' }, [slotField]);
+            var rightCol = ce('div', { className: 'gs-schedule-col gs-schedule-col-right' },
+                              [durBlock, guestFields, this.metaContainer]);
+
+            var grid = ce('div', { className: 'gs-schedule-grid' }, [leftCol, rightCol]);
+
+            var typeBlock   = ce('div', { className: 'gs-schedule-block gs-schedule-types-block' }, [typeFieldset]);
+            var submitBlock = ce('div', { className: 'gs-schedule-block gs-schedule-submit-block' }, [submitBtn, errBox]);
+
             var form = ce('form', { className: 'gs-schedule-form',
                                     onsubmit: function (e) { self.onSubmit(e, form, errBox); } },
-                [
-                    typeFieldset, slotField,
-                    ce('label', {}, [ce('span', { text: 'Duration' }), durSel]),
-                    guestFields,
-                    this.metaContainer,
-                    submitBtn,
-                    errBox
-                ]);
+                [ typeBlock, grid, submitBlock ]);
 
             this.modalRoot.innerHTML = '';
-            this.modalRoot.appendChild(ce('div', { className: 'gs-schedule-card' }, [closeBtn, title, form]));
+            var card = ce('div', { className: 'gs-schedule-card' }, [closeBtn, title, form]);
+            this.modalRoot.appendChild(card);
             this.renderTypeFields();
+
+            // Wire the staggered on-scroll entrance reveals (card is the scroll container).
+            this.setupReveals(card);
+        },
+
+        // Click handler for the meeting-type icon buttons: sync state, repaint the
+        // selected/aria-pressed state across all three buttons, and refresh meta.
+        selectType: function (value) {
+            this.state.type = value;
+            if (this._typeButtons) {
+                for (var i = 0; i < this._typeButtons.length; i++) {
+                    var b = this._typeButtons[i];
+                    var on = (b.getAttribute('data-type') === value);
+                    b.classList.toggle('is-selected', on);
+                    b.setAttribute('aria-pressed', on ? 'true' : 'false');
+                }
+            }
+            this.renderTypeFields();
+        },
+
+        // ─── Staggered on-scroll entrance reveals ───
+        // Observe every [data-reveal] block within the modal's scroll container.
+        // When a block crosses into view, add .is-in (CSS transitions transform +
+        // opacity). Stagger via a per-block --rev-i transition-delay. Blocks already
+        // visible on open cascade in immediately. GPU-only; reduced-motion shows all
+        // instantly. Observer is rebuilt each render() and disconnected on close.
+        setupReveals: function (scrollEl) {
+            var self = this;
+            if (this.revealObserver) { this.revealObserver.disconnect(); this.revealObserver = null; }
+
+            // Collect the content blocks to reveal, assign stagger index.
+            var blocks = scrollEl.querySelectorAll(
+                '.gs-schedule-types-block, .gs-dtp, .gs-schedule-block, .gs-schedule-guest > label, .gs-schedule-meta > label, .gs-schedule-submit-block'
+            );
+            for (var i = 0; i < blocks.length; i++) {
+                blocks[i].setAttribute('data-reveal', '');
+                blocks[i].style.setProperty('--rev-i', String(i % 8)); // cap delay growth
+            }
+
+            // Reduced-motion or no IntersectionObserver → reveal everything instantly.
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce || typeof IntersectionObserver === 'undefined') {
+                for (var j = 0; j < blocks.length; j++) { blocks[j].classList.add('is-in'); }
+                return;
+            }
+
+            this.revealObserver = new IntersectionObserver(function (entries) {
+                for (var e = 0; e < entries.length; e++) {
+                    if (entries[e].isIntersecting) {
+                        entries[e].target.classList.add('is-in');
+                        self.revealObserver.unobserve(entries[e].target);
+                    }
+                }
+            }, { root: scrollEl, threshold: 0.08, rootMargin: '0px 0px -5% 0px' });
+
+            for (var k = 0; k < blocks.length; k++) { this.revealObserver.observe(blocks[k]); }
         },
 
         renderTypeFields: function () {
