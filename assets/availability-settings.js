@@ -1,23 +1,30 @@
 /**
- * gend-society — Availability Settings Panel (Phase 28-03).
+ * gend-society — Availability + Visibility Settings (Phase 28-03 + 31-frontend).
  *
- * Mount: #gs-avail-settings inside #gs-calendar-app (Phase 26 calendar tab).
+ * Refactor: the settings UI now lives in TWO POPUP MODALS opened from the
+ * calendar action bar (data-gs-avail-open / data-gs-vis-open), NOT the inline
+ * panel that used to fill #gs-avail-settings.
+ *
+ *   • Availability modal  — timezone + Weekly Working Hours (7-col grid) + Blocked Time
+ *   • Visibility   modal  — privacy segmented / detail / sources / identity / share-link
+ *
+ * Both modals mirror the schedule-meeting.js modal UX: an overlay appended to
+ * <body>, aria-hidden toggling, glassmorphic card, close ×, backdrop-click +
+ * ESC close, and a document-level click delegate that opens them.
+ *
  * REST: GET + PUT /wp-json/gs/v1/calendar/availability (Plan 28-02).
+ * Shared in-memory state (_lastState) is fetched once on init and kept WHOLE so
+ * SAVE from EITHER modal round-trips the FULL payload (timezone, working_hours,
+ * blocked_ranges, booking_settings) with only that modal's edits merged in —
+ * so saving Visibility never wipes Working Hours and vice-versa.
  *
- * UI:
- *   - Timezone picker (datalist of common IANA names + free-text fallback; validated by server)
- *   - Mon-Sun working-hour grid: per day, list of {start, end} with [+ Add range] / [×] remove
- *   - Blocked ranges: list of {start_utc, end_utc, reason} with [+ Add] / [×] remove
- *   - Save button → PUT → on success dispatch 'gs:availability-changed' so calendar refreshes
- *
- * Pattern: vanilla JS createElement + textContent (no innerHTML for user data — Plan 26-02 precedent).
+ * Pattern: vanilla JS createElement + textContent (no innerHTML for user data).
  */
 (function () {
     'use strict';
 
-    var ROOT_ID = 'gs-avail-settings';
-    var NONCE   = (window.gsAvailNonce || window.wpApiSettings && window.wpApiSettings.nonce) || '';
-    var REST    = ((window.wpApiSettings && window.wpApiSettings.root) || '/wp-json/').replace(/\/$/, '') + '/gs/v1/calendar/availability';
+    var NONCE = (window.gsAvailNonce || (window.wpApiSettings && window.wpApiSettings.nonce)) || '';
+    var REST  = ((window.wpApiSettings && window.wpApiSettings.root) || '/wp-json/').replace(/\/$/, '') + '/gs/v1/calendar/availability';
 
     var DAYS = [
         { key: 'mon', label: 'Mon' },
@@ -29,14 +36,19 @@
         { key: 'sun', label: 'Sun' }
     ];
 
-    /* Phase 31-frontend — last GET payload, kept whole so SAVE can round-trip the
-     * ENTIRE booking_settings object (the PUT replaces booking_settings_json
-     * WHOLESALE — losing named_durations / enabled_meeting_types / any other key
-     * = data loss). We merge ONLY .visibility into a deep-cloned copy on save. */
+    /* Shared in-memory state — the LAST GET (or PUT response) payload, kept whole
+     * so SAVE can round-trip the ENTIRE booking_settings object (the PUT replaces
+     * booking_settings_json WHOLESALE — losing named_durations / any other key =
+     * data loss). We merge ONLY the editing modal's slice on save. */
     var _lastState = null;
+    var _loaded = false;       // has the initial GET resolved?
+    var _loadError = false;
 
-    /* visibility defaults — mirror the server's always-defaulted shape so the UI
-     * renders coherently even if a (legacy) booking_settings has no visibility. */
+    // Live modal element refs (built once on init, appended to <body>).
+    var availModal = null;     // { overlay, body, onOpen }
+    var visModal = null;
+
+    /* visibility defaults — mirror the server's always-defaulted shape. */
     function defaultVisibility() {
         return {
             privacy: 'private',
@@ -46,7 +58,6 @@
         };
     }
 
-    /** Coerce whatever the server returned into a fully-populated visibility obj. */
     function normalizeVisibility(v) {
         var d = defaultVisibility();
         v = (v && typeof v === 'object') ? v : {};
@@ -70,8 +81,6 @@
     }
 
     function homeBase() {
-        // Derive site origin/path so the share URL matches home_url() without a localize.
-        // wpApiSettings.root is .../wp-json/ on the same host; strip wp-json/ to get home.
         var root = (window.wpApiSettings && window.wpApiSettings.root) || (location.origin + '/');
         return String(root).replace(/wp-json\/?$/, '');
     }
@@ -80,7 +89,6 @@
         return homeBase().replace(/\/$/, '') + '/calendar-view/' + token + '/';
     }
 
-    // Common IANA list (not exhaustive — server validates so free-text is allowed)
     var COMMON_TZS = [
         'UTC', 'America/Toronto', 'America/Halifax', 'America/Vancouver', 'America/New_York',
         'America/Chicago', 'America/Denver', 'America/Los_Angeles', 'Europe/London',
@@ -92,6 +100,7 @@
         if (attrs) Object.keys(attrs).forEach(function (k) {
             if (k === 'class') n.className = attrs[k];
             else if (k === 'text') n.textContent = attrs[k];
+            else if (k.indexOf('on') === 0 && typeof attrs[k] === 'function') n.addEventListener(k.substring(2).toLowerCase(), attrs[k]);
             else n.setAttribute(k, attrs[k]);
         });
         if (kids) kids.forEach(function (c) { if (c) n.appendChild(c); });
@@ -120,25 +129,57 @@
         });
     }
 
-    function buildPanel(state) {
-        var root = document.getElementById(ROOT_ID);
-        if (!root) return;
-        _lastState = state || {}; // keep whole payload for SAVE round-trip
-        root.textContent = ''; // clear
+    /* ===================== Generic modal shell (mirrors schedule-meeting.js) ==== */
 
-        var panel = el('div', { class: 'gs-avail-settings' });
+    // Builds an overlay (root .gs-avail-modal) appended to <body>, aria-hidden,
+    // with a glassmorphic card (title + × close + a body container). Backdrop
+    // click + ESC + × all close. Returns { overlay, card, body, open, close }.
+    function buildModal(rootClass, titleText) {
+        var body = el('div', { class: 'gs-avail-modal-body' });
+        var closeBtn = el('button', {
+            class: 'gs-avail-modal-close', type: 'button', 'aria-label': 'Close', text: '×'
+        });
+        var title = el('h2', { class: 'gs-avail-modal-title', text: titleText });
+        var card = el('div', { class: 'gs-avail-modal-card' }, [closeBtn, title, body]);
+        var overlay = el('div', { class: 'gs-avail-modal ' + rootClass, 'aria-hidden': 'true', role: 'dialog', 'aria-modal': 'true' }, [card]);
 
-        panel.appendChild(el('h3', { class: 'gs-avail-title', text: 'Availability Settings' }));
+        var api = {
+            overlay: overlay,
+            card: card,
+            body: body,
+            open: function () { overlay.setAttribute('aria-hidden', 'false'); },
+            close: function () { overlay.setAttribute('aria-hidden', 'true'); }
+        };
 
-        // Timezone picker — datalist for autocomplete, free-text fallback
+        closeBtn.addEventListener('click', api.close);
+        // Backdrop click (only when the overlay itself, not the card, is clicked).
+        overlay.addEventListener('click', function (e) { if (e.target === overlay) { api.close(); } });
+
+        document.body.appendChild(overlay);
+        return api;
+    }
+
+    // Single ESC handler closes whichever modal is open.
+    document.addEventListener('keydown', function (e) {
+        if (e.key !== 'Escape' && e.keyCode !== 27) { return; }
+        if (availModal && availModal.overlay.getAttribute('aria-hidden') === 'false') { availModal.close(); }
+        if (visModal && visModal.overlay.getAttribute('aria-hidden') === 'false') { visModal.close(); }
+    });
+
+    /* ===================== AVAILABILITY modal body ============================= */
+
+    function renderAvailabilityBody(state) {
+        var body = availModal.body;
+        body.textContent = '';
+
+        var panel = el('div', { class: 'gs-avail-settings gs-avail-settings--modal' });
+
+        // Timezone picker.
         var tzWrap = el('div', { class: 'gs-avail-row gs-avail-tz' });
         tzWrap.appendChild(el('label', { for: 'gs-avail-tz-input', text: 'Timezone (IANA, e.g. America/Toronto)' }));
         var tzInput = el('input', {
-            id: 'gs-avail-tz-input',
-            type: 'text',
-            list: 'gs-avail-tz-list',
-            value: state.timezone || '',
-            placeholder: 'America/Toronto'
+            id: 'gs-avail-tz-input', type: 'text', list: 'gs-avail-tz-list',
+            value: state.timezone || '', placeholder: 'America/Toronto'
         });
         var tzList = el('datalist', { id: 'gs-avail-tz-list' });
         COMMON_TZS.forEach(function (tz) { tzList.appendChild(el('option', { value: tz })); });
@@ -146,17 +187,15 @@
         tzWrap.appendChild(tzList);
         panel.appendChild(tzWrap);
 
-        // Working hours grid
+        // Working hours grid.
         panel.appendChild(el('h4', { class: 'gs-avail-subtitle', text: 'Weekly Working Hours' }));
         var whWrap = el('div', { class: 'gs-avail-wh-grid' });
         DAYS.forEach(function (day) {
             var dayRow = el('div', { class: 'gs-avail-day-row' });
             dayRow.appendChild(el('div', { class: 'gs-avail-day-label', text: day.label }));
             var rangesWrap = el('div', { class: 'gs-avail-ranges', 'data-day': day.key });
-
             var ranges = (state.working_hours && state.working_hours[day.key]) || [];
             ranges.forEach(function (r) { rangesWrap.appendChild(buildRangeRow(day.key, r.start, r.end)); });
-
             var addBtn = el('button', { type: 'button', class: 'gs-avail-add-range', text: '+ Add' });
             addBtn.addEventListener('click', function () {
                 rangesWrap.insertBefore(buildRangeRow(day.key, '09:00', '17:00'), addBtn);
@@ -167,7 +206,7 @@
         });
         panel.appendChild(whWrap);
 
-        // Blocked ranges
+        // Blocked ranges.
         panel.appendChild(el('h4', { class: 'gs-avail-subtitle', text: 'Blocked Time (one-off)' }));
         var brWrap = el('div', { class: 'gs-avail-blocked' });
         var brList = el('div', { class: 'gs-avail-br-list' });
@@ -175,19 +214,12 @@
             brList.appendChild(buildBlockedRow(r.start_utc, r.end_utc, r.reason));
         });
         var addBr = el('button', { type: 'button', class: 'gs-avail-add-br', text: '+ Add blocked range' });
-        addBr.addEventListener('click', function () {
-            brList.appendChild(buildBlockedRow('', '', ''));
-        });
+        addBr.addEventListener('click', function () { brList.appendChild(buildBlockedRow('', '', '')); });
         brWrap.appendChild(brList);
         brWrap.appendChild(addBr);
         panel.appendChild(brWrap);
 
-        // ── Calendar Visibility section (Phase 31-frontend) ──
-        var bs = (state && state.booking_settings && typeof state.booking_settings === 'object')
-            ? state.booking_settings : {};
-        panel.appendChild(buildVisibilitySection(normalizeVisibility(bs.visibility), state.share_token));
-
-        // Save / status
+        // Save / status.
         var actions = el('div', { class: 'gs-avail-actions' });
         var saveBtn = el('button', { type: 'button', class: 'gs-avail-save', text: 'Save Availability' });
         var status = el('span', { class: 'gs-avail-status', text: '' });
@@ -197,46 +229,103 @@
 
         saveBtn.addEventListener('click', function () {
             status.textContent = 'Saving...';
-            var payload = serializeForm(panel);
-            // Round-trip booking_settings WHOLESALE: deep-clone the last-fetched
-            // booking_settings (preserving named_durations / enabled_meeting_types /
-            // any other keys) and merge ONLY the chosen visibility into it. The PUT
-            // replaces booking_settings_json entirely, so anything dropped here is
-            // lost on the server.
-            var priorBs = (_lastState && _lastState.booking_settings && typeof _lastState.booking_settings === 'object')
-                ? _lastState.booking_settings : {};
-            var mergedBs;
-            try { mergedBs = JSON.parse(JSON.stringify(priorBs)); }
-            catch (e) { mergedBs = {}; }
-            mergedBs.visibility = serializeVisibility(panel);
-            payload.booking_settings = mergedBs;
-
+            // Availability edits = timezone + working_hours + blocked_ranges.
+            var avail = serializeAvailability(panel);
+            var payload = mergePayload({
+                timezone: avail.timezone,
+                working_hours: avail.working_hours,
+                blocked_ranges: avail.blocked_ranges
+            });
             saveAvailability(payload).then(function (res) {
                 if (res.ok) {
                     status.textContent = 'Saved.';
-                    // Keep _lastState in sync with what the server now holds so a
-                    // subsequent save re-merges from the freshest booking_settings.
-                    if (res.body && typeof res.body === 'object') {
-                        _lastState = res.body;
-                    } else {
-                        _lastState = payload;
-                    }
-                    // Update tz attribute on calendar root so renderer reads new tz immediately.
+                    refreshState(res.body || payload);
                     var app = document.getElementById('gs-calendar-app');
                     if (app && payload.timezone) app.setAttribute('data-tz', payload.timezone);
                     window.dispatchEvent(new CustomEvent('gs:availability-changed', { detail: res.body }));
                     setTimeout(function () { status.textContent = ''; }, 2500);
                 } else {
-                    var msg = (res.body && res.body.message) || ('error: ' + res.status);
-                    status.textContent = msg;
+                    status.textContent = (res.body && res.body.message) || ('error: ' + res.status);
                 }
-            }).catch(function (e) { status.textContent = 'Network error'; });
+            }).catch(function () { status.textContent = 'Network error'; });
         });
 
-        root.appendChild(panel);
+        body.appendChild(panel);
     }
 
-    /* ---- Calendar Visibility section (Phase 31-frontend) ------------------- */
+    /* ===================== VISIBILITY modal body ============================== */
+
+    function renderVisibilityBody(state) {
+        var body = visModal.body;
+        body.textContent = '';
+
+        var panel = el('div', { class: 'gs-avail-settings gs-avail-settings--modal' });
+        var bs = (state && state.booking_settings && typeof state.booking_settings === 'object') ? state.booking_settings : {};
+        panel.appendChild(buildVisibilitySection(normalizeVisibility(bs.visibility), state.share_token));
+
+        var actions = el('div', { class: 'gs-avail-actions' });
+        var saveBtn = el('button', { type: 'button', class: 'gs-avail-save', text: 'Save Visibility' });
+        var status = el('span', { class: 'gs-avail-status', text: '' });
+        actions.appendChild(saveBtn);
+        actions.appendChild(status);
+        panel.appendChild(actions);
+
+        saveBtn.addEventListener('click', function () {
+            status.textContent = 'Saving...';
+            // Round-trip booking_settings WHOLESALE: deep-clone prior booking_settings
+            // (preserving named_durations / enabled_meeting_types / etc.) and merge
+            // ONLY .visibility. The PUT replaces booking_settings_json entirely.
+            var priorBs = (_lastState && _lastState.booking_settings && typeof _lastState.booking_settings === 'object')
+                ? _lastState.booking_settings : {};
+            var mergedBs;
+            try { mergedBs = JSON.parse(JSON.stringify(priorBs)); } catch (e) { mergedBs = {}; }
+            mergedBs.visibility = serializeVisibility(panel);
+            var payload = mergePayload({ booking_settings: mergedBs });
+
+            saveAvailability(payload).then(function (res) {
+                if (res.ok) {
+                    status.textContent = 'Saved.';
+                    refreshState(res.body || payload);
+                    window.dispatchEvent(new CustomEvent('gs:availability-changed', { detail: res.body }));
+                    setTimeout(function () { status.textContent = ''; }, 2500);
+                } else {
+                    status.textContent = (res.body && res.body.message) || ('error: ' + res.status);
+                }
+            }).catch(function () { status.textContent = 'Network error'; });
+        });
+
+        body.appendChild(panel);
+    }
+
+    /* ===================== Full-payload round-trip helpers ===================== */
+
+    // Build the FULL PUT payload from the shared state, overriding only the keys
+    // the editing modal changed. Anything not overridden is taken from the last
+    // fetched state so the OTHER modal's data is never wiped.
+    function mergePayload(overrides) {
+        var st = _lastState || {};
+        var priorBs;
+        try {
+            priorBs = (st.booking_settings && typeof st.booking_settings === 'object')
+                ? JSON.parse(JSON.stringify(st.booking_settings)) : {};
+        } catch (e) { priorBs = {}; }
+
+        var payload = {
+            timezone: st.timezone || 'UTC',
+            working_hours: (st.working_hours && typeof st.working_hours === 'object') ? st.working_hours : {},
+            blocked_ranges: Array.isArray(st.blocked_ranges) ? st.blocked_ranges : [],
+            booking_settings: priorBs
+        };
+        if (overrides) Object.keys(overrides).forEach(function (k) { payload[k] = overrides[k]; });
+        return payload;
+    }
+
+    // Refresh the shared state from a PUT response (or fall back to the payload).
+    function refreshState(next) {
+        if (next && typeof next === 'object') { _lastState = next; }
+    }
+
+    /* ---- Calendar Visibility section ---------------------------------------- */
 
     var PRIVACY_OPTS = [
         { value: 'private', label: 'Private', hint: 'Only you' },
@@ -279,7 +368,7 @@
         privRow.appendChild(privSeg);
         wrap.appendChild(privRow);
 
-        // Detail — full vs busy (disabled when Private).
+        // Detail — full vs busy.
         var detRow = el('div', { class: 'gs-avail-vis-row', 'data-field': 'detail-row' });
         detRow.appendChild(el('label', { class: 'gs-avail-vis-label', text: 'Detail shown to viewers' }));
         var detSeg = el('div', { class: 'gs-avail-seg', 'data-field': 'detail', role: 'radiogroup', 'aria-label': 'Detail shown to viewers' });
@@ -295,7 +384,7 @@
         detRow.appendChild(detSeg);
         wrap.appendChild(detRow);
 
-        // Visible sources — checkboxes.
+        // Visible sources.
         var srcRow = el('div', { class: 'gs-avail-vis-row' });
         srcRow.appendChild(el('label', { class: 'gs-avail-vis-label', text: 'Visible sources to others' }));
         var srcGrid = el('div', { class: 'gs-avail-vis-checks', 'data-field': 'sources' });
@@ -305,7 +394,7 @@
         srcRow.appendChild(srcGrid);
         wrap.appendChild(srcRow);
 
-        // Identity on shared page — checkboxes.
+        // Identity on shared page.
         var idRow = el('div', { class: 'gs-avail-vis-row' });
         idRow.appendChild(el('label', { class: 'gs-avail-vis-label', text: 'Identity on shared page' }));
         var idGrid = el('div', { class: 'gs-avail-vis-checks', 'data-field': 'identity' });
@@ -340,11 +429,11 @@
         linkBox.appendChild(copyBtn);
         linkBox.appendChild(openLink);
         linkRow.appendChild(linkBox);
-        var privHint = el('div', { class: 'gs-avail-share-hint', text: 'Set privacy to "Anyone with link" or "Public" to share this calendar.' });
-        linkRow.appendChild(privHint);
+        linkRow.appendChild(el('div', { class: 'gs-avail-share-hint',
+            text: 'Set privacy to "Anyone with link" or "Public" to share this calendar.' }));
         wrap.appendChild(linkRow);
 
-        reflectPrivacy(wrap); // initial enable/disable state
+        reflectPrivacy(wrap);
         return wrap;
     }
 
@@ -357,7 +446,6 @@
         return l;
     }
 
-    /** Grey-out detail when privacy=Private; toggle the share-link hint. */
     function reflectPrivacy(wrap) {
         var priv = (wrap.querySelector('input[name="gs-vis-privacy"]:checked') || {}).value || 'private';
         var isPrivate = (priv === 'private');
@@ -370,7 +458,6 @@
         if (share) { share.classList.toggle('is-private', isPrivate); }
     }
 
-    /** Read the visibility section back into the locked visibility shape. */
     function serializeVisibility(panel) {
         var wrap = panel.querySelector('[data-section="visibility"]');
         if (!wrap) { return defaultVisibility(); }
@@ -425,7 +512,6 @@
     }
 
     function utcToLocalInput(iso) {
-        // datetime-local expects YYYY-MM-DDTHH:MM in viewer's local clock
         if (!iso) return '';
         var d = new Date(iso);
         if (isNaN(d.getTime())) return '';
@@ -436,12 +522,13 @@
 
     function localInputToUtc(s) {
         if (!s) return '';
-        var d = new Date(s); // browser parses as local
+        var d = new Date(s);
         if (isNaN(d.getTime())) return '';
         return d.toISOString().replace(/\.\d+Z$/, 'Z');
     }
 
-    function serializeForm(panel) {
+    // Read the AVAILABILITY controls (timezone + working_hours + blocked_ranges).
+    function serializeAvailability(panel) {
         var tz = (panel.querySelector('#gs-avail-tz-input') || {}).value || 'UTC';
         var wh = {};
         DAYS.forEach(function (day) {
@@ -463,11 +550,37 @@
         return { timezone: tz, working_hours: wh, blocked_ranges: br };
     }
 
+    /* ===================== Open delegates + init ============================== */
+
+    function openAvailability() {
+        if (!availModal) { return; }
+        if (_loadError) { availModal.body.textContent = ''; availModal.body.appendChild(el('p', { text: 'Failed to load availability.' })); }
+        else { renderAvailabilityBody(_lastState || {}); }
+        availModal.open();
+    }
+    function openVisibility() {
+        if (!visModal) { return; }
+        if (_loadError) { visModal.body.textContent = ''; visModal.body.appendChild(el('p', { text: 'Failed to load availability.' })); }
+        else { renderVisibilityBody(_lastState || {}); }
+        visModal.open();
+    }
+
     function init() {
-        if (!document.getElementById(ROOT_ID)) return;
-        fetchAvailability().then(buildPanel).catch(function () {
-            var root = document.getElementById(ROOT_ID);
-            if (root) root.textContent = 'Failed to load availability.';
+        // Build both modal shells once (appended to <body>) so the open delegates
+        // work even if clicked before the GET resolves.
+        if (!availModal) { availModal = buildModal('gs-avail-modal--availability', 'Availability Settings'); }
+        if (!visModal)   { visModal   = buildModal('gs-avail-modal--visibility', 'Calendar Visibility'); }
+
+        fetchAvailability().then(function (state) {
+            _lastState = state || {};
+            _loaded = true;
+            // If a modal is already open (clicked before load finished), refresh it.
+            if (availModal.overlay.getAttribute('aria-hidden') === 'false') { renderAvailabilityBody(_lastState); }
+            if (visModal.overlay.getAttribute('aria-hidden') === 'false') { renderVisibilityBody(_lastState); }
+        }).catch(function () {
+            _loadError = true;
+            if (availModal.overlay.getAttribute('aria-hidden') === 'false') { openAvailability(); }
+            if (visModal.overlay.getAttribute('aria-hidden') === 'false') { openVisibility(); }
         });
     }
 
@@ -476,4 +589,22 @@
     } else {
         init();
     }
+
+    // Document-level open delegates (mirror schedule-meeting.js). Ensure the modal
+    // shells exist even if the button is clicked before init ran.
+    document.addEventListener('click', function (e) {
+        var availT = e.target && e.target.closest ? e.target.closest('[data-gs-avail-open]') : null;
+        if (availT) {
+            e.preventDefault();
+            if (!availModal) { init(); }
+            openAvailability();
+            return;
+        }
+        var visT = e.target && e.target.closest ? e.target.closest('[data-gs-vis-open]') : null;
+        if (visT) {
+            e.preventDefault();
+            if (!visModal) { init(); }
+            openVisibility();
+        }
+    });
 })();

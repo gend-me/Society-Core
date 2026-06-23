@@ -360,7 +360,7 @@ function gs_calendar_profile_screen_content() {
 	// the button only shows when the modal script is actually deployed.
 	if ( file_exists( GS_DIR . 'assets/schedule-meeting.js' ) ) {
 		echo '<style>
-			.gs-cal-actionbar{display:flex;justify-content:flex-end;margin:0 0 14px;}
+			.gs-cal-actionbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;margin:0 0 14px;}
 			.gs-cal-newbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
 				padding:10px 18px;border-radius:12px;border:1px solid rgba(182,8,201,.5);
 				background:linear-gradient(135deg,rgba(182,8,201,.22),rgba(182,8,201,.06));
@@ -369,8 +369,26 @@ function gs_calendar_profile_screen_content() {
 				box-shadow:0 6px 18px -8px rgba(182,8,201,.6);transition:transform .15s ease,box-shadow .15s ease,background .15s ease;}
 			.gs-cal-newbtn:hover{transform:translateY(-1px);background:linear-gradient(135deg,rgba(182,8,201,.35),rgba(182,8,201,.12));box-shadow:0 10px 26px -8px rgba(182,8,201,.8);}
 			.gs-cal-newbtn span{font-size:16px;line-height:1;}
+			/* Secondary (indigo/blue glass) tool buttons - Availability + Visibility. */
+			.gs-cal-toolbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
+				padding:10px 18px;border-radius:12px;border:1px solid rgba(129,140,248,.5);
+				background:linear-gradient(135deg,rgba(99,102,241,.20),rgba(99,102,241,.05));
+				color:#fff;font:700 13px/1 system-ui,sans-serif;letter-spacing:.04em;
+				text-transform:uppercase;backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);
+				box-shadow:0 6px 18px -8px rgba(99,102,241,.55);transition:transform .15s ease,box-shadow .15s ease,background .15s ease;}
+			.gs-cal-toolbtn:hover{transform:translateY(-1px);background:linear-gradient(135deg,rgba(99,102,241,.34),rgba(99,102,241,.12));box-shadow:0 10px 26px -8px rgba(99,102,241,.8);}
 		</style>';
+		// Action bar - Availability + Visibility (secondary) to the LEFT of the
+		// primary "New Meeting" CTA. The two tool buttons are gated on the
+		// availability-settings.js asset (their open delegates live there).
+		$gs_avail_btns = '';
+		if ( file_exists( GS_DIR . 'assets/availability-settings.js' ) ) {
+			$gs_avail_btns =
+				  '<button type="button" class="gs-cal-toolbtn" data-gs-avail-open="1">Availability</button>'
+				. '<button type="button" class="gs-cal-toolbtn" data-gs-vis-open="1">Visibility</button>';
+		}
 		echo '<div class="gs-cal-actionbar">'
+			. $gs_avail_btns
 			. '<button type="button" class="gs-cal-newbtn" data-gs-schedule-open="1">'
 			. '<span aria-hidden="true">＋</span> New Meeting</button>'
 			. '</div>';
