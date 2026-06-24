@@ -47,10 +47,13 @@ function gdc_handle_wallet_topup_purchase() {
     $kind = sanitize_key( wp_unslash( $_GET['gdc_topup'] ) );
     if ( ! in_array( $kind, [ 'tasks', 'ai', 'dgen' ], true ) ) return;
 
+    // Login is the real gate. The nonce is best-effort CSRF defense: this only
+    // (re)populates the LOGGED-IN user's OWN cart and routes to the WooCommerce
+    // checkout (payment is independently secured), so a STALE nonce — e.g. the
+    // profile page sat open across a login/session rotation — must not hard-block
+    // a legitimate buyer with "Security check failed". SameSite=Lax auth cookies
+    // already block cross-site cookie'd requests, so the CSRF surface is minimal.
     if ( ! is_user_logged_in() ) { auth_redirect(); exit; }
-    if ( empty( $_GET['_n'] ) || ! wp_verify_nonce( wp_unslash( $_GET['_n'] ), 'gdc_topup' ) ) {
-        wp_die( esc_html__( 'Security check failed — please reopen the Top Up panel and try again.', 'gend-society' ) );
-    }
     if ( ! function_exists( 'WC' ) || ! WC()->cart ) {
         wp_safe_redirect( home_url( '/' ) ); exit;
     }
@@ -90,35 +93,240 @@ function gdc_handle_wallet_topup_purchase() {
         WC()->cart->add_to_cart( $pid, 1, 0, [], [ Gend_CP_DGEN_TopUp::CART_KEY => $amt ] );
     }
 
+    // If the iframe pointed straight at the checkout page, the cart is now
+    // populated — let it render in THIS request instead of a 302 to another full
+    // WP boot (halves the embed's load time). Otherwise redirect to checkout.
+    if ( function_exists( 'is_checkout' ) && is_checkout() ) {
+        return;
+    }
     $checkout_url = wc_get_checkout_url();
-    if ( ! empty( $_GET['gdc_embed'] ) ) {
-        $checkout_url = add_query_arg( 'gdc_embed', '1', $checkout_url );
+    if ( ! empty( $_GET['gend_embed'] ) ) {
+        $checkout_url = add_query_arg( 'gend_embed', '1', $checkout_url );
     }
     wp_safe_redirect( $checkout_url );
     exit;
 }
 
-// When the checkout is loaded inside the Top-Up popup iframe (?gdc_embed=1),
+// When the checkout is loaded inside the Top-Up popup iframe (?gend_embed=1),
 // strip the theme header/footer/admin-bar/chat-widget so only the checkout
 // payment form shows. Scoped strictly to that query flag — never affects normal
 // page loads.
 add_filter( 'show_admin_bar', 'gdc_topup_embed_hide_admin_bar' );
 function gdc_topup_embed_hide_admin_bar( $show ) {
-    return empty( $_GET['gdc_embed'] ) ? $show : false;
+    return empty( $_GET['gend_embed'] ) ? $show : false;
 }
+
+// Inside the embed iframe, render the CLASSIC checkout (server-rendered payment
+// methods) instead of the React checkout BLOCK — the block hydrates client-side
+// and reliably fails to surface payment gateways inside an iframe. Classic
+// checkout prints every enabled gateway in the HTML and works in the frame.
+add_filter( 'render_block', 'gdc_topup_embed_classic_checkout', 10, 2 );
+function gdc_topup_embed_classic_checkout( $block_content, $block ) {
+    if ( empty( $_GET['gend_embed'] ) ) return $block_content;
+    if ( ! empty( $block['blockName'] ) && 'woocommerce/checkout' === $block['blockName'] ) {
+        return do_shortcode( '[woocommerce_checkout]' );
+    }
+    return $block_content;
+}
+
+// Inside the embed iframe, drop the heavy site-wide frontend assets the checkout
+// doesn't need (youzify ~175 refs, the LEO AI widget bundle, the gend-society
+// frontend bar / template modal, BuddyPress). Keeps everything WooCommerce /
+// payment-gateway / jQuery / WP-core so the classic checkout still works. This
+// is the bulk of the embed's load weight.
+add_action( 'wp_enqueue_scripts', 'gdc_topup_embed_trim_assets', 9999 );
+// Also run right before footer scripts/styles print — the Woo blocks bundle is
+// enqueued during block render (the_content), AFTER wp_enqueue_scripts, so the
+// early pass alone misses it. wp_print_footer_scripts (10) prints them; we run
+// at 1 to dequeue first.
+add_action( 'wp_print_footer_scripts', 'gdc_topup_embed_trim_assets', 1 );
+function gdc_topup_embed_trim_assets() {
+    if ( empty( $_GET['gend_embed'] ) ) return;
+    $kill = [ 'youzify', 'aipa-widget', 'leo-flow', 'leo-widget', 'gs-frontend-bar', 'gs-template-modal', 'gs-site-editor', 'gs-animation', 'buddypress', 'bp-' ];
+    $keep = [ 'woocommerce', 'wc-', 'wc_', 'ppcp', 'paypal', 'jquery', 'wp-', 'select', 'sourcebuster', 'stripe', 'checkout', 'dashicons' ];
+    $hit  = function ( $h ) use ( $kill, $keep ) {
+        $h = (string) $h;
+        // The Woo cart/checkout BLOCKS bundle is dead weight here — we render the
+        // CLASSIC checkout. Drop it BEFORE the keep-list (which keeps wc-*).
+        if ( strpos( $h, 'wc-blocks' ) === 0 ) return true;
+        foreach ( $keep as $k ) { if ( strpos( $h, $k ) !== false ) return false; }
+        foreach ( $kill as $p ) { if ( strpos( $h, $p ) === 0 ) return true; }
+        return false;
+    };
+    global $wp_scripts, $wp_styles;
+    if ( $wp_scripts && ! empty( $wp_scripts->registered ) ) {
+        foreach ( array_keys( $wp_scripts->registered ) as $h ) { if ( $hit( $h ) ) wp_dequeue_script( $h ); }
+    }
+    if ( $wp_styles && ! empty( $wp_styles->registered ) ) {
+        foreach ( array_keys( $wp_styles->registered ) as $h ) { if ( $hit( $h ) ) wp_dequeue_style( $h ); }
+    }
+}
+
+// De-duplicate the checkout payment methods on the gend.me HUB. The customer-
+// container "bridge" gateways (which exist to redirect a container's checkout TO
+// the hub) are also registered here and duplicate every hub-native method
+// (e.g. "Pay with PayPal"/gend_paypal vs ppcp, "Pay with DGEN balance"/gend_dgen
+// vs gend_dgen_hub). On the hub the bridge variants are redundant (they'd point
+// the hub at itself), so drop them — leaving one clean option per method:
+// ppcp (PayPal/card), gend_dgen_hub (DGEN), gend_btcpay_hub (BTC/Lightning),
+// gend_evm_hub (USDC/ETH), mycred (Store Credits). Hub-only via is_main_node;
+// reversible (pure filter — changes no gateway settings).
+add_filter( 'woocommerce_available_payment_gateways', 'gdc_dedupe_hub_payment_gateways', 100 );
+function gdc_dedupe_hub_payment_gateways( $gateways ) {
+    if ( ! is_array( $gateways ) ) return $gateways;
+    $is_hub = ! class_exists( 'Gend_CP_OAuth_Resource' )
+        || ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
+        || Gend_CP_OAuth_Resource::is_main_node();
+    if ( ! $is_hub ) return $gateways;
+    // Container "bridge" gateways (redundant on the hub) + gend_dgen_hub: DGEN is
+    // applied via the C&P wallet panel ("Apply your DGEN and/or store credit") that
+    // renders above the gateways, so a separate "Pay with DGEN" gateway radio just
+    // duplicates it. Store credit is likewise handled by that panel.
+    foreach ( [ 'gend_token', 'gend_paypal', 'gend_btcpay', 'gend_usdc', 'gend_dgen', 'gend_dgen_hub' ] as $remove_id ) {
+        unset( $gateways[ $remove_id ] );
+    }
+    return $gateways;
+}
+
+// Suppress the LEO/<aipa-widget> chat bubble AT THE SOURCE inside the embed —
+// unhook its enqueue + footer render before they fire (on `wp`, which runs before
+// wp_enqueue_scripts and wp_footer). CSS/DOM removal alone loses to the widget's
+// late re-mount + inline styles, so kill it before it ever loads. Covers both
+// LEO's global functions and the gend-society fallback widget.
+add_action( 'wp', 'gdc_topup_embed_kill_chat_widget' );
+function gdc_topup_embed_kill_chat_widget() {
+    if ( empty( $_GET['gend_embed'] ) ) return;
+    remove_action( 'wp_footer', 'aipa_widget_render_footer', 99999 );
+    remove_action( 'wp_enqueue_scripts', 'aipa_widget_register_scripts', 5 );
+    remove_action( 'wp_enqueue_scripts', 'aipa_widget_load_assets', 10 );
+    if ( class_exists( 'GS_AI_Widget' ) ) {
+        remove_action( 'wp_footer', [ 'GS_AI_Widget', 'render_footer' ], 99999 );
+        remove_action( 'wp_enqueue_scripts', [ 'GS_AI_Widget', 'enqueue' ], 5 );
+    }
+}
+
 add_action( 'wp_enqueue_scripts', 'gdc_topup_embed_checkout_css', 100 );
 function gdc_topup_embed_checkout_css() {
-    if ( empty( $_GET['gdc_embed'] ) ) return;
+    if ( empty( $_GET['gend_embed'] ) ) return;
+    // gend_embed=1 already suppresses the gend-society frontend bar + mini-cart
+    // (gs_is_embed_request). This strips the rest of the theme chrome + the AI
+    // chat widget so the iframe shows ONLY the checkout. Float-bar selectors are
+    // kept as belt-and-suspenders.
     $css = '
         html { margin-top: 0 !important; }
         body { background: #0a0f1a !important; padding: 16px !important; }
         #wpadminbar, header, footer, #masthead, #colophon, .site-header, .site-footer,
-        .youzify-mobile-nav, .gs-frontend-bar, aipa-widget, #gdc-profile-nav { display: none !important; }
+        .youzify-mobile-nav, #gdc-profile-nav,
+        .gs-float-menu, #gs-float-menu, #gs-front-sidebar, .gs-front-sidebar, .gs-float-dock,
+        #gs-mini-cart-overlay, #gs-mini-cart-trigger,
+        aipa-widget, leo-widget, #aipa-widget, .aipa-widget, [id^="aipa-"], [class*="leo-launcher"] {
+            display: none !important;
+            visibility: hidden !important;
+        }
         .woocommerce, .wc-block-checkout, .wp-block-woocommerce-checkout { background: transparent !important; }
+
+        /* ══ "Pay with your balance" → self-assembling futuristic dashboard ══ */
+        .gend-wallet-classic {
+            position: relative;
+            display: flex; flex-wrap: wrap; gap: 14px 22px; align-items: flex-start;
+            padding: 26px 26px 22px; margin-bottom: 22px;
+            border-radius: 20px;
+            background: linear-gradient(160deg, rgba(20,26,40,.92), rgba(10,14,22,.94));
+            border: 1px solid rgba(137,194,224,.16);
+            box-shadow: 0 22px 60px -26px rgba(0,0,0,.75), inset 0 1px 0 rgba(255,255,255,.05);
+            overflow: hidden;
+            opacity: 0; transform: translateY(20px) scale(.99);
+            animation: gwcCardIn .7s cubic-bezier(.16,1,.3,1) forwards;
+        }
+        @keyframes gwcCardIn { to { opacity: 1; transform: none; } }
+        /* scanning top light */
+        .gend-wallet-classic::before {
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, #89C2E0, #b608c9, #00ff88, transparent);
+            background-size: 200% 100%; animation: gwcScan 6s linear infinite; opacity: .75;
+        }
+        @keyframes gwcScan { from { background-position: 200% 0; } to { background-position: -200% 0; } }
+
+        /* staggered "builds itself" entrance for each child */
+        .gend-wallet-classic > * { opacity: 0; animation: gwcBuildIn .58s cubic-bezier(.22,1,.36,1) forwards; }
+        .gend-wallet-classic > *:nth-child(1) { animation-delay: .18s; }
+        .gend-wallet-classic > *:nth-child(2) { animation-delay: .30s; }
+        .gend-wallet-classic > *:nth-child(3) { animation-delay: .44s; }
+        .gend-wallet-classic > *:nth-child(4) { animation-delay: .58s; }
+        .gend-wallet-classic > *:nth-child(5) { animation-delay: .72s; }
+        .gend-wallet-classic > *:nth-child(6) { animation-delay: .86s; }
+        @keyframes gwcBuildIn { from { opacity: 0; transform: translateY(16px) scale(.97); } to { opacity: 1; transform: none; } }
+
+        /* header + badge */
+        .gend-wallet-classic .gwc-head { flex: 0 0 100%; display: flex; align-items: center; gap: 12px; font-size: 1rem; font-weight: 900; color: #fff; letter-spacing: .4px; margin: 0; padding: 0; }
+        .gend-wallet-classic .gwc-badge { width: 34px; height: 34px; border-radius: 10px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; color: #0a0f1a; background: linear-gradient(135deg,#a78bfa,#7857ff); animation: gwcBadge 2.6s ease-in-out infinite; flex: 0 0 auto; }
+        @keyframes gwcBadge { 0%,100% { box-shadow: 0 0 12px rgba(120,87,255,.45); } 50% { box-shadow: 0 0 26px rgba(120,87,255,.85); } }
+        .gend-wallet-classic .gwc-sub { flex: 0 0 100%; width: 100%; margin: 0; padding: 0; color: #94a3b8; font-size: .85rem; line-height: 1.5; }
+
+        /* balance rows → glowing metric tiles (DGEN green, store credit pink) */
+        .gend-wallet-classic .gwc-row {
+            flex: 1 1 calc(50% - 11px); min-width: 240px; box-sizing: border-box; position: relative; overflow: hidden;
+            padding: 18px 20px 20px 26px !important; margin: 0 !important; border-radius: 16px;
+            background: rgba(255,255,255,.025); border: 1px solid rgba(255,255,255,.08);
+            transition: border-color .3s, box-shadow .3s, transform .3s; --gwc-accent: #89C2E0;
+        }
+        .gend-wallet-classic .gwc-row:has(input[data-type="dgen"]) { --gwc-accent: #00ff88; }
+        .gend-wallet-classic .gwc-row:has(input[data-type="credit"]) { --gwc-accent: #f0598a; }
+        /* accent edge bar + a soft radial glow in the tile corner */
+        .gend-wallet-classic .gwc-row::before { content: ""; position: absolute; left: 0; top: 12px; bottom: 12px; width: 4px; border-radius: 0 4px 4px 0; background: var(--gwc-accent); box-shadow: 0 0 12px var(--gwc-accent); }
+        .gend-wallet-classic .gwc-row::after { content: ""; position: absolute; right: -40px; top: -40px; width: 130px; height: 130px; border-radius: 50%; background: radial-gradient(circle, color-mix(in srgb, var(--gwc-accent) 22%, transparent), transparent 70%); pointer-events: none; opacity: .8; }
+        .gend-wallet-classic .gwc-row:hover { transform: translateY(-3px); border-color: color-mix(in srgb, var(--gwc-accent) 55%, transparent); box-shadow: 0 0 28px -8px var(--gwc-accent); }
+        .gend-wallet-classic .gwc-row-top { display: flex; justify-content: space-between; align-items: center; gap: 8px; margin-bottom: 14px; padding: 0; position: relative; z-index: 1; }
+        .gend-wallet-classic .gwc-row-title { font-weight: 800; color: #fff; font-size: .8rem; text-transform: uppercase; letter-spacing: 1.2px; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        /* the balance — the engaging metric: glowing accent chip with a live dot */
+        .gend-wallet-classic .gwc-row-bal { display: inline-flex; align-items: center; gap: 7px; font-family: "Inter", sans-serif; font-size: .82rem; font-weight: 800; color: var(--gwc-accent); background: color-mix(in srgb, var(--gwc-accent) 13%, rgba(8,11,17,.6)); border: 1px solid color-mix(in srgb, var(--gwc-accent) 38%, transparent); padding: 5px 12px; border-radius: 999px; white-space: nowrap; flex: 0 0 auto; box-shadow: 0 0 18px -8px var(--gwc-accent), inset 0 0 12px -8px var(--gwc-accent); text-shadow: 0 0 10px color-mix(in srgb, var(--gwc-accent) 60%, transparent); }
+        .gend-wallet-classic .gwc-row-bal::before { content: ""; width: 7px; height: 7px; border-radius: 50%; background: var(--gwc-accent); box-shadow: 0 0 8px var(--gwc-accent); animation: gwcDot 1.8s ease-in-out infinite; flex: 0 0 auto; }
+        @keyframes gwcDot { 0%,100% { opacity: .4; transform: scale(.8); } 50% { opacity: 1; transform: scale(1.2); } }
+        .gend-wallet-classic .gwc-ctl { display: flex; align-items: center; gap: 8px; position: relative; z-index: 1; }
+        .gend-wallet-classic .gwc-cur { color: var(--gwc-accent); font-weight: 900; font-size: 1.05rem; flex: 0 0 auto; }
+        .gend-wallet-classic .gwc-input { flex: 1 1 auto; min-width: 0; background: rgba(8,11,17,.72) !important; border: 1px solid rgba(255,255,255,.12) !important; color: #fff !important; border-radius: 10px; padding: 11px 13px !important; font-size: 1.05rem; font-weight: 700; transition: border-color .25s, box-shadow .25s; }
+        .gend-wallet-classic .gwc-input:focus { border-color: var(--gwc-accent) !important; box-shadow: 0 0 0 3px color-mix(in srgb, var(--gwc-accent) 22%, transparent), 0 0 18px -4px var(--gwc-accent) !important; outline: none; }
+        .gend-wallet-classic .gwc-btn { flex: 0 0 auto; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.14); color: #e2e8f0; border-radius: 10px; padding: 10px 15px; font-weight: 800; font-size: .72rem; text-transform: uppercase; letter-spacing: .5px; cursor: pointer; transition: background .2s, border-color .2s, box-shadow .2s, color .2s, transform .15s; }
+        .gend-wallet-classic .gwc-btn[data-act="max"]:hover { background: color-mix(in srgb, var(--gwc-accent) 22%, transparent); border-color: var(--gwc-accent); color: #fff; box-shadow: 0 0 16px -4px var(--gwc-accent); }
+        .gend-wallet-classic .gwc-btn:active { transform: scale(.95); }
+        .gend-wallet-classic .gwc-btn-ghost:hover { border-color: #f0598a; color: #f0598a; }
+
+        /* remaining to pay */
+        .gend-wallet-classic .gwc-due { flex: 0 0 100%; width: 100%; margin: 6px 0 0; padding: 14px 2px 0; border-top: 1px dashed rgba(255,255,255,.12); font-size: .9rem; color: #cbd5e1; font-weight: 700; }
+        .gend-wallet-classic .gwc-due strong { color: #fff; font-size: 1.25rem; margin-left: 6px; text-shadow: 0 0 16px rgba(137,194,224,.45); }
+        .gend-wallet-classic .gwc-covered, .gend-wallet-classic .gwc-due.gwc-covered { color: #00ff88 !important; text-shadow: 0 0 16px rgba(0,255,136,.5); }
+
+        @media (max-width: 560px) { .gend-wallet-classic .gwc-row { flex: 0 0 100% !important; } }
+        @media (prefers-reduced-motion: reduce) {
+            .gend-wallet-classic, .gend-wallet-classic > *, .gend-wallet-classic::before, .gwc-badge { animation: none !important; opacity: 1 !important; transform: none !important; }
+        }
     ';
     wp_register_style( 'gdc-embed-checkout', false, [], GS_VERSION );
     wp_enqueue_style( 'gdc-embed-checkout' );
     wp_add_inline_style( 'gdc-embed-checkout', $css );
+}
+
+// The AI chat widget (LEO/<aipa-widget>) sets its own inline styles and may
+// portal a launcher to <body>, so CSS display:none isn't always enough inside
+// the embed iframe. Hard-remove it from the DOM (and keep removing for a few
+// beats in case it mounts late).
+add_action( 'wp_footer', 'gdc_topup_embed_strip_widget', 100001 );
+function gdc_topup_embed_strip_widget() {
+    if ( empty( $_GET['gend_embed'] ) ) return;
+    ?>
+    <script>
+    (function () {
+        function strip() {
+            document.querySelectorAll('aipa-widget, leo-widget, [id^="aipa-"], [class*="leo-launcher"], .gs-float-dock, #gs-front-sidebar, #gs-float-menu').forEach(function (n) {
+                if (n && n.parentNode) n.parentNode.removeChild(n);
+            });
+        }
+        strip();
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', strip);
+        var n = 0, t = setInterval(function () { strip(); if (++n > 12) clearInterval(t); }, 250);
+    }());
+    </script>
+    <?php
 }
 
 // Price the task-credit top-up line at the per-credit rate (sales-team's own
@@ -753,16 +961,17 @@ function gdc_render_profile_header() {
             'dgenBalance' => (float) $dgen_balance,
             'creditValue' => (float) $gdc_task_credit_rate,
             'retainerUrl' => ( $task_topup_pid && function_exists( 'get_permalink' ) ) ? ( get_permalink( $task_topup_pid ) ?: '' ) : '',
-            'buyUrl'      => home_url( '/' ),
+            'checkoutUrl' => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : home_url( '/checkout/' ),
             'nonce'       => wp_create_nonce( 'gdc_topup' ),
         ] ); ?>;
 
-        // Build the purchase-handler URL. The handler (template_redirect) adds the
-        // product to the cart and 302s to the WooCommerce checkout — we load that
-        // chain inside an iframe so the real payment form renders IN the popup.
+        // Point the iframe STRAIGHT at the checkout with the top-up params: the
+        // template_redirect handler populates the cart on that same request and
+        // lets the checkout render (one WP boot, no 302 round-trip).
         function buyUrlFor(kind, params) {
-            var u = CFG.buyUrl + (CFG.buyUrl.indexOf('?') === -1 ? '?' : '&') +
-                'gdc_topup=' + encodeURIComponent(kind) + '&_n=' + encodeURIComponent(CFG.nonce) + '&gdc_embed=1';
+            var b = CFG.checkoutUrl;
+            var u = b + (b.indexOf('?') === -1 ? '?' : '&') +
+                'gdc_topup=' + encodeURIComponent(kind) + '&_n=' + encodeURIComponent(CFG.nonce) + '&gend_embed=1';
             for (var k in params) { if (params.hasOwnProperty(k)) u += '&' + k + '=' + encodeURIComponent(params[k]); }
             return u;
         }
@@ -782,12 +991,17 @@ function gdc_render_profile_header() {
             d.appendChild(close);
             var bar = el('div', 'gdc-tp-cobar', '<span class="gdc-tp-cobar__dot"></span> Secure Checkout');
             d.appendChild(bar);
-            var loading = el('div', 'gdc-tp-loading', '<div class="gdc-tp-spinner"></div><p>Preparing your secure checkout&hellip;</p>');
+            var loading = el('div', 'gdc-tp-loading', '<div class="gdc-tp-spinner"></div><p class="gdc-tp-loadmsg">Preparing your secure checkout&hellip;</p>');
             d.appendChild(loading);
+            // Cycle reassuring messages so the load feels active (the hub render
+            // takes a few seconds).
+            var msgs = ['Preparing your secure checkout…', 'Loading payment methods…', 'Encrypting your connection…', 'Almost ready…'];
+            var mp = loading.querySelector('.gdc-tp-loadmsg'), mi = 0;
+            var cyc = setInterval(function () { mi = (mi + 1) % msgs.length; if (mp) mp.textContent = msgs[mi]; }, 1400);
             var frame = el('iframe', 'gdc-tp-frame');
             frame.setAttribute('title', 'Secure checkout');
             frame.setAttribute('allow', 'payment *');
-            frame.addEventListener('load', function () { loading.style.display = 'none'; frame.classList.add('is-loaded'); });
+            frame.addEventListener('load', function () { clearInterval(cyc); loading.style.display = 'none'; frame.classList.add('is-loaded'); });
             frame.src = url;
             d.appendChild(frame);
             var fb = el('div', 'gdc-tp-foot', 'Trouble loading? <a href="' + url + '" target="_blank" rel="noopener">Open checkout in a new tab &rarr;</a>');
@@ -2191,6 +2405,12 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 
 /* ── Overlay ─────────────────────────────────────────────────────────────── */
 .gdc-tp-overlay {
+    /* The popup is portaled to <body>, OUTSIDE .gdc-profile-uplink, so the brand
+       tokens must be (re)declared here or var(--gph-accent) resolves to nothing
+       and the CTA loses its fill. */
+    --gph-magenta: #b608c9;
+    --gph-blue:    #89C2E0;
+    --gph-green:   #00ff88;
     position: fixed;
     inset: 0;
     z-index: 2147483646;            /* above the floating AI chat bubble */
@@ -2400,32 +2620,43 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 .gdc-tp-total strong { font-family: "Inter", sans-serif; font-size: 1.5rem; letter-spacing: 0; color: #fff; }
 .gdc-tp-total small { margin-left: auto; font-size: 0.66rem; text-transform: none; color: #64748b; }
 
-/* Primary CTA */
+/* Primary CTA — glossy, glowing, unmistakably a button */
 .gdc-tp-cta {
-    margin-top: 18px;
+    margin-top: 20px;
     width: 100%;
     display: flex;
     align-items: center;
     justify-content: center;
     gap: 10px;
-    padding: 15px 20px;
+    padding: 17px 22px;
     border: 0;
     border-radius: 14px;
-    background: var(--gph-accent);
+    background:
+        linear-gradient(180deg, rgba(255,255,255,0.22), rgba(255,255,255,0) 46%),
+        var(--gph-accent, var(--gph-blue));
     color: #06080d;
     font-family: "Inter", sans-serif;
-    font-size: 0.82rem;
+    font-size: 0.86rem;
     font-weight: 900;
-    letter-spacing: 1px;
+    letter-spacing: 1.2px;
     text-transform: uppercase;
     cursor: pointer;
-    box-shadow: 0 12px 30px -10px var(--gph-accent);
-    transition: transform 0.18s, box-shadow 0.25s, filter 0.2s;
+    box-shadow:
+        0 14px 34px -10px var(--gph-accent, var(--gph-blue)),
+        0 0 0 1px rgba(255,255,255,0.08) inset,
+        inset 0 1px 0 rgba(255,255,255,0.4);
+    transition: transform 0.18s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s, filter 0.2s;
 }
-.gdc-tp-cta svg { width: 18px; height: 18px; transition: transform 0.2s; }
-.gdc-tp-cta:hover { transform: translateY(-2px); filter: brightness(1.08); box-shadow: 0 18px 40px -12px var(--gph-accent); }
-.gdc-tp-cta:hover svg { transform: translateX(4px); }
-.gdc-tp-cta:active { transform: translateY(0); }
+.gdc-tp-cta svg { width: 19px; height: 19px; transition: transform 0.25s; }
+.gdc-tp-cta:hover {
+    transform: translateY(-2px);
+    filter: brightness(1.07) saturate(1.05);
+    box-shadow:
+        0 20px 46px -12px var(--gph-accent, var(--gph-blue)),
+        inset 0 1px 0 rgba(255,255,255,0.5);
+}
+.gdc-tp-cta:hover svg { transform: translateX(5px); }
+.gdc-tp-cta:active { transform: translateY(0) scale(0.99); }
 
 .gdc-tp-foot {
     margin-top: 14px;

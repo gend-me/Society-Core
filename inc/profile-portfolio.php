@@ -18,12 +18,13 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-add_action( 'bp_before_member_body', 'gs_member_portfolio_tabs_open', 1 );
-add_action( 'bp_after_member_body',  'gs_member_portfolio_tabs_close', 99 );
+// The portfolio sub-tabs now render inside the Overview tab — see
+// gdc_inject_profile_page_embed() in member-profile-pages.php. The render
+// helpers below (Social schedule / Posts / linked socials) are reused by those
+// Overview panels; the old media-route wrapper + in-page tab UI was removed.
 
-// Pull in Blog Manager's Library styling on the portfolio page so the
-// Playlists sub-tab renders with its dashboard look. No-op if blog-manager
-// isn't loaded (e.g. plugin disabled on this site).
+// Pull in Blog Manager's Library styling on the Overview page so the Playlists
+// sub-tab renders with its dashboard look. No-op if blog-manager isn't loaded.
 add_action( 'wp_enqueue_scripts', 'gs_portfolio_enqueue_playlists_assets' );
 function gs_portfolio_enqueue_playlists_assets () {
     if ( ! gs_portfolio_is_target() ) return;
@@ -34,84 +35,22 @@ function gs_portfolio_enqueue_playlists_assets () {
 
 function gs_portfolio_is_target () {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return false;
-    $slug = function_exists( 'youzify_profile_media_slug' ) ? youzify_profile_media_slug() : 'media';
-    return function_exists( 'bp_is_current_component' ) && bp_is_current_component( $slug );
+    // Now the Overview tab (the panels are hosted there), not the media route.
+    return function_exists( 'bp_is_current_component' ) && bp_is_current_component( 'overview' );
 }
 
-function gs_member_portfolio_tabs_open () {
-    if ( ! gs_portfolio_is_target() ) return;
-    $own = function_exists( 'bp_is_my_profile' ) && bp_is_my_profile();
+/**
+ * Shared styling + behaviour for the reused Portfolio render helpers (Posts
+ * grid, linked-socials cards, empty states). The sub-tabs themselves now live
+ * under the Overview tab (gdc_inject_profile_page_embed()); this emits once,
+ * called from gs_portfolio_render_posts().
+ */
+function gs_portfolio_panels_styles () {
+    static $done = false;
+    if ( $done ) return;
+    $done = true;
     ?>
-    <div class="gs-portfolio-wrap">
-        <div class="gs-portfolio-tabs" role="tablist">
-            <button type="button" class="gs-portfolio-tab is-active" data-gs-portfolio-tab="schedule" role="tab" aria-selected="true"><?php esc_html_e( 'Content Schedule', 'gend-society' ); ?></button>
-            <button type="button" class="gs-portfolio-tab" data-gs-portfolio-tab="posts" role="tab" aria-selected="false"><?php esc_html_e( 'Posts', 'gend-society' ); ?></button>
-            <button type="button" class="gs-portfolio-tab" data-gs-portfolio-tab="media" role="tab" aria-selected="false"><?php esc_html_e( 'Media', 'gend-society' ); ?></button>
-            <?php if ( function_exists( 'bm_render_library_section' ) ) : ?>
-                <button type="button" class="gs-portfolio-tab" data-gs-portfolio-tab="playlists" role="tab" aria-selected="false"><?php esc_html_e( 'Playlists', 'gend-society' ); ?></button>
-            <?php endif; ?>
-        </div>
-
-        <div class="gs-portfolio-panel is-active" data-gs-portfolio-panel="schedule" role="tabpanel">
-            <?php gs_portfolio_render_schedule( $own ); ?>
-        </div>
-
-        <div class="gs-portfolio-panel" data-gs-portfolio-panel="posts" role="tabpanel">
-            <?php gs_portfolio_render_posts(); ?>
-        </div>
-
-        <div class="gs-portfolio-panel" data-gs-portfolio-panel="media" role="tabpanel">
-    <?php
-}
-
-function gs_member_portfolio_tabs_close () {
-    if ( ! gs_portfolio_is_target() ) return;
-    ?>
-        </div><!-- /panel:media (Youzify gallery rendered above) -->
-
-        <?php if ( function_exists( 'bm_render_library_section' ) ) : ?>
-        <div class="gs-portfolio-panel" data-gs-portfolio-panel="playlists" role="tabpanel">
-            <?php bm_render_library_section(); ?>
-        </div>
-        <?php endif; ?>
-    </div><!-- /.gs-portfolio-wrap -->
-
     <style>
-    /* ── Full-width: collapse Youzify's two-column grid on the media page,
-       scoped to body.media so other profile pages stay normal. Mirrors the
-       wallet / groups full-width fix we deployed earlier. */
-    body.media .youzify-right-sidebar-layout,
-    body.media .youzify-left-sidebar-layout {
-        display: block !important;
-        grid-template-columns: 1fr !important;
-        grid-gap: 0 !important;
-    }
-    body.media .youzify-main-column,
-    body.media .youzify-main-column.grid-column {
-        width: 100% !important;
-        max-width: none !important;
-        flex: 0 0 100% !important;
-    }
-    body.media .gs-portfolio-wrap,
-    body.media .youzify-page-main-content,
-    body.media .youzify-content {
-        max-width: none !important;
-        width: 100% !important;
-    }
-    body.media .youzify-profile-sidebar,
-    body.media .youzify-sidebar-column,
-    body.media .yz-sidebar-column {
-        display: none !important;
-    }
-
-    .gs-portfolio-wrap { width:100%; max-width:none; padding-top:18px; }
-    .gs-portfolio-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:22px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0; }
-    .gs-portfolio-tab { background:transparent; border:0; border-bottom:2px solid transparent; padding:12px 22px; color:#64748b; font-family:"Inter",sans-serif; font-size:0.78rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:color 0.18s, border-color 0.18s; margin-bottom:-1px; }
-    .gs-portfolio-tab:hover { color:rgba(255,255,255,0.75); }
-    .gs-portfolio-tab.is-active { color:#b608c9; border-bottom-color:#b608c9; }
-    .gs-portfolio-panel { display:none; }
-    .gs-portfolio-panel.is-active { display:block; }
-
     /* Posts list */
     .gs-portfolio-posts-bar { display:flex; flex-wrap:wrap; gap:10px; align-items:center; margin-bottom:14px; }
     .gs-portfolio-posts-bar input[type="search"] { flex:1 1 280px; min-width:0; background:rgba(11,14,20,0.7); border:1px solid rgba(255,255,255,0.12); border-radius:10px; padding:10px 14px; color:#f8fafc; font-size:0.9rem; }
@@ -137,44 +76,9 @@ function gs_member_portfolio_tabs_close () {
 
     <script>
     (function () {
-        var wrap = document.querySelector('.gs-portfolio-wrap');
-        if (!wrap) return;
-
-        // Tab switching
-        var tabs   = wrap.querySelectorAll('.gs-portfolio-tab');
-        var panels = wrap.querySelectorAll('.gs-portfolio-panel');
-        tabs.forEach(function (tab) {
-            tab.addEventListener('click', function () {
-                var target = tab.getAttribute('data-gs-portfolio-tab');
-                tabs.forEach(function (t) { t.classList.remove('is-active'); t.setAttribute('aria-selected','false'); });
-                panels.forEach(function (p) { p.classList.remove('is-active'); });
-                tab.classList.add('is-active'); tab.setAttribute('aria-selected','true');
-                var p = wrap.querySelector('[data-gs-portfolio-panel="' + target + '"]');
-                if (p) p.classList.add('is-active');
-            });
-        });
-
-        // Move the existing Youzify media gallery (#youzify-media) INTO our
-        // Media panel. The Media tabs subnav (.youzify-media-tabs / etc.)
-        // already lives inside it, so the user keeps the All/Photos/Videos
-        // controls.
-        var mediaPanel = wrap.querySelector('[data-gs-portfolio-panel="media"]');
-        function relocateMedia () {
-            if (!mediaPanel) return;
-            var src = document.querySelector('#youzify-media, .youzify-page-main-content > .youzify-media, .youzify-media-content');
-            if (src && src.parentElement !== mediaPanel) {
-                mediaPanel.appendChild(src);
-            }
-        }
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', function () { setTimeout(relocateMedia, 0); });
-        } else {
-            setTimeout(relocateMedia, 0);
-        }
-        window.addEventListener('load', relocateMedia);
-
-        // Posts: scope toggle (mine / all) + search filter
-        var postsRoot = wrap.querySelector('[data-gs-portfolio-panel="posts"]');
+        // Posts: scope toggle (mine / all) + search filter. The Posts panel now
+        // lives under the Overview tab; scope to its self-contained root.
+        var postsRoot = document.querySelector('[data-gs-posts-root]');
         if (postsRoot) {
             var scopeBtns  = postsRoot.querySelectorAll('[data-gs-posts-scope]');
             var searchInput= postsRoot.querySelector('[data-gs-posts-search]');
@@ -223,8 +127,8 @@ function gs_portfolio_render_schedule ( $own_profile ) {
             // inline display:none + the overlay's fixed positioning so its
             // contents render inline inside our panel.
             echo '<style>'
-                . '.gs-portfolio-panel #aas-social-poster-modal,'
-                . '.gs-portfolio-panel .aas-modal-overlay {'
+                . '.gs-overview-panel #aas-social-poster-modal,'
+                . '.gs-overview-panel .aas-modal-overlay {'
                 . '  display: block !important;'
                 . '  position: static !important; inset: auto !important;'
                 . '  opacity: 1 !important; visibility: visible !important;'
@@ -232,22 +136,22 @@ function gs_portfolio_render_schedule ( $own_profile ) {
                 . '  background: transparent !important; backdrop-filter: none !important;'
                 . '  z-index: auto !important;'
                 . '}'
-                . '.gs-portfolio-panel #aas-social-poster-modal .aas-modal,'
-                . '.gs-portfolio-panel .aas-modal-overlay .aas-modal,'
-                . '.gs-portfolio-panel #aas-social-poster-modal .aas-modal-content {'
+                . '.gs-overview-panel #aas-social-poster-modal .aas-modal,'
+                . '.gs-overview-panel .aas-modal-overlay .aas-modal,'
+                . '.gs-overview-panel #aas-social-poster-modal .aas-modal-content {'
                 . '  position: static !important; transform: none !important;'
                 . '  max-width: none !important; width: 100% !important;'
                 . '  height: auto !important;'
                 . '  margin: 0 !important; max-height: none !important;'
                 . '  box-shadow: none !important;'
                 . '}'
-                . '.gs-portfolio-panel .aas-modal-close,'
-                . '.gs-portfolio-panel #aas-social-poster-modal-close { display: none !important; }'
+                . '.gs-overview-panel .aas-modal-close,'
+                . '.gs-overview-panel #aas-social-poster-modal-close { display: none !important; }'
                 /* Hide the modal header ("Social Post Scheduler / Manage your
                    social channels…") — redundant when rendered inline inside
                    the Content Schedule tab. */
-                . '.gs-portfolio-panel #aas-social-poster-modal .aas-modal-title-group { display: none !important; }'
-                . '.gs-portfolio-panel #aas-social-poster-modal .aas-modal-header {'
+                . '.gs-overview-panel #aas-social-poster-modal .aas-modal-title-group { display: none !important; }'
+                . '.gs-overview-panel #aas-social-poster-modal .aas-modal-header {'
                 . '  border-bottom: 0 !important; padding: 0 !important;'
                 . '}'
                 . '</style>';
@@ -407,7 +311,9 @@ function gs_portfolio_render_posts () {
         'posts_per_page' => 60,
         'no_found_rows'  => true,
     ) );
+    gs_portfolio_panels_styles();
     ?>
+    <div data-gs-posts-root>
     <div class="gs-portfolio-posts-bar">
         <input type="search" placeholder="<?php esc_attr_e( 'Search posts…', 'gend-society' ); ?>" data-gs-posts-search />
         <div class="gs-portfolio-posts-scope" role="tablist">
@@ -422,6 +328,7 @@ function gs_portfolio_render_posts () {
     <div data-gs-posts-grid="all" class="gs-portfolio-posts-grid" style="display:none;">
         <?php gs_portfolio_render_post_grid( $all, 'all' ); ?>
     </div>
+    </div><!-- /[data-gs-posts-root] -->
     <?php
     if ( $mine ) wp_reset_postdata();
     wp_reset_postdata();

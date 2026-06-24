@@ -126,14 +126,18 @@
 
 .gs-agent-popup__dialog {
     position: relative;
-    width: 100%;
-    max-width: 480px;
-    max-height: 88vh;
+    width: 80vw;
+    max-width: 80vw;
+    max-height: 92vh;
     overflow: auto;
-    background: #1b1626;
+    background:
+        radial-gradient(1200px 400px at 0% -10%, rgba(182, 8, 201, 0.18), transparent 60%),
+        radial-gradient(1200px 400px at 100% -10%, rgba(110, 193, 228, 0.16), transparent 60%),
+        #14101d;
     border: 1px solid rgba(255, 255, 255, 0.10);
-    border-radius: 18px;
-    box-shadow: 0 24px 64px rgba(0, 0, 0, 0.55);
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.6),
+                0 0 0 1px rgba(182, 8, 201, 0.12) inset;
     color: #f3f0fa;
 }
 
@@ -270,6 +274,80 @@
     box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
 }
 
+/* ---- Agent-create form parity: side-by-side row, help text, run-target sub-blocks ---- */
+.gs-agent-field-row {
+    display: flex;
+    gap: 10px;
+}
+
+.gs-agent-field-row .gs-agent-field {
+    flex: 1 1 auto;
+}
+
+.gs-agent-field--grow2 {
+    flex: 2 1 0;
+}
+
+.gs-agent-field--grow1 {
+    flex: 1 1 0;
+}
+
+.gs-agent-help {
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    opacity: 0.6;
+}
+
+.gs-agent-runblock {
+    margin-top: 10px;
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.gs-agent-runblock label {
+    display: block;
+    margin: 8px 0 6px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.9;
+}
+
+.gs-agent-runblock label:first-child {
+    margin-top: 0;
+}
+
+.gs-agent-runblock input,
+.gs-agent-runblock select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.gs-agent-runblock input:focus,
+.gs-agent-runblock select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-runblock select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+
+.gs-agent-runblock .gs-agent-help {
+    margin-top: 6px;
+}
+
 /* ---- Actions + status ---- */
 .gs-agent-actions {
     display: flex;
@@ -322,4 +400,1395 @@
 
 .gs-agent-status.is-error {
     color: #ff6b6b;
+}
+
+/* ============================================================
+ * Plan 43-01 (v8.2 redesign 2) — single-form "agent builder"
+ * dashboard: 80vw glass dialog, numbered section cards. The agent
+ * has a SINGLE Home org (Web App, AJAX search). Layout is a single
+ * vertical stack of full-width section cards; rows 1 (Home org |
+ * Billing) and 6 (Department | Reports to) split internally into
+ * two columns via .gs-agent-2col. Tokens reuse the
+ * magenta(#b608c9)->blue(#6ec1e4) gradient.
+ * ============================================================ */
+
+/* Body is a single vertical stack of full-width section cards. The
+   2-column rows handle their own internal split via .gs-agent-2col. */
+.gs-agent-popup__body {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ---- Section card ---- */
+.gs-agent-card {
+    position: relative;
+    padding: 16px 18px;
+    border-radius: 16px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    transition: border-color 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+                box-shadow 0.2s cubic-bezier(0.22, 1, 0.36, 1),
+                background 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gs-agent-card:focus-within {
+    border-color: rgba(110, 193, 228, 0.55);
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 0 0 1px rgba(110, 193, 228, 0.25),
+                0 12px 30px rgba(110, 193, 228, 0.10);
+}
+
+.gs-agent-card__head {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.gs-agent-card__num {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    font-size: 13px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+    box-shadow: 0 2px 10px rgba(182, 8, 201, 0.4);
+}
+
+.gs-agent-card__title {
+    margin: 0;
+    font-size: 15px;
+    font-weight: 700;
+    letter-spacing: 0.01em;
+}
+
+.gs-agent-req {
+    color: #ff6b6b;
+}
+
+.gs-agent-card > input,
+.gs-agent-card > textarea,
+.gs-agent-card > select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.gs-agent-card > textarea {
+    resize: vertical;
+    min-height: 70px;
+}
+
+.gs-agent-card > input:focus,
+.gs-agent-card > textarea:focus,
+.gs-agent-card > select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+/* ---- Run-target: selected chips ---- */
+.gs-agent-targets {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin: 4px 0 12px;
+    min-height: 20px;
+}
+
+.gs-agent-targets__empty {
+    font-size: 12px;
+    opacity: 0.55;
+}
+
+.gs-agent-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 6px 8px 6px 6px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.32) 0%, rgba(110, 193, 228, 0.32) 100%);
+    font-size: 13px;
+    font-weight: 600;
+}
+
+.gs-agent-chip__avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+.gs-agent-chip__rm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(0, 0, 0, 0.28);
+    color: #fff;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.gs-agent-chip__rm:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+/* ---- Run-target: option grids ---- */
+.gs-agent-subgroup {
+    margin-top: 14px;
+}
+
+.gs-agent-subgroup__title {
+    margin: 0 0 8px;
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+}
+
+.gs-agent-target-grid,
+.gs-agent-devicelist,
+.gs-agent-webapplist {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+.gs-agent-target-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 14px;
+    border-radius: 12px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.16s, border-color 0.16s, transform 0.16s, box-shadow 0.16s;
+}
+
+.gs-agent-target-opt:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.2);
+    transform: translateY(-1px);
+}
+
+.gs-agent-target-opt.is-selected {
+    border-color: transparent;
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+    color: #fff;
+    box-shadow: 0 4px 14px rgba(182, 8, 201, 0.34);
+}
+
+.gs-agent-target-opt.is-disabled,
+.gs-agent-target-opt:disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+    transform: none;
+}
+
+.gs-agent-target-opt__avatar {
+    width: 22px;
+    height: 22px;
+    border-radius: 999px;
+    object-fit: cover;
+}
+
+.gs-agent-target-opt__icon {
+    font-size: 16px;
+    line-height: 1;
+}
+
+/* ---- Web-App AJAX search input ---- */
+.gs-agent-search {
+    width: 100%;
+    box-sizing: border-box;
+    margin-bottom: 10px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.gs-agent-search:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-hint {
+    color: #e6b450;
+    opacity: 0.95;
+}
+
+/* ---- v8.2 redesign 2: responsive 2-column section card ---- */
+/* A .gs-agent-card with .gs-agent-2col lays its two .gs-agent-2col__cell
+   children side-by-side on desktop, stacking to one column when narrow.
+   Reuses the existing .gs-agent-card glass + focus tokens. */
+.gs-agent-2col {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px 18px;
+    align-items: start;
+}
+
+.gs-agent-2col__cell {
+    min-width: 0;
+}
+
+.gs-agent-2col__cell > input,
+.gs-agent-2col__cell > textarea,
+.gs-agent-2col__cell > select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.gs-agent-2col__cell > select:focus,
+.gs-agent-2col__cell > input:focus,
+.gs-agent-2col__cell > textarea:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+@media (max-width: 720px) {
+    .gs-agent-2col {
+        grid-template-columns: 1fr;
+    }
+}
+
+/* ---- Home org: the chosen-value chip (avatar + name + "change") ---- */
+.gs-agent-home-chosen {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 8px 8px 10px;
+    border-radius: 12px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.30) 0%, rgba(110, 193, 228, 0.30) 100%);
+}
+
+.gs-agent-home-chosen[hidden] {
+    display: none;
+}
+
+.gs-agent-home-chosen__av {
+    width: 26px;
+    height: 26px;
+    border-radius: 999px;
+    object-fit: cover;
+    flex: 0 0 auto;
+}
+
+.gs-agent-home-chosen__av[hidden] {
+    display: none;
+}
+
+.gs-agent-home-chosen__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    font-size: 14px;
+    font-weight: 700;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gs-agent-home-change {
+    flex: 0 0 auto;
+    padding: 5px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.22);
+    background: rgba(0, 0, 0, 0.18);
+    color: #fff;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.gs-agent-home-change:hover {
+    background: rgba(0, 0, 0, 0.34);
+    border-color: rgba(255, 255, 255, 0.34);
+}
+
+/* ---- Department: <select> + "+ New" control on one row ---- */
+.gs-agent-dept {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.gs-agent-dept select {
+    flex: 1 1 auto;
+    min-width: 0;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 14px;
+    font-family: inherit;
+}
+
+.gs-agent-dept select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-dept-new {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 0 14px;
+    border-radius: 10px;
+    border: 1px dashed rgba(110, 193, 228, 0.5);
+    background: rgba(110, 193, 228, 0.08);
+    color: #6ec1e4;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    white-space: nowrap;
+    transition: background 0.16s, border-color 0.16s;
+}
+
+.gs-agent-dept-new:hover {
+    background: rgba(110, 193, 228, 0.16);
+    border-color: rgba(110, 193, 228, 0.8);
+}
+
+/* ---- Prompt-sequence builder ---- */
+.gs-agent-steps {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin-bottom: 12px;
+}
+
+.gs-agent-step-row {
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.09);
+    background: rgba(255, 255, 255, 0.03);
+    transition: border-color 0.18s, box-shadow 0.18s;
+}
+
+.gs-agent-step-row:focus-within {
+    border-color: rgba(110, 193, 228, 0.5);
+    box-shadow: 0 0 0 1px rgba(110, 193, 228, 0.22);
+}
+
+.gs-agent-step-row__head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    margin-bottom: 8px;
+}
+
+.gs-agent-step-row__num {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 24px;
+    height: 24px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 700;
+    color: #fff;
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+}
+
+.gs-agent-step-row__move {
+    display: inline-flex;
+    gap: 6px;
+}
+
+.gs-agent-step-mv,
+.gs-agent-step-rm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 12px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.gs-agent-step-mv:hover,
+.gs-agent-step-rm:hover {
+    background: rgba(255, 255, 255, 0.1);
+    border-color: rgba(255, 255, 255, 0.22);
+}
+
+.gs-agent-step-rm:hover {
+    background: rgba(255, 107, 107, 0.25);
+    border-color: rgba(255, 107, 107, 0.4);
+}
+
+.gs-agent-step-prompt {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 10px 12px;
+    border-radius: 10px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 14px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 54px;
+}
+
+.gs-agent-step-prompt:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-step-row__targets {
+    display: flex;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.gs-agent-step-row__targets label {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.gs-agent-step-row__targets select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.gs-agent-step-row__targets select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+@media (max-width: 620px) {
+    .gs-agent-step-row__targets {
+        flex-direction: column;
+    }
+}
+
+.gs-agent-step-add {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 9px 16px;
+    border-radius: 999px;
+    border: 1px dashed rgba(110, 193, 228, 0.5);
+    background: rgba(110, 193, 228, 0.08);
+    color: #6ec1e4;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.16s, border-color 0.16s;
+}
+
+.gs-agent-step-add:hover {
+    background: rgba(110, 193, 228, 0.16);
+    border-color: rgba(110, 193, 228, 0.8);
+}
+
+/* ---- Prompt-sequence LIST (rows inside the agent popup) ---- */
+.gs-agent-seqlist {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-bottom: 12px;
+}
+
+.gs-agent-seqlist__empty {
+    margin: 0;
+}
+
+.gs-agent-seqrow {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 12px 14px;
+    border-radius: 14px;
+    border: 1px solid rgba(255, 255, 255, 0.10);
+    background: rgba(255, 255, 255, 0.04);
+    transition: border-color 0.15s, background 0.15s;
+}
+
+.gs-agent-seqrow:hover {
+    border-color: rgba(255, 255, 255, 0.20);
+    background: rgba(255, 255, 255, 0.07);
+}
+
+.gs-agent-seqrow__main {
+    display: flex;
+    align-items: baseline;
+    gap: 10px;
+    min-width: 0;
+}
+
+.gs-agent-seqrow__name {
+    font-size: 14px;
+    font-weight: 600;
+    color: #f3f0fa;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gs-agent-seqrow__count {
+    flex: 0 0 auto;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.7;
+}
+
+.gs-agent-seqrow__actions {
+    flex: 0 0 auto;
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+}
+
+.gs-agent-seqrow__edit {
+    padding: 6px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(110, 193, 228, 0.5);
+    background: rgba(110, 193, 228, 0.10);
+    color: #6ec1e4;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.gs-agent-seqrow__edit:hover {
+    background: rgba(110, 193, 228, 0.20);
+    border-color: rgba(110, 193, 228, 0.8);
+}
+
+.gs-agent-seqrow__rm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 26px;
+    height: 26px;
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    transition: background 0.15s, border-color 0.15s;
+}
+
+.gs-agent-seqrow__rm:hover {
+    background: rgba(255, 107, 107, 0.25);
+    border-color: rgba(255, 107, 107, 0.4);
+}
+
+/* ============================================================
+ * Nested step-builder popup ("Prompt sequence"). A SECOND overlay
+ * above the agent popup (higher z-index + own backdrop) with the
+ * same futuristic glass + gradient styling. ~min(820px, 94vw).
+ * ============================================================ */
+.gs-seq-popup {
+    position: fixed;
+    inset: 0;
+    z-index: 100010; /* above .gs-agent-popup (100000) */
+    display: none;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+}
+
+.gs-seq-popup.is-open {
+    display: flex;
+}
+
+.gs-seq-popup__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(8, 6, 18, 0.55);
+    backdrop-filter: blur(6px);
+    -webkit-backdrop-filter: blur(6px);
+}
+
+.gs-seq-popup__dialog {
+    position: relative;
+    width: min(820px, 94vw);
+    max-width: min(820px, 94vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background:
+        radial-gradient(900px 320px at 0% -10%, rgba(182, 8, 201, 0.20), transparent 60%),
+        radial-gradient(900px 320px at 100% -10%, rgba(110, 193, 228, 0.18), transparent 60%),
+        #14101d;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    box-shadow: 0 24px 80px rgba(0, 0, 0, 0.65),
+                0 0 0 1px rgba(182, 8, 201, 0.14) inset;
+    color: #f3f0fa;
+}
+
+.gs-seq-popup__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 18px 22px 12px;
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.22) 0%, rgba(110, 193, 228, 0.18) 100%);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+}
+
+.gs-seq-popup__header h2 {
+    margin: 0;
+    font-size: 17px;
+    font-weight: 700;
+}
+
+.gs-seq-popup__close {
+    flex: 0 0 auto;
+    width: 32px;
+    height: 32px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.14);
+    background: rgba(255, 255, 255, 0.05);
+    color: inherit;
+    font-size: 20px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.gs-seq-popup__close:hover {
+    background: rgba(255, 255, 255, 0.12);
+}
+
+.gs-seq-popup__body {
+    padding: 16px 22px;
+    overflow: auto;
+}
+
+.gs-seq-popup__footer {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 14px 22px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.02);
+}
+
+.gs-seq-popup__footer .gs-agent-status {
+    flex: 1 1 auto;
+    margin: 0;
+}
+
+.gs-seq-popup__footer .gs-agent-back {
+    margin: 0;
+}
+
+.gs-seq-popup__footer .gs-agent-submit {
+    flex: 0 0 auto;
+}
+
+/* ============================================================
+ * Plan 44-01 — Projects tab: Group column, project filter, and
+ * the per-row "Attach to project" control. Own .gs-thread- /
+ * .gs-chat-project- prefixes; tokens reuse the .gs-chat-tab pill
+ * gradient (#b608c9 -> #6ec1e4) so the Messages page stays
+ * visually consistent. Phase-42/43 styles above are untouched.
+ * ============================================================ */
+
+/* The Group column header + cell (only present on the Projects tab). */
+.gs-thread-group {
+    padding: 8px 12px;
+    font-size: 13px;
+    font-weight: 600;
+    white-space: nowrap;
+    text-overflow: ellipsis;
+    overflow: hidden;
+    max-width: 280px;
+    vertical-align: middle;
+}
+
+th.gs-thread-group {
+    text-align: left;
+    opacity: 0.82;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 11px;
+}
+
+td.gs-thread-group {
+    opacity: 0.92;
+}
+
+/* ---- Project filter (sits just under the .gs-chat-tabs pill row) ---- */
+.gs-chat-project-filter {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin: 0 0 16px;
+}
+
+.gs-chat-project-filter__label {
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.82;
+}
+
+.gs-chat-project-filter select {
+    min-width: 200px;
+    padding: 9px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 14px;
+    font-weight: 600;
+    font-family: inherit;
+    cursor: pointer;
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    transition: border-color 0.18s cubic-bezier(0.22, 1, 0.36, 1),
+                background 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+}
+
+.gs-chat-project-filter select:hover {
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.20);
+}
+
+.gs-chat-project-filter select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+/* ---- Per-row "Attach to project" control (Projects + Members tabs) ---- */
+.gs-thread-attach {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 30px;
+    height: 30px;
+    margin-left: 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: inherit;
+    font-size: 14px;
+    line-height: 1;
+    cursor: pointer;
+    vertical-align: middle;
+    transition: background 0.15s, border-color 0.15s, transform 0.15s;
+}
+
+.gs-thread-attach:hover {
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.32) 0%, rgba(110, 193, 228, 0.32) 100%);
+    border-color: rgba(255, 255, 255, 0.22);
+    transform: translateY(-1px);
+}
+
+/* ============================================================
+ * v8.3 step-studio — per-step "Prompt Runs At" cascade
+ * (device → AI integration → model → estimated cost), Context
+ * Files (chips + controls), and Response actions (checkbox
+ * multi-select + settings sub-forms). Reuses the .gs-agent-*
+ * glass + gradient tokens; mirrors the chat-widget step studio.
+ * ============================================================ */
+
+/* The "Prompt Runs At" row holds up to three cascade selects and
+   should wrap rather than crush on narrow dialogs. */
+.gs-agent-step-row__targets {
+    flex-wrap: wrap;
+}
+
+.gs-agent-step-row__targets label[hidden] {
+    display: none;
+}
+
+/* Estimated cost-per-run line. */
+.gs-agent-step-cost {
+    margin: 8px 0 0;
+    font-size: 12px;
+    font-weight: 600;
+    color: #6ec1e4;
+    opacity: 0.95;
+}
+
+.gs-agent-step-cost[hidden] {
+    display: none;
+}
+
+/* ---- Context Files ---- */
+.gs-agent-step-ctx {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.gs-agent-step-ctx__head,
+.gs-agent-step-out__head {
+    font-size: 12px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    opacity: 0.7;
+    margin-bottom: 8px;
+}
+
+.gs-agent-step-ctx__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.gs-agent-step-ctx__chips:empty {
+    margin-bottom: 0;
+}
+
+.gs-agent-ctx-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 5px 8px 5px 12px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.30) 0%, rgba(110, 193, 228, 0.30) 100%);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.gs-agent-ctx-chip__label {
+    max-width: 220px;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.gs-agent-ctx-chip__rm {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 18px;
+    height: 18px;
+    border-radius: 999px;
+    border: none;
+    background: rgba(0, 0, 0, 0.28);
+    color: #fff;
+    font-size: 13px;
+    line-height: 1;
+    cursor: pointer;
+}
+
+.gs-agent-ctx-chip__rm:hover {
+    background: rgba(0, 0, 0, 0.5);
+}
+
+.gs-agent-step-ctx__controls {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 8px;
+}
+
+.gs-agent-ctx-btn {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px dashed rgba(110, 193, 228, 0.5);
+    background: rgba(110, 193, 228, 0.08);
+    color: #6ec1e4;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.16s, border-color 0.16s;
+}
+
+.gs-agent-ctx-btn:hover {
+    background: rgba(110, 193, 228, 0.16);
+    border-color: rgba(110, 193, 228, 0.8);
+}
+
+.gs-agent-ctx-btn.is-on {
+    border-style: solid;
+    border-color: transparent;
+    background: linear-gradient(135deg, #b608c9 0%, #6ec1e4 100%);
+    color: #fff;
+}
+
+.gs-agent-ctx-seq {
+    flex: 0 1 auto;
+    min-width: 150px;
+    padding: 7px 10px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 12px;
+    font-family: inherit;
+    cursor: pointer;
+}
+
+.gs-agent-ctx-seq:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-ctx-gdrive {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    flex: 1 1 240px;
+    min-width: 200px;
+}
+
+.gs-agent-ctx-gdrive-url {
+    flex: 1 1 auto;
+    min-width: 0;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+.gs-agent-ctx-gdrive-url:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+/* ---- Google Drive picker (mirrors the chat-widget) ---- */
+.gs-agent-ctx-gdrive-wrap {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    flex: 1 1 240px;
+    min-width: 200px;
+}
+
+.gs-agent-gdrive-note {
+    margin: 0;
+    font-size: 11px;
+    opacity: 0.7;
+}
+
+/* "Connect Google Drive" reuses the dashed ctx-btn token; just let it size to content. */
+.gs-agent-gdrive-connect {
+    align-self: flex-start;
+}
+
+.gs-agent-ctx-gdrive-picker {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gs-agent-ctx-gdrive-search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 7px 12px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 12px;
+    font-family: inherit;
+}
+
+.gs-agent-ctx-gdrive-search:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-ctx-gdrive-results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 180px;
+    overflow-y: auto;
+}
+
+.gs-agent-ctx-gdrive-results:empty {
+    display: none;
+}
+
+.gs-agent-ctx-gdrive-result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    padding: 6px 8px;
+    border: 1px solid transparent;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #f3f0fa;
+    font-size: 12px;
+    font-family: inherit;
+    text-align: left;
+    cursor: pointer;
+    transition: background 0.16s, border-color 0.16s;
+}
+
+.gs-agent-ctx-gdrive-result:hover {
+    background: rgba(110, 193, 228, 0.12);
+    border-color: rgba(110, 193, 228, 0.5);
+}
+
+.gs-agent-ctx-gdrive-icon {
+    width: 16px;
+    height: 16px;
+    flex: 0 0 auto;
+    object-fit: contain;
+}
+
+.gs-agent-ctx-gdrive-result__name {
+    flex: 1 1 auto;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+/* ---- Response actions ---- */
+.gs-agent-step-out {
+    margin-top: 12px;
+    padding: 10px 12px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.025);
+    border: 1px solid rgba(255, 255, 255, 0.07);
+}
+
+.gs-agent-step-out__opts {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px 16px;
+}
+
+.gs-agent-out-opt {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    opacity: 0.92;
+    cursor: pointer;
+}
+
+.gs-agent-out-opt input {
+    width: 15px;
+    height: 15px;
+    accent-color: #b608c9;
+    cursor: pointer;
+}
+
+.gs-agent-step-out__forms {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    margin-top: 10px;
+}
+
+.gs-agent-step-out__forms:empty {
+    margin-top: 0;
+}
+
+.gs-agent-out-form {
+    padding: 10px 12px;
+    border-radius: 10px;
+    background: rgba(255, 255, 255, 0.035);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+}
+
+.gs-agent-out-form__title {
+    font-size: 12px;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #6ec1e4;
+}
+
+.gs-agent-out-form label {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.gs-agent-out-form input,
+.gs-agent-out-form select {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.gs-agent-out-form input:focus,
+.gs-agent-out-form select:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-out-form .gs-agent-help {
+    margin: 0;
+}
+
+/* =========================================================================
+ * v8.3 step-studio refinement — per-output settings sub-forms (mirrors the
+ * chat-widget). Email body textarea, chat recipient multi-select (search +
+ * results + chips), project workspace select + "New", launch Agent->Sequence
+ * cascade. Reuses the gs-agent-out-form tokens above for fields/focus.
+ * ========================================================================= */
+
+/* Email: Body textarea (sits below To + Subject). */
+.gs-agent-out-form textarea {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 13px;
+    font-family: inherit;
+    resize: vertical;
+    min-height: 64px;
+}
+
+.gs-agent-out-form textarea:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-out-email-body span {
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+/* Chat: recipient multi-select. */
+.gs-agent-out-recip {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+
+.gs-agent-out-recip__label {
+    font-size: 12px;
+    font-weight: 600;
+    opacity: 0.85;
+}
+
+.gs-agent-out-recip__chips {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+}
+
+.gs-agent-out-recip__chips:empty {
+    display: none;
+}
+
+.gs-agent-out-recip__chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 3px 6px 3px 4px;
+    border-radius: 999px;
+    background: rgba(110, 193, 228, 0.14);
+    border: 1px solid rgba(110, 193, 228, 0.35);
+    font-size: 12px;
+    color: #f3f0fa;
+}
+
+.gs-agent-out-recip__av {
+    width: 20px;
+    height: 20px;
+    border-radius: 50%;
+    object-fit: cover;
+    flex: 0 0 auto;
+}
+
+.gs-agent-out-recip__name {
+    white-space: nowrap;
+}
+
+.gs-agent-out-recip__x {
+    border: none;
+    background: transparent;
+    color: inherit;
+    cursor: pointer;
+    font-size: 14px;
+    line-height: 1;
+    padding: 0 2px;
+    opacity: 0.7;
+}
+
+.gs-agent-out-recip__x:hover {
+    opacity: 1;
+}
+
+.gs-agent-out-recip__search {
+    width: 100%;
+    box-sizing: border-box;
+    padding: 8px 10px;
+    border-radius: 9px;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    background: rgba(255, 255, 255, 0.04);
+    color: #f3f0fa;
+    font-size: 13px;
+    font-family: inherit;
+}
+
+.gs-agent-out-recip__search:focus {
+    outline: none;
+    border-color: #6ec1e4;
+    box-shadow: 0 0 0 2px rgba(110, 193, 228, 0.25);
+}
+
+.gs-agent-out-recip__results {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    max-height: 180px;
+    overflow-y: auto;
+    border-radius: 9px;
+}
+
+.gs-agent-out-recip__results:empty {
+    display: none;
+}
+
+.gs-agent-out-recip__result {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    width: 100%;
+    text-align: left;
+    padding: 6px 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.03);
+    color: #f3f0fa;
+    font-size: 13px;
+    cursor: pointer;
+}
+
+.gs-agent-out-recip__result:hover {
+    background: rgba(110, 193, 228, 0.14);
+    border-color: rgba(110, 193, 228, 0.35);
+}
+
+/* Project: workspace <select> + "+ New workspace" on one row. */
+.gs-agent-out-proj-row {
+    display: flex;
+    gap: 8px;
+    align-items: stretch;
+}
+
+.gs-agent-out-proj-row select {
+    flex: 1 1 auto;
+}
+
+.gs-agent-out-proj-new {
+    flex: 0 0 auto;
+    white-space: nowrap;
+    padding: 8px 12px;
+    border-radius: 9px;
+    border: 1px solid rgba(110, 193, 228, 0.35);
+    background: rgba(110, 193, 228, 0.14);
+    color: #f3f0fa;
+    font-size: 12px;
+    font-weight: 600;
+    cursor: pointer;
+}
+
+.gs-agent-out-proj-new:hover {
+    background: rgba(110, 193, 228, 0.24);
+}
+
+/* Launch another sequence: cascading Agent -> Sequence selects. */
+.gs-agent-out-form [data-gs-seq-out-launch-seq]:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
 }

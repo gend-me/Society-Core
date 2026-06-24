@@ -102,7 +102,7 @@ function gs_register_admin_menu()
 
         // Mirror online-store submenus if active
         if (gs_plugin_active('online-store/online-store.php')) {
-            add_submenu_page('gs-store', __('Store Settings', 'gend-society'), __('Store Settings', 'gend-society'), 'manage_options', 'gdc-store-settings', 'gdc_render_store_settings_page');
+            add_submenu_page('gs-store', __('Store Management', 'gend-society'), __('Store Management', 'gend-society'), 'manage_options', 'gdc-store-settings', 'gdc_render_store_settings_page');
             add_submenu_page(null, __('Store Reports', 'gend-society'), __('Store Reports', 'gend-society'), 'manage_options', 'gdc-store-reports', 'gdc_render_store_reports_page');
         }
 

@@ -325,6 +325,144 @@ function gdc_inject_profile_page_embed() {
     $viewed_user_id = (int) bp_displayed_user_id();
     if ( ! $viewed_user_id ) return;
 
+    // The Overview tab now hosts a sub-tab strip (formerly the Portfolio tabs):
+    //   Cover · Resume · Social · Posts · Media · Playlists · Completed Contracts
+    // Cover = the member's editable profile-node embed (gdc_render_cover_panel).
+    $is_own_profile = ( (int) get_current_user_id() === $viewed_user_id );
+    $has_playlists  = function_exists( 'bm_render_library_section' );
+
+    // The Youzify Media gallery only renders on the real /media/ route, so we
+    // surface it inside the Media panel via an iframe with ?gdc_tab_only=1
+    // (chrome-stripped by gdc_tab_only_strip_chrome() further down this file).
+    $media_slug = function_exists( 'youzify_profile_media_slug' ) ? youzify_profile_media_slug() : 'media';
+    $media_url  = add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . $media_slug ) );
+    ?>
+    <div class="gs-overview-wrap">
+        <div class="gs-overview-tabs" role="tablist">
+            <button type="button" class="gs-overview-tab is-active" data-gs-ov-tab="cover" role="tab" aria-selected="true"><?php esc_html_e( 'Cover', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="resume" role="tab" aria-selected="false"><?php esc_html_e( 'Resume', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="social" role="tab" aria-selected="false"><?php esc_html_e( 'Social', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="posts" role="tab" aria-selected="false"><?php esc_html_e( 'Posts', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="media" role="tab" aria-selected="false"><?php esc_html_e( 'Media', 'gend-society' ); ?></button>
+            <?php if ( $has_playlists ) : ?>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="playlists" role="tab" aria-selected="false"><?php esc_html_e( 'Playlists', 'gend-society' ); ?></button>
+            <?php endif; ?>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="contracts" role="tab" aria-selected="false"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></button>
+        </div>
+
+        <div class="gs-overview-panel is-active" data-gs-ov-panel="cover" role="tabpanel">
+            <?php gdc_render_cover_panel(); ?>
+        </div>
+
+        <div class="gs-overview-panel" data-gs-ov-panel="resume" role="tabpanel">
+            <?php if ( function_exists( 'gdc_render_resume_panel' ) ) gdc_render_resume_panel( $viewed_user_id, $is_own_profile ); ?>
+        </div>
+
+        <div class="gs-overview-panel" data-gs-ov-panel="social" role="tabpanel">
+            <?php if ( function_exists( 'gs_portfolio_render_schedule' ) ) gs_portfolio_render_schedule( $is_own_profile ); ?>
+        </div>
+
+        <div class="gs-overview-panel" data-gs-ov-panel="posts" role="tabpanel">
+            <?php if ( function_exists( 'gs_portfolio_render_posts' ) ) gs_portfolio_render_posts(); ?>
+        </div>
+
+        <div class="gs-overview-panel" data-gs-ov-panel="media" role="tabpanel">
+            <iframe class="gs-overview-media-frame" src="<?php echo esc_url( $media_url ); ?>" title="<?php esc_attr_e( 'Media', 'gend-society' ); ?>" loading="lazy"></iframe>
+        </div>
+
+        <?php if ( $has_playlists ) : ?>
+        <div class="gs-overview-panel" data-gs-ov-panel="playlists" role="tabpanel">
+            <?php bm_render_library_section(); ?>
+        </div>
+        <?php endif; ?>
+
+        <div class="gs-overview-panel" data-gs-ov-panel="contracts" role="tabpanel">
+            <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( $viewed_user_id ); ?>
+        </div>
+    </div>
+    <?php
+    gdc_overview_tabs_assets();
+}
+
+/**
+ * Overview sub-tab CSS + tab-switch JS. Mirrors the former .gs-portfolio-*
+ * tab styling/toggler and force-full-width approach used by the groups page.
+ */
+function gdc_overview_tabs_assets() {
+    ?>
+    <style>
+    .gs-overview-wrap { width:100%; max-width:none; padding-top:18px; }
+    .gs-overview-tabs { display:flex; flex-wrap:wrap; gap:6px; margin-bottom:22px; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:0; }
+    .gs-overview-tab { background:transparent; border:0; border-bottom:2px solid transparent; padding:12px 22px; color:#64748b; font-family:"Inter",sans-serif; font-size:0.78rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:color 0.18s, border-color 0.18s; margin-bottom:-1px; }
+    .gs-overview-tab:hover { color:rgba(255,255,255,0.75); }
+    .gs-overview-tab.is-active { color:#b608c9; border-bottom-color:#b608c9; }
+    .gs-overview-panel { display:none; }
+    .gs-overview-panel.is-active { display:block; }
+    .gs-overview-media-frame { display:block; width:100%; min-height:80vh; height:80vh; border:0; background:transparent; border-radius:12px; overflow:hidden; }
+    /* Full-width on the overview tab so the strip + media iframe span the column. */
+    body.overview .youzify-right-sidebar-layout,
+    body.overview .youzify-left-sidebar-layout { display:block !important; grid-template-columns:1fr !important; grid-gap:0 !important; }
+    body.overview .youzify-main-column,
+    body.overview .youzify-main-column.grid-column { width:100% !important; max-width:none !important; flex:0 0 100% !important; }
+    body.overview .youzify-profile-sidebar,
+    body.overview .youzify-sidebar-column,
+    body.overview .yz-sidebar-column { display:none !important; }
+    </style>
+    <script>
+    (function () {
+        var wrap = document.querySelector('.gs-overview-wrap');
+        if (!wrap) return;
+
+        var tabs   = wrap.querySelectorAll('.gs-overview-tab');
+        var panels = wrap.querySelectorAll('.gs-overview-panel');
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                var target = tab.getAttribute('data-gs-ov-tab');
+                tabs.forEach(function (t) { t.classList.remove('is-active'); t.setAttribute('aria-selected','false'); });
+                panels.forEach(function (p) { p.classList.remove('is-active'); });
+                tab.classList.add('is-active'); tab.setAttribute('aria-selected','true');
+                var p = wrap.querySelector('[data-gs-ov-panel="' + target + '"]');
+                if (p) p.classList.add('is-active');
+            });
+        });
+
+        // Deep-link: #resume / #contracts / etc. opens that sub-tab on load.
+        var hash = (window.location.hash || '').replace('#','');
+        if (hash) {
+            var deep = wrap.querySelector('.gs-overview-tab[data-gs-ov-tab="' + hash + '"]');
+            if (deep) deep.click();
+        }
+
+        // Force full width by expanding every ancestor up to <body> — bypasses
+        // guessing which Youzify/theme class constrains the overview column.
+        function forceWidth () {
+            var node = wrap.parentElement, depth = 0;
+            while (node && node !== document.body && depth < 30) {
+                node.style.setProperty('max-width', 'none', 'important');
+                node.style.setProperty('width',     '100%', 'important');
+                node = node.parentElement; depth++;
+            }
+            document.querySelectorAll('.youzify-profile-sidebar, .youzify-sidebar-column, .yz-sidebar-column, #secondary')
+                .forEach(function (s) { s.remove(); });
+        }
+        forceWidth();
+        setTimeout(forceWidth, 0);
+        setTimeout(forceWidth, 300);
+        window.addEventListener('load', forceWidth);
+    }());
+    </script>
+    <?php
+}
+
+/**
+ * Cover panel — the member's editable profile-node embed. This was formerly the
+ * entire Overview tab body; extracted verbatim so it can render inside the
+ * Overview sub-tab strip as the first ("Cover") panel.
+ */
+function gdc_render_cover_panel() {
+    $viewed_user_id = (int) bp_displayed_user_id();
+    if ( ! $viewed_user_id ) return;
+
     $post_id = gdc_get_user_profile_page_id( $viewed_user_id );
     if ( ! $post_id ) return;
 
@@ -700,7 +838,9 @@ function gdc_profile_page_css() {
 
 /* ── 6. Rendered Content — fades + slides up (has-content state) ─────── */
 .gdc-ppe-content {
-    padding: 40px 48px;
+    /* Extra top padding so the absolutely-positioned "Edit Profile Node"
+       button (top:30px) clears the first heading instead of overlapping it. */
+    padding: 92px 48px 40px;
     width: 100%;
     box-sizing: border-box;
     color: rgba(255,255,255,0.86);
