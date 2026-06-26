@@ -720,6 +720,9 @@ function gdc_render_profile_header() {
     <?php endif; ?>
     <section class="gdc-profile-uplink">
 
+        <!-- Cinematic boot sequence: light sweep + top bloom (pure CSS, plays once) -->
+        <div class="gdc-boot-fx" aria-hidden="true"></div>
+
         <div class="gdc-profile-hub">
 
             <!-- ── 1. Identity Port ───────────────────────────────────── -->
@@ -1023,12 +1026,20 @@ function gdc_render_profile_header() {
             var o = document.getElementById('gdc-topup-overlay');
             if (o) { o.classList.add('is-closing'); setTimeout(function(){ o.remove(); }, 220); }
             document.removeEventListener('keydown', onEsc);
+            // Release the body scroll-lock taken in mount().
+            document.documentElement.classList.remove('gdc-tp-lock');
         }
         function onEsc(e) { if (e.key === 'Escape') closeOverlay(); }
 
         // Mounts a dialog node inside a fresh body-portaled overlay.
         function mount(dialog, accent) {
             closeOverlay();
+            // Ease any header card that was mid-hover back to flat — otherwise the
+            // overlay swallows its pointerout and it stays frozen/tilted (oversized)
+            // behind the modal, bleeding through the glass and adding page scrollbars.
+            document.dispatchEvent(new Event('gdc:release-tilt'));
+            // Lock the page so the (tall) dialog scrolls itself, not the page.
+            document.documentElement.classList.add('gdc-tp-lock');
             var overlay = el('div');
             overlay.id = 'gdc-topup-overlay';
             overlay.className = 'gdc-tp-overlay';
@@ -1341,6 +1352,133 @@ function gdc_render_profile_header() {
         }
     }());
     </script>
+    <script id="gdc-kbx-tilt">
+    (function () {
+        if (window.__gdcKbxTilt) return;        // bind once per page
+        window.__gdcKbxTilt = true;
+
+        var reduce = window.matchMedia &&
+                     window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce) return;
+
+        var SEL  = '.gdc-profile-uplink .gdc-kbx';
+        var MAX  = 7;        // max pitch / yaw in degrees — restrained = elegant
+        var LERP = 0.12;     // easing factor; lower = silkier, longer glide
+        var active = new Map();
+        var raf = null;
+
+        function glareFor(el) {
+            var g = el.querySelector(':scope > .gdc-kbx-glare');
+            if (!g) {
+                g = document.createElement('i');
+                g.className = 'gdc-kbx-glare';
+                el.appendChild(g);
+            }
+            return g;
+        }
+        function stateFor(el) {
+            var s = active.get(el);
+            if (!s) {
+                s = {
+                    cur: { rx: 0, ry: 0, mx: 50, my: 50, lift: 0 },
+                    tgt: { rx: 0, ry: 0, mx: 50, my: 50, lift: 0 },
+                    glare: glareFor(el)
+                };
+                active.set(el, s);
+            }
+            return s;
+        }
+
+        function loop() {
+            raf = null;
+            var running = false;
+            active.forEach(function (s, el) {
+                var c = s.cur, t = s.tgt;
+                c.rx   += (t.rx   - c.rx)   * LERP;
+                c.ry   += (t.ry   - c.ry)   * LERP;
+                c.mx   += (t.mx   - c.mx)   * LERP;
+                c.my   += (t.my   - c.my)   * LERP;
+                c.lift += (t.lift - c.lift) * LERP;
+
+                // settled at rest → clean up so the resting neon spin returns
+                if (t.lift === 0 && c.lift < 0.003 &&
+                    Math.abs(c.rx) < 0.02 && Math.abs(c.ry) < 0.02) {
+                    el.classList.remove('gdc-kbx--live');
+                    el.style.removeProperty('transform');
+                    el.style.removeProperty('box-shadow');
+                    el.style.removeProperty('--kbx-lift');
+                    el.style.removeProperty('--kbx-mx');
+                    el.style.removeProperty('--kbx-my');
+                    s.glare.style.opacity = '0';
+                    active.delete(el);
+                    return;
+                }
+                running = true;
+
+                var lift = c.lift;
+                // !important so the tilt beats the gdcKbxEnter entrance animation,
+                // which (with fill: forwards) otherwise outranks inline transform
+                // in the cascade and silently flattens the metrics/balance cards.
+                el.style.setProperty('transform',
+                    'perspective(1100px) rotateX(' + c.rx.toFixed(3) + 'deg) rotateY(' +
+                    c.ry.toFixed(3) + 'deg) translateZ(0) scale(' +
+                    (1 + 0.026 * lift).toFixed(4) + ')', 'important');
+                el.style.setProperty('box-shadow',
+                    '0 ' + (30 * lift).toFixed(1) + 'px ' + (66 * lift).toFixed(1) +
+                    'px -24px color-mix(in srgb, var(--kbx-color, var(--gph-blue)) 70%, transparent)');
+                el.style.setProperty('--kbx-mx', c.mx.toFixed(2) + '%');
+                el.style.setProperty('--kbx-my', c.my.toFixed(2) + '%');
+                el.style.setProperty('--kbx-lift', lift.toFixed(3));
+                s.glare.style.opacity = lift.toFixed(3);
+            });
+            if (running) raf = requestAnimationFrame(loop);
+        }
+        function kick() { if (!raf) raf = requestAnimationFrame(loop); }
+
+        // When a top-up popup opens, ease every active card back to rest so none
+        // freeze mid-tilt behind the modal (the overlay eats their pointerout).
+        document.addEventListener('gdc:release-tilt', function () {
+            active.forEach(function (s) {
+                s.tgt.rx = 0; s.tgt.ry = 0; s.tgt.mx = 50; s.tgt.my = 50; s.tgt.lift = 0;
+            });
+            kick();
+        });
+
+        document.addEventListener('pointermove', function (e) {
+            if (e.pointerType === 'touch') return;
+            // Don't tilt while a popup is open (its overlay sits above the header).
+            if (document.getElementById('gdc-topup-overlay')) return;
+            var el = e.target.closest && e.target.closest(SEL);
+            if (!el) return;
+            var r = el.getBoundingClientRect();
+            var px = (e.clientX - r.left) / r.width;
+            var py = (e.clientY - r.top) / r.height;
+            px = px < 0 ? 0 : px > 1 ? 1 : px;
+            py = py < 0 ? 0 : py > 1 ? 1 : py;
+            var s = stateFor(el);
+            s.tgt.ry   = (px - 0.5) * 2 * MAX;
+            s.tgt.rx   = -(py - 0.5) * 2 * MAX;
+            s.tgt.mx   = px * 100;
+            s.tgt.my   = py * 100;
+            s.tgt.lift = 1;
+            if (!el.classList.contains('gdc-kbx--live')) el.classList.add('gdc-kbx--live');
+            kick();
+        }, { passive: true });
+
+        document.addEventListener('pointerout', function (e) {
+            var el = e.target.closest && e.target.closest(SEL);
+            if (!el) return;
+            // moving between children of the same box — stay live
+            if (e.relatedTarget && el.contains(e.relatedTarget)) return;
+            var s = active.get(el);
+            if (!s) return;
+            s.tgt.rx = 0; s.tgt.ry = 0;     // ease the tilt flat
+            s.tgt.mx = 50; s.tgt.my = 50;   // drift the glow back to centre
+            s.tgt.lift = 0;                 // fade glow + sheen out
+            kick();
+        }, { passive: true });
+    }());
+    </script>
     <?php
 }
 
@@ -1391,6 +1529,84 @@ function gdc_profile_header_css() {
     transform: scale(1.06); /* hides blur fringing at edges */
     z-index: -2;
     pointer-events: none;
+    /* Cinematic backdrop boot: slow zoom + focus-pull from black */
+    animation: gdcCoverIn 2.8s cubic-bezier(0.22,1,0.36,1) both;
+}
+@keyframes gdcCoverIn {
+    from { opacity: 0; transform: scale(1.25); filter: blur(34px) brightness(0)    saturate(1.3); }
+    to   { opacity: 1; transform: scale(1.06); filter: blur(14px) brightness(0.35) saturate(1.3); }
+}
+
+/* ══ CINEMATIC HEADER ENTRANCE ════════════════════════════════════════════
+   One choreographed "power-on": the whole section fades up while the cover
+   zooms into focus, a light bar sweeps across, and a glow blooms from the top
+   before the cards cascade in (see the per-element keyframes further down).
+   ═══════════════════════════════════════════════════════════════════════ */
+.gdc-profile-uplink {
+    animation: gdcUplinkIn 1s ease both;
+}
+@keyframes gdcUplinkIn { from { opacity: 0; } to { opacity: 1; } }
+
+/* Boot FX layer — sits above content; pure light, no pointer capture */
+.gdc-boot-fx {
+    position: absolute;
+    inset: 0;
+    z-index: 2;
+    pointer-events: none;
+    overflow: hidden;
+    mix-blend-mode: screen;
+}
+/* The sweeping light bar */
+.gdc-boot-fx::before {
+    content: "";
+    position: absolute;
+    top: -20%;
+    bottom: -20%;
+    width: 45%;
+    left: -60%;
+    background: linear-gradient(
+        100deg,
+        transparent 0%,
+        rgba(137,194,224,0.00) 18%,
+        rgba(255,255,255,0.14) 50%,
+        rgba(182,8,201,0.10) 70%,
+        transparent 100%
+    );
+    filter: blur(8px);
+    transform: skewX(-12deg);
+    animation: gdcSweep 1.6s cubic-bezier(0.5,0,0.2,1) 0.25s both;
+}
+@keyframes gdcSweep {
+    0%   { left: -60%; opacity: 0; }
+    18%  { opacity: 1; }
+    100% { left: 125%; opacity: 0; }
+}
+/* The top bloom that swells then settles */
+.gdc-boot-fx::after {
+    content: "";
+    position: absolute;
+    inset: 0;
+    background: radial-gradient(130% 80% at 50% 0%,
+                rgba(137,194,224,0.20), transparent 60%);
+    opacity: 0;
+    animation: gdcBloom 2.4s ease-out 0.1s both;
+}
+@keyframes gdcBloom { 0% { opacity: 0; } 28% { opacity: 1; } 100% { opacity: 0; } }
+
+/* Respect reduced-motion: skip the whole boot sequence, show everything settled */
+@media (prefers-reduced-motion: reduce) {
+    .gdc-profile-uplink,
+    .gdc-profile-uplink::before,
+    .gdc-identity-wrap,
+    .gdc-metrics-port .gdc-kbx,
+    .gdc-balance-grid .gdc-kbx {
+        animation: none !important;
+        opacity: 1 !important;
+        transform: none !important;
+        filter: none !important;
+    }
+    .gdc-profile-uplink::before { filter: blur(14px) brightness(0.35) saturate(1.3) !important; transform: scale(1.06) !important; }
+    .gdc-boot-fx { display: none !important; }
 }
 .gdc-profile-uplink::after {
     content: "";
@@ -1465,16 +1681,71 @@ function gdc_profile_header_css() {
     to   { transform: rotate(360deg); }
 }
 
+/* ══ 3D POINTER-FOLLOW HOVER ═══════════════════════════════════════════════
+   On hover the spinning conic rim hands off to a parallax 3D tilt that
+   eases toward the cursor (damped per-frame in JS, never snapping), plus a
+   pointer-anchored rim glow and a glass sheen that drifts across the surface.
+   JS drives transform / box-shadow inline and these custom props:
+     --kbx-mx / --kbx-my  glow + sheen origin (%)
+     --kbx-lift           0..1 hover intensity (eases in on enter, out on exit)
+   ═══════════════════════════════════════════════════════════════════════ */
+.gdc-kbx {
+    transform-style: preserve-3d;
+    will-change: transform;
+    backface-visibility: hidden;
+}
+.gdc-kbx.gdc-kbx--live { z-index: 4; }
+/* Hand the spinning conic track over to a soft pointer-anchored rim glow.
+   opacity is tied to --kbx-lift so the glow eases in/out with the tilt. */
+.gdc-kbx.gdc-kbx--live::before {
+    animation: none;
+    inset: 0;
+    opacity: var(--kbx-lift, 1);
+    background: radial-gradient(
+        300px circle at var(--kbx-mx, 50%) var(--kbx-my, 50%),
+        var(--kbx-color, var(--gph-blue)) 0%,
+        color-mix(in srgb, var(--kbx-color, var(--gph-blue)) 45%, transparent) 26%,
+        transparent 62%
+    );
+}
+/* Glass sheen — a soft specular highlight on the card surface that the
+   pointer drags around, sold as light catching glass. Injected by JS. */
+.gdc-kbx-glare {
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    pointer-events: none;
+    z-index: 3;
+    opacity: 0;
+    background: radial-gradient(
+        420px circle at var(--kbx-mx, 50%) var(--kbx-my, 50%),
+        rgba(255,255,255,0.18) 0%,
+        rgba(255,255,255,0.06) 20%,
+        transparent 48%
+    );
+    mix-blend-mode: screen;
+}
+@media (prefers-reduced-motion: reduce) {
+    .gdc-kbx.gdc-kbx--live { transform: none !important; box-shadow: none !important; }
+    .gdc-kbx.gdc-kbx--live::before { animation: gdcBorderScan 4s linear infinite; opacity: 1; }
+    .gdc-kbx-glare { display: none; }
+}
+
 /* ══ 1. IDENTITY PORT ════════════════════════════════════════════════════
    3D entrance: swings in from the left.
    ═══════════════════════════════════════════════════════════════════════ */
 .gdc-identity-wrap {
     opacity: 0;
-    transform: rotateY(-20deg) translateX(-50px);
-    animation: gdcPortEnter 1s cubic-bezier(0.16,1,0.3,1) forwards;
+    transform: perspective(1600px) rotateY(-24deg) translateX(-70px) translateZ(-160px);
+    filter: blur(12px);
+    animation: gdcPortEnter 1.4s cubic-bezier(0.16,1,0.3,1) forwards;
 }
 @keyframes gdcPortEnter {
-    to { opacity: 1; transform: rotateY(0) translateX(0); }
+    to {
+        opacity: 1;
+        transform: perspective(1600px) rotateY(0) translateX(0) translateZ(0);
+        filter: blur(0);
+    }
 }
 /* The inner card inside the kinetic box */
 .gdc-identity-inner {
@@ -1546,15 +1817,18 @@ function gdc_profile_header_css() {
     flex-direction: column;
     gap: 25px;
 }
-/* Entrance animation applied to the kinetic boxes in the metrics column */
+/* Entrance animation applied to the kinetic boxes in the metrics column —
+   each card lifts out of depth and pulls into focus (parent perspective does
+   not reach grandchildren, so the perspective() lives in the transform). */
 .gdc-metrics-port .gdc-kbx,
 .gdc-balance-grid .gdc-kbx {
     opacity: 0;
-    transform: translateY(24px);
-    animation: gdcKbxEnter 0.7s cubic-bezier(0.22,1,0.36,1) forwards;
+    transform: perspective(1600px) translateY(64px) translateZ(-150px) rotateX(14deg);
+    filter: blur(9px);
+    animation: gdcKbxEnter 1.15s cubic-bezier(0.16,1,0.3,1) forwards;
 }
 @keyframes gdcKbxEnter {
-    to { opacity: 1; transform: none; }
+    to { opacity: 1; transform: none; filter: blur(0); }
 }
 
 /* Stagger delays — applied to any element that needs them */
@@ -2382,7 +2656,12 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
     line-height: 1;
     letter-spacing: 1.3px;
     text-transform: uppercase;
-    transition: transform 0.2s cubic-bezier(0.22,1,0.36,1), box-shadow 0.25s, background 0.25s, color 0.2s;
+    transition: transform 0.35s cubic-bezier(0.34,1.56,0.64,1),
+                padding 0.35s cubic-bezier(0.34,1.56,0.64,1),
+                font-size 0.3s cubic-bezier(0.22,1,0.36,1),
+                letter-spacing 0.3s ease,
+                gap 0.3s ease,
+                box-shadow 0.3s ease, background 0.25s ease, color 0.2s ease;
     opacity: 0;
     transform: translateY(10px) scale(0.94);
     animation: gdcTpBtnIn 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards;
@@ -2392,16 +2671,31 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 .gdc-stagger-2 .gdc-topup-btn { animation-delay: 1.00s; }
 .gdc-stagger-3 .gdc-topup-btn { animation-delay: 1.15s; }
 .gdc-stagger-4 .gdc-topup-btn { animation-delay: 1.30s; }
-.gdc-topup-btn:hover {
+/* Hover: grow the real type + padding (crisp, not a blurry scale) for a
+   bigger, easier-to-read pill that lifts and glows on its accent colour. */
+.gdc-topup-btn:hover,
+.gdc-topup-btn:focus-visible {
     background: var(--gph-accent, var(--gph-blue));
     color: #06080d;
-    transform: translateY(-2px);
-    box-shadow: 0 10px 26px -8px var(--gph-accent, var(--gph-blue)),
-                0 0 16px -4px var(--gph-accent, var(--gph-blue));
+    transform: translateY(-3px);
+    padding: 10px 21px 10px 16px;
+    gap: 8px;
+    font-size: 0.76rem;
+    letter-spacing: 1.7px;
+    box-shadow: 0 16px 34px -10px var(--gph-accent, var(--gph-blue)),
+                0 0 24px -4px var(--gph-accent, var(--gph-blue));
+    outline: none;
 }
-.gdc-topup-btn:active { transform: translateY(0) scale(0.97); }
+.gdc-topup-btn:active { transform: translateY(-1px) scale(0.97); }
 .gdc-topup-btn__plus { display: inline-flex; }
-.gdc-topup-btn__plus svg { width: 12px; height: 12px; display: block; }
+.gdc-topup-btn__plus svg {
+    width: 12px; height: 12px; display: block;
+    transition: transform 0.4s cubic-bezier(0.34,1.56,0.64,1);
+}
+.gdc-topup-btn:hover .gdc-topup-btn__plus svg,
+.gdc-topup-btn:focus-visible .gdc-topup-btn__plus svg {
+    transform: rotate(90deg) scale(1.18);
+}
 
 /* ── Overlay ─────────────────────────────────────────────────────────────── */
 .gdc-tp-overlay {
@@ -2427,6 +2721,9 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 }
 .gdc-tp-overlay.is-open { opacity: 1; }
 .gdc-tp-overlay.is-closing { opacity: 0; }
+/* While a popup is open, lock the page so only the dialog scrolls (and the
+   header behind it cannot add stray scrollbars). */
+html.gdc-tp-lock { overflow: hidden !important; }
 
 /* ── Dialog — slides + scales in; children stagger after it ─────────────── */
 .gdc-tp-dialog {
@@ -2434,28 +2731,54 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
     position: relative;
     width: min(460px, 100%);
     max-height: 92vh;
+    overflow-x: hidden;
     overflow-y: auto;
     padding: 30px 28px 24px;
     border-radius: 24px;
     border: 1px solid rgba(255,255,255,0.08);
     background: linear-gradient(165deg, #0d1320 0%, #080b12 100%);
+    /* Accent-tinted bloom + inner glow ties each popup to its card colour */
     box-shadow: 0 40px 120px rgba(0,0,0,0.6),
                 0 0 0 1px rgba(255,255,255,0.03),
-                inset 0 1px 0 rgba(255,255,255,0.04);
+                inset 0 1px 0 rgba(255,255,255,0.04),
+                inset 0 0 60px -30px var(--gph-accent),
+                0 30px 90px -45px var(--gph-accent);
     color: #e2e8f0;
     opacity: 0;
-    transform: translateY(24px) scale(0.96);
-    transition: transform 0.42s cubic-bezier(0.16,1,0.3,1), opacity 0.42s ease;
+    transform: translateY(28px) scale(0.94);
+    filter: blur(6px);
+    transition: transform 0.5s cubic-bezier(0.16,1,0.3,1),
+                opacity 0.45s ease,
+                filter 0.5s ease;
 }
-.gdc-tp-overlay.is-open .gdc-tp-dialog { opacity: 1; transform: none; }
+.gdc-tp-overlay.is-open .gdc-tp-dialog { opacity: 1; transform: none; filter: blur(0); }
+/* Rotating neon kinetic rim — the header card border, on the popup frame.
+   Uses the border-mask trick (works with the scrollable dialog) and an
+   animated @property angle so the accent arc sweeps the rounded rectangle. */
+@property --gdc-tp-angle { syntax: "<angle>"; inherits: false; initial-value: 0deg; }
 .gdc-tp-dialog::before {
     content: "";
     position: absolute;
     inset: 0;
     border-radius: 24px;
+    padding: 1.5px;
+    background: conic-gradient(
+        from var(--gdc-tp-angle, 0deg),
+        transparent 0%,
+        transparent 35%,
+        var(--gph-accent) 50%,
+        transparent 65%,
+        transparent 100%
+    );
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    animation: gdcTpSpin 5s linear infinite;
     pointer-events: none;
-    box-shadow: inset 0 0 60px -30px var(--gph-accent);
+    z-index: 1;
 }
+@keyframes gdcTpSpin { to { --gdc-tp-angle: 360deg; } }
 /* Top edge scan-line that sweeps on open */
 .gdc-tp-scan {
     position: absolute;
@@ -2497,6 +2820,11 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
     animation-delay: calc(0.18s + var(--i, 0) * 0.08s);
 }
 @keyframes gdcTpRowIn { to { opacity: 1; transform: none; } }
+@media (prefers-reduced-motion: reduce) {
+    .gdc-tp-dialog { filter: none !important; transition: opacity 0.2s ease !important; transform: none !important; }
+    .gdc-tp-dialog::before { animation: none !important; }
+    .gdc-tp-scan, .gdc-tp-row { animation: none !important; opacity: 1 !important; transform: none !important; }
+}
 
 /* Head */
 .gdc-tp-head {
