@@ -263,7 +263,7 @@
 
             // Collect the content blocks to reveal, assign stagger index.
             var blocks = scrollEl.querySelectorAll(
-                '.gs-schedule-types-block, .gs-dtp, .gs-schedule-block, .gs-schedule-guest > label, .gs-schedule-meta > label, .gs-schedule-submit-block'
+                '.gs-schedule-title, .gs-schedule-types-block, .gs-dtp, .gs-schedule-block, .gs-schedule-guest > label, .gs-schedule-meta > label, .gs-schedule-submit-block'
             );
             for (var i = 0; i < blocks.length; i++) {
                 blocks[i].setAttribute('data-reveal', '');

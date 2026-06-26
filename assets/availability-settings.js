@@ -48,6 +48,50 @@
     var availModal = null;     // { overlay, body, onOpen }
     var visModal = null;
 
+    /* ===================== Staggered on-scroll entrance reveals =================
+     * Mirrors schedule-meeting.js setupReveals(): tag every meaningful item in a
+     * modal's scroll container (the card) with [data-reveal] + a per-item --rev-i
+     * stagger index, then add .is-in as each crosses into view. Items already on
+     * screen when the modal opens cascade in immediately. GPU-only (transform +
+     * opacity + blur); reduced-motion / no-IntersectionObserver → instant reveal.
+     * Each modal keeps its own observer so we can disconnect on close (no leaks). */
+    function setupReveals(modal) {
+        var scrollEl = modal.card;
+        if (modal._revealObserver) { modal._revealObserver.disconnect(); modal._revealObserver = null; }
+
+        // Every item we want to cascade in, in document order. Mirrors the schedule
+        // modal's granularity: title, each section row / day card / blocked row,
+        // each vis row, member chips area, share row, and the save actions.
+        var blocks = scrollEl.querySelectorAll(
+            '.gs-avail-modal-title, .gs-avail-tz, .gs-avail-subtitle, ' +
+            '.gs-avail-day-row, .gs-avail-blocked, ' +
+            '.gs-avail-vis-help, .gs-avail-vis-row, .gs-avail-members, .gs-avail-vis-share, ' +
+            '.gs-avail-actions'
+        );
+        for (var i = 0; i < blocks.length; i++) {
+            blocks[i].setAttribute('data-reveal', '');
+            blocks[i].style.setProperty('--rev-i', String(i % 10)); // cap delay growth
+            blocks[i].classList.remove('is-in');
+        }
+
+        var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        if (reduce || typeof IntersectionObserver === 'undefined') {
+            for (var j = 0; j < blocks.length; j++) { blocks[j].classList.add('is-in'); }
+            return;
+        }
+
+        modal._revealObserver = new IntersectionObserver(function (entries) {
+            for (var e = 0; e < entries.length; e++) {
+                if (entries[e].isIntersecting) {
+                    entries[e].target.classList.add('is-in');
+                    modal._revealObserver.unobserve(entries[e].target);
+                }
+            }
+        }, { root: scrollEl, threshold: 0.08, rootMargin: '0px 0px -5% 0px' });
+
+        for (var k = 0; k < blocks.length; k++) { modal._revealObserver.observe(blocks[k]); }
+    }
+
     /* visibility defaults — mirror the server's always-defaulted shape. */
     function defaultVisibility() {
         return {
@@ -180,7 +224,11 @@
             card: card,
             body: body,
             open: function () { overlay.setAttribute('aria-hidden', 'false'); },
-            close: function () { overlay.setAttribute('aria-hidden', 'true'); }
+            close: function () {
+                overlay.setAttribute('aria-hidden', 'true');
+                // Tear down the reveal observer so we never leak across opens.
+                if (api._revealObserver) { api._revealObserver.disconnect(); api._revealObserver = null; }
+            }
         };
 
         closeBtn.addEventListener('click', api.close);
@@ -700,12 +748,16 @@
         if (_loadError) { availModal.body.textContent = ''; availModal.body.appendChild(el('p', { text: 'Failed to load availability.' })); }
         else { renderAvailabilityBody(_lastState || {}); }
         availModal.open();
+        // Wire the staggered on-scroll entrance reveals (card is the scroll container).
+        setupReveals(availModal);
     }
     function openVisibility() {
         if (!visModal) { return; }
         if (_loadError) { visModal.body.textContent = ''; visModal.body.appendChild(el('p', { text: 'Failed to load availability.' })); }
         else { renderVisibilityBody(_lastState || {}); }
         visModal.open();
+        // Wire the staggered on-scroll entrance reveals (card is the scroll container).
+        setupReveals(visModal);
     }
 
     function init() {
@@ -717,9 +769,10 @@
         fetchAvailability().then(function (state) {
             _lastState = state || {};
             _loaded = true;
-            // If a modal is already open (clicked before load finished), refresh it.
-            if (availModal.overlay.getAttribute('aria-hidden') === 'false') { renderAvailabilityBody(_lastState); }
-            if (visModal.overlay.getAttribute('aria-hidden') === 'false') { renderVisibilityBody(_lastState); }
+            // If a modal is already open (clicked before load finished), refresh it
+            // and re-wire the reveals against the freshly-rendered body.
+            if (availModal.overlay.getAttribute('aria-hidden') === 'false') { renderAvailabilityBody(_lastState); setupReveals(availModal); }
+            if (visModal.overlay.getAttribute('aria-hidden') === 'false') { renderVisibilityBody(_lastState); setupReveals(visModal); }
         }).catch(function () {
             _loadError = true;
             if (availModal.overlay.getAttribute('aria-hidden') === 'false') { openAvailability(); }

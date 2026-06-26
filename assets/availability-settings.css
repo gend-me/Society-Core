@@ -5,11 +5,14 @@
 
 /* ─── Modal overlay (mirror of .gs-schedule-modal) ─── */
 .gs-avail-modal {
+    --gph-blue: #89C2E0;
+    --gph-magenta: #b608c9;
+    --gph-green: #00ff88;
     position: fixed; inset: 0; z-index: 100000;
     display: flex; align-items: flex-start; justify-content: center;
     padding: 40px 16px;
-    background: rgba(8, 6, 20, 0.62);
-    backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px);
+    background: radial-gradient(120% 120% at 50% 0%, rgba(20, 12, 40, 0.66), rgba(0, 0, 0, 0.72));
+    backdrop-filter: blur(10px); -webkit-backdrop-filter: blur(10px);
     overflow-y: auto; overflow-x: hidden;
     opacity: 0; visibility: hidden; pointer-events: none;
     transition: opacity 0.18s ease, visibility 0.18s ease;
@@ -19,22 +22,97 @@
 .gs-avail-modal[aria-hidden="false"] {
     opacity: 1; visibility: visible; pointer-events: auto;
 }
+
+/* ─── Futuristic glass dashboard shell (identical look to .gs-schedule-card) ───
+ * Deep translucent indigo/black gradient + top highlight, strong backdrop blur,
+ * hairline border, large soft depth shadow, faint scanline-grid texture + corner
+ * accent glows, and a slowly-drifting dual-radial accent border. Generous
+ * dashboard width: min(85vw, 760px). Self-contained — no cross-file dependency. */
 .gs-avail-modal-card {
     position: relative;
-    width: 100%; max-width: 760px;
+    isolation: isolate;
+    width: min(85vw, 760px); max-width: 760px;
     margin: auto;
     max-height: calc(100vh - 80px);
     overflow-y: auto; overflow-x: hidden;
-    padding: 24px 26px 26px;
-    background: rgba(22, 18, 40, 0.92);
-    backdrop-filter: blur(28px); -webkit-backdrop-filter: blur(28px);
-    border: 1px solid rgba(255, 255, 255, 0.14);
-    border-radius: 18px;
-    box-shadow: 0 24px 70px -20px rgba(0, 0, 0, 0.7);
+    padding: 26px 28px 28px;
+    background:
+        linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 22%, transparent 60%),
+        linear-gradient(150deg, rgba(28, 20, 56, 0.92), rgba(10, 8, 22, 0.94));
+    backdrop-filter: blur(30px) saturate(120%); -webkit-backdrop-filter: blur(30px) saturate(120%);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 20px;
+    box-shadow:
+        0 30px 80px -24px rgba(0, 0, 0, 0.8),
+        0 0 0 1px rgba(137, 194, 224, 0.06),
+        inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color: var(--gph-fg, #fff);
     box-sizing: border-box;
 }
+
+/* Faint futuristic grid/scanline texture + soft corner accent glows. */
+.gs-avail-modal-card::after {
+    content: '';
+    position: absolute; inset: 0; z-index: -1;
+    border-radius: 20px; pointer-events: none;
+    background:
+        radial-gradient(60% 50% at 0% 0%, rgba(137, 194, 224, 0.12), transparent 70%),
+        radial-gradient(60% 50% at 100% 100%, rgba(182, 8, 201, 0.12), transparent 70%),
+        repeating-linear-gradient(0deg, rgba(255, 255, 255, 0.025) 0px, rgba(255, 255, 255, 0.025) 1px, transparent 1px, transparent 26px),
+        repeating-linear-gradient(90deg, rgba(255, 255, 255, 0.02) 0px, rgba(255, 255, 255, 0.02) 1px, transparent 1px, transparent 26px);
+}
+
+/* Animated dual-radial accent border glow — slow ~8s drift, low opacity, GPU-friendly. */
+@property --gs-avail-border-angle {
+    syntax: '<angle>';
+    inherits: false;
+    initial-value: 0deg;
+}
+@keyframes gs-avail-border-drift {
+    to { --gs-avail-border-angle: 360deg; }
+}
+.gs-avail-modal-card::before {
+    content: '';
+    position: absolute; inset: -1px; z-index: -1;
+    border-radius: 21px; padding: 1.5px;
+    background: conic-gradient(from var(--gs-avail-border-angle, 0deg),
+        rgba(137, 194, 224, 0.0) 0deg,
+        rgba(137, 194, 224, 0.85) 70deg,
+        rgba(182, 8, 201, 0.85) 180deg,
+        rgba(0, 255, 136, 0.55) 260deg,
+        rgba(137, 194, 224, 0.0) 360deg);
+    -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+    -webkit-mask-composite: xor;
+            mask-composite: exclude;
+    opacity: 0.55;
+    animation: gs-avail-border-drift 8s linear infinite;
+    pointer-events: none;
+}
+
 .gs-avail-modal-card, .gs-avail-modal-card * { box-sizing: border-box; }
+
+/* ─── Staggered on-scroll entrance reveals (identical values to schedule-meeting.css) ───
+ * Items start translated down + scaled + blurred; .is-in (added by the
+ * IntersectionObserver in availability-settings.js setupReveals) reveals them.
+ * Per-item --rev-i staggers the delay. Cinematic ease, ~0.65s. Reduced-motion
+ * override at the bottom shows all instantly. */
+.gs-avail-modal-card [data-reveal] {
+    opacity: 0;
+    transform: translateY(28px) scale(0.96);
+    filter: blur(6px);
+    transition:
+        opacity 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+        transform 0.65s cubic-bezier(0.22, 1, 0.36, 1),
+        filter 0.65s cubic-bezier(0.22, 1, 0.36, 1);
+    transition-delay: calc(var(--rev-i, 0) * 80ms);
+    will-change: transform, opacity, filter;
+}
+.gs-avail-modal-card [data-reveal].is-in {
+    opacity: 1;
+    transform: none;
+    filter: blur(0);
+}
 .gs-avail-modal-title {
     margin: 0 32px 14px 0; font-size: 19px; font-weight: 700;
     font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif !important;
@@ -47,7 +125,11 @@
     border-radius: 10px; color: #fff; font-size: 20px; cursor: pointer;
     transition: background 0.15s ease;
 }
-.gs-avail-modal-close:hover { background: rgba(255, 255, 255, 0.18); }
+.gs-avail-modal-close:hover {
+    background: rgba(182, 8, 201, 0.28);
+    border-color: var(--gph-magenta, #b608c9);
+    box-shadow: 0 0 14px rgba(182, 8, 201, 0.5);
+}
 .gs-avail-modal-body { width: 100%; }
 
 /* When the settings card lives inside a modal, drop the standalone panel chrome
@@ -102,8 +184,17 @@
 .gs-avail-row { margin-bottom: 12px; display: flex; flex-direction: column; gap: 6px; }
 .gs-avail-row label { font-size: 12px; opacity: 0.75; }
 .gs-avail-tz input[type="text"] {
-    background: rgba(0,0,0,0.18); border: 1px solid rgba(255,255,255,0.14); border-radius: 8px;
+    background: rgba(0,0,0,0.28); border: 1px solid rgba(255,255,255,0.16); border-radius: 8px;
     color: inherit; padding: 8px 10px; font-size: 13px; min-width: 240px;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+}
+/* Consistent glass-control focus rings across the whole modal (gph-blue accent). */
+.gs-avail-modal-card input:focus,
+.gs-avail-modal-card select:focus,
+.gs-avail-modal-card textarea:focus {
+    outline: none;
+    border-color: var(--gph-blue, #89C2E0);
+    box-shadow: 0 0 0 2px rgba(137, 194, 224, 0.30);
 }
 
 /* Working-hour grid — desktop: 7 horizontal day columns */
@@ -152,9 +243,16 @@
 /* Save row */
 .gs-avail-actions { margin-top: 16px; display: flex; gap: 12px; align-items: center; }
 .gs-avail-save {
-    background: linear-gradient(135deg, rgba(165,180,252,0.35), rgba(99,102,241,0.45));
-    color: #fff; border: 1px solid rgba(165,180,252,0.45);
-    border-radius: 8px; padding: 8px 16px; font-size: 13px; font-weight: 600; cursor: pointer;
+    background: linear-gradient(135deg, var(--gph-blue, #89C2E0), var(--gph-magenta, #b608c9));
+    color: #fff; border: 0;
+    border-radius: 10px; padding: 10px 20px; font-size: 13px; font-weight: 700; cursor: pointer;
+    box-shadow: 0 8px 22px -8px rgba(182, 8, 201, 0.6);
+    transition: filter 0.15s ease, transform 0.15s ease, box-shadow 0.15s ease;
+}
+.gs-avail-save:hover {
+    filter: brightness(1.1);
+    transform: translateY(-1px);
+    box-shadow: 0 12px 28px -8px rgba(182, 8, 201, 0.75);
 }
 .gs-avail-status { font-size: 12px; opacity: 0.85; }
 
@@ -316,3 +414,22 @@
     cursor: pointer; font-size: 15px; line-height: 1; padding: 0 2px;
 }
 .gs-avail-member-chip__rm:hover { color: #fff; }
+
+/* ─── Reduced-motion: kill the drifting border + cinematic reveals (instant) ─── */
+@media (prefers-reduced-motion: reduce) {
+    .gs-avail-modal {
+        backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+    .gs-avail-modal-card {
+        backdrop-filter: none; -webkit-backdrop-filter: none;
+    }
+    .gs-avail-modal-card::before {
+        animation: none;
+    }
+    .gs-avail-modal-card [data-reveal] {
+        opacity: 1;
+        transform: none;
+        filter: none;
+        transition: none;
+    }
+}
