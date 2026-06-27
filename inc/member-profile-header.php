@@ -31,32 +31,24 @@ function gdc_enqueue_profile_header_styles() {
     wp_enqueue_style( 'gdc-profile-header' );
     wp_add_inline_style( 'gdc-profile-header', gdc_profile_header_css() );
 
-    // The DGEN top-up popup embeds the reward-programs wallet card; pull in that
-    // plugin's stylesheet so the card renders identically here (its CSS vars are
-    // declared on :root, and the card classes are flat BEM, so it stands alone).
-    $wallet_css = WP_CONTENT_DIR . '/plugins/reward-programs/assets/frontend-wallet.css';
-    if ( file_exists( $wallet_css ) ) {
-        wp_enqueue_style( 'gend-wallet-frontend', content_url( '/plugins/reward-programs/assets/frontend-wallet.css' ), [], filemtime( $wallet_css ) );
+    // The DGEN top-up popup embeds the live reward-programs wallet card. We render
+    // the wallet hidden on this page (see gdc_render_profile_header) so the plugin
+    // binds its action buttons + parses card data at init; then the popup relocates
+    // that bound node. So we need the plugin's OWN css + js + GEND_WALLET config.
+    if ( ! is_user_logged_in() ) return;
+    $rp_dir = WP_CONTENT_DIR . '/plugins/reward-programs/assets/';
+    $rp_url = content_url( '/plugins/reward-programs/assets/' );
+    if ( file_exists( $rp_dir . 'frontend-wallet.css' ) ) {
+        wp_enqueue_style( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.css', [], filemtime( $rp_dir . 'frontend-wallet.css' ) );
     }
-}
-
-// Render JUST the DGEN ("transact") wallet card from the [gend_wallet] shortcode,
-// for embedding atop the DGEN top-up popup. Extracts the single card node from
-// the full wallet output so we reuse the source of truth rather than duplicate it.
-function gdc_get_dgen_wallet_card() {
-    if ( ! shortcode_exists( 'gend_wallet' ) || ! class_exists( 'DOMDocument' ) ) return '';
-    $html = do_shortcode( '[gend_wallet]' );
-    if ( ! $html || strpos( $html, 'gend-wallet__balance-card' ) === false ) return '';
-    $prev = libxml_use_internal_errors( true );
-    $doc  = new DOMDocument();
-    $doc->loadHTML( '<?xml encoding="utf-8" ?><div id="gdc-wrap">' . $html . '</div>', LIBXML_NOERROR | LIBXML_NOWARNING );
-    libxml_clear_errors();
-    libxml_use_internal_errors( $prev );
-    $xp = new DOMXPath( $doc );
-    $nodes = $xp->query( '//*[contains(concat(" ", normalize-space(@class), " "), " gend-wallet__balance-card ") and @data-point-type="transact"]' );
-    if ( ! $nodes || ! $nodes->length ) return '';
-    $out = $doc->saveHTML( $nodes->item( 0 ) );
-    return $out ? '<div class="gend-wallet gdc-dgen-wallet-card">' . $out . '</div>' : '';
+    if ( file_exists( $rp_dir . 'frontend-wallet.js' ) ) {
+        wp_enqueue_script( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.js', [ 'jquery' ], filemtime( $rp_dir . 'frontend-wallet.js' ), true );
+        wp_localize_script( 'gend-wallet-frontend', 'GEND_WALLET', [
+            'ajax'  => admin_url( 'admin-ajax.php' ),
+            'nonce' => wp_create_nonce( 'gend_wallet_nonce' ),
+            'i18n'  => [ 'processing' => __( 'Processing…', 'reward-programs' ) ],
+        ] );
+    }
 }
 
 // ─── Wallet Top-Up purchase handler ──────────────────────────────────────────
@@ -929,6 +921,15 @@ function gdc_render_profile_header() {
 
         </div><!-- .gdc-profile-hub -->
 
+        <?php
+        // Hidden wallet source — rendered here (own profile only) so the
+        // reward-programs JS binds its action buttons + parses card data at init.
+        // The DGEN top-up popup relocates this bound .gend-wallet node into itself
+        // (showing only the transact card) and returns it here on close.
+        if ( $is_own_profile && shortcode_exists( 'gend_wallet' ) ) : ?>
+        <div id="gdc-wallet-home" hidden aria-hidden="true"><?php echo do_shortcode( '[gend_wallet]' ); ?></div>
+        <?php endif; ?>
+
         <!-- ── 3. Nav Bar ────────────────────────────────────────────── -->
         <?php
         // Hide the in-page profile tab strip when:
@@ -983,8 +984,7 @@ function gdc_render_profile_header() {
             'dgen'        => ! empty( $topup_enabled['dgen'] ),
             'store'       => ! empty( $topup_enabled['store'] ),
             'shopUrl'     => function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ),
-            'dgenCard'    => $is_own_profile ? gdc_get_dgen_wallet_card() : '',
-            'walletUrl'   => function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'wallet' ) : home_url( '/my-account/wallet/' ),
+            'hasWalletCard' => (bool) ( $is_own_profile && shortcode_exists( 'gend_wallet' ) ),
             'sym'         => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$',
             'taskBalance' => (float) $task_credits,
             'aiBalance'   => (float) $ai_tokens,
@@ -1177,7 +1177,15 @@ function gdc_render_profile_header() {
         }
         function closeOverlay() {
             var o = document.getElementById('gdc-topup-overlay');
-            if (o) { o.classList.add('is-closing'); setTimeout(function(){ o.remove(); }, 220); }
+            // Return the (bound) wallet node to its hidden home so it survives the
+            // overlay removal and stays wired for the next open.
+            if (o) {
+                var w = o.querySelector('.gend-wallet');
+                var home = document.getElementById('gdc-wallet-home');
+                if (w && home) home.appendChild(w);
+                o.classList.add('is-closing');
+                setTimeout(function(){ o.remove(); }, 220);
+            }
             document.removeEventListener('keydown', onEsc);
             // Release the body scroll-lock taken in mount().
             document.documentElement.classList.remove('gdc-tp-lock');
@@ -1307,12 +1315,21 @@ function gdc_render_profile_header() {
             var foot = el('div', 'gdc-tp-foot', 'Pay with card, crypto, or any store gateway &middot; DGEN credited on payment.');
             var rows = [];
             // The live wallet card (balance + Exchange/Transfer/Withdraw/Spend/
-            // History) sits at the very top, with its own staggered entrance.
-            if (CFG.dgenCard) rows.push(el('div', 'gdc-tp-walletcard', CFG.dgenCard));
+            // History, fully functional) sits at the very top with its own
+            // staggered entrance. We relocate the page's bound .gend-wallet node
+            // into this placeholder so its action buttons keep working.
+            var walletSlot = null;
+            if (CFG.hasWalletCard) { walletSlot = el('div', 'gdc-tp-walletcard'); rows.push(walletSlot); }
             rows.push(head, bal, benefits, amtLabel, amt.node, totalRow, go, foot);
             var dlg = dialog('var(--gph-green)', rows);
-            if (CFG.dgenCard) dlg.classList.add('gdc-tp-dialog--wallet');
+            if (CFG.hasWalletCard) dlg.classList.add('gdc-tp-dialog--wallet');
             mount(dlg, 'var(--gph-green)');
+            // Move the bound wallet into the popup (after it is in the DOM).
+            if (walletSlot) {
+                var home = document.getElementById('gdc-wallet-home');
+                var w = home && home.querySelector('.gend-wallet');
+                if (w) { walletSlot.appendChild(w); }
+            }
         }
 
         // ── Task Credits — pick how many credits to buy (or upgrade retainer) ─
@@ -1348,16 +1365,6 @@ function gdc_render_profile_header() {
             if (kind === 'ai' && CFG.ai) return openAI();
             if (kind === 'dgen' && CFG.dgen) return openDGEN();
             if (kind === 'store' && CFG.store) return openShop();
-        });
-
-        // The embedded wallet card's actions (Exchange/Transfer/Withdraw/Spend/
-        // History) operate via the reward-programs modal JS, which only binds on
-        // the real wallet page — so here they route to that page.
-        document.addEventListener('click', function (e) {
-            var b = e.target.closest && e.target.closest('.gdc-dgen-wallet-card [data-modal-action]');
-            if (!b) return;
-            e.preventDefault();
-            if (CFG.walletUrl) window.location.href = CFG.walletUrl;
         });
     }());
     </script>
@@ -1697,19 +1704,21 @@ function gdc_profile_header_css() {
     content: "";
     position: absolute;
     inset: 0;
-    background-size: cover;
-    background-position: center top;
+    background-size: 100% 100%;   /* fill the whole header — 100% width & height */
+    background-position: center center;
+    background-repeat: no-repeat;
     filter: brightness(0.78) saturate(1.35) contrast(1.04);
-    transform: scale(1.08); /* slight overscan for the Ken Burns drift */
+    transform: none;
     z-index: -2;
     pointer-events: none;
-    /* Cinematic backdrop boot: slow zoom + focus-pull rising out of black */
+    /* Cinematic backdrop boot: zoom + focus-pull from black, settling at an
+       exact 100%×100% fill. */
     animation: gdcCoverIn 3s cubic-bezier(0.22,1,0.36,1) both;
 }
 @keyframes gdcCoverIn {
-    from { opacity: 0; transform: scale(1.28); filter: blur(26px) brightness(0)    saturate(1.35) contrast(1.04); }
+    from { opacity: 0; transform: scale(1.14); filter: blur(26px) brightness(0)    saturate(1.35) contrast(1.04); }
     60%  { opacity: 1; }
-    to   { opacity: 1; transform: scale(1.08); filter: blur(0)    brightness(0.78) saturate(1.35) contrast(1.04); }
+    to   { opacity: 1; transform: none;        filter: blur(0)    brightness(0.78) saturate(1.35) contrast(1.04); }
 }
 
 /* ══ CINEMATIC HEADER ENTRANCE ════════════════════════════════════════════
@@ -1781,7 +1790,7 @@ function gdc_profile_header_css() {
         transform: none !important;
         filter: none !important;
     }
-    .gdc-profile-uplink::before { filter: brightness(0.78) saturate(1.35) contrast(1.04) !important; transform: scale(1.08) !important; }
+    .gdc-profile-uplink::before { filter: brightness(0.78) saturate(1.35) contrast(1.04) !important; transform: none !important; background-size: 100% 100% !important; }
     .gdc-boot-fx { display: none !important; }
 }
 .gdc-profile-uplink::after {
@@ -3309,7 +3318,12 @@ html.gdc-tp-lock { overflow: hidden !important; }
    outer .gend-wallet chrome (we only want the card), and reflow the card to a
    wrap layout so it never overflows the narrower popup width. */
 .gdc-tp-dialog--wallet { width: min(720px, 96vw); }
-.gdc-tp-walletcard { width: 100%; }
+.gdc-tp-walletcard {
+    width: 100%;
+    margin-bottom: 26px;
+    padding-bottom: 26px;
+    border-bottom: 1px solid rgba(255,255,255,0.08);
+}
 .gdc-tp-walletcard .gend-wallet {
     background: none !important;
     border: 0 !important;
@@ -3330,6 +3344,28 @@ html.gdc-tp-lock { overflow: hidden !important; }
     display: grid;
     grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
     gap: 8px;
+}
+/* Embed shows ONLY the DGEN card — hide tabs, the overview hero, other panels
+   and every non-transact balance card from the relocated full wallet. */
+.gdc-tp-walletcard .gend-wallet__tabs,
+.gdc-tp-walletcard .gw-hero,
+.gdc-tp-walletcard .economy-control-section,
+.gdc-tp-walletcard .gend-wallet__panel:not(#gwp-overview),
+.gdc-tp-walletcard .gend-wallet__balance-card:not([data-point-type="transact"]) {
+    display: none !important;
+}
+.gdc-tp-walletcard .gend-wallet__panel,
+.gdc-tp-walletcard .gend-wallet__balances {
+    padding: 0 !important;
+    margin: 0 !important;
+    background: none !important;
+    border: 0 !important;
+    display: block !important;
+}
+/* The wallet action modals append to <body>; lift them above the popup overlay. */
+body.gw-modal-open .gw-modal-backdrop,
+body.gw-modal-open .gw-modal {
+    z-index: 2147483647 !important;
 }
 
 @media (max-width: 480px) {
