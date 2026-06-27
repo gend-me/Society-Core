@@ -34,7 +34,11 @@
     width: min(85vw, 760px); max-width: 760px;
     margin: auto;
     max-height: calc(100vh - 80px);
-    overflow-y: auto; overflow-x: hidden;
+    /* The card is now a NON-scrolling fixed FRAME — clip to the rounded corners so
+     * the ::before glowing border + ::after texture enclose the whole popup (top +
+     * bottom + sides) at every scroll position. Scrolling moves to the inner
+     * .gs-avail-modal-body wrapper below; the title stays pinned above it. */
+    overflow: hidden;
     padding: 26px 28px 28px;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 22%, transparent 60%),
@@ -130,7 +134,20 @@
     border-color: var(--gph-magenta, #b608c9);
     box-shadow: 0 0 14px rgba(182, 8, 201, 0.5);
 }
-.gs-avail-modal-body { width: 100%; }
+/* ─── Inner scroller ───
+ * The card is a fixed FRAME; THIS body scrolls inside it so the glowing frame
+ * never scrolls away. Title stays pinned above it inside the card. Capped to fit
+ * within the card under the title (card max-height − card top/bottom padding −
+ * title block height), clips horizontally, and keeps right padding so the
+ * scrollbar doesn't overlap content or the glowing frame. */
+.gs-avail-modal-body {
+    width: 100%;
+    box-sizing: border-box;
+    max-height: calc(100vh - 80px - 26px - 28px - 52px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    padding-right: 6px;
+}
 
 /* When the settings card lives inside a modal, drop the standalone panel chrome
    (border / margin / glow border) — the modal card already provides it. */

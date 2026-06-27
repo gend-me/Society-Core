@@ -44,8 +44,11 @@
     width: 85vw;
     max-width: 1280px;
     max-height: calc(100vh - 64px);
-    overflow-y: auto;
-    overflow-x: hidden;
+    /* The card is now a NON-scrolling fixed FRAME — clip content to the rounded
+     * corners so the ::before glowing border + ::after texture cleanly enclose the
+     * whole popup (top + bottom + sides) at every scroll position. Scrolling moves
+     * to the inner .gs-schedule-scroll wrapper below. */
+    overflow: hidden;
     box-sizing: border-box;
     background:
         linear-gradient(180deg, rgba(255, 255, 255, 0.10) 0%, rgba(255, 255, 255, 0.02) 22%, transparent 60%),
@@ -61,6 +64,24 @@
         0 0 0 1px rgba(137, 194, 224, 0.06),
         inset 0 1px 0 rgba(255, 255, 255, 0.08);
     color: #fff;
+}
+
+/* ─── Inner scroller ───
+ * Holds all the scrollable content (title + form). The card stays a fixed frame;
+ * THIS element scrolls inside it, so the glowing frame never scrolls away. Capped
+ * to the card's inner height (card max-height − the card's 26px top+bottom padding)
+ * and clips horizontally so no second scrollbar appears. Right padding keeps the
+ * vertical scrollbar from overlapping content / the glowing frame. */
+.gs-schedule-scroll {
+    max-height: calc(100vh - 64px - 52px);
+    overflow-y: auto;
+    overflow-x: hidden;
+    box-sizing: border-box;
+    /* Room so content isn't flush against the glowing frame and the scrollbar
+     * doesn't sit on top of the content. */
+    padding-right: 6px;
+    /* Leave clearance under the absolutely-positioned × close button. */
+    padding-top: 4px;
 }
 
 /* Faint futuristic grid/scanline texture + soft corner accent glows. */

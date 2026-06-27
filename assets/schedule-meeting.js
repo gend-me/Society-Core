@@ -228,12 +228,17 @@
                 [ typeBlock, grid, submitBlock ]);
 
             this.modalRoot.innerHTML = '';
-            var card = ce('div', { className: 'gs-schedule-card' }, [closeBtn, title, form]);
+            // The card is a NON-scrolling fixed FRAME (glowing border + texture cover
+            // the whole popup). All scrollable content lives in an inner
+            // .gs-schedule-scroll wrapper; the close × stays pinned to the card.
+            var scroll = ce('div', { className: 'gs-schedule-scroll' }, [title, form]);
+            var card = ce('div', { className: 'gs-schedule-card' }, [closeBtn, scroll]);
             this.modalRoot.appendChild(card);
             this.renderTypeFields();
 
-            // Wire the staggered on-scroll entrance reveals (card is the scroll container).
-            this.setupReveals(card);
+            // Wire the staggered on-scroll entrance reveals against the INNER scroll
+            // container (the IntersectionObserver root must be the scrolling element).
+            this.setupReveals(scroll);
         },
 
         // Click handler for the meeting-type icon buttons: sync state, repaint the

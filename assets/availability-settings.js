@@ -56,14 +56,27 @@
      * opacity + blur); reduced-motion / no-IntersectionObserver → instant reveal.
      * Each modal keeps its own observer so we can disconnect on close (no leaks). */
     function setupReveals(modal) {
-        var scrollEl = modal.card;
+        // The card is a fixed FRAME; the inner body is the scroll container, so the
+        // IntersectionObserver root MUST be the body (not the card) for on-scroll
+        // reveals to fire. The title is pinned in the card (outside the scroller) —
+        // it's revealed immediately below.
+        var scrollEl = modal.body;
         if (modal._revealObserver) { modal._revealObserver.disconnect(); modal._revealObserver = null; }
 
+        // The pinned title lives in the card above the scroller — reveal it instantly.
+        var pinnedTitle = modal.card.querySelector('.gs-avail-modal-title');
+        if (pinnedTitle) {
+            pinnedTitle.setAttribute('data-reveal', '');
+            pinnedTitle.style.setProperty('--rev-i', '0');
+            pinnedTitle.classList.add('is-in');
+        }
+
         // Every item we want to cascade in, in document order. Mirrors the schedule
-        // modal's granularity: title, each section row / day card / blocked row,
-        // each vis row, member chips area, share row, and the save actions.
+        // modal's granularity: each section row / day card / blocked row, each vis
+        // row, member chips area, share row, and the save actions. Queried within
+        // the scrolling body (the observer root).
         var blocks = scrollEl.querySelectorAll(
-            '.gs-avail-modal-title, .gs-avail-tz, .gs-avail-subtitle, ' +
+            '.gs-avail-tz, .gs-avail-subtitle, ' +
             '.gs-avail-day-row, .gs-avail-blocked, ' +
             '.gs-avail-vis-help, .gs-avail-vis-row, .gs-avail-members, .gs-avail-vis-share, ' +
             '.gs-avail-actions'
