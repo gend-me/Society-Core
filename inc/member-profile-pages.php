@@ -1031,6 +1031,53 @@ function gs_wallet_profile_screen() {
     bp_core_load_template( 'members/single/plugins' );
 }
 
+// ── "Invest" profile tab — the wallet's Fund content on its own nav item,
+// placed right after Connections (position 33, between Connections and Wallet=35).
+add_action( 'bp_setup_nav', 'gs_add_invest_profile_tab', 101 );
+function gs_add_invest_profile_tab() {
+    if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
+        return;
+    }
+    bp_core_new_nav_item( [
+        'name'                    => __( 'Invest', 'gend-society' ),
+        'slug'                    => 'invest',
+        'screen_function'         => 'gs_invest_profile_screen',
+        'position'                => 33,
+        'item_css_id'             => 'invest',
+        'show_for_displayed_user' => true,
+    ] );
+}
+
+function gs_invest_profile_screen() {
+    add_action( 'bp_template_title', '__return_empty_string' );
+    add_action( 'bp_template_content', 'gs_invest_profile_screen_content' );
+    bp_core_load_template( 'members/single/plugins' );
+}
+
+function gs_invest_profile_screen_content() {
+    if ( ! bp_is_my_profile() ) {
+        echo '<p>' . esc_html__( 'This is private.', 'gend-society' ) . '</p>';
+        return;
+    }
+    // Wallet CSS/JS are already enqueued on profile pages by
+    // gdc_enqueue_profile_header_styles(). We render the wallet and scope it down
+    // to ONLY the Fund panel — its inline JS auto-loads (loadStats/loadAdmin).
+    ?>
+    <style>
+        .gend-invest-screen .gend-wallet__tabs,
+        .gend-invest-screen #gwp-overview,
+        .gend-invest-screen #gwp-exchange,
+        .gend-invest-screen #gwp-transfer,
+        .gend-invest-screen #gwp-spend,
+        .gend-invest-screen #gwp-withdraw,
+        .gend-invest-screen #gwp-history { display: none !important; }
+        .gend-invest-screen #gwp-fund { display: block !important; }
+        .gend-invest-screen .gend-wallet { background: none !important; border: 0 !important; padding: 0 !important; max-width: none !important; }
+    </style>
+    <div class="gend-invest-screen"><?php echo do_shortcode( '[gend_wallet]' ); ?></div>
+    <?php
+}
+
 function gs_wallet_profile_screen_content() {
     // Only show if it is the current user's profile
     if ( ! bp_is_my_profile() ) {

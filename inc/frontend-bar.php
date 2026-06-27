@@ -727,6 +727,9 @@ function gs_build_frontend_profile_nav()
     $items[] = ['label' => __('Connections', 'gend-society'), 'url' => $base . 'friends/', 'icon' => 'dashicons-networking'];
   }
 
+  // Invest (gend-society custom BP tab — slug 'invest', the wallet Fund content).
+  $items[] = ['label' => __('Invest', 'gend-society'), 'url' => $base . 'invest/', 'icon' => 'dashicons-chart-line'];
+
   // Wallet (gend-society custom BP tab — registered with slug 'member-wallet'
   // in member-profile-pages.php via bp_core_new_nav_item, so URL is
   // /members/<user>/member-wallet/, NOT /wallet/ which 404s).
