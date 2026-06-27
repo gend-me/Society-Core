@@ -30,6 +30,33 @@ function gdc_enqueue_profile_header_styles() {
     wp_register_style( 'gdc-profile-header', false, [], GS_VERSION );
     wp_enqueue_style( 'gdc-profile-header' );
     wp_add_inline_style( 'gdc-profile-header', gdc_profile_header_css() );
+
+    // The DGEN top-up popup embeds the reward-programs wallet card; pull in that
+    // plugin's stylesheet so the card renders identically here (its CSS vars are
+    // declared on :root, and the card classes are flat BEM, so it stands alone).
+    $wallet_css = WP_CONTENT_DIR . '/plugins/reward-programs/assets/frontend-wallet.css';
+    if ( file_exists( $wallet_css ) ) {
+        wp_enqueue_style( 'gend-wallet-frontend', content_url( '/plugins/reward-programs/assets/frontend-wallet.css' ), [], filemtime( $wallet_css ) );
+    }
+}
+
+// Render JUST the DGEN ("transact") wallet card from the [gend_wallet] shortcode,
+// for embedding atop the DGEN top-up popup. Extracts the single card node from
+// the full wallet output so we reuse the source of truth rather than duplicate it.
+function gdc_get_dgen_wallet_card() {
+    if ( ! shortcode_exists( 'gend_wallet' ) || ! class_exists( 'DOMDocument' ) ) return '';
+    $html = do_shortcode( '[gend_wallet]' );
+    if ( ! $html || strpos( $html, 'gend-wallet__balance-card' ) === false ) return '';
+    $prev = libxml_use_internal_errors( true );
+    $doc  = new DOMDocument();
+    $doc->loadHTML( '<?xml encoding="utf-8" ?><div id="gdc-wrap">' . $html . '</div>', LIBXML_NOERROR | LIBXML_NOWARNING );
+    libxml_clear_errors();
+    libxml_use_internal_errors( $prev );
+    $xp = new DOMXPath( $doc );
+    $nodes = $xp->query( '//*[contains(concat(" ", normalize-space(@class), " "), " gend-wallet__balance-card ") and @data-point-type="transact"]' );
+    if ( ! $nodes || ! $nodes->length ) return '';
+    $out = $doc->saveHTML( $nodes->item( 0 ) );
+    return $out ? '<div class="gend-wallet gdc-dgen-wallet-card">' . $out . '</div>' : '';
 }
 
 // ─── Wallet Top-Up purchase handler ──────────────────────────────────────────
@@ -533,10 +560,12 @@ function gdc_render_profile_header() {
             'topup'   => 'dgen',
         ],
         [
-            'label'   => '🇨🇦 Store Credits',
-            'value'   => '$' . number_format( $store_credits, 2 ),
-            'color'   => 'var(--gph-red)',
-            'stagger' => 5,
+            'label'       => '🇨🇦 Store Credits',
+            'value'       => '$' . number_format( $store_credits, 2 ),
+            'color'       => 'var(--gph-red)',
+            'stagger'     => 5,
+            'topup'       => 'store',
+            'topup_label' => 'Spend',
         ],
     ], $user_id );
 
@@ -558,6 +587,8 @@ function gdc_render_profile_header() {
         'ai'    => class_exists( 'AIPA_Commerce' ),
         // DGEN purchase is hub-only; the product/credit hook lives in C&P.
         'dgen'  => class_exists( 'Gend_CP_DGEN_TopUp' ),
+        // Store credits → "Spend" opens the shop (any WooCommerce store).
+        'store' => class_exists( 'WooCommerce' ),
     ];
 
     // ── Linked application row ────────────────────────────────────────────────
@@ -755,14 +786,6 @@ function gdc_render_profile_header() {
             <!-- ── 2. Metrics Port ────────────────────────────────────── -->
             <div class="gdc-metrics-port">
 
-                <!-- Linked app row -->
-                <div class="gdc-kbx gdc-stagger-2" style="--kbx-color: var(--gph-blue)">
-                    <a href="<?php echo esc_url( $linked_app['url'] ); ?>" class="gdc-linked-app-row">
-                        <span class="gdc-linked-app-label"><?php echo esc_html( $linked_app['label'] ); ?></span>
-                        <span class="gdc-linked-app-id"><?php echo esc_html( $linked_app['id'] ); ?></span>
-                    </a>
-                </div>
-
                 <?php if ( $admin_group ) : ?>
                 <!-- Most recent admin group with a linked app -->
                 <div class="gdc-kbx gdc-stagger-3" style="--kbx-color: var(--gph-magenta)">
@@ -894,7 +917,7 @@ function gdc_render_profile_header() {
                                 <span class="gdc-topup-btn__plus" aria-hidden="true">
                                     <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
                                 </span>
-                                <span class="gdc-topup-btn__label">Top Up</span>
+                                <span class="gdc-topup-btn__label"><?php echo esc_html( $b['topup_label'] ?? 'Top Up' ); ?></span>
                             </button>
                             <?php endif; ?>
                         </div>
@@ -958,10 +981,15 @@ function gdc_render_profile_header() {
             'tasks'       => ! empty( $topup_enabled['tasks'] ),
             'ai'          => ! empty( $topup_enabled['ai'] ),
             'dgen'        => ! empty( $topup_enabled['dgen'] ),
+            'store'       => ! empty( $topup_enabled['store'] ),
+            'shopUrl'     => function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ),
+            'dgenCard'    => $is_own_profile ? gdc_get_dgen_wallet_card() : '',
+            'walletUrl'   => function_exists( 'wc_get_account_endpoint_url' ) ? wc_get_account_endpoint_url( 'wallet' ) : home_url( '/my-account/wallet/' ),
             'sym'         => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$',
             'taskBalance' => (float) $task_credits,
             'aiBalance'   => (float) $ai_tokens,
             'dgenBalance' => (float) $dgen_balance,
+            'storeBalance'=> (float) $store_credits,
             'creditValue' => (float) $gdc_task_credit_rate,
             'retainerUrl' => ( $task_topup_pid && function_exists( 'get_permalink' ) ) ? ( get_permalink( $task_topup_pid ) ?: '' ) : '',
             'checkoutUrl' => function_exists( 'wc_get_checkout_url' ) ? wc_get_checkout_url() : home_url( '/checkout/' ),
@@ -1008,6 +1036,131 @@ function gdc_render_profile_header() {
             frame.src = url;
             d.appendChild(frame);
             var fb = el('div', 'gdc-tp-foot', 'Trouble loading? <a href="' + url + '" target="_blank" rel="noopener">Open checkout in a new tab &rarr;</a>');
+            d.appendChild(fb);
+            mount(d, accent);
+        }
+
+        // ── Store Credits → Spend: a big cinematic popup that embeds /shop ──
+        // Same-origin, so we reach into the iframe to (a) strip the site chrome
+        // we don't want in the embed and (b) scroll-reveal each product.
+
+        // Hide the top header (logo + hamburger) and the bottom-right chat bubble,
+        // and the bottom-left profile orb — but KEEP the floating cart.
+        function styleShopEmbed(frame) {
+            var doc, win;
+            try { win = frame.contentWindow; doc = frame.contentDocument || win.document; } catch (e) { return; }
+            if (!doc || !doc.head) return;
+            if (!doc.getElementById('gdc-shop-embed')) {
+                var css = doc.createElement('style');
+                css.id = 'gdc-shop-embed';
+                css.textContent =
+                    /* top header: gend.me logo (top-left) + hamburger (top-right) */
+                    '#main-3d-header,.header-anchor-wrap{display:none!important;}' +
+                    /* AI / chat widget bubble (bottom-right) */
+                    'aipa-widget,leo-widget,[class*="leo-launcher"],[class*="chat-launcher"],' +
+                    '[id*="chat-launcher"],[class*="cf-launcher"],[id*="cf-launcher"],' +
+                    '[class*="chat-widget"],[id*="chat-widget"]{display:none!important;}' +
+                    'html,body{margin-top:0!important;padding-top:0!important;}';
+                doc.head.appendChild(css);
+            }
+            // The profile orb is a fixed/sticky launcher carrying a user avatar,
+            // sitting by the cart. Hide it; never touch anything cart-related.
+            function sweep() {
+                var nodes;
+                try { nodes = doc.querySelectorAll('body > *, body > * > *'); } catch (e) { return; }
+                Array.prototype.forEach.call(nodes, function (n) {
+                    var cs;
+                    try { cs = win.getComputedStyle(n); } catch (e) { return; }
+                    if (!cs || (cs.position !== 'fixed' && cs.position !== 'sticky')) return;
+                    var key = (n.id || '') + ' ' + (n.className && n.className.toString ? n.className.toString() : '');
+                    if (/cart/i.test(key)) return;                       // keep the cart
+                    var img = n.querySelector && n.querySelector('img');
+                    var isProfile = /profile|account|avatar|user-orb|gs-user/i.test(key) ||
+                        (img && /avatar|gravatar|\/uploads\/avatars|user-photo|profile/i.test(img.getAttribute('src') || ''));
+                    if (isProfile) n.style.setProperty('display', 'none', 'important');
+                });
+            }
+            sweep(); setTimeout(sweep, 800); setTimeout(sweep, 2200);    // catch late mounts
+        }
+
+        // The shop is same-origin, so once it loads we reach into the iframe and
+        // give every product a staggered scroll-reveal as it enters view.
+        function injectShopReveal(frame) {
+            var doc, win;
+            try { win = frame.contentWindow; doc = frame.contentDocument || win.document; } catch (e) { return; }
+            if (!doc || !doc.head) return;
+            var st = doc.createElement('style');
+            st.textContent =
+                '.gdc-reveal{opacity:0;transform:translateY(34px) scale(0.985);' +
+                'transition:opacity .7s cubic-bezier(.16,1,.3,1),transform .7s cubic-bezier(.16,1,.3,1);will-change:opacity,transform;}' +
+                '.gdc-reveal.gdc-in{opacity:1;transform:none;}' +
+                '@media (prefers-reduced-motion: reduce){.gdc-reveal{opacity:1!important;transform:none!important;transition:none!important;}}';
+            doc.head.appendChild(st);
+            var sel = 'ul.products li.product, li.product, .wc-block-grid__product, ' +
+                      '.products .product, .wp-block-woocommerce-product-template li, .wc-block-product';
+            var items = doc.querySelectorAll(sel);
+            if (!items.length) return;
+            var IO = win.IntersectionObserver || window.IntersectionObserver;
+            if (!IO) { Array.prototype.forEach.call(items, function (it) { it.classList.add('gdc-reveal', 'gdc-in'); }); return; }
+            var io = new IO(function (entries) {
+                entries.forEach(function (en) {
+                    if (!en.isIntersecting) return;
+                    var idx = +(en.target.getAttribute('data-gdc-i') || 0);
+                    en.target.style.transitionDelay = (Math.min(idx, 6) * 0.07) + 's';
+                    en.target.classList.add('gdc-in');
+                    io.unobserve(en.target);
+                });
+            }, { threshold: 0.06 });
+            Array.prototype.forEach.call(items, function (it, i) {
+                it.classList.add('gdc-reveal');
+                it.setAttribute('data-gdc-i', i % 8);
+                io.observe(it);
+            });
+        }
+
+        function openShop() {
+            var accent = 'var(--gph-red)';
+            var d = el('div', 'gdc-tp-dialog gdc-tp-dialog--shop');
+            d.style.setProperty('--gph-accent', accent);
+            d.appendChild(el('div', 'gdc-tp-scan'));
+            var close = el('button', 'gdc-tp-close', '&times;');
+            close.type = 'button'; close.setAttribute('aria-label', 'Close');
+            close.addEventListener('click', closeOverlay);
+            d.appendChild(close);
+            var bar = el('div', 'gdc-tp-cobar',
+                '<span class="gdc-tp-cobar__dot"></span> Spend Store Credits &middot; ' +
+                '<strong style="color:var(--gph-accent)">' + CFG.sym + fmt(CFG.storeBalance) + '</strong> available');
+            d.appendChild(bar);
+            var loading = el('div', 'gdc-tp-loading', '<div class="gdc-tp-spinner"></div><p class="gdc-tp-loadmsg">Opening the shop&hellip;</p>');
+            d.appendChild(loading);
+            var msgs = ['Opening the shop…', 'Loading the latest products…', 'Applying your store credit…', 'Almost ready…'];
+            var mp = loading.querySelector('.gdc-tp-loadmsg'), mi = 0;
+            var cyc = setInterval(function () { mi = (mi + 1) % msgs.length; if (mp) mp.textContent = msgs[mi]; }, 1400);
+            var frame = el('iframe', 'gdc-tp-frame gdc-tp-frame--shop');
+            frame.setAttribute('title', 'Shop');
+
+            // Reveal as soon as the shop's DOM is PARSED — don't wait for the
+            // full `load` (which blocks on every image + the chat widget bundle,
+            // ~15-20s on a heavy WP page). Same-origin lets us watch readyState.
+            var revealed = false, poll, hard;
+            function reveal() {
+                if (revealed) return; revealed = true;
+                clearInterval(cyc); clearInterval(poll); clearTimeout(hard);
+                loading.style.display = 'none';
+                frame.classList.add('is-loaded');
+                styleShopEmbed(frame);
+                injectShopReveal(frame);
+            }
+            poll = setInterval(function () {
+                var rs;
+                try { rs = frame.contentDocument && frame.contentDocument.readyState; } catch (e) { rs = null; }
+                if (rs === 'interactive' || rs === 'complete') reveal();
+            }, 150);
+            frame.addEventListener('load', reveal);           // fallback / cross-origin
+            hard = setTimeout(reveal, 12000);                 // never hang the loader
+            frame.src = CFG.shopUrl;
+            d.appendChild(frame);
+            var fb = el('div', 'gdc-tp-foot', 'Store credit applies at checkout &middot; <a href="' + CFG.shopUrl + '" target="_blank" rel="noopener">Open the shop in a new tab &rarr;</a>');
             d.appendChild(fb);
             mount(d, accent);
         }
@@ -1152,7 +1305,14 @@ function gdc_render_profile_header() {
                 goCheckout('dgen', { amount: Math.max(1, Math.round(amt.get())) });
             });
             var foot = el('div', 'gdc-tp-foot', 'Pay with card, crypto, or any store gateway &middot; DGEN credited on payment.');
-            mount(dialog('var(--gph-green)', [head, bal, benefits, amtLabel, amt.node, totalRow, go, foot]), 'var(--gph-green)');
+            var rows = [];
+            // The live wallet card (balance + Exchange/Transfer/Withdraw/Spend/
+            // History) sits at the very top, with its own staggered entrance.
+            if (CFG.dgenCard) rows.push(el('div', 'gdc-tp-walletcard', CFG.dgenCard));
+            rows.push(head, bal, benefits, amtLabel, amt.node, totalRow, go, foot);
+            var dlg = dialog('var(--gph-green)', rows);
+            if (CFG.dgenCard) dlg.classList.add('gdc-tp-dialog--wallet');
+            mount(dlg, 'var(--gph-green)');
         }
 
         // ── Task Credits — pick how many credits to buy (or upgrade retainer) ─
@@ -1187,6 +1347,17 @@ function gdc_render_profile_header() {
             if (kind === 'tasks' && CFG.tasks) return openTasks();
             if (kind === 'ai' && CFG.ai) return openAI();
             if (kind === 'dgen' && CFG.dgen) return openDGEN();
+            if (kind === 'store' && CFG.store) return openShop();
+        });
+
+        // The embedded wallet card's actions (Exchange/Transfer/Withdraw/Spend/
+        // History) operate via the reward-programs modal JS, which only binds on
+        // the real wallet page — so here they route to that page.
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest && e.target.closest('.gdc-dgen-wallet-card [data-modal-action]');
+            if (!b) return;
+            e.preventDefault();
+            if (CFG.walletUrl) window.location.href = CFG.walletUrl;
         });
     }());
     </script>
@@ -1516,25 +1687,29 @@ function gdc_profile_header_css() {
     isolation: isolate;
 }
 
-/* ── Cover photo background ──────────────────────────────────────────── */
-/* ::before = blurred cover image (background-image injected via <style>) */
-/* ::after  = dark gradient scrim for legibility                          */
+/* ── Cover photo background (glassmorphic) ───────────────────────────────
+   ::before = the actual Youzify cover image, kept vivid (the glass frosting
+              is done by the ::after backdrop-filter, not by pre-blurring this)
+   ::after  = the frosted-glass sheet: a translucent tint + backdrop blur that
+              turns the live cover image into glassmorphism behind the content
+   ─────────────────────────────────────────────────────────────────────── */
 .gdc-profile-uplink::before {
     content: "";
     position: absolute;
     inset: 0;
     background-size: cover;
     background-position: center top;
-    filter: blur(14px) brightness(0.35) saturate(1.3);
-    transform: scale(1.06); /* hides blur fringing at edges */
+    filter: brightness(0.78) saturate(1.35) contrast(1.04);
+    transform: scale(1.08); /* slight overscan for the Ken Burns drift */
     z-index: -2;
     pointer-events: none;
-    /* Cinematic backdrop boot: slow zoom + focus-pull from black */
-    animation: gdcCoverIn 2.8s cubic-bezier(0.22,1,0.36,1) both;
+    /* Cinematic backdrop boot: slow zoom + focus-pull rising out of black */
+    animation: gdcCoverIn 3s cubic-bezier(0.22,1,0.36,1) both;
 }
 @keyframes gdcCoverIn {
-    from { opacity: 0; transform: scale(1.25); filter: blur(34px) brightness(0)    saturate(1.3); }
-    to   { opacity: 1; transform: scale(1.06); filter: blur(14px) brightness(0.35) saturate(1.3); }
+    from { opacity: 0; transform: scale(1.28); filter: blur(26px) brightness(0)    saturate(1.35) contrast(1.04); }
+    60%  { opacity: 1; }
+    to   { opacity: 1; transform: scale(1.08); filter: blur(0)    brightness(0.78) saturate(1.35) contrast(1.04); }
 }
 
 /* ══ CINEMATIC HEADER ENTRANCE ════════════════════════════════════════════
@@ -1597,6 +1772,7 @@ function gdc_profile_header_css() {
 @media (prefers-reduced-motion: reduce) {
     .gdc-profile-uplink,
     .gdc-profile-uplink::before,
+    .gdc-profile-uplink::after,
     .gdc-identity-wrap,
     .gdc-metrics-port .gdc-kbx,
     .gdc-balance-grid .gdc-kbx {
@@ -1605,21 +1781,41 @@ function gdc_profile_header_css() {
         transform: none !important;
         filter: none !important;
     }
-    .gdc-profile-uplink::before { filter: blur(14px) brightness(0.35) saturate(1.3) !important; transform: scale(1.06) !important; }
+    .gdc-profile-uplink::before { filter: brightness(0.78) saturate(1.35) contrast(1.04) !important; transform: scale(1.08) !important; }
     .gdc-boot-fx { display: none !important; }
 }
 .gdc-profile-uplink::after {
     content: "";
     position: absolute;
     inset: 0;
+    /* Translucent tint — light enough to read the cover through the glass,
+       deepening toward the bottom where the content sits, for legibility. */
     background: linear-gradient(
-        to bottom,
-        rgba(11,14,20,0.40) 0%,
-        rgba(11,14,20,0.68) 55%,
-        rgba(11,14,20,0.92) 100%
+        165deg,
+        rgba(18,24,38,0.22) 0%,
+        rgba(11,14,20,0.46) 52%,
+        rgba(8,11,17,0.74) 100%
     );
+    /* The glassmorphism: frost the live cover image behind this sheet. */
+    -webkit-backdrop-filter: blur(22px) saturate(1.6);
+            backdrop-filter: blur(22px) saturate(1.6);
+    box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); /* crisp glass top edge */
     z-index: -1;
     pointer-events: none;
+    /* Cinematic beat: the cover is glimpsed sharp, then the frost rolls in. */
+    animation: gdcGlassIn 1.9s cubic-bezier(0.16,1,0.3,1) 0.35s both;
+}
+@keyframes gdcGlassIn {
+    from {
+        opacity: 0;
+        -webkit-backdrop-filter: blur(0) saturate(1);
+                backdrop-filter: blur(0) saturate(1);
+    }
+    to {
+        opacity: 1;
+        -webkit-backdrop-filter: blur(22px) saturate(1.6);
+                backdrop-filter: blur(22px) saturate(1.6);
+    }
 }
 
 /* ── Two-column layout ───────────────────────────────────────────────── */
@@ -1815,6 +2011,7 @@ function gdc_profile_header_css() {
 .gdc-metrics-port {
     display: flex;
     flex-direction: column;
+    justify-content: center; /* centre the metrics block against the taller identity column */
     gap: 25px;
 }
 /* Entrance animation applied to the kinetic boxes in the metrics column —
@@ -2774,11 +2971,11 @@ html.gdc-tp-lock { overflow: hidden !important; }
             mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
     -webkit-mask-composite: xor;
             mask-composite: exclude;
-    animation: gdcTpSpin 5s linear infinite;
+    animation: gdcTpRimSpin 5s linear infinite;
     pointer-events: none;
     z-index: 1;
 }
-@keyframes gdcTpSpin { to { --gdc-tp-angle: 360deg; } }
+@keyframes gdcTpRimSpin { to { --gdc-tp-angle: 360deg; } }
 /* Top edge scan-line that sweeps on open */
 .gdc-tp-scan {
     position: absolute;
@@ -3076,6 +3273,64 @@ html.gdc-tp-lock { overflow: hidden !important; }
 }
 .gdc-tp-dialog--checkout .gdc-tp-foot a { color: var(--gph-accent); font-weight: 700; text-decoration: none; }
 .gdc-tp-dialog--checkout .gdc-tp-foot a:hover { text-decoration: underline; }
+
+/* ── Spend / Shop popup — wide cinematic frame embedding /shop ──────────── */
+.gdc-tp-dialog--shop {
+    width: min(1180px, 96vw);
+    height: min(92vh, 980px);
+    padding: 0;
+    overflow: hidden;
+    display: flex;
+    flex-direction: column;
+}
+.gdc-tp-frame--shop {
+    flex: 1 1 auto;
+    width: 100%;
+    border: 0;
+    background: #0a0f1a;
+    opacity: 0;
+    transition: opacity 0.5s ease;
+}
+.gdc-tp-frame--shop.is-loaded { opacity: 1; }
+.gdc-tp-dialog--shop .gdc-tp-foot {
+    flex: 0 0 auto;
+    margin: 0;
+    padding: 10px 20px 14px;
+    border-top: 1px solid rgba(255,255,255,0.06);
+}
+.gdc-tp-dialog--shop .gdc-tp-foot a { color: var(--gph-accent); font-weight: 700; text-decoration: none; }
+.gdc-tp-dialog--shop .gdc-tp-foot a:hover { text-decoration: underline; }
+@media (max-width: 480px) {
+    .gdc-tp-dialog--shop { padding: 0; height: 94vh; }
+}
+
+/* ── Embedded wallet card atop the DGEN popup ──────────────────────────────
+   Widen the dialog so the wallet card breathes, neutralise the wallet-plugin
+   outer .gend-wallet chrome (we only want the card), and reflow the card to a
+   wrap layout so it never overflows the narrower popup width. */
+.gdc-tp-dialog--wallet { width: min(720px, 96vw); }
+.gdc-tp-walletcard { width: 100%; }
+.gdc-tp-walletcard .gend-wallet {
+    background: none !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    max-width: none !important;
+    width: 100% !important;
+}
+.gdc-tp-walletcard .gend-wallet__card-inner {
+    display: flex !important;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 14px 20px;
+}
+.gdc-tp-walletcard .gend-wallet__card-actions {
+    flex: 1 1 100%;
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
+    gap: 8px;
+}
 
 @media (max-width: 480px) {
     .gdc-tp-dialog { padding: 26px 20px 20px; border-radius: 20px; }
