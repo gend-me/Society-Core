@@ -51,6 +51,23 @@ function gdc_enqueue_profile_header_styles() {
     }
 }
 
+// Source wallet for the DGEN top-up popup. Rendered ONCE, late, at body level
+// and kept fully off-screen — the reward-programs JS binds it + parses card data
+// at init, then the popup relocates this bound node in and out of itself. Done
+// via wp_footer (not the header markup) so it cannot duplicate when Youzify fires
+// its before-header hook more than once, and cannot disturb the header/menu.
+add_action( 'wp_footer', 'gdc_render_wallet_source', 5 );
+function gdc_render_wallet_source() {
+    static $done = false;
+    if ( $done ) return;
+    if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() || ! bp_is_my_profile() ) return;
+    if ( ! shortcode_exists( 'gend_wallet' ) ) return;
+    $done = true;
+    echo '<div id="gdc-wallet-home" aria-hidden="true" tabindex="-1" style="position:fixed;left:-99999px;top:0;width:1px;height:1px;overflow:hidden;opacity:0;pointer-events:none;">'
+        . do_shortcode( '[gend_wallet]' )
+        . '</div>';
+}
+
 // ─── Wallet Top-Up purchase handler ──────────────────────────────────────────
 // The three header Top-Up popups navigate (GET) to /?gdc_topup=<kind>… . We run
 // on template_redirect — a FRONTEND request where WooCommerce's cart IS loaded
@@ -921,15 +938,6 @@ function gdc_render_profile_header() {
 
         </div><!-- .gdc-profile-hub -->
 
-        <?php
-        // Hidden wallet source — rendered here (own profile only) so the
-        // reward-programs JS binds its action buttons + parses card data at init.
-        // The DGEN top-up popup relocates this bound .gend-wallet node into itself
-        // (showing only the transact card) and returns it here on close.
-        if ( $is_own_profile && shortcode_exists( 'gend_wallet' ) ) : ?>
-        <div id="gdc-wallet-home" hidden aria-hidden="true"><?php echo do_shortcode( '[gend_wallet]' ); ?></div>
-        <?php endif; ?>
-
         <!-- ── 3. Nav Bar ────────────────────────────────────────────── -->
         <?php
         // Hide the in-page profile tab strip when:
@@ -1366,6 +1374,24 @@ function gdc_render_profile_header() {
             if (kind === 'dgen' && CFG.dgen) return openDGEN();
             if (kind === 'store' && CFG.store) return openShop();
         });
+
+        // The embedded wallet card's action buttons (Exchange/Transfer/Withdraw/
+        // Spend/History) → open the wallet modal directly via the reward-programs
+        // exposed API. Robust regardless of whether the relocated jQuery binding
+        // survived the move into the popup. Capture-phase + stopPropagation so it
+        // fires exactly once even if the wallet's own handler also moved in.
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest && e.target.closest('.gdc-tp-walletcard [data-modal-action]');
+            if (!b) return;
+            e.preventDefault();
+            e.stopPropagation();
+            if (window.GendWallet && typeof window.GendWallet.openModal === 'function') {
+                window.GendWallet.openModal(
+                    b.getAttribute('data-point-type') || 'transact',
+                    b.getAttribute('data-modal-action') || 'overview'
+                );
+            }
+        }, true);
     }());
     </script>
     <?php endif; ?>
@@ -1704,21 +1730,30 @@ function gdc_profile_header_css() {
     content: "";
     position: absolute;
     inset: 0;
-    background-size: 100% 100%;   /* fill the whole header — 100% width & height */
+    background-size: cover;
     background-position: center center;
     background-repeat: no-repeat;
-    filter: brightness(0.78) saturate(1.35) contrast(1.04);
+    /* Sticky/parallax: the cover stays fixed to the viewport as the header
+       scrolls, rather than stretching over the full content height. The
+       section overflow:hidden clips it to the header bounds. (No transform
+       here — a transform on the element would break fixed attachment.) */
+    background-attachment: fixed;
+    filter: brightness(0.98) saturate(1.35) contrast(1.04);
     transform: none;
     z-index: -2;
     pointer-events: none;
-    /* Cinematic backdrop boot: zoom + focus-pull from black, settling at an
-       exact 100%×100% fill. */
+    /* Cinematic backdrop boot: focus-pull rising out of black (opacity + blur
+       only, so fixed attachment is never disturbed). */
     animation: gdcCoverIn 3s cubic-bezier(0.22,1,0.36,1) both;
 }
 @keyframes gdcCoverIn {
-    from { opacity: 0; transform: scale(1.14); filter: blur(26px) brightness(0)    saturate(1.35) contrast(1.04); }
+    from { opacity: 0; filter: blur(26px) brightness(0)    saturate(1.35) contrast(1.04); }
     60%  { opacity: 1; }
-    to   { opacity: 1; transform: none;        filter: blur(0)    brightness(0.78) saturate(1.35) contrast(1.04); }
+    to   { opacity: 1; filter: blur(0)    brightness(0.98) saturate(1.35) contrast(1.04); }
+}
+/* background-attachment: fixed is unreliable on mobile — fall back to scroll */
+@media (max-width: 768px) {
+    .gdc-profile-uplink::before { background-attachment: scroll; }
 }
 
 /* ══ CINEMATIC HEADER ENTRANCE ════════════════════════════════════════════
@@ -1790,7 +1825,7 @@ function gdc_profile_header_css() {
         transform: none !important;
         filter: none !important;
     }
-    .gdc-profile-uplink::before { filter: brightness(0.78) saturate(1.35) contrast(1.04) !important; transform: none !important; background-size: 100% 100% !important; }
+    .gdc-profile-uplink::before { filter: brightness(0.98) saturate(1.35) contrast(1.04) !important; transform: none !important; background-size: cover !important; }
     .gdc-boot-fx { display: none !important; }
 }
 .gdc-profile-uplink::after {
@@ -1801,13 +1836,13 @@ function gdc_profile_header_css() {
        deepening toward the bottom where the content sits, for legibility. */
     background: linear-gradient(
         165deg,
-        rgba(18,24,38,0.22) 0%,
-        rgba(11,14,20,0.46) 52%,
-        rgba(8,11,17,0.74) 100%
+        rgba(18,24,38,0.10) 0%,
+        rgba(11,14,20,0.26) 52%,
+        rgba(8,11,17,0.52) 100%
     );
     /* The glassmorphism: frost the live cover image behind this sheet. */
-    -webkit-backdrop-filter: blur(22px) saturate(1.6);
-            backdrop-filter: blur(22px) saturate(1.6);
+    -webkit-backdrop-filter: blur(9px) saturate(1.45);
+            backdrop-filter: blur(9px) saturate(1.45);
     box-shadow: inset 0 1px 0 rgba(255,255,255,0.06); /* crisp glass top edge */
     z-index: -1;
     pointer-events: none;
@@ -1822,8 +1857,8 @@ function gdc_profile_header_css() {
     }
     to {
         opacity: 1;
-        -webkit-backdrop-filter: blur(22px) saturate(1.6);
-                backdrop-filter: blur(22px) saturate(1.6);
+        -webkit-backdrop-filter: blur(9px) saturate(1.45);
+                backdrop-filter: blur(9px) saturate(1.45);
     }
 }
 
