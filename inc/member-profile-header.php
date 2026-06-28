@@ -460,8 +460,8 @@ function gdc_get_profile_nav_icon( $slug ) {
         'referral-sales'=> '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><line x1="8.2" y1="10.8" x2="15.8" y2="6.2"/><line x1="8.2" y1="13.2" x2="15.8" y2="17.8"/>',
         // Invite — user with plus
         'invite'        => '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><line x1="19" y1="6" x2="19" y2="14"/><line x1="15" y1="10" x2="23" y2="10"/>',
-        // Invest (Fund) — stacked-coin / treasury cylinder
-        'invest'        => '<ellipse cx="12" cy="6" rx="7" ry="3"/><path d="M5 6v6c0 1.7 3.1 3 7 3s7-1.3 7-3V6"/><path d="M5 12v6c0 1.7 3.1 3 7 3s7-1.3 7-3v-6"/>',
+        // Contracts (Fund) — signed document
+        'invest'        => '<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="13" y2="16"/>',
         // Connections (alias to friends visual, kept explicit for clarity)
         'connections'   => '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7.5" x2="11" y2="15.5"/><line x1="16" y1="7.5" x2="13" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/>',
     ];
@@ -740,7 +740,7 @@ function gdc_render_profile_header() {
     // Guarantees placement regardless of where Youzify orders the registered tab.
     if ( bp_is_my_profile() ) {
         $invest_obj = (object) [
-            'name' => 'Invest',
+            'name' => 'Contracts',
             'slug' => 'invest',
             'link' => trailingslashit( bp_displayed_user_domain() ) . 'invest/',
         ];

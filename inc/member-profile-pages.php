@@ -1039,7 +1039,7 @@ function gs_add_invest_profile_tab() {
         return;
     }
     bp_core_new_nav_item( [
-        'name'                    => __( 'Invest', 'gend-society' ),
+        'name'                    => __( 'Contracts', 'gend-society' ),
         'slug'                    => 'invest',
         'screen_function'         => 'gs_invest_profile_screen',
         'position'                => 33,
@@ -1065,6 +1065,8 @@ function gs_invest_profile_screen_content() {
     ?>
     <style>
         .gend-invest-screen .gend-wallet__tabs,
+        .gend-invest-screen .wallet-dashboard-section,
+        .gend-invest-screen #wallet-dashboard-nexus,
         .gend-invest-screen #gwp-overview,
         .gend-invest-screen #gwp-exchange,
         .gend-invest-screen #gwp-transfer,
