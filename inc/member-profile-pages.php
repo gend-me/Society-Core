@@ -1064,6 +1064,7 @@ function gs_invest_profile_screen_content() {
     // to ONLY the Fund panel — its inline JS auto-loads (loadStats/loadAdmin).
     ?>
     <style>
+        /* ── Show only the Fund dashboard ── */
         .gend-invest-screen .gend-wallet__tabs,
         .gend-invest-screen .wallet-dashboard-section,
         .gend-invest-screen #wallet-dashboard-nexus,
@@ -1075,8 +1076,94 @@ function gs_invest_profile_screen_content() {
         .gend-invest-screen #gwp-history { display: none !important; }
         .gend-invest-screen #gwp-fund { display: block !important; }
         .gend-invest-screen .gend-wallet { background: none !important; border: 0 !important; padding: 0 !important; max-width: none !important; }
+
+        /* ══ Glassmorphic futurist dashboard ══════════════════════════════════ */
+        .gend-invest-screen { --gi-accent: #00d2ff; --gi-accent2: #89C2E0; }
+        /* Frosted-glass panels */
+        .gend-invest-screen .gend-fund-col,
+        .gend-invest-screen .gend-wallet__table-wrap,
+        .gend-invest-screen #gend-fund-admin,
+        .gend-invest-screen .gend-fund-card {
+            background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.015)) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(1.3);
+                    backdrop-filter: blur(16px) saturate(1.3);
+            border: 1px solid rgba(255,255,255,.12) !important;
+            border-radius: 18px !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7) !important;
+        }
+        .gend-invest-screen .gend-wallet__table-wrap { overflow: hidden; }
+        /* Glass stat tiles + neon top rail + hover lift */
+        .gend-invest-screen .gend-wallet__stat {
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,.1);
+            border-radius: 14px; padding: 14px 16px;
+            position: relative; overflow: hidden;
+            transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease, border-color .35s ease;
+        }
+        .gend-invest-screen .gend-wallet__stat::before {
+            content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 100%;
+            background: linear-gradient(90deg, transparent, var(--gi-accent), transparent); opacity: .55;
+        }
+        .gend-invest-screen .gend-wallet__stat:hover {
+            transform: translateY(-3px); border-color: rgba(0,210,255,.4);
+            box-shadow: 0 16px 36px -18px rgba(0,210,255,.5);
+        }
+        .gend-invest-screen .gend-wallet__stat-value { color: #fff; }
+        /* Glass cards hover lift */
+        .gend-invest-screen .gend-fund-card { transition: transform .4s cubic-bezier(.22,1,.36,1), box-shadow .4s ease, border-color .4s ease; }
+        .gend-invest-screen .gend-fund-card:hover {
+            transform: translateY(-5px); border-color: rgba(0,210,255,.4) !important;
+            box-shadow: 0 26px 55px -24px rgba(0,210,255,.45) !important;
+        }
+        .gend-invest-screen .gend-wallet__table th { color: var(--gi-accent2); }
+
+        /* ══ Staggered cinematic entrance (reveal on scroll) ══════════════════ */
+        .gend-invest-screen .gi-reveal {
+            opacity: 0; transform: translateY(32px) scale(.985); filter: blur(6px);
+            transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1), filter .8s ease;
+            will-change: opacity, transform;
+        }
+        .gend-invest-screen .gi-reveal.gi-in { opacity: 1; transform: none; filter: none; }
+        /* cascade siblings within their container */
+        .gend-invest-screen .gi-reveal:nth-child(1){transition-delay:.04s}
+        .gend-invest-screen .gi-reveal:nth-child(2){transition-delay:.10s}
+        .gend-invest-screen .gi-reveal:nth-child(3){transition-delay:.16s}
+        .gend-invest-screen .gi-reveal:nth-child(4){transition-delay:.22s}
+        .gend-invest-screen .gi-reveal:nth-child(5){transition-delay:.28s}
+        .gend-invest-screen .gi-reveal:nth-child(6){transition-delay:.34s}
+        .gend-invest-screen .gi-reveal:nth-child(7){transition-delay:.40s}
+        .gend-invest-screen .gi-reveal:nth-child(8){transition-delay:.46s}
+        @media (prefers-reduced-motion: reduce) {
+            .gend-invest-screen .gi-reveal { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; }
+        }
     </style>
     <div class="gend-invest-screen"><?php echo do_shortcode( '[gend_wallet]' ); ?></div>
+    <script>
+    (function () {
+        var screen = document.querySelector('.gend-invest-screen');
+        if (!screen) return;
+        // Every dashboard block + tile + card + table gets a staggered scroll-reveal.
+        var SEL = '.gw-hero, .gend-fund-col, .gend-wallet__stat, .gend-fund-tabs,' +
+                  '.gend-fund-subtabs, .gend-fund-panel, .gend-fund-card,' +
+                  '.gend-wallet__table-wrap, #gend-fund-admin';
+        var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function (ents) {
+            ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('gi-in'); io.unobserve(en.target); } });
+        }, { threshold: 0.06 }) : null;
+        function tag() {
+            screen.querySelectorAll(SEL).forEach(function (el) {
+                if (el.classList.contains('gi-reveal')) return;
+                el.classList.add('gi-reveal');
+                if (io) io.observe(el); else el.classList.add('gi-in');
+            });
+        }
+        tag();
+        // The fund loads cards/rows via AJAX — re-tag new nodes as they appear.
+        if (window.MutationObserver) {
+            new MutationObserver(tag).observe(screen, { childList: true, subtree: true });
+        }
+    }());
+    </script>
     <?php
 }
 
