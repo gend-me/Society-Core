@@ -1154,62 +1154,179 @@ function gs_invest_profile_screen_content() {
             content:""; position:absolute; left:0; right:0; top:0; height:2px;
             background: linear-gradient(90deg, transparent, #00d2ff, transparent);
         }
-        .gci-panel { display:none; }
-        .gci-panel.is-active { display:block; animation: gciFade .45s cubic-bezier(.16,1,.3,1); }
+        .gci-panel { display:none !important; }
+        .gci-panel.is-active { display:block !important; animation: gciFade .45s cubic-bezier(.16,1,.3,1); }
         @keyframes gciFade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
     </style>
     <div class="gend-invest-screen gend-contracts-tabbed">
+        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" checked>
+        <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
+        <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
+        <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio">
+        <input type="radio" name="gci-tab" id="gci-tab-completed" class="gci-radio">
         <div class="gci-tabs" role="tablist">
-            <button type="button" class="gci-tab is-active" data-gci-tab="profitshare" role="tab" aria-selected="true"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></button>
-            <button type="button" class="gci-tab" data-gci-tab="completed" role="tab" aria-selected="false"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></button>
+            <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
+            <label for="gci-tab-hold"      class="gci-tab"><?php esc_html_e( 'Currency Hold', 'gend-society' ); ?></label>
+            <label for="gci-tab-growth"    class="gci-tab"><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
+            <label for="gci-tab-projects"  class="gci-tab"><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
+            <label for="gci-tab-completed" class="gci-tab"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></label>
         </div>
-        <div class="gci-panel is-active" data-gci-panel="profitshare" role="tabpanel">
+        <div class="gci-panel gci-panel--fund" role="tabpanel">
             <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
-        <div class="gci-panel" data-gci-panel="completed" role="tabpanel">
+        <div class="gci-panel gci-panel--hold" role="tabpanel"><div class="gci-placeholder"><h3><?php esc_html_e( 'Currency Hold', 'gend-society' ); ?></h3><p><?php esc_html_e( 'Coming soon.', 'gend-society' ); ?></p></div></div>
+        <div class="gci-panel gci-panel--growth" role="tabpanel"><div class="gci-placeholder"><h3><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></h3><p><?php esc_html_e( 'Coming soon.', 'gend-society' ); ?></p></div></div>
+        <div class="gci-panel gci-panel--projects" role="tabpanel"><div class="gci-placeholder"><h3><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></h3><p><?php esc_html_e( 'Coming soon.', 'gend-society' ); ?></p></div></div>
+        <div class="gci-panel gci-panel--completed" role="tabpanel">
             <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
         </div>
     </div>
-    <script>
+    <?php
+}
+
+// CSS + JS for the Contracts screen, output from wp_footer (gated to the 'invest'
+// component) so they are NOT stripped/neutralized by bp_template_content on this
+// screen (the inline copies inside the screen content are not honored there).
+// Tab switching is by INDEX so it survives even if data-attributes are altered.
+add_action( 'wp_footer', 'gs_invest_footer_assets', 50 );
+function gs_invest_footer_assets() {
+    if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
+    if ( ! function_exists( 'bp_current_component' ) || bp_current_component() !== 'invest' ) return;
+    ?>
+    <style id="gci-assets">
+        .gend-invest-screen .gend-wallet__tabs,
+        .gend-invest-screen .wallet-dashboard-section,
+        .gend-invest-screen #wallet-dashboard-nexus,
+        .gend-invest-screen #gwp-overview,
+        .gend-invest-screen #gwp-exchange,
+        .gend-invest-screen #gwp-transfer,
+        .gend-invest-screen #gwp-spend,
+        .gend-invest-screen #gwp-withdraw,
+        .gend-invest-screen #gwp-history { display: none !important; }
+        .gend-invest-screen #gwp-fund { display: block !important; }
+        .gend-invest-screen .gend-wallet { background: none !important; border: 0 !important; padding: 0 !important; max-width: none !important; }
+
+        .gend-invest-screen { --gi-accent: #00d2ff; --gi-accent2: #89C2E0; }
+        .gend-invest-screen .gend-fund-col,
+        .gend-invest-screen .gend-wallet__table-wrap,
+        .gend-invest-screen #gend-fund-admin,
+        .gend-invest-screen .gend-fund-card {
+            background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.015)) !important;
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border: 1px solid rgba(255,255,255,.12) !important; border-radius: 18px !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7) !important;
+        }
+        .gend-invest-screen .gend-wallet__table-wrap { overflow: hidden; }
+        .gend-invest-screen .gend-wallet__stat {
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(10px); backdrop-filter: blur(10px);
+            border: 1px solid rgba(255,255,255,.1); border-radius: 14px; padding: 14px 16px;
+            position: relative; overflow: hidden;
+            transition: transform .35s cubic-bezier(.22,1,.36,1), box-shadow .35s ease, border-color .35s ease;
+        }
+        .gend-invest-screen .gend-wallet__stat::before {
+            content: ""; position: absolute; left: 0; top: 0; height: 2px; width: 100%;
+            background: linear-gradient(90deg, transparent, var(--gi-accent), transparent); opacity: .55;
+        }
+        .gend-invest-screen .gend-wallet__stat:hover { transform: translateY(-3px); border-color: rgba(0,210,255,.4); box-shadow: 0 16px 36px -18px rgba(0,210,255,.5); }
+        .gend-invest-screen .gend-wallet__stat-value { color: #fff; }
+        .gend-invest-screen .gend-fund-card { transition: transform .4s cubic-bezier(.22,1,.36,1), box-shadow .4s ease, border-color .4s ease; }
+        .gend-invest-screen .gend-fund-card:hover { transform: translateY(-5px); border-color: rgba(0,210,255,.4) !important; box-shadow: 0 26px 55px -24px rgba(0,210,255,.45) !important; }
+        .gend-invest-screen .gend-wallet__table th { color: var(--gi-accent2); }
+
+        .gend-invest-screen .gi-reveal { opacity: 0; transform: translateY(32px) scale(.985); filter: blur(6px); transition: opacity .8s cubic-bezier(.16,1,.3,1), transform .8s cubic-bezier(.16,1,.3,1), filter .8s ease; will-change: opacity, transform; }
+        .gend-invest-screen .gi-reveal.gi-in { opacity: 1; transform: none; filter: none; }
+        .gend-invest-screen .gi-reveal:nth-child(1){transition-delay:.04s}
+        .gend-invest-screen .gi-reveal:nth-child(2){transition-delay:.10s}
+        .gend-invest-screen .gi-reveal:nth-child(3){transition-delay:.16s}
+        .gend-invest-screen .gi-reveal:nth-child(4){transition-delay:.22s}
+        .gend-invest-screen .gi-reveal:nth-child(5){transition-delay:.28s}
+        .gend-invest-screen .gi-reveal:nth-child(6){transition-delay:.34s}
+        @media (prefers-reduced-motion: reduce) { .gend-invest-screen .gi-reveal { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; } }
+
+        /* CSS-ONLY radio tabs — switching needs no JS (JS only force-checks the radio as insurance). */
+        .gend-invest-screen .gci-radio { position:absolute; width:1px; height:1px; opacity:0; clip:rect(0 0 0 0); }
+        .gci-tabs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:26px; }
+        .gci-tab {
+            display:inline-flex; align-items:center;
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(12px) saturate(1.3); backdrop-filter: blur(12px) saturate(1.3);
+            border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: 13px 24px;
+            color:#94a3b8; font-family:"Inter",sans-serif; font-size:.74rem; font-weight:800;
+            letter-spacing:1.4px; text-transform:uppercase; cursor:pointer; position:relative; overflow:hidden;
+            transition: color .25s, border-color .25s, box-shadow .25s, transform .25s; user-select:none;
+        }
+        .gci-tab:hover { color:#fff; transform:translateY(-2px); }
+        .gci-panel { display:none !important; }
+        /* active panel via :checked ~ sibling */
+        #gci-tab-fund:checked      ~ .gci-panel--fund,
+        #gci-tab-tasks:checked     ~ .gci-panel--tasks,
+        #gci-tab-hold:checked      ~ .gci-panel--hold,
+        #gci-tab-growth:checked    ~ .gci-panel--growth,
+        #gci-tab-projects:checked  ~ .gci-panel--projects,
+        #gci-tab-completed:checked ~ .gci-panel--completed { display:block !important; animation: gciFade .45s cubic-bezier(.16,1,.3,1); }
+        /* active tab look via :checked ~ label */
+        #gci-tab-fund:checked      ~ .gci-tabs label[for="gci-tab-fund"],
+        #gci-tab-tasks:checked     ~ .gci-tabs label[for="gci-tab-tasks"],
+        #gci-tab-hold:checked      ~ .gci-tabs label[for="gci-tab-hold"],
+        #gci-tab-growth:checked    ~ .gci-tabs label[for="gci-tab-growth"],
+        #gci-tab-projects:checked  ~ .gci-tabs label[for="gci-tab-projects"],
+        #gci-tab-completed:checked ~ .gci-tabs label[for="gci-tab-completed"] {
+            color:#fff; border-color: rgba(0,210,255,.5);
+            box-shadow: 0 14px 32px -16px rgba(0,210,255,.55), inset 0 0 0 1px rgba(0,210,255,.2);
+        }
+        #gci-tab-fund:checked      ~ .gci-tabs label[for="gci-tab-fund"]::before,
+        #gci-tab-tasks:checked     ~ .gci-tabs label[for="gci-tab-tasks"]::before,
+        #gci-tab-hold:checked      ~ .gci-tabs label[for="gci-tab-hold"]::before,
+        #gci-tab-growth:checked    ~ .gci-tabs label[for="gci-tab-growth"]::before,
+        #gci-tab-projects:checked  ~ .gci-tabs label[for="gci-tab-projects"]::before,
+        #gci-tab-completed:checked ~ .gci-tabs label[for="gci-tab-completed"]::before {
+            content:""; position:absolute; left:0; right:0; top:0; height:2px; background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+        }
+        @keyframes gciFade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
+        /* Placeholder panels for the not-yet-built tabs */
+        .gci-placeholder { padding:60px 30px; text-align:center; border-radius:18px;
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            border:1px solid rgba(255,255,255,.12); }
+        .gci-placeholder h3 { margin:0 0 8px; font-size:1.3rem; font-weight:800; color:#fff; }
+        .gci-placeholder p { margin:0; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; font-size:.72rem; }
+    </style>
+    <script id="gci-js">
     (function () {
-        var screen = document.querySelector('.gend-contracts-tabbed');
-        if (!screen) return;
-
-        // Tab switching.
-        var tabs = screen.querySelectorAll('.gci-tab');
-        var panels = screen.querySelectorAll('.gci-panel');
-        tabs.forEach(function (tab) {
-            tab.addEventListener('click', function () {
-                var t = tab.getAttribute('data-gci-tab');
-                tabs.forEach(function (x) { x.classList.remove('is-active'); x.setAttribute('aria-selected', 'false'); });
-                panels.forEach(function (p) { p.classList.remove('is-active'); });
-                tab.classList.add('is-active'); tab.setAttribute('aria-selected', 'true');
-                var p = screen.querySelector('[data-gci-panel="' + t + '"]');
-                if (p) p.classList.add('is-active');
-            });
-        });
-
-        // Staggered scroll-reveal across BOTH panels (fund dashboard + contracts).
-        var SEL = '.gw-hero, .gend-fund-col, .gend-wallet__stat, .gend-fund-tabs,' +
-                  '.gend-fund-subtabs, .gend-fund-panel, .gend-fund-card,' +
-                  '.gend-wallet__table-wrap, #gend-fund-admin,' +
-                  '.gdc-contracts-sales, .gdc-contracts-sales-item,' +
-                  '.psoo-wd-panel, .psoo-pm-orders, .psoo-wd-task-table-wrap';
-        var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function (ents) {
-            ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('gi-in'); io.unobserve(en.target); } });
-        }, { threshold: 0.06 }) : null;
-        function tag() {
-            screen.querySelectorAll(SEL).forEach(function (el) {
-                if (el.classList.contains('gi-reveal')) return;
-                el.classList.add('gi-reveal');
-                if (io) io.observe(el); else el.classList.add('gi-in');
+        // Insurance: force-check the radio when its label is clicked. Native label
+        // activation already does this; this covers any interference. Switching
+        // itself is pure CSS (#radio:checked ~ .gci-panel--x).
+        if (!window.__gciRadioBound) {
+            window.__gciRadioBound = true;
+            document.addEventListener('click', function (e) {
+                var label = (e.target && e.target.closest) ? e.target.closest('label.gci-tab[for]') : null;
+                if (!label) return;
+                var radio = document.getElementById(label.getAttribute('for'));
+                if (radio && !radio.checked) { radio.checked = true; }
             });
         }
-        tag();
-        // Fund + contracts content renders async — re-tag new nodes as they appear.
-        if (window.MutationObserver) {
-            new MutationObserver(tag).observe(screen, { childList: true, subtree: true });
+        function initReveal() {
+            var screen = document.querySelector('.gend-contracts-tabbed');
+            if (!screen || screen.dataset.giInit) return;
+            screen.dataset.giInit = '1';
+            var SEL = '.gw-hero, .gend-fund-col, .gend-wallet__stat, .gend-fund-tabs, .gend-fund-subtabs,' +
+                      '.gend-fund-panel, .gend-fund-card, .gend-wallet__table-wrap, #gend-fund-admin,' +
+                      '.gdc-contracts-sales, .gdc-contracts-sales-item, .psoo-wd-panel, .psoo-pm-orders, .psoo-wd-task-table-wrap';
+            var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function (ents) {
+                ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('gi-in'); io.unobserve(en.target); } });
+            }, { threshold: 0.06 }) : null;
+            function tag() {
+                screen.querySelectorAll(SEL).forEach(function (el) {
+                    if (el.classList.contains('gi-reveal')) return;
+                    el.classList.add('gi-reveal');
+                    if (io) io.observe(el); else el.classList.add('gi-in');
+                });
+            }
+            tag();
+            if (window.MutationObserver) new MutationObserver(tag).observe(screen, { childList: true, subtree: true });
         }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initReveal);
+        else initReveal();
     }());
     </script>
     <?php
