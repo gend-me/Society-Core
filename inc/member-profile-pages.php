@@ -347,7 +347,6 @@ function gdc_inject_profile_page_embed() {
             <?php if ( $has_playlists ) : ?>
             <button type="button" class="gs-overview-tab" data-gs-ov-tab="playlists" role="tab" aria-selected="false"><?php esc_html_e( 'Playlists', 'gend-society' ); ?></button>
             <?php endif; ?>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="contracts" role="tab" aria-selected="false"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></button>
         </div>
 
         <div class="gs-overview-panel is-active" data-gs-ov-panel="cover" role="tabpanel">
@@ -376,9 +375,6 @@ function gdc_inject_profile_page_embed() {
         </div>
         <?php endif; ?>
 
-        <div class="gs-overview-panel" data-gs-ov-panel="contracts" role="tabpanel">
-            <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( $viewed_user_id ); ?>
-        </div>
     </div>
     <?php
     gdc_overview_tabs_assets();
@@ -1137,16 +1133,68 @@ function gs_invest_profile_screen_content() {
         @media (prefers-reduced-motion: reduce) {
             .gend-invest-screen .gi-reveal { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; }
         }
+
+        /* ── Glass tabs (Network Profit Share | Completed Contracts) ── */
+        .gci-tabs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:26px; }
+        .gci-tab {
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(12px) saturate(1.3); backdrop-filter: blur(12px) saturate(1.3);
+            border: 1px solid rgba(255,255,255,.12); border-radius: 14px;
+            padding: 13px 24px; color:#94a3b8; font-family:"Inter",sans-serif;
+            font-size:.74rem; font-weight:800; letter-spacing:1.4px; text-transform:uppercase;
+            cursor:pointer; position:relative; overflow:hidden;
+            transition: color .25s, border-color .25s, box-shadow .25s, transform .25s;
+        }
+        .gci-tab:hover { color:#fff; transform:translateY(-2px); }
+        .gci-tab.is-active {
+            color:#fff; border-color: rgba(0,210,255,.5);
+            box-shadow: 0 14px 32px -16px rgba(0,210,255,.55), inset 0 0 0 1px rgba(0,210,255,.2);
+        }
+        .gci-tab.is-active::before {
+            content:""; position:absolute; left:0; right:0; top:0; height:2px;
+            background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+        }
+        .gci-panel { display:none; }
+        .gci-panel.is-active { display:block; animation: gciFade .45s cubic-bezier(.16,1,.3,1); }
+        @keyframes gciFade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
     </style>
-    <div class="gend-invest-screen"><?php echo do_shortcode( '[gend_wallet]' ); ?></div>
+    <div class="gend-invest-screen gend-contracts-tabbed">
+        <div class="gci-tabs" role="tablist">
+            <button type="button" class="gci-tab is-active" data-gci-tab="profitshare" role="tab" aria-selected="true"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></button>
+            <button type="button" class="gci-tab" data-gci-tab="completed" role="tab" aria-selected="false"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></button>
+        </div>
+        <div class="gci-panel is-active" data-gci-panel="profitshare" role="tabpanel">
+            <?php echo do_shortcode( '[gend_wallet]' ); ?>
+        </div>
+        <div class="gci-panel" data-gci-panel="completed" role="tabpanel">
+            <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
+        </div>
+    </div>
     <script>
     (function () {
-        var screen = document.querySelector('.gend-invest-screen');
+        var screen = document.querySelector('.gend-contracts-tabbed');
         if (!screen) return;
-        // Every dashboard block + tile + card + table gets a staggered scroll-reveal.
+
+        // Tab switching.
+        var tabs = screen.querySelectorAll('.gci-tab');
+        var panels = screen.querySelectorAll('.gci-panel');
+        tabs.forEach(function (tab) {
+            tab.addEventListener('click', function () {
+                var t = tab.getAttribute('data-gci-tab');
+                tabs.forEach(function (x) { x.classList.remove('is-active'); x.setAttribute('aria-selected', 'false'); });
+                panels.forEach(function (p) { p.classList.remove('is-active'); });
+                tab.classList.add('is-active'); tab.setAttribute('aria-selected', 'true');
+                var p = screen.querySelector('[data-gci-panel="' + t + '"]');
+                if (p) p.classList.add('is-active');
+            });
+        });
+
+        // Staggered scroll-reveal across BOTH panels (fund dashboard + contracts).
         var SEL = '.gw-hero, .gend-fund-col, .gend-wallet__stat, .gend-fund-tabs,' +
                   '.gend-fund-subtabs, .gend-fund-panel, .gend-fund-card,' +
-                  '.gend-wallet__table-wrap, #gend-fund-admin';
+                  '.gend-wallet__table-wrap, #gend-fund-admin,' +
+                  '.gdc-contracts-sales, .gdc-contracts-sales-item,' +
+                  '.psoo-wd-panel, .psoo-pm-orders, .psoo-wd-task-table-wrap';
         var io = ('IntersectionObserver' in window) ? new IntersectionObserver(function (ents) {
             ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('gi-in'); io.unobserve(en.target); } });
         }, { threshold: 0.06 }) : null;
@@ -1158,7 +1206,7 @@ function gs_invest_profile_screen_content() {
             });
         }
         tag();
-        // The fund loads cards/rows via AJAX — re-tag new nodes as they appear.
+        // Fund + contracts content renders async — re-tag new nodes as they appear.
         if (window.MutationObserver) {
             new MutationObserver(tag).observe(screen, { childList: true, subtree: true });
         }
