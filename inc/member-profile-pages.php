@@ -1237,7 +1237,6 @@ function gs_invest_profile_screen_content() {
             background: linear-gradient(90deg, transparent, #00d2ff, transparent);
         }
         .gci-panel { display:none !important; }
-        .gci-panel.is-active { display:block !important; animation: gciFade .45s cubic-bezier(.16,1,.3,1); }
         @keyframes gciFade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
     </style>
     <div class="gend-invest-screen gend-contracts-tabbed">
@@ -1327,8 +1326,9 @@ function gs_invest_footer_assets() {
         @media (prefers-reduced-motion: reduce) { .gend-invest-screen .gi-reveal { opacity: 1 !important; transform: none !important; filter: none !important; transition: none !important; } }
 
         /* CSS-ONLY radio tabs — switching needs no JS (JS only force-checks the radio as insurance). */
+        .gend-contracts-tabbed { padding-top: 34px; }
         .gend-invest-screen .gci-radio { position:absolute; width:1px; height:1px; opacity:0; clip:rect(0 0 0 0); }
-        .gci-tabs { display:flex; flex-wrap:wrap; gap:10px; margin-bottom:26px; }
+        .gci-tabs { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:30px; padding: 4px 2px; }
         .gci-tab {
             display:inline-flex; align-items:center;
             background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
