@@ -187,3 +187,83 @@ add_action('admin_head', function () {
 // Hide WP-admin footer text and version
 add_filter('admin_footer_text', '__return_empty_string', 9999);
 add_filter('update_footer', '__return_empty_string', 9999);
+
+/* ============================================================
+   Phase 63-02 — Chain Gas Rates admin sub-tab styling
+   Namespace: .gs-fiat-gas-rates-*
+   NO new keyframes. NO new external CDN. Emits an inline <style>
+   block on every wp-admin page (the namespace ensures it only
+   affects the Phase 63 sub-tab DOM).
+   ============================================================ */
+add_action( 'admin_head', function () {
+    ?>
+    <style id="gs-fiat-gas-rates-inline-css">
+    .gs-fiat-gas-rates-wrap { max-width: 1300px; }
+    .gs-fiat-gas-rates-intro { margin: 8px 0 4px; opacity: 0.85; }
+    .gs-fiat-gas-rates-flag-state { margin: 0 0 16px; font-size: 0.9em; }
+
+    .gs-fiat-gas-rates-table { width: 100%; margin-top: 12px; border-collapse: collapse; }
+    .gs-fiat-gas-rates-table th { text-align: left; font-weight: 600; padding: 8px 10px; background: rgba(255,255,255,0.04); border-bottom: 1px solid rgba(255,255,255,0.12); color: #e6edf7; }
+    .gs-fiat-gas-rates-table td { padding: 8px 10px; vertical-align: middle; border-bottom: 1px solid rgba(255,255,255,0.06); }
+    .gs-fiat-gas-rates-row { background: transparent; }
+    .gs-fiat-gas-rates-row:hover { background: rgba(255,255,255,0.03); }
+
+    .gs-fiat-gas-rates-cell-rail { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 0.95em; min-width: 8em; }
+
+    .gs-fiat-gas-rates-cell-edit { padding-left: 10px; padding-right: 10px; }
+    .gs-fiat-gas-rates-form { display: inline-block; width: 100%; }
+    .gs-fiat-gas-rates-form-deactivate { display: inline-block; margin-left: 8px; vertical-align: middle; }
+    .gs-fiat-gas-rates-inline-grid {
+        display: grid;
+        grid-template-columns: 6em 9em 9em 5em 1fr 4em 12em auto;
+        gap: 10px;
+        align-items: center;
+    }
+    .gs-fiat-gas-rates-inline-field { display: block; }
+    .gs-fiat-gas-rates-inline-notes { min-width: 0; }
+
+    .gs-fiat-gas-rates-input-currency { width: 100%; text-transform: uppercase; }
+    .gs-fiat-gas-rates-input-amount { width: 100%; text-align: right; }
+    .gs-fiat-gas-rates-input-notes { width: 100%; }
+
+    .gs-fiat-gas-rates-active { color: #00d27a; font-weight: 600; }
+    .gs-fiat-gas-rates-inactive { color: #ff5e6c; font-weight: 600; }
+
+    .gs-fiat-gas-rates-cell-actions { white-space: nowrap; }
+    .gs-fiat-gas-rates-save { margin-right: 4px; }
+    .gs-fiat-gas-rates-deactivate { color: #ff5e6c; border-color: rgba(255,94,108,0.4) !important; }
+
+    .gs-fiat-gas-rates-add-heading { margin-top: 28px; color: #e6edf7; }
+    .gs-fiat-gas-rates-add-form {
+        display: flex; flex-wrap: wrap; gap: 12px; align-items: flex-end;
+        padding: 14px; background: rgba(20,24,34,0.55);
+        border: 1px solid rgba(255,255,255,0.10); border-radius: 10px;
+        backdrop-filter: blur(20px) saturate(160%);
+        -webkit-backdrop-filter: blur(20px) saturate(160%);
+    }
+    .gs-fiat-gas-rates-add-form label { display: flex; flex-direction: column; font-size: 0.9em; gap: 4px; color: #e6edf7; }
+    .gs-fiat-gas-rates-add-form input,
+    .gs-fiat-gas-rates-add-form select { padding: 4px 8px; }
+
+    .gs-fiat-gas-rates-notice { margin: 12px 0; }
+    .gs-fiat-gas-rates-empty td { font-style: italic; opacity: 0.7; }
+
+    @media (max-width: 900px) {
+        .gs-fiat-gas-rates-inline-grid {
+            grid-template-columns: 1fr 1fr;
+        }
+        .gs-fiat-gas-rates-inline-notes { grid-column: 1 / -1; }
+    }
+    @media (max-width: 768px) {
+        .gs-fiat-gas-rates-table thead { display: none; }
+        .gs-fiat-gas-rates-table tr { display: block; margin-bottom: 12px; padding: 8px; border: 1px solid rgba(255,255,255,0.10); border-radius: 8px; }
+        .gs-fiat-gas-rates-table td { display: block; padding: 6px 0; border-bottom: none; }
+        .gs-fiat-gas-rates-table td[data-label]::before { content: attr(data-label) ": "; font-weight: 600; opacity: 0.8; }
+        .gs-fiat-gas-rates-inline-grid { grid-template-columns: 1fr; }
+        .gs-fiat-gas-rates-input-amount,
+        .gs-fiat-gas-rates-input-notes,
+        .gs-fiat-gas-rates-input-currency { width: 100%; }
+    }
+    </style>
+    <?php
+} );

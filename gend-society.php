@@ -328,3 +328,11 @@ require_once GS_DIR . 'inc/user-profile-router.php';
 // Feature-access upgrade prompt page — shown when a customer hits a
 // wp-admin area their current Dashboard plan doesn't include.
 require_once GS_DIR . 'inc/pages/feature-upgrade.php';
+
+// Phase 63-02 — Hosting > Chain Gas Rates admin sub-tab (super-admin
+// only). Loads ONLY in wp-admin (perf microoptim) and only when the
+// Plan 63-01 charger class file is present (file_exists guard tolerates
+// pre-Plan-63-01 PVCs and rollback windows per project_hub_plugin_sync_gotcha).
+if ( is_admin() && file_exists( GS_DIR . 'inc/admin/fiat-gas-rates-tab.php' ) ) {
+	require_once GS_DIR . 'inc/admin/fiat-gas-rates-tab.php';
+}
