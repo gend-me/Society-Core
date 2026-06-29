@@ -1050,6 +1050,88 @@ function gs_invest_profile_screen() {
     bp_core_load_template( 'members/single/plugins' );
 }
 
+/**
+ * Currency Hold tab — the DGEN Accelerator (yDGEN) from the member's view:
+ * holdings, claimable yield, return %, and the auto-facilitated yield summary
+ * (earned this month / last payout / lifetime / next payout). Rendered via the
+ * contracts-and-payments yDGEN display classes.
+ */
+function gci_render_currency_hold( $uid ) {
+    $uid = (int) $uid;
+    if ( ! class_exists( 'Gend_CP_yDGEN_Display' ) ) {
+        return '<div class="gci-placeholder"><h3>' . esc_html__( 'Currency Hold', 'gend-society' ) . '</h3><p>' . esc_html__( 'The DGEN Accelerator is not available.', 'gend-society' ) . '</p></div>';
+    }
+    $dgen = function_exists( 'mycred_get_users_balance' ) ? (float) mycred_get_users_balance( $uid, 'transact' ) : 0.0;
+    $out  = '<div class="gci-currency-hold">';
+    // Intro — explains the accelerator so the tab reads clearly even before any
+    // yield has accrued.
+    $out .= '<div class="gci-hold-intro">'
+        . '<div class="gci-hold-intro__head"><span class="gci-hold-badge">' . esc_html__( 'DGEN Accelerator · Active', 'gend-society' ) . '</span></div>'
+        . '<h3>' . esc_html__( 'Your DGEN is working for you', 'gend-society' ) . '</h3>'
+        . '<p>' . esc_html__( 'Held DGEN automatically earns yield through the network treasury — the currency-holding exchanges are facilitated for you, and your interest accrues and pays out without any action needed.', 'gend-society' ) . '</p>'
+        . '<div class="gci-hold-balance"><span class="gci-hold-balance__label">' . esc_html__( 'Currently holding', 'gend-society' ) . '</span><span class="gci-hold-balance__value">' . esc_html( number_format_i18n( $dgen, 2 ) ) . ' <small>DGEN</small></span></div>'
+        . '</div>';
+    $out .= Gend_CP_yDGEN_Display::render_card( $uid );
+    if ( class_exists( 'Gend_CP_yDGEN_Return_Display' ) ) {
+        $out .= Gend_CP_yDGEN_Return_Display::render_return( $uid );
+        ob_start();
+        Gend_CP_yDGEN_Return_Display::render_yield_summary( $uid );
+        $out .= ob_get_clean();
+    }
+    $out .= '</div>';
+    return $out;
+}
+
+/**
+ * Growth Investments tab — a marketplace list of OPEN growth-investment funding
+ * requests across every web app (group) that has put one out to market.
+ */
+function gci_render_growth_market() {
+    if ( ! class_exists( 'PSOO_Funding_Requests' ) || ! function_exists( 'groups_get_groupmeta' ) ) {
+        return '<div class="gci-placeholder"><h3>' . esc_html__( 'Growth Investments', 'gend-society' ) . '</h3><p>' . esc_html__( 'Unavailable.', 'gend-society' ) . '</p></div>';
+    }
+    global $wpdb;
+    $gmeta = ( function_exists( 'buddypress' ) && isset( buddypress()->groups->table_name_groupmeta ) )
+        ? buddypress()->groups->table_name_groupmeta
+        : $wpdb->prefix . 'bp_groups_groupmeta';
+    $group_ids = $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT group_id FROM {$gmeta} WHERE meta_key = %s", PSOO_Funding_Requests::META_KEY ) ); // phpcs:ignore
+
+    $cards = '';
+    foreach ( (array) $group_ids as $gid ) {
+        $gid = (int) $gid;
+        foreach ( PSOO_Funding_Requests::get_open( $gid ) as $req ) {
+            if ( ( $req['type'] ?? '' ) !== 'growth_investment' ) {
+                continue;
+            }
+            $req   = PSOO_Funding_Requests::hydrate( $gid, $req );
+            $group = function_exists( 'groups_get_group' ) ? groups_get_group( $gid ) : null;
+            $name  = ( $group && ! empty( $group->name ) ) ? $group->name : ( '#' . $gid );
+            $url   = ( $group && function_exists( 'bp_get_group_permalink' ) ) ? bp_get_group_permalink( $group ) : '';
+            $pct   = (float) ( $req['payload']['commission_pct'] ?? 0 );
+
+            $cards .= '<div class="gci-growth-card">'
+                . '<div class="gci-growth-card__head"><span class="gci-growth-badge">' . esc_html__( 'Growth', 'gend-society' ) . '</span>'
+                . '<span class="gci-growth-app">' . esc_html( $name ) . '</span></div>'
+                . '<h4 class="gci-growth-title">' . esc_html( (string) ( $req['title'] ?? '' ) ) . '</h4>';
+            if ( ! empty( $req['summary'] ) ) {
+                $cards .= '<p class="gci-growth-summary">' . esc_html( wp_trim_words( wp_strip_all_tags( (string) $req['summary'] ), 28, '…' ) ) . '</p>';
+            }
+            $cards .= '<div class="gci-growth-meta">'
+                . '<span>' . esc_html( sprintf( __( 'Commission %s%%', 'gend-society' ), rtrim( rtrim( number_format( $pct, 2 ), '0' ), '.' ) ) ) . '</span>'
+                . '<span>' . esc_html( sprintf( __( '%s DGEN raised', 'gend-society' ), number_format_i18n( (float) ( $req['raised_dgen'] ?? 0 ), 2 ) ) ) . '</span>'
+                . '</div>';
+            if ( $url ) {
+                $cards .= '<a class="gci-growth-link" href="' . esc_url( $url ) . '">' . esc_html__( 'View contract →', 'gend-society' ) . '</a>';
+            }
+            $cards .= '</div>';
+        }
+    }
+    if ( $cards === '' ) {
+        return '<div class="gci-placeholder"><h3>' . esc_html__( 'Growth Investments', 'gend-society' ) . '</h3><p>' . esc_html__( 'No growth investment contracts on the market yet.', 'gend-society' ) . '</p></div>';
+    }
+    return '<div class="gci-growth-grid">' . $cards . '</div>';
+}
+
 function gs_invest_profile_screen_content() {
     if ( ! bp_is_my_profile() ) {
         echo '<p>' . esc_html__( 'This is private.', 'gend-society' ) . '</p>';
@@ -1174,8 +1256,8 @@ function gs_invest_profile_screen_content() {
         <div class="gci-panel gci-panel--fund" role="tabpanel">
             <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
-        <div class="gci-panel gci-panel--hold" role="tabpanel"><div class="gci-placeholder"><h3><?php esc_html_e( 'Currency Hold', 'gend-society' ); ?></h3><p><?php esc_html_e( 'Coming soon.', 'gend-society' ); ?></p></div></div>
-        <div class="gci-panel gci-panel--growth" role="tabpanel"><div class="gci-placeholder"><h3><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></h3><p><?php esc_html_e( 'Coming soon.', 'gend-society' ); ?></p></div></div>
+        <div class="gci-panel gci-panel--hold" role="tabpanel"><?php echo gci_render_currency_hold( (int) bp_displayed_user_id() ); // phpcs:ignore ?></div>
+        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gci_render_growth_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--projects" role="tabpanel"><div class="gci-placeholder"><h3><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></h3><p><?php esc_html_e( 'Coming soon.', 'gend-society' ); ?></p></div></div>
         <div class="gci-panel gci-panel--completed" role="tabpanel">
             <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
@@ -1290,7 +1372,50 @@ function gs_invest_footer_assets() {
             border:1px solid rgba(255,255,255,.12); }
         .gci-placeholder h3 { margin:0 0 8px; font-size:1.3rem; font-weight:800; color:#fff; }
         .gci-placeholder p { margin:0; color:#94a3b8; letter-spacing:1px; text-transform:uppercase; font-size:.72rem; }
+
+        /* ── Growth Investments marketplace cards ── */
+        .gci-growth-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(300px,1fr)); gap:18px; }
+        .gci-growth-card {
+            display:flex; flex-direction:column; gap:10px; padding:22px;
+            background: linear-gradient(160deg, rgba(255,255,255,.06), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(255,255,255,.12); border-radius:18px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+            transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s, box-shadow .35s;
+        }
+        .gci-growth-card:hover { transform:translateY(-4px); border-color:rgba(0,210,255,.4); box-shadow:0 26px 55px -24px rgba(0,210,255,.45); }
+        .gci-growth-card__head { display:flex; align-items:center; gap:10px; }
+        .gci-growth-badge { font-size:.62rem; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#0b0e14; background:linear-gradient(135deg,#00d2ff,#89C2E0); padding:4px 10px; border-radius:999px; }
+        .gci-growth-app { font-size:.72rem; color:#94a3b8; letter-spacing:.5px; }
+        .gci-growth-title { margin:0; font-size:1.05rem; font-weight:800; color:#fff; }
+        .gci-growth-summary { margin:0; font-size:.85rem; line-height:1.5; color:#94a3b8; }
+        .gci-growth-meta { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.74rem; color:#cbd5e1; font-family:monospace; }
+        .gci-growth-link { margin-top:6px; align-self:flex-start; color:#00d2ff; font-weight:700; font-size:.8rem; text-decoration:none; }
+        .gci-growth-link:hover { text-decoration:underline; }
+
+        /* ── Currency Hold intro ── */
+        .gci-hold-intro {
+            padding:26px 28px; margin-bottom:22px; border-radius:18px;
+            background: linear-gradient(160deg, rgba(0,210,255,.08), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(0,210,255,.2);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+        }
+        .gci-hold-badge { display:inline-block; font-size:.62rem; font-weight:800; letter-spacing:1.6px; text-transform:uppercase; color:#0b0e14; background:linear-gradient(135deg,#00d2ff,#00ff88); padding:5px 12px; border-radius:999px; }
+        .gci-hold-intro h3 { margin:12px 0 6px; font-size:1.4rem; font-weight:800; color:#fff; }
+        .gci-hold-intro p { margin:0 0 16px; color:#cbd5e1; line-height:1.55; font-size:.9rem; max-width:680px; }
+        .gci-hold-balance { display:flex; flex-direction:column; gap:2px; }
+        .gci-hold-balance__label { font-size:.66rem; letter-spacing:1.4px; text-transform:uppercase; color:#94a3b8; }
+        .gci-hold-balance__value { font-size:2rem; font-weight:800; color:#00ff88; }
+        .gci-hold-balance__value small { font-size:.9rem; color:#94a3b8; font-weight:600; }
     </style>
+    <?php
+    // The yDGEN (Currency Hold) display uses contracts-and-payments styling.
+    $ydgen_css = WP_CONTENT_DIR . '/plugins/contracts-and-payments/assets/css/ydgen-return.css';
+    if ( file_exists( $ydgen_css ) ) {
+        echo '<link rel="stylesheet" href="' . esc_url( content_url( '/plugins/contracts-and-payments/assets/css/ydgen-return.css' ) ) . '?v=' . filemtime( $ydgen_css ) . '">';
+    }
+    ?>
     <script id="gci-js">
     (function () {
         // Insurance: force-check the radio when its label is clicked. Native label
