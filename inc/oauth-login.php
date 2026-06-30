@@ -393,6 +393,11 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
         // is deliberately NOT allow-listed (it stays cookie-gated).
         if ( strpos( $route, '/gs/v1/calendar/public/' ) !== false ) return null;
         if ( strpos( $route, '/gs/v1/calendar/ics/'    ) !== false ) return null;
+        // Phase 71 v10.0 — domain manager REST (gdc-app-manager/v1/install/{id}/hosting/domains/*)
+        // is install-token-gated INSIDE the route's permission_callback (Gend_Domain_REST::check_install_ownership).
+        // Allow-list it past the site-wide auth filter so the install-token check has a chance to run.
+        // NARROW scope: BOTH strpos checks must match — won't allow-list /hosting/backups or other /hosting/* subtrees.
+        if ( strpos( $route, '/gdc-app-manager/v1/install/' ) !== false && strpos( $route, '/hosting/domains' ) !== false ) return null;
     }
     return $result;
 }, 99 );
