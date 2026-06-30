@@ -191,6 +191,99 @@ add_action( 'wp_ajax_gs_membership_domain_remove', function () {
     wp_send_json_success( $r );
 } );
 
+// ─── Phase 72-02: Connect-a-Domain wizard AJAX proxies ─────────────────
+// Each handler wraps gs_remote_membership_call to the new hosting/domains/* REST
+// routes from Phase 72-01. Error responses preserve code+status so wizard JS can
+// distinguish e.g. 409 import_review_required from generic 500.
+
+add_action( 'wp_ajax_gs_membership_domain_connect', function () {
+    gs_membership_ajax_authorize();
+    $domain = isset( $_POST['domain'] ) ? strtolower( trim( wp_unslash( (string) $_POST['domain'] ) ) ) : '';
+    if ( $domain === '' ) {
+        wp_send_json_error( array( 'message' => __( 'Domain required.', 'gend-society' ), 'code' => 'missing_domain' ), 400 );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/connect', array( 'host' => $domain ), 'POST' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    gs_remote_membership_invalidate();
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_import_records', function () {
+    gs_membership_ajax_authorize();
+    $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    if ( $zone_id <= 0 ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/import-records', array(), 'POST' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_records', function () {
+    gs_membership_ajax_authorize();
+    $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    if ( $zone_id <= 0 ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records', array(), 'GET' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_get_nameservers', function () {
+    gs_membership_ajax_authorize();
+    $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    if ( $zone_id <= 0 ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/nameservers', array(), 'GET' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        // CRITICAL: 409 import_review_required surfaces verbatim to wizard JS which jumps UI back to Step 2.
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_get_status', function () {
+    gs_membership_ajax_authorize();
+    $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    if ( $zone_id <= 0 ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/status', array(), 'GET' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_list', function () {
+    gs_membership_ajax_authorize();
+    $r = gs_remote_membership_call( 'hosting/domains', array(), 'GET' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
 // Refresh-cache hook — used after the plan-upgrade popup closes so
 // the new plan appears immediately without waiting out the TTL.
 add_action( 'wp_ajax_gs_membership_refresh', function () {
