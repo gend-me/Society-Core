@@ -210,53 +210,15 @@ function gs_render_hosting_tab( $payload = array() ) {
                 <div class="gs-hosting__feedback" data-gs-hosting-feedback="dashboard"></div>
             </section>
 
-            <!-- ── Domains sub-panel ─────────────────────────────── -->
+            <!-- ── Domains sub-panel (Phase 72-02 — Connect-a-Domain wizard) ─────── -->
             <section class="gs-hosting__panel" data-panel="domains" role="tabpanel">
-                <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Domains', 'gend-society' ); ?></h4>
-                <p class="gs-hosting__section-sub"><?php esc_html_e( 'Add, verify, and remove custom domains. DNS records / SSL provision automatically on verify.', 'gend-society' ); ?></p>
-
-                <form class="gs-mship-form" data-gs-hosting-form="domain-add" style="max-width: 540px;">
-                    <input type="text" name="domain" placeholder="<?php esc_attr_e( 'yourdomain.com', 'gend-society' ); ?>" required style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.1); color:#fff; padding:8px 12px; border-radius:8px; flex:1;">
-                    <button type="submit" class="gs-hosting__btn"><?php esc_html_e( 'Add domain', 'gend-society' ); ?></button>
-                </form>
-
-                <table class="gs-hosting__table" id="gs-hosting-domains-table" style="margin-top: 16px;">
-                    <thead>
-                        <tr>
-                            <th><?php esc_html_e( 'Domain', 'gend-society' ); ?></th>
-                            <th><?php esc_html_e( 'DNS', 'gend-society' ); ?></th>
-                            <th><?php esc_html_e( 'SSL', 'gend-society' ); ?></th>
-                            <th style="width: 1%;"><?php esc_html_e( 'Actions', 'gend-society' ); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
-                        <?php if ( empty( $domains ) ) : ?>
-                            <tr><td colspan="4" style="color:var(--gs-muted, #94a3b8); font-style:italic; padding:18px 12px;"><?php esc_html_e( 'No custom domains added yet.', 'gend-society' ); ?></td></tr>
-                        <?php else : foreach ( $domains as $d ) :
-                            $host        = isset( $d['host'] ) ? (string) $d['host'] : '';
-                            $is_primary  = ! empty( $d['primary'] );
-                            $dns_status  = isset( $d['dns_status'] ) ? (string) $d['dns_status'] : ( ! empty( $d['verified'] ) ? 'ok' : 'pending' );
-                            $ssl_status  = isset( $d['ssl_status'] ) ? (string) $d['ssl_status'] : ( ! empty( $d['ssl'] ) ? 'ok' : 'pending' );
-                        ?>
-                            <tr data-domain="<?php echo esc_attr( $host ); ?>">
-                                <td>
-                                    <strong style="color:#fff;"><?php echo esc_html( $host ); ?></strong>
-                                    <?php if ( $is_primary ) : ?>
-                                        <span class="gs-hosting__pill is-ok" style="margin-left:6px;"><?php esc_html_e( 'Primary', 'gend-society' ); ?></span>
-                                    <?php endif; ?>
-                                </td>
-                                <td><?php echo gs_hosting_render_status_pill( $dns_status ); ?></td>
-                                <td><?php echo gs_hosting_render_status_pill( $ssl_status ); ?></td>
-                                <td style="white-space: nowrap;">
-                                    <button type="button" class="gs-hosting__btn" data-gs-hosting="domain-verify" data-domain="<?php echo esc_attr( $host ); ?>" style="background: rgba(255,255,255,0.08); margin-right: 6px;"><?php esc_html_e( 'Verify', 'gend-society' ); ?></button>
-                                    <button type="button" class="gs-hosting__btn is-danger" data-gs-hosting="domain-remove" data-domain="<?php echo esc_attr( $host ); ?>"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
-                                </td>
-                            </tr>
-                        <?php endforeach; endif; ?>
-                    </tbody>
-                </table>
-
-                <div class="gs-hosting__feedback" data-gs-hosting-feedback="domains"></div>
+                <?php
+                if ( function_exists( 'gs_render_hosting_domains_panel' ) ) {
+                    gs_render_hosting_domains_panel( $payload );
+                } else {
+                    echo '<p style="color: var(--gs-muted, #94a3b8); font-style: italic;">' . esc_html__( 'Domains wizard is not yet deployed on this install. Try again shortly.', 'gend-society' ) . '</p>';
+                }
+                ?>
             </section>
 
             <?php // Compute Gas panel relocated to the top membership tab strip
