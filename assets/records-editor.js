@@ -33,6 +33,13 @@
         editingRecordId: null,
         pendingDeleteRecord: null,
         pendingDeleteWarning: null,
+        // ── Phase 74-02 additions ──
+        pointAtAppInFlight: false,
+        sslStatus: null,              // { overall, edge, origin, dual_stack, polled_at, cached }
+        sslPollTimer: null,           // setTimeout handle
+        sslPollPaused: false,
+        pendingSslWarning: null,      // { code, pendingBody: {...} | null, retryAction: 'point_to_app'|'ssl_mode_set' }
+        advancedOpen: false,
     };
 
     // ── Type metadata ──────────────────────────────────────────────
@@ -195,6 +202,11 @@
         state.editingRecordId = null;
         state.pendingDeleteRecord = null;
         state.pendingDeleteWarning = null;
+        // Phase 74-02: reset SSL state on open.
+        state.pointAtAppInFlight = false;
+        state.sslStatus = null;
+        state.sslPollPaused = false;
+        state.pendingSslWarning = null;
         var modal = $('#gs-records-editor');
         if (!modal || state.zoneId <= 0) { return; }
         modal.hidden = false;
@@ -202,11 +214,21 @@
         if (title) {
             title.textContent = (i18n.modalTitle || 'DNS Records') + (state.zoneHost ? ' — ' + state.zoneHost : '');
         }
+        // Phase 74-02: reveal Point-at-App button + kick off SSL badge poll if we have a host.
+        var pta = $('#gs-records-editor-point-at-app');
+        if (pta && state.zoneHost) { pta.hidden = false; }
         fetchRecords();
+        if (state.zoneHost) { fetchSslStatus(); }
     }
     function closeModal() {
         var modal = $('#gs-records-editor');
         if (modal) { modal.hidden = true; }
+        // Phase 74-02: stop SSL poll + hide chrome BEFORE zeroing state.
+        pauseSslPoll();
+        var badge = $('#gs-records-editor-ssl-badge');
+        if (badge) { badge.hidden = true; }
+        var pta = $('#gs-records-editor-point-at-app');
+        if (pta) { pta.hidden = true; }
         state.zoneId = null;
         state.zoneHost = '';
         state.records = [];
@@ -215,6 +237,9 @@
         state.editingRecordId = null;
         state.pendingDeleteRecord = null;
         state.pendingDeleteWarning = null;
+        state.pointAtAppInFlight = false;
+        state.sslStatus = null;
+        state.pendingSslWarning = null;
     }
 
     // ── Fetch + render list ────────────────────────────────────────
@@ -649,6 +674,210 @@
         } catch (e) { return ''; }
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Phase 74-02 additions — Point-at-App + SSL status + advanced-options.
+    // Vanilla only; extends the Phase 73 state machine byte-additively.
+    // Ship-it-anyway flow surfaces both origin_cert_invalid + flexible_ssl_destructive.
+    // 60s recursive setTimeout poll with visibilitychange pause — matches 74-01 server cache.
+    // ─────────────────────────────────────────────────────────────────
+
+    function showToast(msg) {
+        // No dedicated toast surface in Phase 73 — reuse renderError which is a 6-second
+        // auto-dismissing status pill. Style/severity is CSS-driven via the same slot.
+        renderError(String(msg == null ? '' : msg));
+    }
+
+    function handlePointAtApp() {
+        if (state.pointAtAppInFlight) { return; }
+        var title = i18n.pointAtAppConfirmTitle || 'Route this domain at your app?';
+        var body  = i18n.pointAtAppConfirmBody  || 'This will write apex A + wildcard CNAME + force Full (Strict) SSL.';
+        var confirmed = window.confirm(title + '\n\n' + body);
+        if (!confirmed) { return; }
+        submitPointAtApp(false);
+    }
+
+    function submitPointAtApp(force) {
+        state.pointAtAppInFlight = true;
+        ajaxCall('gs_membership_domain_point_to_app',
+            { host: state.zoneHost, force: force ? 1 : 0 },
+            function (json) {
+                state.pointAtAppInFlight = false;
+                // Full(Strict) fail-safe: server signals origin_cert_invalid + !force → surface Ship-it-anyway modal.
+                if (json && json.ssl_mode_skipped === 'origin_cert_invalid' && !force) {
+                    state.pendingSslWarning = {
+                        code: 'origin_cert_invalid',
+                        pendingBody: null,
+                        retryAction: 'point_to_app'
+                    };
+                    renderSslWarningModal();
+                    return;
+                }
+                showToast(i18n.pointAtAppSuccess || 'Domain pointed at app. SSL provisioning…');
+                fetchSslStatus();
+                fetchRecords();
+            },
+            function (err) {
+                state.pointAtAppInFlight = false;
+                showToast(mapErrorMessage(err) || (i18n.pointAtAppFailed || 'Point-at-app failed. Please retry.'));
+            }
+        );
+    }
+
+    function fetchSslStatus() {
+        if (!state.zoneHost) { return; }
+        ajaxCall('gs_membership_domain_ssl_status',
+            { host: state.zoneHost },
+            function (json) {
+                state.sslStatus = (json && typeof json === 'object') ? json : { overall: 'unknown' };
+                renderSslBadge();
+                scheduleSslPoll();
+            },
+            function () {
+                // Read-path swallow — badge shows 'unknown' fallback; keep polling.
+                state.sslStatus = { overall: 'unknown' };
+                renderSslBadge();
+                scheduleSslPoll();
+            }
+        );
+    }
+
+    function scheduleSslPoll() {
+        if (state.sslPollTimer) { clearTimeout(state.sslPollTimer); state.sslPollTimer = null; }
+        if (state.sslPollPaused) { return; }
+        if (!state.zoneHost) { return; }
+        state.sslPollTimer = setTimeout(function () {
+            if (state.sslPollPaused) { return; }
+            fetchSslStatus();
+        }, 60000);
+    }
+
+    function pauseSslPoll() {
+        state.sslPollPaused = true;
+        if (state.sslPollTimer) { clearTimeout(state.sslPollTimer); state.sslPollTimer = null; }
+    }
+    function resumeSslPoll() {
+        state.sslPollPaused = false;
+        if (state.zoneHost) { fetchSslStatus(); }
+    }
+
+    function renderSslBadge() {
+        var badge = $('#gs-records-editor-ssl-badge');
+        if (!badge) { return; }
+        var overall = (state.sslStatus && state.sslStatus.overall) ? String(state.sslStatus.overall) : 'unknown';
+        badge.hidden = false;
+        badge.setAttribute('data-state', overall);
+        var labelEl = badge.querySelector('.gs-records-editor__ssl-badge-label');
+        // Map overall (snake_case) → i18n key (camelCase) — active_ipv4_only → sslBadgeIpv4Only.
+        var labelKeyMap = {
+            'provisioning':     'sslBadgeProvisioning',
+            'active':           'sslBadgeActive',
+            'mismatched':       'sslBadgeMismatched',
+            'active_ipv4_only': 'sslBadgeIpv4Only',
+            'stale_aaaa':       'sslBadgeStaleAaaa',
+            'unknown':          'sslBadgeUnknown'
+        };
+        var labelKey = labelKeyMap[overall] || 'sslBadgeUnknown';
+        var labelText = i18n[labelKey] || 'Checking…';
+        if (labelEl) { labelEl.textContent = labelText; }
+        // Aggregate tooltip from edge + origin + dual_stack.
+        var edge = (state.sslStatus && state.sslStatus.edge) ? state.sslStatus.edge : { state: '?' };
+        var origin = (state.sslStatus && state.sslStatus.origin) ? state.sslStatus.origin : {};
+        var ds = (state.sslStatus && state.sslStatus.dual_stack) ? state.sslStatus.dual_stack : {};
+        var edgeState = String(edge.state || '?');
+        var originState = origin.cert_valid ? 'valid' : (origin.reason || 'unknown');
+        var ipv4Label = ds.ipv4_ok ? 'ok' : 'no';
+        var ipv6Label = ds.ipv6_ok === true ? 'ok' : (ds.ipv6_ok === false ? 'no' : '?');
+        var t1 = String(i18n.sslBadgeTooltipEdge      || 'Cloudflare edge: {state}').replace('{state}', edgeState);
+        var t2 = String(i18n.sslBadgeTooltipOrigin    || 'Origin cert: {state}').replace('{state}', originState);
+        var t3 = String(i18n.sslBadgeTooltipDualStack || 'IPv4: {ipv4_ok} | IPv6: {ipv6_ok}').replace('{ipv4_ok}', ipv4Label).replace('{ipv6_ok}', ipv6Label);
+        badge.setAttribute('title', t1 + '\n' + t2 + '\n' + t3);
+    }
+
+    function renderSslWarningModal() {
+        if (!state.pendingSslWarning) { return; }
+        var code = state.pendingSslWarning.code;
+        var title = (code === 'flexible_ssl_destructive')
+            ? (i18n.flexibleSslWarnTitle || 'Flexible SSL is unsafe')
+            : (i18n.originCertInvalidTitle || 'Origin cert not yet valid');
+        var body = (code === 'flexible_ssl_destructive')
+            ? (i18n.flexibleSslWarnBody || 'Flexible SSL sends plaintext to origin.')
+            : (i18n.originCertInvalidBody || 'Full (Strict) SSL was NOT enabled.');
+        var shipLabel = (code === 'origin_cert_invalid')
+            ? (i18n.originCertInvalidRetry || 'Enable Full (Strict) anyway')
+            : (i18n.pointAtAppShipItAnyway || 'Ship it anyway');
+        var cancelLabel = i18n.cancel || 'Cancel';
+        // Modal-within-modal — inject into #gs-records-editor-body per Phase 73 destructive-warning pattern.
+        var bodyEl = $('#gs-records-editor-body');
+        if (!bodyEl) { return; }
+        bodyEl.innerHTML =
+            '<div class="gs-records-editor__warning gs-records-editor__warning--ssl" role="alertdialog" aria-modal="true">' +
+            '  <h3 class="gs-records-editor__warning-title">' + escapeHtml(title) + '</h3>' +
+            '  <p class="gs-records-editor__warning-body">' + escapeHtml(body) + '</p>' +
+            '  <div class="gs-records-editor__warning-actions">' +
+            '    <button type="button" class="gs-records-editor__btn is-warning" data-ssl-warning-ship>' + escapeHtml(shipLabel) + '</button>' +
+            '    <button type="button" class="gs-records-editor__btn" data-ssl-warning-cancel>' + escapeHtml(cancelLabel) + '</button>' +
+            '  </div>' +
+            '</div>';
+    }
+
+    function handleSslWarningShipIt() {
+        if (!state.pendingSslWarning) { return; }
+        var warn = state.pendingSslWarning;
+        state.pendingSslWarning = null;
+        if (warn.retryAction === 'point_to_app') {
+            submitPointAtApp(true);
+        } else if (warn.retryAction === 'ssl_mode_set' && warn.pendingBody && warn.pendingBody.mode) {
+            submitSslModeSet(warn.pendingBody.mode, true);
+        }
+        // Redraw the list so the warning modal-within-modal is replaced by the records table.
+        fetchRecords();
+    }
+
+    function handleSslWarningCancel() {
+        state.pendingSslWarning = null;
+        fetchRecords();
+    }
+
+    function handleAdvancedToggle(e) {
+        state.advancedOpen = !!(e.target && e.target.open);
+    }
+
+    function handleSslModeSelectChange(e) {
+        var mode = e.target ? String(e.target.value || '') : '';
+        if (!mode) { return; }
+        submitSslModeSet(mode, false);
+        // Reset select so the user can pick again after the round-trip.
+        if (e.target) { e.target.value = ''; }
+    }
+
+    function submitSslModeSet(mode, force) {
+        ajaxCall('gs_membership_domain_ssl_mode_set',
+            { host: state.zoneHost, mode: mode, force: force ? 1 : 0 },
+            function () {
+                showToast(i18n.pointAtAppSuccess || 'SSL mode change queued.');
+                fetchSslStatus();
+            },
+            function (err) {
+                // Flexible SSL destructive-warning path (409 flexible_ssl_destructive) → modal-within-modal
+                // with Ship-it-anyway → force=true retry.
+                if (err && err.code === 'flexible_ssl_destructive') {
+                    state.pendingSslWarning = {
+                        code: 'flexible_ssl_destructive',
+                        pendingBody: { mode: mode, force: true },
+                        retryAction: 'ssl_mode_set'
+                    };
+                    renderSslWarningModal();
+                    return;
+                }
+                if (err && err.code === 'cf_invalid_argument') {
+                    showToast(i18n.sslModeInvalid || 'Invalid SSL mode.');
+                    return;
+                }
+                showToast(mapErrorMessage(err) || (err && err.message) || 'SSL mode change failed.');
+            }
+        );
+    }
+
     // ── Event wiring ───────────────────────────────────────────────
     function init() {
         // Delegated click handlers.
@@ -683,6 +912,22 @@
                 handleDelete(t.getAttribute('data-delete-record'));
                 return;
             }
+            // ── Phase 74-02 delegated clicks ──
+            if (t.id === 'gs-records-editor-point-at-app' || (t.closest && t.closest('#gs-records-editor-point-at-app'))) {
+                e.preventDefault();
+                handlePointAtApp();
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-ssl-warning-ship')) {
+                e.preventDefault();
+                handleSslWarningShipIt();
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-ssl-warning-cancel')) {
+                e.preventDefault();
+                handleSslWarningCancel();
+                return;
+            }
         });
 
         // Delegated change handler for proxy toggle in the list.
@@ -690,6 +935,29 @@
             var t = e.target;
             if (t && t.hasAttribute && t.hasAttribute('data-toggle-proxy') && !t.disabled) {
                 handleProxyToggle(t.getAttribute('data-record-id'), t.checked);
+                return;
+            }
+            // Phase 74-02: SSL mode select in advanced-options.
+            if (t && t.id === 'gs-records-editor-ssl-mode') {
+                handleSslModeSelectChange(e);
+                return;
+            }
+        });
+
+        // Phase 74-02: <details> toggle event does NOT bubble — must use capture.
+        document.addEventListener('toggle', function (e) {
+            if (e.target && e.target.id === 'gs-records-editor-advanced') {
+                handleAdvancedToggle(e);
+            }
+        }, true);
+
+        // Phase 74-02: pause SSL poll when tab hidden; resume on visible.
+        // Mirrors Phase 72 domains-wizard.js polling pattern.
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                pauseSslPoll();
+            } else if (state.zoneHost) {
+                resumeSslPoll();
             }
         });
 

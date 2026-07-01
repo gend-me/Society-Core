@@ -328,3 +328,149 @@
         display: none;
     }
 }
+
+/* ── Phase 74-02 additions — SSL badge + Point-at-App + advanced-options ──
+   No new keyframe declarations; no jQuery; no third-party deps.
+   6 SSL-badge visual states mirror the 74-01 consolidated overall classifier
+   (provisioning / active / mismatched / active_ipv4_only / stale_aaaa / unknown).
+   MAKE-OR-BREAK invariant: active_ipv4_only is yellow-green (NOT green)
+   so operators never mistake IPv4-only for full "active" dual-stack. */
+
+.gs-records-editor__point-at-app {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin-left: 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(78, 170, 255, 0.4);
+    background: linear-gradient(135deg, #4eaaff 0%, #3a8ce6 100%);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.gs-records-editor__point-at-app:hover {
+    box-shadow: 0 0 12px rgba(78, 170, 255, 0.5);
+}
+.gs-records-editor__point-at-app[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.gs-records-editor__ssl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-left: 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.25);
+    font-size: 0.75rem;
+    color: #e2e8f0;
+    cursor: default;
+    transition: background 0.15s;
+}
+.gs-records-editor__ssl-badge-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    box-shadow: 0 0 4px rgba(148, 163, 184, 0.5);
+}
+.gs-records-editor__ssl-badge-label {
+    line-height: 1;
+}
+.gs-records-editor__ssl-badge[data-state="provisioning"] .gs-records-editor__ssl-badge-dot {
+    background: #94a3b8;
+    box-shadow: 0 0 4px rgba(148, 163, 184, 0.5);
+}
+.gs-records-editor__ssl-badge[data-state="active"] .gs-records-editor__ssl-badge-dot {
+    background: #4ade80;
+    box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+}
+.gs-records-editor__ssl-badge[data-state="active_ipv4_only"] .gs-records-editor__ssl-badge-dot {
+    background: #a3e635;
+    box-shadow: 0 0 4px rgba(163, 230, 53, 0.5);
+}
+.gs-records-editor__ssl-badge[data-state="stale_aaaa"] .gs-records-editor__ssl-badge-dot {
+    background: #fcd34d;
+    box-shadow: 0 0 4px rgba(252, 211, 77, 0.5);
+}
+.gs-records-editor__ssl-badge[data-state="mismatched"] .gs-records-editor__ssl-badge-dot {
+    background: #fb923c;
+    box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
+}
+.gs-records-editor__ssl-badge[data-state="unknown"] .gs-records-editor__ssl-badge-dot {
+    background: transparent;
+    border: 1px solid #94a3b8;
+    box-shadow: none;
+}
+
+.gs-records-editor__advanced {
+    margin: 12px 16px 0;
+    padding: 8px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    font-size: 0.85rem;
+}
+.gs-records-editor__advanced > summary {
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    color: #94a3b8;
+    padding: 4px 0;
+    outline: none;
+}
+.gs-records-editor__advanced[open] > summary {
+    color: #e2e8f0;
+}
+.gs-records-editor__advanced-body {
+    padding: 8px 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.gs-records-editor__ssl-mode-select {
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    max-width: 260px;
+}
+
+/* Ship-it-anyway modal-within-modal — reuses Phase 73 destructive-warning slot. */
+.gs-records-editor__warning--ssl {
+    border-left: 4px solid #fcd34d;
+    padding: 16px;
+    margin: 12px;
+    background: rgba(252, 211, 77, 0.06);
+    border-radius: 8px;
+}
+.gs-records-editor__warning--ssl .gs-records-editor__warning-title {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: #fef3c7;
+}
+.gs-records-editor__warning--ssl .gs-records-editor__warning-body {
+    margin: 0 0 12px;
+    color: #e2e8f0;
+    line-height: 1.4;
+}
+.gs-records-editor__warning--ssl .gs-records-editor__warning-actions {
+    display: flex;
+    gap: 8px;
+}
+.gs-records-editor__btn.is-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #fff;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+}
+.gs-records-editor__btn.is-warning:hover {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
