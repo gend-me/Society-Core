@@ -528,6 +528,78 @@ add_action( 'wp_ajax_gs_membership_domain_ssl_mode_set', function () {
     wp_send_json_success( $r );
 } );
 
+// ────────────────────────────────────────────────────────────────────────
+// Phase 75-02: Email (MX) preset apply + list.
+// 2 new proxies that pipe to Phase 75-01 host-scoped REST routes:
+//   POST /install/{install_id}/hosting/domains/{host}/email-preset
+//   GET  /install/{install_id}/hosting/domains/{host}/email-presets
+// gs_remote_membership_call signature: ($path, $body, $method) with install_id
+// auto-injected from get_option('gs_install_id') inside the helper.
+// Forwards backend response verbatim (200 success, 400 preset_validation_failed,
+// 409 spf_conflict_detected, 500 rolled_back — all pass-through so records-editor.js
+// can render per-code UX).
+// ────────────────────────────────────────────────────────────────────────
+
+add_action( 'wp_ajax_gs_membership_domain_email_preset_apply', function () {
+    gs_membership_ajax_authorize();
+
+    $host = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
+    if ( $host === '' ) {
+        wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+
+    $body = array(
+        'preset' => isset( $_POST['preset'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['preset'] ) ) : '',
+        'force'  => ! empty( $_POST['force'] ),
+    );
+    // Optional overrides — accept only known keys.
+    foreach ( array( 'mx_host', 'dkim_selector', 'dkim_value', 'dmarc_policy' ) as $k ) {
+        if ( isset( $_POST[ $k ] ) ) {
+            $body[ $k ] = sanitize_text_field( wp_unslash( (string) $_POST[ $k ] ) );
+        }
+    }
+    if ( isset( $_POST['spf_includes'] ) ) {
+        $raw_spf = is_array( $_POST['spf_includes'] )
+            ? wp_unslash( $_POST['spf_includes'] )
+            : (array) json_decode( wp_unslash( (string) $_POST['spf_includes'] ), true );
+        $body['spf_includes'] = array_values( array_filter( array_map( 'sanitize_text_field', (array) $raw_spf ) ) );
+    }
+    if ( isset( $_POST['spf_replace'] ) ) {
+        $body['spf_replace'] = ! empty( $_POST['spf_replace'] );
+    }
+
+    $r = gs_remote_membership_call(
+        'hosting/domains/' . rawurlencode( $host ) . '/email-preset',
+        $body,
+        'POST'
+    );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 502;
+        wp_send_json_error( array_merge( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), (array) $data ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_email_preset_list', function () {
+    gs_membership_ajax_authorize();
+    $host = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
+    if ( $host === '' ) {
+        wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    $r = gs_remote_membership_call(
+        'hosting/domains/' . rawurlencode( $host ) . '/email-presets',
+        array(),
+        'GET'
+    );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 502;
+        wp_send_json_error( array_merge( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), (array) $data ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
 // Refresh-cache hook — used after the plan-upgrade popup closes so
 // the new plan appears immediately without waiting out the TTL.
 add_action( 'wp_ajax_gs_membership_refresh', function () {

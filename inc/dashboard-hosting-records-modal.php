@@ -141,6 +141,41 @@ function gs_render_hosting_records_modal( $payload = array() ) {
                 'sslModePickPrompt'       => __( '— pick a mode —', 'gend-society' ),
                 'sslModeInvalid'          => __( 'Invalid SSL mode.', 'gend-society' ),
                 'pointAtAppFailed'        => __( 'Point-at-app failed. Please retry.', 'gend-society' ),
+                // ── Phase 75-02 additions — Email preset picker + managed-record protection ──
+                'applyPreset'              => __( 'Apply email preset', 'gend-society' ),
+                'presetPickerTitle'        => __( 'Choose email preset', 'gend-society' ),
+                'presetLabelGoogle'        => __( 'Google Workspace', 'gend-society' ),
+                'presetLabelGeneric'       => __( 'Generic email host', 'gend-society' ),
+                'presetPreviewHeading'     => __( 'Records to be written', 'gend-society' ),
+                'presetFieldMxHost'        => __( 'MX host', 'gend-society' ),
+                'presetFieldMxHostHint'    => __( 'Required for Generic preset (e.g. mx.example.com)', 'gend-society' ),
+                'presetFieldDkimSelector'  => __( 'DKIM selector', 'gend-society' ),
+                'presetFieldDkimValue'     => __( 'DKIM value', 'gend-society' ),
+                'presetFieldDkimHint'      => __( 'Paste from Google Admin > Apps > Google Workspace > Gmail > Authenticate email. DKIM improves deliverability but is optional.', 'gend-society' ),
+                'presetFieldSpfIncludes'   => __( 'Extra SPF includes (one per line)', 'gend-society' ),
+                'presetFieldSpfReplace'    => __( 'Replace default SPF instead of appending', 'gend-society' ),
+                'presetFieldDmarcPolicy'   => __( 'DMARC policy', 'gend-society' ),
+                'presetApplyBtn'           => __( 'Apply preset', 'gend-society' ),
+                'presetCancelBtn'          => __( 'Cancel', 'gend-society' ),
+                'presetApplyingStatus'     => __( 'Applying preset…', 'gend-society' ),
+                'presetSuccessToast'       => __( 'Applied {preset}: {n} records written.', 'gend-society' ),
+                'presetValidationFailed'   => __( 'Preset validation failed at record {index} ({field}): {message}', 'gend-society' ),
+                'presetRollbackAlertTitle' => __( 'Preset partially applied — rolled back', 'gend-society' ),
+                'presetRollbackAlertBody'  => __( 'The preset failed at record {index}. All previously-written records ({rolled_back}) have been deleted so your zone is back to how it was before. Reason: {reason}', 'gend-society' ),
+                'presetRollbackAlertClose' => __( 'Close', 'gend-society' ),
+                'spfConflictTitle'         => __( 'Existing SPF record found', 'gend-society' ),
+                'spfConflictBody'          => __( 'Your zone already has an SPF record: {existing}. Applying this preset would create a SECOND SPF record and break mail routing (RFC 4408). You can replace the existing SPF or cancel.', 'gend-society' ),
+                'spfConflictReplace'       => __( 'Replace SPF and apply preset', 'gend-society' ),
+                'spfConflictCancel'        => __( 'Cancel', 'gend-society' ),
+                'managedLockTooltip'       => __( 'Written by preset — protected. Click Delete to see a warning.', 'gend-society' ),
+                'managedLockAriaLabel'     => __( 'Preset-managed record (protected)', 'gend-society' ),
+                'deleteManagedMx'          => __( 'Deleting this MX record will stop email delivery for {host}. Are you sure?', 'gend-society' ),
+                'deleteManagedDmarc'       => __( 'Deleting this DMARC record will break email report routing and may reduce deliverability. Are you sure?', 'gend-society' ),
+                'deleteManagedDkim'        => __( 'Deleting this DKIM record will break email signing. Emails from this domain may be marked as spam. Are you sure?', 'gend-society' ),
+                'deleteManagedSpf'         => __( 'Deleting this SPF record will break email sender verification. Emails may be rejected. Are you sure?', 'gend-society' ),
+                'deleteManagedGeneric'     => __( 'This record was written by an email preset. Deleting it may break email. Are you sure?', 'gend-society' ),
+                'deleteManagedAnyway'      => __( 'Delete anyway', 'gend-society' ),
+                'deleteManagedCancel'      => __( 'Cancel', 'gend-society' ),
             ),
         )
     );
@@ -153,6 +188,8 @@ function gs_render_hosting_records_modal( $payload = array() ) {
                 <button type="button" class="gs-records-editor__undo" id="gs-records-editor-undo" hidden></button>
                 <?php // Phase 74-02: Point-at-App orchestrator button + SSL badge component (both hidden until openModal). ?>
                 <button type="button" class="gs-records-editor__point-at-app" id="gs-records-editor-point-at-app" hidden><?php esc_html_e( 'Point at my app', 'gend-society' ); ?></button>
+                <?php // Phase 75-02: Apply-preset button (opens preset picker modal-over-modal; hidden until openModal per Phase 74 chrome pattern). ?>
+                <button type="button" class="gs-records-editor__btn is-primary" id="gs-records-editor-apply-preset" data-open-preset-picker="1" hidden><?php esc_html_e( 'Apply email preset', 'gend-society' ); ?></button>
                 <span id="gs-records-editor-ssl-badge" class="gs-records-editor__ssl-badge" role="status" aria-live="polite" data-state="unknown" hidden>
                     <span class="gs-records-editor__ssl-badge-dot" aria-hidden="true"></span>
                     <span class="gs-records-editor__ssl-badge-label"><?php esc_html_e( 'Checking…', 'gend-society' ); ?></span>
@@ -181,6 +218,8 @@ function gs_render_hosting_records_modal( $payload = array() ) {
                     </select>
                 </div>
             </details>
+            <?php // Phase 75-02: preset picker modal-over-modal slot (populated by records-editor.js openPresetPicker; cleared by closePresetPicker). ?>
+            <div id="gs-records-editor-preset-picker" class="gs-records-editor__preset-picker" hidden></div>
             <div class="gs-records-editor__error" id="gs-records-editor-error" hidden></div>
         </div>
     </div>
