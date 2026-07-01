@@ -321,12 +321,24 @@
                 // Phase 73-02: Edit-records button opens the records-editor modal for this
                 // zone. records-editor.js delegates its own click handler on [data-edit-records]
                 // reading data-zone-id + data-zone-host. Continue button UNCHANGED (Phase 72).
+                // Phase 74-02: compact SSL badge (dot + tooltip) rendered alongside the buttons.
+                // Populated by refreshSslBadgesInRow (per-badge AJAX fan-out) + polled every 60s
+                // via scheduleWizardSslPoll with visibilitychange pause.
+                var sslBadgeHtml =
+                    '<span class="gs-domain-ssl-badge" ' +
+                    'data-ssl-badge="1" ' +
+                    'data-zone-host="' + escapeHtml(row.host || '') + '" ' +
+                    'data-state="unknown" ' +
+                    'title="Checking SSL...">' +
+                    '<span class="gs-domain-ssl-badge-dot" aria-hidden="true"></span>' +
+                    '</span>';
                 tr.innerHTML =
                     '<td>' + escapeHtml(row.host || '') + '</td>' +
                     '<td>' + escapeHtml(row.import_status || 'pending') + '</td>' +
                     '<td>' + escapeHtml(row.zone_status || row.status || 'pending') + '</td>' +
                     '<td><button type="button" class="gs-domains-wizard__btn" data-resume-zone="' + escapeHtml(String(row.id || '')) + '" data-resume-import="' + escapeHtml(row.import_status || 'pending') + '" data-resume-zonestatus="' + escapeHtml(row.zone_status || 'pending') + '">Continue</button>' +
-                    ' <button type="button" class="gs-domains-wizard__btn" data-edit-records data-zone-id="' + escapeHtml(String(row.id || '')) + '" data-zone-host="' + escapeHtml(row.host || '') + '">Edit records</button></td>';
+                    ' <button type="button" class="gs-domains-wizard__btn" data-edit-records data-zone-id="' + escapeHtml(String(row.id || '')) + '" data-zone-host="' + escapeHtml(row.host || '') + '">Edit records</button>' +
+                    ' ' + sslBadgeHtml + '</td>';
                 tbody.appendChild(tr);
             });
             // Render stale banner if needed.
@@ -340,8 +352,53 @@
                     staleBanner.style.display = 'none';
                 }
             }
+            // Phase 74-02: populate compact SSL badges via per-badge AJAX fan-out.
+            refreshSslBadgesInRow();
+            scheduleWizardSslPoll();
         }, function () { /* swallow — non-critical */ });
     }
+
+    // Phase 74-02: per-row compact SSL badge polling.
+    // Same 60s cadence as records-editor modal; recursive setTimeout with
+    // visibilitychange pause (interval invariant preserved — timeouts only).
+    // 6 badge states mirror the 74-01 consolidated overall classifier —
+    // MAKE-OR-BREAK: active_ipv4_only NEVER shown as green (see domains-wizard.css).
+    function refreshSslBadgesInRow() {
+        var badges = document.querySelectorAll('[data-ssl-badge][data-zone-host]');
+        for (var i = 0; i < badges.length; i++) {
+            (function (el) {
+                var host = el.getAttribute('data-zone-host');
+                if (!host) { return; }
+                ajaxCall('gs_membership_domain_ssl_status', { host: host }, function (data) {
+                    var d = (data && typeof data === 'object') ? data : {};
+                    var overall = d.overall ? String(d.overall) : 'unknown';
+                    el.setAttribute('data-state', overall);
+                    el.setAttribute('title', 'SSL: ' + overall.replace(/_/g, ' '));
+                }, function () {
+                    // Read-path swallow — badge stays 'unknown'.
+                });
+            })(badges[i]);
+        }
+    }
+
+    var wizardSslPollTimer = null;
+    function scheduleWizardSslPoll() {
+        if (wizardSslPollTimer) { clearTimeout(wizardSslPollTimer); wizardSslPollTimer = null; }
+        if (document.hidden) { return; }
+        wizardSslPollTimer = setTimeout(function () {
+            refreshSslBadgesInRow();
+            scheduleWizardSslPoll();
+        }, 60000);
+    }
+    document.addEventListener('visibilitychange', function () {
+        if (document.hidden) {
+            if (wizardSslPollTimer) { clearTimeout(wizardSslPollTimer); wizardSslPollTimer = null; }
+        } else {
+            // Refresh once on resume (matches records-editor.js pattern).
+            refreshSslBadgesInRow();
+            scheduleWizardSslPoll();
+        }
+    });
 
     function escapeHtml(s) {
         return String(s).replace(/[&<>"']/g, function (c) {

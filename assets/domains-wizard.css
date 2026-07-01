@@ -241,3 +241,48 @@
     color: #4eaaff;
     text-decoration: underline;
 }
+
+/* ── Phase 74-02: compact SSL badge in connected-domains row Actions cell ──
+   Dot + tooltip only (no label text — compact form-factor).
+   6 badge states mirror the 74-01 consolidated overall classifier.
+   MAKE-OR-BREAK invariant: active_ipv4_only is yellow-green (NOT green)
+   so operators never mistake IPv4-only for a full dual-stack Active state.
+   No new keyframe declarations; polling is JS-side recursive setTimeout. */
+.gs-domain-ssl-badge {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 2px 6px;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.2);
+    vertical-align: middle;
+    line-height: 1;
+    cursor: default;
+}
+.gs-domain-ssl-badge-dot {
+    display: inline-block;
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: #94a3b8;
+}
+.gs-domain-ssl-badge[data-state="provisioning"] .gs-domain-ssl-badge-dot {
+    background: #94a3b8;
+}
+.gs-domain-ssl-badge[data-state="active"] .gs-domain-ssl-badge-dot {
+    background: #4ade80;
+    box-shadow: 0 0 4px rgba(74, 222, 128, 0.6);
+}
+.gs-domain-ssl-badge[data-state="active_ipv4_only"] .gs-domain-ssl-badge-dot {
+    background: #a3e635;
+}
+.gs-domain-ssl-badge[data-state="stale_aaaa"] .gs-domain-ssl-badge-dot {
+    background: #fcd34d;
+}
+.gs-domain-ssl-badge[data-state="mismatched"] .gs-domain-ssl-badge-dot {
+    background: #fb923c;
+}
+.gs-domain-ssl-badge[data-state="unknown"] .gs-domain-ssl-badge-dot {
+    background: transparent;
+    border: 1px solid #94a3b8;
+}
+
