@@ -179,4 +179,12 @@ function gs_render_hosting_domains_panel( $payload = array() ) {
 
     </div>
     <?php
+    // Phase 73-02 — DNS records-editor modal (rendered hidden; opened via JS
+    // click on the connected-domains row [data-edit-records] button).
+    // function_exists guard for the hub PVC .no-plugin-sync partial-deploy
+    // race (Phase 71-02 pattern): if the sibling include is missing, the
+    // wizard still renders — the Edit-records button just becomes a no-op.
+    if ( function_exists( 'gs_render_hosting_records_modal' ) ) {
+        gs_render_hosting_records_modal( $payload );
+    }
 }

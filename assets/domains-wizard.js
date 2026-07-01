@@ -318,11 +318,15 @@
                     staleEntries.push(row.host || '');
                 }
                 var tr = document.createElement('tr');
+                // Phase 73-02: Edit-records button opens the records-editor modal for this
+                // zone. records-editor.js delegates its own click handler on [data-edit-records]
+                // reading data-zone-id + data-zone-host. Continue button UNCHANGED (Phase 72).
                 tr.innerHTML =
                     '<td>' + escapeHtml(row.host || '') + '</td>' +
                     '<td>' + escapeHtml(row.import_status || 'pending') + '</td>' +
                     '<td>' + escapeHtml(row.zone_status || row.status || 'pending') + '</td>' +
-                    '<td><button type="button" class="gs-domains-wizard__btn" data-resume-zone="' + escapeHtml(String(row.id || '')) + '" data-resume-import="' + escapeHtml(row.import_status || 'pending') + '" data-resume-zonestatus="' + escapeHtml(row.zone_status || 'pending') + '">Continue</button></td>';
+                    '<td><button type="button" class="gs-domains-wizard__btn" data-resume-zone="' + escapeHtml(String(row.id || '')) + '" data-resume-import="' + escapeHtml(row.import_status || 'pending') + '" data-resume-zonestatus="' + escapeHtml(row.zone_status || 'pending') + '">Continue</button>' +
+                    ' <button type="button" class="gs-domains-wizard__btn" data-edit-records data-zone-id="' + escapeHtml(String(row.id || '')) + '" data-zone-host="' + escapeHtml(row.host || '') + '">Edit records</button></td>';
                 tbody.appendChild(tr);
             });
             // Render stale banner if needed.
