@@ -398,6 +398,11 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
         // Allow-list it past the site-wide auth filter so the install-token check has a chance to run.
         // NARROW scope: BOTH strpos checks must match — won't allow-list /hosting/backups or other /hosting/* subtrees.
         if ( strpos( $route, '/gdc-app-manager/v1/install/' ) !== false && strpos( $route, '/hosting/domains' ) !== false ) return null;
+        // Phase 76 v10.0 — admin bulk-reconcile (gdc-app-manager/v1/admin/hosting/domains/reconcile-all)
+        // is manage_network-gated INSIDE the route's permission_callback. Allow-list past the
+        // site-wide auth filter so the manage_network check has a chance to run.
+        // NARROW scope: BOTH strpos checks must match — MUST NOT allow-list other /admin/* subtrees.
+        if ( strpos( $route, '/gdc-app-manager/v1/admin/' ) !== false && strpos( $route, '/hosting/domains/reconcile-all' ) !== false ) return null;
     }
     return $result;
 }, 99 );
