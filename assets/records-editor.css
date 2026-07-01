@@ -1,0 +1,330 @@
+/**
+ * Records-Editor — Phase 73-02 of v10.0.
+ *
+ * Namespaced modal styling for the DNS records-editor. Mirrors Phase 72
+ * domains-wizard.css glass-card conventions (rgba surface + subtle border +
+ * radius 12-14 + CSS var text colors). No new keyframe declarations — the sole
+ * visual animation is a plain CSS opacity/transform transition on modal reveal.
+ *
+ * Namespaced under .gs-records-editor to prevent bleed into other Hosting
+ * sub-panels (Dashboard / Domains / Logs / Tables / Containers / Backups).
+ *
+ * @package gend-society
+ * @since   v10.0 / Phase 73-02
+ */
+
+/* ── Root modal + backdrop ──────────────────────────────────────── */
+.gs-records-editor {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.gs-records-editor[hidden] { display: none !important; }
+
+.gs-records-editor__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+}
+
+.gs-records-editor__panel {
+    position: relative;
+    background: rgba(11, 14, 20, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    box-shadow: 0 30px 90px -20px rgba(0, 0, 0, 0.75);
+    width: min(900px, 96vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #f8fafc;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.gs-records-editor__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.gs-records-editor__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #f8fafc;
+    flex: 1;
+}
+.gs-records-editor__undo {
+    background: rgba(78, 170, 255, 0.15);
+    border: 1px solid rgba(78, 170, 255, 0.35);
+    color: #93c5fd;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease;
+    white-space: nowrap;
+}
+.gs-records-editor__undo:hover { background: rgba(78, 170, 255, 0.25); border-color: rgba(78, 170, 255, 0.55); }
+.gs-records-editor__undo[hidden] { display: none; }
+.gs-records-editor__close {
+    background: transparent;
+    border: 0;
+    color: var(--gs-muted, #94a3b8);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+}
+.gs-records-editor__close:hover { color: #f8fafc; }
+
+/* ── Toolbar ────────────────────────────────────────────────────── */
+.gs-records-editor__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.015);
+}
+.gs-records-editor__status {
+    color: var(--gs-muted, #94a3b8);
+    font-size: 0.82rem;
+    flex: 1;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.gs-records-editor__btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease;
+    white-space: nowrap;
+}
+.gs-records-editor__btn:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.22); }
+.gs-records-editor__btn.is-primary {
+    background: linear-gradient(135deg, rgba(78, 170, 255, 0.85), rgba(78, 170, 255, 0.65));
+    border-color: rgba(78, 170, 255, 0.9);
+    color: #061024;
+}
+.gs-records-editor__btn.is-primary:hover { background: linear-gradient(135deg, rgba(78, 170, 255, 1), rgba(78, 170, 255, 0.8)); }
+.gs-records-editor__btn.is-danger {
+    background: rgba(252, 165, 165, 0.12);
+    border-color: rgba(252, 165, 165, 0.4);
+    color: #fca5a5;
+}
+.gs-records-editor__btn.is-danger:hover { background: rgba(252, 165, 165, 0.22); }
+.gs-records-editor__btn.is-warning {
+    background: rgba(252, 211, 77, 0.18);
+    border-color: rgba(252, 211, 77, 0.45);
+    color: #fcd34d;
+}
+.gs-records-editor__btn.is-warning:hover { background: rgba(252, 211, 77, 0.3); }
+
+/* ── Body (scrollable) ──────────────────────────────────────────── */
+.gs-records-editor__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px 20px;
+}
+
+.gs-records-editor__loading,
+.gs-records-editor__empty {
+    text-align: center;
+    color: var(--gs-muted, #94a3b8);
+    font-style: italic;
+    padding: 40px 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+/* ── Records table ──────────────────────────────────────────────── */
+.gs-records-editor__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.gs-records-editor__table thead th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--gs-muted, #94a3b8);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.015);
+    position: sticky;
+    top: 0;
+}
+.gs-records-editor__table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+}
+.gs-records-editor__table tbody tr:hover td {
+    background: rgba(78, 170, 255, 0.05);
+}
+.gs-records-editor__table code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #a5b4fc;
+    word-break: break-all;
+}
+.gs-records-editor__table input[type="checkbox"] {
+    accent-color: #4eaaff;
+    cursor: pointer;
+}
+.gs-records-editor__table input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* ── Form (Add / Edit) ─────────────────────────────────────────── */
+.gs-records-editor__form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.gs-records-editor__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.gs-records-editor__field[hidden] { display: none; }
+.gs-records-editor__field label {
+    color: var(--gs-muted, #94a3b8);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.gs-records-editor__field input[type="text"],
+.gs-records-editor__field input[type="number"],
+.gs-records-editor__field select {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.gs-records-editor__field input[type="text"]:focus,
+.gs-records-editor__field input[type="number"]:focus,
+.gs-records-editor__field select:focus {
+    outline: none;
+    border-color: rgba(78, 170, 255, 0.7);
+    box-shadow: 0 0 0 3px rgba(78, 170, 255, 0.15);
+}
+.gs-records-editor__field select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.gs-records-editor__hint {
+    color: var(--gs-muted, #94a3b8);
+    font-size: 0.72rem;
+    font-style: italic;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.gs-records-editor__form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+.gs-records-editor__form-error {
+    color: #fca5a5;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    background: rgba(252, 165, 165, 0.08);
+    border: 1px solid rgba(252, 165, 165, 0.28);
+    border-radius: 8px;
+}
+.gs-records-editor__form-error[hidden] { display: none; }
+
+/* ── Destructive-edit warning banner (modal-within-modal) ──────── */
+.gs-records-editor__warning {
+    background: linear-gradient(135deg, rgba(252, 211, 77, 0.16), rgba(252, 165, 165, 0.12));
+    border: 1px solid rgba(252, 211, 77, 0.45);
+    border-radius: 12px;
+    padding: 18px 20px;
+    color: #fcd34d;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.gs-records-editor__warning strong {
+    font-size: 0.95rem;
+    color: #fef3c7;
+}
+.gs-records-editor__warning p {
+    margin: 0;
+    color: #fde68a;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+/* ── Inline error toast (auto-hide via JS setTimeout) ──────────── */
+.gs-records-editor__error {
+    padding: 12px 20px;
+    background: rgba(252, 165, 165, 0.14);
+    border-top: 1px solid rgba(252, 165, 165, 0.35);
+    color: #fca5a5;
+    font-size: 0.82rem;
+    text-align: center;
+}
+.gs-records-editor__error[hidden] { display: none; }
+
+/* ── Reduced motion support ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .gs-records-editor__panel,
+    .gs-records-editor__btn,
+    .gs-records-editor__undo {
+        transition: none !important;
+    }
+}
+
+/* ── Narrow viewports ──────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .gs-records-editor {
+        padding: 0;
+    }
+    .gs-records-editor__panel {
+        width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+        border: 0;
+    }
+    .gs-records-editor__table {
+        font-size: 0.78rem;
+    }
+    .gs-records-editor__table thead th:nth-child(4),
+    .gs-records-editor__table tbody td:nth-child(4) {
+        display: none;
+    }
+}
