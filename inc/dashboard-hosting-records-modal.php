@@ -116,6 +116,31 @@ function gs_render_hosting_records_modal( $payload = array() ) {
                 'notFound'           => __( 'Record or zone not found.', 'gend-society' ),
                 'serverError'        => __( 'Server error. Please retry.', 'gend-society' ),
                 'undoUnsupported'    => __( 'This change cannot be undone.', 'gend-society' ),
+                // ── Phase 74-02 additions — Point-at-App + SSL badge + advanced options ──
+                'pointAtApp'              => __( 'Point at my app', 'gend-society' ),
+                'pointAtAppConfirmTitle'  => __( 'Route this domain at your app?', 'gend-society' ),
+                'pointAtAppConfirmBody'   => __( 'This will write apex A + wildcard CNAME + force Full (Strict) SSL. Any existing apex A record will be OVERWRITTEN (backed up in audit log — undo available).', 'gend-society' ),
+                'pointAtAppShipItAnyway'  => __( 'Ship it anyway', 'gend-society' ),
+                'pointAtAppSuccess'       => __( 'Domain pointed at app. SSL provisioning…', 'gend-society' ),
+                'originCertInvalidTitle'  => __( 'Origin cert not yet valid', 'gend-society' ),
+                'originCertInvalidBody'   => __( 'Full (Strict) SSL was NOT enabled because your origin cert is not valid yet. DNS records were written; SSL will follow when cert-manager finishes issuance. If your cert IS valid, click below to retry the origin probe.', 'gend-society' ),
+                'originCertInvalidRetry'  => __( 'Enable Full (Strict) anyway (my cert IS valid — retry origin probe)', 'gend-society' ),
+                'flexibleSslWarnTitle'    => __( 'Flexible SSL is unsafe', 'gend-society' ),
+                'flexibleSslWarnBody'     => __( 'Flexible SSL sends plaintext to origin (MITM-able). Are you sure you want to proceed?', 'gend-society' ),
+                'sslBadgeProvisioning'    => __( 'Provisioning', 'gend-society' ),
+                'sslBadgeActive'          => __( 'Active', 'gend-society' ),
+                'sslBadgeMismatched'      => __( 'Mismatched', 'gend-society' ),
+                'sslBadgeIpv4Only'        => __( 'IPv4 only', 'gend-society' ),
+                'sslBadgeStaleAaaa'       => __( 'Stale AAAA', 'gend-society' ),
+                'sslBadgeUnknown'         => __( 'Checking…', 'gend-society' ),
+                'sslBadgeTooltipEdge'     => __( 'Cloudflare edge: {state}', 'gend-society' ),
+                'sslBadgeTooltipOrigin'   => __( 'Origin cert: {state}', 'gend-society' ),
+                'sslBadgeTooltipDualStack'=> __( 'IPv4: {ipv4_ok} | IPv6: {ipv6_ok}', 'gend-society' ),
+                'advancedOptionsToggle'   => __( 'Advanced options', 'gend-society' ),
+                'sslModeLabel'            => __( 'SSL mode (advanced)', 'gend-society' ),
+                'sslModePickPrompt'       => __( '— pick a mode —', 'gend-society' ),
+                'sslModeInvalid'          => __( 'Invalid SSL mode.', 'gend-society' ),
+                'pointAtAppFailed'        => __( 'Point-at-app failed. Please retry.', 'gend-society' ),
             ),
         )
     );
@@ -126,6 +151,12 @@ function gs_render_hosting_records_modal( $payload = array() ) {
             <header class="gs-records-editor__header">
                 <h3 id="gs-records-editor-title" class="gs-records-editor__title"><?php esc_html_e( 'DNS Records', 'gend-society' ); ?></h3>
                 <button type="button" class="gs-records-editor__undo" id="gs-records-editor-undo" hidden></button>
+                <?php // Phase 74-02: Point-at-App orchestrator button + SSL badge component (both hidden until openModal). ?>
+                <button type="button" class="gs-records-editor__point-at-app" id="gs-records-editor-point-at-app" hidden><?php esc_html_e( 'Point at my app', 'gend-society' ); ?></button>
+                <span id="gs-records-editor-ssl-badge" class="gs-records-editor__ssl-badge" role="status" aria-live="polite" data-state="unknown" hidden>
+                    <span class="gs-records-editor__ssl-badge-dot" aria-hidden="true"></span>
+                    <span class="gs-records-editor__ssl-badge-label"><?php esc_html_e( 'Checking…', 'gend-society' ); ?></span>
+                </span>
                 <button type="button" class="gs-records-editor__close" data-close-modal aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
             </header>
             <div class="gs-records-editor__toolbar">
@@ -135,6 +166,21 @@ function gs_render_hosting_records_modal( $payload = array() ) {
             <div class="gs-records-editor__body" id="gs-records-editor-body">
                 <div class="gs-records-editor__loading"><?php esc_html_e( 'Loading records…', 'gend-society' ); ?></div>
             </div>
+            <?php // Phase 74-02: Advanced options expandable — hidden by default (Open Q3: reduces footgun surface). ?>
+            <details id="gs-records-editor-advanced" class="gs-records-editor__advanced">
+                <summary><?php esc_html_e( 'Advanced options', 'gend-society' ); ?></summary>
+                <div class="gs-records-editor__advanced-body">
+                    <label for="gs-records-editor-ssl-mode"><?php esc_html_e( 'SSL mode (advanced)', 'gend-society' ); ?></label>
+                    <select id="gs-records-editor-ssl-mode" class="gs-records-editor__ssl-mode-select">
+                        <option value=""><?php esc_html_e( '— pick a mode —', 'gend-society' ); ?></option>
+                        <option value="off">Off</option>
+                        <option value="flexible">Flexible</option>
+                        <option value="full">Full</option>
+                        <option value="strict">Full (Strict)</option>
+                        <option value="origin_pull">Origin Pull</option>
+                    </select>
+                </div>
+            </details>
             <div class="gs-records-editor__error" id="gs-records-editor-error" hidden></div>
         </div>
     </div>

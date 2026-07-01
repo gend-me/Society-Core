@@ -436,6 +436,98 @@ add_action( 'wp_ajax_gs_membership_domain_record_undo', function () {
     wp_send_json_success( $r );
 } );
 
+// ────────────────────────────────────────────────────────────────────────
+// Phase 74-02: Point-to-App + SSL status + advanced SSL mode override.
+// 3 new proxies that pipe to Phase 74-01 host-scoped REST routes:
+//   POST /install/{install_id}/hosting/domains/{host}/point-to-app
+//   GET  /install/{install_id}/hosting/domains/{host}/ssl-status
+//   POST /install/{install_id}/hosting/domains/{host}/point-to-app  (with ssl_mode_only=1)
+// NOTE: routes are HOST-scoped (verified against 74-01 SUMMARY cross-plan constants),
+// hence the URL uses rawurlencode($host) — NOT $zone_id like Phase 73 record CRUD.
+// gs_remote_membership_call signature: ($path, $body, $method) with install_id
+// auto-injected from get_option('gs_install_id') inside the helper.
+// ────────────────────────────────────────────────────────────────────────
+
+add_action( 'wp_ajax_gs_membership_domain_point_to_app', function () {
+    gs_membership_ajax_authorize();
+    $host  = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
+    $force = ! empty( $_POST['force'] );
+    if ( $host === '' ) {
+        wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    $r = gs_remote_membership_call(
+        'hosting/domains/' . rawurlencode( $host ) . '/point-to-app',
+        array( 'force' => $force ),
+        'POST'
+    );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_ssl_status', function () {
+    gs_membership_ajax_authorize();
+    $host = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
+    if ( $host === '' ) {
+        wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    // GET — body is ignored by wp_remote_get; pass empty array().
+    $r = gs_remote_membership_call( 'hosting/domains/' . rawurlencode( $host ) . '/ssl-status', array(), 'GET' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_ssl_mode_set', function () {
+    gs_membership_ajax_authorize();
+    $host  = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
+    $mode  = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['mode'] ) ) : '';
+    $force = ! empty( $_POST['force'] );
+    $allowed = array( 'off', 'flexible', 'full', 'strict', 'origin_pull' );
+    if ( ! in_array( $mode, $allowed, true ) ) {
+        wp_send_json_error( array( 'message' => __( 'Invalid SSL mode.', 'gend-society' ), 'code' => 'invalid_mode' ), 400 );
+    }
+    if ( $host === '' ) {
+        wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    // Client-side Flexible SSL destructive-warning shim — front-of-door UX guard requiring force=true.
+    // Server (74-01) does not yet honor this branch explicitly; this early-return guarantees the modal
+    // fires even if the operator's Wave 1 backend build lands before the SSL-mode-only param handler.
+    if ( $mode === 'flexible' && ! $force ) {
+        wp_send_json_error( array(
+            'code'    => 'flexible_ssl_destructive',
+            'message' => __( 'Flexible SSL is plaintext to origin (MITM-able). Confirm with force=true to proceed.', 'gend-society' ),
+        ), 409 );
+    }
+    // Route through 74-01's route_point_to_app handler with ssl_mode_only body param.
+    // NOTE: 74-01 was not shipped with an explicit ssl_mode_only branch (per plan file interface note);
+    // interim behavior — this becomes a full idempotent re-point (writes same apex A + wildcard CNAME +
+    // sets requested SSL mode). Non-destructive because Phase 73 records are already the target values.
+    // A future 74-01 patch can short-circuit on ssl_mode_only=true to skip the DNS writes.
+    $body = array(
+        'ssl_mode_only' => true,
+        'mode'          => $mode,
+        'force'         => $force,
+    );
+    $r = gs_remote_membership_call(
+        'hosting/domains/' . rawurlencode( $host ) . '/point-to-app',
+        $body,
+        'POST'
+    );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
 // Refresh-cache hook — used after the plan-upgrade popup closes so
 // the new plan appears immediately without waiting out the TTL.
 add_action( 'wp_ajax_gs_membership_refresh', function () {
