@@ -239,6 +239,41 @@ add_action( 'wp_ajax_gs_membership_domain_records', function () {
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
         wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
     }
+    // ── Phase 73-02 last_change enrichment ─────────────────────────────
+    // Gated behind include_last_change=1 so the Phase 72 wizard's Step 2 records-list
+    // call (which does NOT set this param) keeps receiving the bare-array shape it
+    // expects. Only records-editor.js (73-02) sets include_last_change=1 and gets
+    // the wrapped shape {records:[...], last_change:{...}|null}.
+    if ( ! empty( $_POST['include_last_change'] ) && is_array( $r ) ) {
+        global $wpdb;
+        $audit_table = $wpdb->base_prefix . 'gend_domain_audit';
+        $install_id  = (string) get_option( 'gs_install_id', '' );
+        $zone_host   = isset( $_POST['zone_host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['zone_host'] ) ) : '';
+        $last_change = null;
+        if ( $install_id !== '' && $zone_host !== '' ) {
+            // Gend_Domain_Audit::ACTION_RECORD_CHANGED = 'record.changed' (73-01 SUMMARY).
+            // Cross-tenant guard at SQL WHERE — install_id + host match in the SELECT itself,
+            // defense in depth on top of Repository::get_zone_by_id IDOR check.
+            $row = $wpdb->get_row( $wpdb->prepare(
+                "SELECT id, action, before_json, after_json, created_at FROM {$audit_table}
+                 WHERE install_id = %s AND host = %s AND action = %s
+                 ORDER BY created_at DESC LIMIT 1",
+                $install_id, $zone_host, 'record.changed'
+            ), ARRAY_A );
+            if ( is_array( $row ) ) {
+                $after = json_decode( isset( $row['after_json'] ) ? (string) $row['after_json'] : '', true );
+                $last_change = array(
+                    'audit_id'   => (int) $row['id'],
+                    'op'         => is_array( $after ) && isset( $after['op'] ) ? (string) $after['op'] : '',
+                    'created_at' => isset( $row['created_at'] ) ? (string) $row['created_at'] : '',
+                );
+            }
+        }
+        $r = array(
+            'records'     => $r,
+            'last_change' => $last_change,
+        );
+    }
     wp_send_json_success( $r );
 } );
 
@@ -279,6 +314,123 @@ add_action( 'wp_ajax_gs_membership_domain_list', function () {
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+// ─── Phase 73-02: DNS records CRUD + Undo AJAX proxies ──────────────────
+// Each handler mirrors the Phase 72 6-handler pattern verbatim (nonce → param
+// sanitize → gs_remote_membership_call → WP_Error passthrough → success). Pipes
+// to the 4 new REST routes from Phase 73-01 under gdc-app-manager/v1/install/{id}/
+// hosting/domains/{zone_id}/records[/{record_id}[/{audit_id}]]. Force-bypass for
+// destructive-edit 409s: delete uses ?force=true query param (DELETE bodies are
+// unreliable); update accepts force in the body (some clients can't add query
+// params on PUT).
+//
+// Error codes preserved verbatim so records-editor.js can switch on them:
+//   validation_failed / proxied_not_supported / txt_too_long → 400
+//   delete_mx_breaks_email / delete_apex_a_breaks_site       → 409 (force=true bypasses)
+//   undo_unsupported_event                                    → 400
+//   cf_auth_missing                                           → 401
+//   cf_rate_limit                                             → 429
+//   cf_network / cf_api_error                                 → 502
+//   not_found                                                 → 404 (IDOR OR missing record/audit)
+
+add_action( 'wp_ajax_gs_membership_domain_record_create', function () {
+    gs_membership_ajax_authorize();
+    $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    if ( $zone_id <= 0 ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
+    }
+    $body = array(
+        'type'    => isset( $_POST['type'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['type'] ) ) : '',
+        'name'    => isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['name'] ) ) : '',
+        'content' => isset( $_POST['content'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['content'] ) ) : '',
+        'ttl'     => isset( $_POST['ttl'] ) ? (int) $_POST['ttl'] : 1,
+        'proxied' => ! empty( $_POST['proxied'] ),
+    );
+    if ( isset( $_POST['priority'] ) && $_POST['priority'] !== '' ) {
+        $body['priority'] = (int) $_POST['priority'];
+    }
+    if ( isset( $_POST['data'] ) && is_array( $_POST['data'] ) ) {
+        $body['data'] = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records', $body, 'POST' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_record_update', function () {
+    gs_membership_ajax_authorize();
+    $zone_id   = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    $record_id = isset( $_POST['record_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['record_id'] ) ) : '';
+    if ( $zone_id <= 0 || $record_id === '' ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id or record_id missing.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    $body = array(
+        'type'    => isset( $_POST['type'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['type'] ) ) : '',
+        'name'    => isset( $_POST['name'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['name'] ) ) : '',
+        'content' => isset( $_POST['content'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['content'] ) ) : '',
+        'ttl'     => isset( $_POST['ttl'] ) ? (int) $_POST['ttl'] : 1,
+        'proxied' => ! empty( $_POST['proxied'] ),
+    );
+    if ( isset( $_POST['priority'] ) && $_POST['priority'] !== '' ) {
+        $body['priority'] = (int) $_POST['priority'];
+    }
+    if ( isset( $_POST['data'] ) && is_array( $_POST['data'] ) ) {
+        $body['data'] = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) );
+    }
+    if ( ! empty( $_POST['force'] ) ) {
+        $body['force'] = true;
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records/' . rawurlencode( $record_id ), $body, 'PUT' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_record_delete', function () {
+    gs_membership_ajax_authorize();
+    $zone_id   = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    $record_id = isset( $_POST['record_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['record_id'] ) ) : '';
+    if ( $zone_id <= 0 || $record_id === '' ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id or record_id missing.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    // Delete uses query-param force=true (DELETE bodies are not universally serialized per 73-01 decision).
+    $path = 'hosting/domains/' . $zone_id . '/records/' . rawurlencode( $record_id );
+    if ( ! empty( $_POST['force'] ) ) {
+        $path .= '?force=true';
+    }
+    $r = gs_remote_membership_call( $path, array(), 'DELETE' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
+    }
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_domain_record_undo', function () {
+    gs_membership_ajax_authorize();
+    $zone_id  = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
+    $audit_id = isset( $_POST['audit_id'] ) ? (int) $_POST['audit_id'] : 0;
+    if ( $zone_id <= 0 || $audit_id <= 0 ) {
+        wp_send_json_error( array( 'message' => __( 'zone_id or audit_id missing.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
+    }
+    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records/undo/' . $audit_id, array(), 'POST' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
+        // undo_unsupported_event (422 per Phase 73-01 error map — actual is 400 per 73-01 SUMMARY) surfaces verbatim so
+        // JS can toast "Change cannot be undone" without retrying.
         wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
     }
     wp_send_json_success( $r );

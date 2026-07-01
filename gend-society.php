@@ -3,7 +3,7 @@
  * Plugin Name: GenD Society
  * Plugin URI:  https://gend.me
  * Description: Futuristic glassmorphic WordPress admin experience with custom menus, redesigned backend, and dynamic frontend sidebar.
- * Version:     1.0.4
+ * Version:     1.0.5
  * Author:      By GenD
  * Author URI:  https://gend.me
  * Network:     true
@@ -14,7 +14,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('GS_VERSION', '1.1.1');
+define('GS_VERSION', '1.1.2');
 define('GS_DIR', plugin_dir_path(__FILE__));
 define('GS_URL', plugin_dir_url(__FILE__));
 
@@ -41,6 +41,11 @@ require_once GS_DIR . 'inc/dashboard-hosting.php';
 // file_exists guard mirrors Phase 71-02 partial-deploy defense (hub PVC .no-plugin-sync quirk).
 if ( file_exists( GS_DIR . 'inc/dashboard-hosting-domains.php' ) ) {
     require_once GS_DIR . 'inc/dashboard-hosting-domains.php';
+}
+// Phase 73-02 (v10.0) — DNS records-editor modal renderer (sibling to dashboard-hosting-domains.php).
+// Same file_exists guard for the hub PVC .no-plugin-sync partial-deploy defense (Phase 71-02 pattern).
+if ( file_exists( GS_DIR . 'inc/dashboard-hosting-records-modal.php' ) ) {
+    require_once GS_DIR . 'inc/dashboard-hosting-records-modal.php';
 }
 // Media-storage plan panel for the blog-manager Media tab (Phase 33). Loads
 // AFTER dashboard-hosting.php + dashboard-remote-membership.php so its helper
