@@ -40,6 +40,12 @@
         sslPollPaused: false,
         pendingSslWarning: null,      // { code, pendingBody: {...} | null, retryAction: 'point_to_app'|'ssl_mode_set' }
         advancedOpen: false,
+        // ── Phase 75-02 additions — Email preset picker + managed-record protection ──
+        pendingPreset: null,          // { preset, overrides, previewRecords }
+        presetInFlight: false,        // double-click guard mirrors server 30s idempotency transient
+        presetCatalog: null,          // response from /email-presets GET (session cache)
+        pendingSpfConflict: null,     // { existing_spf, overrides } on 409 spf_conflict_detected
+        pendingManagedDelete: null,   // { record } on managed-record delete click (per-type copy branch)
     };
 
     // ── Type metadata ──────────────────────────────────────────────
@@ -207,6 +213,11 @@
         state.sslStatus = null;
         state.sslPollPaused = false;
         state.pendingSslWarning = null;
+        // Phase 75-02: reset preset picker state on open.
+        state.pendingPreset = null;
+        state.presetInFlight = false;
+        state.pendingSpfConflict = null;
+        state.pendingManagedDelete = null;
         var modal = $('#gs-records-editor');
         if (!modal || state.zoneId <= 0) { return; }
         modal.hidden = false;
@@ -217,6 +228,9 @@
         // Phase 74-02: reveal Point-at-App button + kick off SSL badge poll if we have a host.
         var pta = $('#gs-records-editor-point-at-app');
         if (pta && state.zoneHost) { pta.hidden = false; }
+        // Phase 75-02: reveal Apply-preset button.
+        var apb = $('#gs-records-editor-apply-preset');
+        if (apb && state.zoneHost) { apb.hidden = false; apb.disabled = false; }
         fetchRecords();
         if (state.zoneHost) { fetchSslStatus(); }
     }
@@ -229,6 +243,11 @@
         if (badge) { badge.hidden = true; }
         var pta = $('#gs-records-editor-point-at-app');
         if (pta) { pta.hidden = true; }
+        // Phase 75-02: hide Apply-preset button + clear picker slot.
+        var apb = $('#gs-records-editor-apply-preset');
+        if (apb) { apb.hidden = true; apb.disabled = false; }
+        var picker = $('#gs-records-editor-preset-picker');
+        if (picker) { picker.hidden = true; picker.innerHTML = ''; }
         state.zoneId = null;
         state.zoneHost = '';
         state.records = [];
@@ -240,6 +259,11 @@
         state.pointAtAppInFlight = false;
         state.sslStatus = null;
         state.pendingSslWarning = null;
+        // Phase 75-02: reset preset state on close.
+        state.pendingPreset = null;
+        state.presetInFlight = false;
+        state.pendingSpfConflict = null;
+        state.pendingManagedDelete = null;
     }
 
     // ── Fetch + render list ────────────────────────────────────────
@@ -323,8 +347,14 @@
                     : (i18n.proxyDisabledSrv || '');
             proxyCell = '<input type="checkbox" disabled title="' + escapeHtml(tip) + '">';
         }
+        // Phase 75-02: prepend 🔒 icon to Type cell when record.managed === true (preset-written).
+        // LEFT JOIN semantics per Phase 75-01 route_list_records projection; renders inline
+        // (Open Q4 lock icon) with title tooltip educating operator on protection.
+        var lockIcon = (rec.managed === true)
+            ? '<span class="gs-records-editor__managed-lock" title="' + escapeHtml(i18n.managedLockTooltip || 'Written by preset — protected.') + '" aria-label="' + escapeHtml(i18n.managedLockAriaLabel || 'Preset-managed record (protected)') + '">🔒</span> '
+            : '';
         return '<tr data-record-id="' + escapeHtml(recId) + '">' +
-            '<td>' + escapeHtml(recType) + '</td>' +
+            '<td>' + lockIcon + escapeHtml(recType) + '</td>' +
             '<td>' + escapeHtml(rec.name || '') + '</td>' +
             '<td><code>' + escapeHtml(rec.content || '') + '</code></td>' +
             '<td>' + escapeHtml(ttlLabel) + '</td>' +
@@ -548,6 +578,13 @@
         if (!rec) return;
         state.pendingDeleteRecord = recordId;
         state.pendingDeleteWarning = null;
+        // Phase 75-02: managed-record branch (BEFORE existing Phase 73 destructive-warning flow).
+        // Server (Phase 75-01) also returns 409 managed_record_delete with record_type surfaced;
+        // client-side pre-check gives the operator per-type-specific copy without a round-trip.
+        if (rec.managed === true) {
+            renderManagedDeleteConfirm(rec);
+            return;
+        }
         // First attempt: no force. On 409 → re-prompt with warning + Proceed Anyway.
         submitDelete(recordId, false, null);
     }
@@ -569,6 +606,13 @@
                 if (status === 409 && (err.code === 'delete_mx_breaks_email' || err.code === 'delete_apex_a_breaks_site')) {
                     state.pendingDeleteWarning = err.code;
                     renderDeleteWarning(err);
+                } else if (status === 409 && err.code === 'managed_record_delete') {
+                    // Phase 75-02 fallback: if row-projection lacked managed:true (stale cache), server
+                    // surfaces 409 managed_record_delete + record_type; synthesize a record for per-type copy.
+                    var recFallback = state.records.find(function (r) { return String(r.id) === String(recordId); }) || {};
+                    if (err.record_type) { recFallback.type = err.record_type; }
+                    recFallback.managed = true;
+                    renderManagedDeleteConfirm(recFallback);
                 } else {
                     renderError(mapErrorMessage(err));
                 }
@@ -878,6 +922,327 @@
         );
     }
 
+    // ─────────────────────────────────────────────────────────────────
+    // Phase 75-02 additions — Email preset picker + apply flow + partial-failure
+    // rollback UX + managed-record protection with per-type-specific delete copy.
+    // Vanilla implementation only. No new keyframe declarations. Extends the Phase
+    // 73-74 state machine additively — 5 state keys + 11 helpers + delegated events.
+    // Server-authoritative preview: /email-presets GET returns the catalog verbatim.
+    // Client-side buildPresetPreview mirrors the server template for live optional-
+    // field preview only (UAT 75-03 cross-checks drift).
+    // ─────────────────────────────────────────────────────────────────
+
+    function openPresetPicker() {
+        if (state.presetInFlight) { return; }
+        // Session-cache catalog to avoid re-fetch on close/reopen.
+        if (state.presetCatalog) {
+            renderPresetPicker();
+            return;
+        }
+        fetchPresetCatalog();
+    }
+
+    function closePresetPicker() {
+        var picker = $('#gs-records-editor-preset-picker');
+        if (picker) { picker.hidden = true; picker.innerHTML = ''; }
+        state.pendingPreset = null;
+        state.pendingSpfConflict = null;
+    }
+
+    function fetchPresetCatalog() {
+        ajaxCall('gs_membership_domain_email_preset_list',
+            { host: state.zoneHost },
+            function (data) {
+                // Catalog shape per Phase 75-01 route_list_email_presets:
+                //   { google_workspace: {...}, generic: {...} } with {host} placeholder in preview strings
+                state.presetCatalog = (data && (data.google_workspace || data.generic)) ? data : null;
+                if (state.presetCatalog) {
+                    renderPresetPicker();
+                } else {
+                    renderError(String(i18n.presetPickerTitle || 'Choose email preset') + ': failed to load');
+                }
+            },
+            function (err) {
+                renderError(mapErrorMessage(err));
+            }
+        );
+    }
+
+    function renderPresetPicker() {
+        var picker = $('#gs-records-editor-preset-picker');
+        if (!picker) { return; }
+        var catalog = state.presetCatalog || {};
+        var pk = (state.pendingPreset && state.pendingPreset.preset) ? state.pendingPreset.preset : 'google_workspace';
+        // Only show catalog entries the server actually returned.
+        var presetKeys = ['google_workspace', 'generic'].filter(function (k) { return !!catalog[k]; });
+        if (presetKeys.length === 0) { return; }
+        if (presetKeys.indexOf(pk) === -1) { pk = presetKeys[0]; }
+
+        var opts = presetKeys.map(function (k) {
+            var label = (k === 'google_workspace')
+                ? (catalog[k].name || i18n.presetLabelGoogle || 'Google Workspace')
+                : (catalog[k].name || i18n.presetLabelGeneric || 'Generic email host');
+            var sel = (k === pk) ? ' selected' : '';
+            return '<option value="' + escapeHtml(k) + '"' + sel + '>' + escapeHtml(label) + '</option>';
+        }).join('');
+
+        var overrides = (state.pendingPreset && state.pendingPreset.overrides) || {};
+        var showMxHost = (pk === 'generic');
+        var previewRecords = buildPresetPreview(pk, overrides);
+        var spfIncludesText = Array.isArray(overrides.spf_includes) ? overrides.spf_includes.join('\n') : (overrides.spf_includes || '');
+        var dmarcOpts = ['', 'none', 'quarantine', 'reject'].map(function (p) {
+            var lbl = (p === '') ? '(default)' : p;
+            var sel = ((overrides.dmarc_policy || '') === p) ? ' selected' : '';
+            return '<option value="' + escapeHtml(p) + '"' + sel + '>' + escapeHtml(lbl) + '</option>';
+        }).join('');
+
+        var previewRows = previewRecords.map(function (r) {
+            var contentSub = String(r.content || '').replace(/\{host\}/g, state.zoneHost || '');
+            return '<tr>' +
+                '<td>' + escapeHtml(r.type) + '</td>' +
+                '<td>' + escapeHtml(r.name) + '</td>' +
+                '<td>' + escapeHtml(contentSub) + '</td>' +
+                '<td>' + escapeHtml(String(r.ttl)) + '</td>' +
+                '<td>' + escapeHtml(r.priority != null ? String(r.priority) : '') + '</td>' +
+              '</tr>';
+        }).join('');
+
+        var html = '<div class="gs-records-editor__preset-picker-inner" role="dialog" aria-modal="true">' +
+            '<h3>' + escapeHtml(i18n.presetPickerTitle || 'Choose email preset') + '</h3>' +
+            '<label>' + escapeHtml((i18n.presetLabelGoogle || 'Preset')) + ':' +
+              ' <select data-preset-select>' + opts + '</select></label>' +
+            (showMxHost
+                ? '<label>' + escapeHtml(i18n.presetFieldMxHost || 'MX host') + ':' +
+                  ' <input type="text" data-preset-field="mx_host" value="' + escapeHtml(overrides.mx_host || '') + '" required>' +
+                  '<span class="gs-records-editor__hint">' + escapeHtml(i18n.presetFieldMxHostHint || '') + '</span></label>'
+                : '') +
+            '<label>' + escapeHtml(i18n.presetFieldDkimSelector || 'DKIM selector') + ':' +
+              ' <input type="text" data-preset-field="dkim_selector" value="' + escapeHtml(overrides.dkim_selector || '') + '"></label>' +
+            '<label>' + escapeHtml(i18n.presetFieldDkimValue || 'DKIM value') + ':' +
+              ' <textarea data-preset-field="dkim_value">' + escapeHtml(overrides.dkim_value || '') + '</textarea>' +
+              '<span class="gs-records-editor__hint">' + escapeHtml(i18n.presetFieldDkimHint || '') + '</span></label>' +
+            '<label>' + escapeHtml(i18n.presetFieldSpfIncludes || 'Extra SPF includes') + ':' +
+              ' <textarea data-preset-field="spf_includes">' + escapeHtml(spfIncludesText) + '</textarea></label>' +
+            '<label><input type="checkbox" data-preset-field="spf_replace"' + (overrides.spf_replace ? ' checked' : '') + '> ' +
+              escapeHtml(i18n.presetFieldSpfReplace || 'Replace default SPF instead of appending') + '</label>' +
+            '<label>' + escapeHtml(i18n.presetFieldDmarcPolicy || 'DMARC policy') + ':' +
+              ' <select data-preset-field="dmarc_policy">' + dmarcOpts + '</select></label>' +
+            '<h4>' + escapeHtml(i18n.presetPreviewHeading || 'Records to be written') + ' (' + previewRecords.length + ')</h4>' +
+            '<table class="gs-records-editor__preset-preview">' +
+              '<thead><tr>' +
+                '<th>Type</th><th>Name</th><th>Content</th><th>TTL</th><th>Priority</th>' +
+              '</tr></thead>' +
+              '<tbody>' + previewRows + '</tbody>' +
+            '</table>' +
+            '<div class="gs-records-editor__preset-actions">' +
+              '<button type="button" class="gs-records-editor__btn is-primary" data-preset-apply' + (state.presetInFlight ? ' disabled' : '') + '>' +
+                escapeHtml(i18n.presetApplyBtn || 'Apply preset') + '</button>' +
+              '<button type="button" class="gs-records-editor__btn" data-preset-cancel>' +
+                escapeHtml(i18n.presetCancelBtn || 'Cancel') + '</button>' +
+            '</div>' +
+          '</div>';
+        picker.innerHTML = html;
+        picker.hidden = false;
+        // Persist current picker state so field-change handlers can mutate + redraw.
+        state.pendingPreset = { preset: pk, overrides: overrides, previewRecords: previewRecords };
+    }
+
+    function buildPresetPreview(preset, overrides) {
+        // CLIENT-SIDE MIRROR of the server _preset_records template — used for optional-field
+        // live-preview only. The server response from POST /email-preset is authoritative for
+        // the actual write. UAT 75-03 cross-checks drift between this mirror and the server.
+        var records = [];
+        var dmarcPolicy = overrides.dmarc_policy || (preset === 'google_workspace' ? 'quarantine' : 'none');
+        var spfBase = (preset === 'google_workspace') ? ['_spf.google.com'] : [];
+        var spfExtra;
+        if (Array.isArray(overrides.spf_includes)) {
+            spfExtra = overrides.spf_includes;
+        } else if (typeof overrides.spf_includes === 'string') {
+            spfExtra = overrides.spf_includes.split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+        } else {
+            spfExtra = [];
+        }
+        var spfFinal;
+        if (overrides.spf_replace) {
+            spfFinal = spfExtra;
+        } else {
+            var merged = spfBase.slice();
+            for (var si = 0; si < spfExtra.length; si++) {
+                if (merged.indexOf(spfExtra[si]) < 0) { merged.push(spfExtra[si]); }
+            }
+            spfFinal = merged;
+        }
+        var spfContent = 'v=spf1' + (spfFinal.length ? ' ' + spfFinal.map(function (inc) { return 'include:' + inc; }).join(' ') : '') + ' ~all';
+        var dmarcContent = 'v=DMARC1; p=' + dmarcPolicy + '; rua=mailto:postmaster@{host}';
+
+        if (preset === 'google_workspace') {
+            records.push({ type: 'MX', name: '@', content: 'aspmx.l.google.com',      ttl: 3600, priority: 1 });
+            records.push({ type: 'MX', name: '@', content: 'alt1.aspmx.l.google.com', ttl: 3600, priority: 5 });
+            records.push({ type: 'MX', name: '@', content: 'alt2.aspmx.l.google.com', ttl: 3600, priority: 5 });
+            records.push({ type: 'MX', name: '@', content: 'alt3.aspmx.l.google.com', ttl: 3600, priority: 10 });
+            records.push({ type: 'MX', name: '@', content: 'alt4.aspmx.l.google.com', ttl: 3600, priority: 10 });
+            records.push({ type: 'TXT', name: '@',      content: spfContent,   ttl: 3600 });
+            records.push({ type: 'TXT', name: '_dmarc', content: dmarcContent, ttl: 3600 });
+        } else if (preset === 'generic') {
+            var mxHost = overrides.mx_host || '(mx host required)';
+            records.push({ type: 'MX',  name: '@',      content: mxHost,        ttl: 3600, priority: 10 });
+            records.push({ type: 'TXT', name: '@',      content: spfContent,    ttl: 3600 });
+            records.push({ type: 'TXT', name: '_dmarc', content: dmarcContent,  ttl: 3600 });
+        }
+        if (overrides.dkim_selector && overrides.dkim_value) {
+            var selSafe = String(overrides.dkim_selector).replace(/[^a-z0-9._\-]/gi, '');
+            var valSafe = String(overrides.dkim_value).replace(/\s+/g, '').replace(/"/g, '');
+            records.push({
+                type: 'TXT',
+                name: selSafe + '._domainkey',
+                content: 'v=DKIM1; k=rsa; p=' + valSafe,
+                ttl: 3600
+            });
+        }
+        return records;
+    }
+
+    function handleApplyPreset(force) {
+        if (state.presetInFlight) { return; }
+        if (!state.pendingPreset) { return; }
+        state.presetInFlight = true;
+        // Disable the Apply-preset header button too — mirrors server 30s idempotency transient.
+        var apb = $('#gs-records-editor-apply-preset');
+        if (apb) { apb.disabled = true; }
+        submitApplyPreset(!!force);
+    }
+
+    function submitApplyPreset(force) {
+        var pk = state.pendingPreset.preset;
+        var ov = state.pendingPreset.overrides || {};
+        var body = { host: state.zoneHost, preset: pk, force: force ? 1 : 0 };
+        if (ov.mx_host)        { body.mx_host       = ov.mx_host; }
+        if (ov.dkim_selector)  { body.dkim_selector = ov.dkim_selector; }
+        if (ov.dkim_value)     { body.dkim_value    = ov.dkim_value; }
+        if (ov.dmarc_policy)   { body.dmarc_policy  = ov.dmarc_policy; }
+        if (ov.spf_includes && ov.spf_includes.length) {
+            body.spf_includes = ov.spf_includes;
+        }
+        if (ov.spf_replace)    { body.spf_replace   = 1; }
+
+        ajaxCall('gs_membership_domain_email_preset_apply', body,
+            function (data) {
+                state.presetInFlight = false;
+                var apb2 = $('#gs-records-editor-apply-preset');
+                if (apb2) { apb2.disabled = false; }
+                // Success — applied:true.
+                if (data && data.applied === true) {
+                    var msg = String(i18n.presetSuccessToast || 'Applied {preset}: {n} records written.')
+                        .replace('{preset}', pk).replace('{n}', String(data.records_written || 0));
+                    closePresetPicker();
+                    fetchRecords();
+                    showToast(msg);
+                    return;
+                }
+                // Partial-failure rollback — applied:false + rolled_back:N-1 + failure:{...}.
+                if (data && data.applied === false && data.rolled_back != null) {
+                    renderRollbackAlert(data);
+                    return;
+                }
+                renderError('Unexpected preset response');
+                fetchRecords();
+            },
+            function (err) {
+                state.presetInFlight = false;
+                var apb3 = $('#gs-records-editor-apply-preset');
+                if (apb3) { apb3.disabled = false; }
+                if (err && err.code === 'spf_conflict_detected') {
+                    state.pendingSpfConflict = { existing_spf: err.existing_spf };
+                    renderSpfConflictWarning(err);
+                    return;
+                }
+                if (err && err.code === 'preset_validation_failed') {
+                    var msg = String(i18n.presetValidationFailed || 'Preset validation failed at record {index} ({field}): {message}')
+                        .replace('{index}',   String(err.failed_index != null ? err.failed_index : '?'))
+                        .replace('{field}',   String(err.failed_field || '?'))
+                        .replace('{message}', String(err.message || 'invalid'));
+                    renderError(msg);
+                    return;
+                }
+                renderError(mapErrorMessage(err));
+            }
+        );
+    }
+
+    function renderSpfConflictWarning(err) {
+        var picker = $('#gs-records-editor-preset-picker');
+        if (!picker) { return; }
+        var existing = (err && err.existing_spf) ? (err.existing_spf.content || '') : '';
+        var bodyStr = String(i18n.spfConflictBody || 'Your zone already has an SPF record: {existing}.')
+            .replace('{existing}', existing);
+        picker.innerHTML =
+            '<div class="gs-records-editor__warning is-spf-conflict" role="alertdialog" aria-modal="true">' +
+              '<h3>' + escapeHtml(i18n.spfConflictTitle || 'Existing SPF record found') + '</h3>' +
+              '<p>' + escapeHtml(bodyStr) + '</p>' +
+              '<div class="gs-records-editor__form-actions">' +
+                '<button type="button" class="gs-records-editor__btn is-warning" data-preset-force-ship>' +
+                  escapeHtml(i18n.spfConflictReplace || 'Replace SPF and apply preset') + '</button>' +
+                '<button type="button" class="gs-records-editor__btn" data-preset-cancel>' +
+                  escapeHtml(i18n.spfConflictCancel || 'Cancel') + '</button>' +
+              '</div>' +
+            '</div>';
+        picker.hidden = false;
+    }
+
+    function renderRollbackAlert(data) {
+        var picker = $('#gs-records-editor-preset-picker');
+        if (!picker) { return; }
+        var f = data.failure || {};
+        var bodyStr = String(i18n.presetRollbackAlertBody || 'The preset failed at record {index}. All previously-written records ({rolled_back}) have been deleted. Reason: {reason}')
+            .replace('{index}',       String(f.record_index != null ? f.record_index : '?'))
+            .replace('{rolled_back}', String(data.rolled_back || 0))
+            .replace('{reason}',      String(f.message || f.code || 'unknown'));
+        picker.innerHTML =
+            '<div class="gs-records-editor__warning is-rollback" role="alertdialog" aria-modal="true">' +
+              '<h3>' + escapeHtml(i18n.presetRollbackAlertTitle || 'Preset partially applied — rolled back') + '</h3>' +
+              '<p>' + escapeHtml(bodyStr) + '</p>' +
+              '<div class="gs-records-editor__form-actions">' +
+                '<button type="button" class="gs-records-editor__btn" data-preset-cancel>' +
+                  escapeHtml(i18n.presetRollbackAlertClose || 'Close') + '</button>' +
+              '</div>' +
+            '</div>';
+        picker.hidden = false;
+        // Rollback deleted everything back — refresh list to reflect actual zone state.
+        fetchRecords();
+    }
+
+    // ── Managed-record delete confirmation (per-type-specific copy) ──
+
+    function computeManagedDeleteCopy(record) {
+        var t = String(record.type || '').toUpperCase();
+        var n = String(record.name || '');
+        var c = String(record.content || '');
+        if (t === 'MX') { return i18n.deleteManagedMx || 'Deleting this MX record will stop email delivery.'; }
+        if (t === 'TXT' && n.indexOf('_dmarc') === 0)     { return i18n.deleteManagedDmarc || 'Deleting this DMARC record will break email report routing.'; }
+        if (t === 'TXT' && n.indexOf('._domainkey') !== -1) { return i18n.deleteManagedDkim || 'Deleting this DKIM record will break email signing.'; }
+        if (t === 'TXT' && c.indexOf('v=spf1') === 0)     { return i18n.deleteManagedSpf || 'Deleting this SPF record will break email sender verification.'; }
+        return i18n.deleteManagedGeneric || 'This record was written by an email preset. Deleting it may break email.';
+    }
+
+    function renderManagedDeleteConfirm(record) {
+        state.pendingManagedDelete = { record: record };
+        var bodyEl = $('#gs-records-editor-body');
+        if (!bodyEl) { return; }
+        var copy = computeManagedDeleteCopy(record).replace('{host}', state.zoneHost || '');
+        var recId = String(record.id || state.pendingDeleteRecord || '');
+        bodyEl.innerHTML =
+            '<div class="gs-records-editor__warning is-managed-delete" role="alertdialog" aria-modal="true">' +
+              '<h3>🔒 ' + escapeHtml(i18n.managedLockAriaLabel || 'Preset-managed record') + '</h3>' +
+              '<p>' + escapeHtml(copy) + '</p>' +
+              '<div class="gs-records-editor__form-actions">' +
+                '<button type="button" class="gs-records-editor__btn is-danger" data-managed-force-delete data-record-id="' + escapeHtml(recId) + '">' +
+                  escapeHtml(i18n.deleteManagedAnyway || 'Delete anyway') + '</button> ' +
+                '<button type="button" class="gs-records-editor__btn" data-managed-cancel>' +
+                  escapeHtml(i18n.deleteManagedCancel || 'Cancel') + '</button>' +
+              '</div>' +
+            '</div>';
+    }
+
     // ── Event wiring ───────────────────────────────────────────────
     function init() {
         // Delegated click handlers.
@@ -928,6 +1293,45 @@
                 handleSslWarningCancel();
                 return;
             }
+            // ── Phase 75-02 delegated clicks — preset picker + managed-record delete ──
+            if (t.hasAttribute && t.hasAttribute('data-open-preset-picker')) {
+                e.preventDefault();
+                openPresetPicker();
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-preset-apply')) {
+                e.preventDefault();
+                handleApplyPreset(false);
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-preset-force-ship')) {
+                // SPF conflict → retry with force=true (Ship-it-anyway pattern reused).
+                e.preventDefault();
+                state.pendingSpfConflict = null;
+                // Re-render the picker so pendingPreset shape is intact then submit with force.
+                renderPresetPicker();
+                handleApplyPreset(true);
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-preset-cancel')) {
+                e.preventDefault();
+                closePresetPicker();
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-managed-force-delete')) {
+                // Managed-record delete → force=1 (Ship-it-anyway reused from Phase 74).
+                e.preventDefault();
+                var mrid = t.getAttribute('data-record-id');
+                state.pendingManagedDelete = null;
+                submitDelete(mrid, true, 'managed_record_delete');
+                return;
+            }
+            if (t.hasAttribute && t.hasAttribute('data-managed-cancel')) {
+                e.preventDefault();
+                state.pendingManagedDelete = null;
+                fetchRecords();
+                return;
+            }
         });
 
         // Delegated change handler for proxy toggle in the list.
@@ -940,6 +1344,74 @@
             // Phase 74-02: SSL mode select in advanced-options.
             if (t && t.id === 'gs-records-editor-ssl-mode') {
                 handleSslModeSelectChange(e);
+                return;
+            }
+            // ── Phase 75-02: preset picker select + optional-field changes → re-render preview ──
+            if (t && t.hasAttribute && t.hasAttribute('data-preset-select')) {
+                var newPreset = t.value;
+                var ov = (state.pendingPreset && state.pendingPreset.overrides) || {};
+                state.pendingPreset = { preset: newPreset, overrides: ov };
+                renderPresetPicker();
+                return;
+            }
+            if (t && t.hasAttribute && t.hasAttribute('data-preset-field')) {
+                var field = t.getAttribute('data-preset-field');
+                var ov2 = (state.pendingPreset && state.pendingPreset.overrides) || {};
+                if (field === 'spf_includes') {
+                    ov2.spf_includes = String(t.value || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+                } else if (field === 'spf_replace') {
+                    ov2.spf_replace = !!t.checked;
+                } else {
+                    ov2[field] = t.value || null;
+                }
+                if (state.pendingPreset) {
+                    state.pendingPreset.overrides = ov2;
+                } else {
+                    state.pendingPreset = { preset: 'google_workspace', overrides: ov2 };
+                }
+                renderPresetPicker();
+                return;
+            }
+        });
+
+        // Phase 75-02: also handle 'input' events on textareas + text inputs so live-preview
+        // updates as operator types (change fires only on blur for text inputs).
+        document.addEventListener('input', function (e) {
+            var t = e.target;
+            if (!t || typeof t.getAttribute !== 'function') { return; }
+            if (t.hasAttribute && t.hasAttribute('data-preset-field')) {
+                var field = t.getAttribute('data-preset-field');
+                var ov3 = (state.pendingPreset && state.pendingPreset.overrides) || {};
+                if (field === 'spf_includes') {
+                    ov3.spf_includes = String(t.value || '').split('\n').map(function (s) { return s.trim(); }).filter(Boolean);
+                } else if (field === 'spf_replace') {
+                    // checkbox — handled by change, no-op on input
+                    return;
+                } else {
+                    ov3[field] = t.value || null;
+                }
+                if (state.pendingPreset) {
+                    state.pendingPreset.overrides = ov3;
+                } else {
+                    state.pendingPreset = { preset: 'google_workspace', overrides: ov3 };
+                }
+                // Debounce redraw to avoid caret-jump on every keystroke: only redraw the preview
+                // table + record count, not the whole picker (preserves text-input focus).
+                var picker = $('#gs-records-editor-preset-picker');
+                if (picker && state.pendingPreset) {
+                    var previewRecords = buildPresetPreview(state.pendingPreset.preset, ov3);
+                    var previewTbody = picker.querySelector('.gs-records-editor__preset-preview tbody');
+                    if (previewTbody) {
+                        previewTbody.innerHTML = previewRecords.map(function (r) {
+                            var contentSub = String(r.content || '').replace(/\{host\}/g, state.zoneHost || '');
+                            return '<tr><td>' + escapeHtml(r.type) + '</td>' +
+                                '<td>' + escapeHtml(r.name) + '</td>' +
+                                '<td>' + escapeHtml(contentSub) + '</td>' +
+                                '<td>' + escapeHtml(String(r.ttl)) + '</td>' +
+                                '<td>' + escapeHtml(r.priority != null ? String(r.priority) : '') + '</td></tr>';
+                        }).join('');
+                    }
+                }
                 return;
             }
         });
