@@ -131,6 +131,20 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-schema.php' ) ) {
 	Gend_GS_Collab_Schema::init();
 }
 
+// GenD Match (v12.0 Phase 82-02) — collab deck engine + gs/v1 REST routes.
+// The deck class has no hooks but the REST class calls it, so require both; the
+// REST class is bound by its OWN single rest_api_init add_action (per-class binding
+// pattern — do NOT fold these routes into the calendar REST class). Routes:
+//   GET  gs/v1/collab/deck  · POST gs/v1/collab/swipe · GET/POST gs/v1/collab/tags.
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-deck.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-deck.php';
+}
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-rest.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-rest.php';
+	add_action( 'rest_api_init', array( 'Gend_GS_Collab_REST', 'register_routes' ) );
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
