@@ -80,6 +80,14 @@ add_action( 'bp_include', function () {
     if ( file_exists( GS_DIR . 'inc/group-davinci-ai-tab.php' ) ) {
         require_once GS_DIR . 'inc/group-davinci-ai-tab.php';
     }
+    // GenD Match (v12.0 Phase 82-03) — swipe-deck group tab. Loaded AFTER
+    // group-app-tabs.php so its gs_group_tabs_user_has_access gate is defined
+    // (same reasoning as the group-davinci-ai-tab require). file_exists-guarded
+    // per the hub PVC .no-plugin-sync quirk (kubectl cp the file before this
+    // edit, or every request fatals + WP auto-deactivates the plugin).
+    if ( file_exists( GS_DIR . 'inc/collab/group-tab-collab.php' ) ) {
+        require_once GS_DIR . 'inc/collab/group-tab-collab.php';
+    }
 } );
 
 // Member profile pages (per-user CPT + BuddyPress embed)
