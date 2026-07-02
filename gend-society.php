@@ -115,6 +115,22 @@ if ( file_exists( GS_DIR . 'inc/class-availability-schema.php' ) ) {
 	Gend_GS_Availability_Schema::init();
 }
 
+// GenD Match (v12.0 Phase 82-01) — collab swipe-ledger schema + rule-based taxonomy.
+// gs_collab_swipes (never-re-show ledger, SWIPE-04 UNIQUE invariant) + gs_collab_matches
+// (schema only, Phase 83 populates) install via ONE version-gated dbDelta routine.
+// The taxonomy is a pure static class (no hooks) but REST + deck (Plan 82-02) require it,
+// so it is required here too so it is always loaded.
+// file_exists-guarded per the hub PVC .no-plugin-sync quirk: the include files MUST be
+// kubectl cp'd to the PVC BEFORE this entrypoint edit, or every request fatals + WP
+// auto-deactivates the plugin. Classes-before-entrypoint (82 deploy note).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-taxonomy.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-taxonomy.php';
+}
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-schema.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-schema.php';
+	Gend_GS_Collab_Schema::init();
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
