@@ -1,0 +1,336 @@
+/**
+ * gend-society — GenD Match swipe-deck styling (Phase 82-04, v12.0).
+ *
+ * Glassmorphic + construction-grid card stack for the "Match" group tab,
+ * reusing the #buddypress-scoped glass tokens from frontend-bar.php
+ * (backdrop-filter: blur(18px) saturate(160%); translucent surface; subtle
+ * border; rounded corners). No external @imports (CSP). No gesture/charting
+ * library — pure CSS driving the Plan 82-04 Pointer-Events controller.
+ *
+ * MANDATORY: .gs-collab-card { touch-action:none } — else a touch drag is
+ * stolen by page scroll and the swipe never fires.
+ *
+ * @package gend-society
+ */
+
+/* ------------------------------------------------------------------ */
+/* Panel + tag editor                                                  */
+/* ------------------------------------------------------------------ */
+.gs-collab-panel {
+	--gs-collab-glass: rgba( 18, 26, 48, 0.55 );
+	--gs-collab-border: rgba( 120, 150, 220, 0.28 );
+	--gs-collab-grid: rgba( 120, 150, 220, 0.10 );
+	color: #e8eefc;
+}
+
+.gs-collab-panel .gs-collab-header h3 {
+	letter-spacing: 0.2px;
+}
+
+.gs-collab-tag-form {
+	position: relative;
+	padding: 16px 18px;
+	border-radius: 14px;
+	border: 1px solid var( --gs-collab-border );
+	background: var( --gs-collab-glass );
+	-webkit-backdrop-filter: blur( 18px ) saturate( 160% );
+	backdrop-filter: blur( 18px ) saturate( 160% );
+	/* Faint construction-grid accent. */
+	background-image:
+		linear-gradient( var( --gs-collab-grid ) 1px, transparent 1px ),
+		linear-gradient( 90deg, var( --gs-collab-grid ) 1px, transparent 1px );
+	background-size: 26px 26px, 26px 26px;
+	background-blend-mode: overlay;
+}
+
+.gs-collab-tag-form select,
+.gs-collab-tag-form input[ type="text" ] {
+	background: rgba( 12, 18, 36, 0.6 );
+	border: 1px solid var( --gs-collab-border );
+	color: #f2f6ff;
+	padding: 8px 10px;
+	border-radius: 8px;
+	font-size: 0.85rem;
+}
+
+.gs-collab-tag-form select:focus,
+.gs-collab-tag-form input[ type="text" ]:focus {
+	outline: none;
+	border-color: rgba( 78, 170, 255, 0.7 );
+	box-shadow: 0 0 0 2px rgba( 78, 170, 255, 0.25 );
+}
+
+.gs-collab-save {
+	transition: background 0.15s ease, transform 0.1s ease;
+}
+
+.gs-collab-save:hover:not( :disabled ) {
+	background: rgba( 78, 170, 255, 0.32 ) !important;
+}
+
+.gs-collab-save:disabled {
+	opacity: 0.55;
+	cursor: default;
+}
+
+/* ------------------------------------------------------------------ */
+/* Deck + card stack                                                   */
+/* ------------------------------------------------------------------ */
+.gs-collab-deck-wrap {
+	margin-top: 8px;
+}
+
+#gs-collab-deck {
+	position: relative;
+	min-height: 360px;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	perspective: 1000px;
+}
+
+.gs-collab-card {
+	/* MANDATORY: without this a touch drag scrolls the page instead of
+	   dragging the card. */
+	touch-action: none;
+
+	position: relative;
+	width: 100%;
+	max-width: 360px;
+	box-sizing: border-box;
+	padding: 26px 24px 22px;
+	border-radius: 20px;
+	border: 1px solid var( --gs-collab-border );
+	background: var( --gs-collab-glass );
+	-webkit-backdrop-filter: blur( 18px ) saturate( 160% );
+	backdrop-filter: blur( 18px ) saturate( 160% );
+	box-shadow: 0 18px 48px rgba( 4, 8, 22, 0.45 );
+	text-align: center;
+	cursor: grab;
+	user-select: none;
+	will-change: transform;
+	transition: transform 0.18s ease;
+	/* Construction-grid inner accent. */
+	background-image:
+		linear-gradient( var( --gs-collab-grid ) 1px, transparent 1px ),
+		linear-gradient( 90deg, var( --gs-collab-grid ) 1px, transparent 1px );
+	background-size: 30px 30px, 30px 30px;
+	background-blend-mode: overlay;
+}
+
+.gs-collab-card:focus {
+	outline: none;
+	border-color: rgba( 78, 170, 255, 0.6 );
+	box-shadow: 0 18px 48px rgba( 4, 8, 22, 0.45 ), 0 0 0 2px rgba( 78, 170, 255, 0.3 );
+}
+
+.gs-collab-card.gs-collab-dragging {
+	cursor: grabbing;
+	transition: none; /* follow the pointer with no lag */
+}
+
+.gs-collab-avatar {
+	width: 96px;
+	height: 96px;
+	border-radius: 20px;
+	object-fit: cover;
+	margin: 0 auto 14px;
+	display: block;
+	border: 1px solid var( --gs-collab-border );
+	box-shadow: 0 8px 22px rgba( 4, 8, 22, 0.4 );
+}
+
+.gs-collab-avatar-placeholder {
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	font-size: 2.4rem;
+	font-weight: 700;
+	color: #cbd5f5;
+	background: rgba( 78, 170, 255, 0.14 );
+	text-transform: uppercase;
+}
+
+.gs-collab-name {
+	margin: 0 0 6px;
+	font-size: 1.25rem;
+	font-weight: 700;
+	color: #fff;
+}
+
+.gs-collab-tagline {
+	margin: 0 0 14px;
+	font-size: 0.9rem;
+	line-height: 1.4;
+	color: #cbd5f5;
+	display: -webkit-box;
+	-webkit-line-clamp: 3;
+	-webkit-box-orient: vertical;
+	overflow: hidden;
+}
+
+.gs-collab-chips {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	justify-content: center;
+}
+
+.gs-collab-chip {
+	display: inline-block;
+	padding: 4px 12px;
+	border-radius: 999px;
+	font-size: 0.76rem;
+	font-weight: 600;
+	color: #dbe6ff;
+	background: rgba( 78, 170, 255, 0.16 );
+	border: 1px solid rgba( 78, 170, 255, 0.35 );
+	text-transform: capitalize;
+}
+
+/* ------------------------------------------------------------------ */
+/* Drag-direction badges (JS toggles opacity)                          */
+/* ------------------------------------------------------------------ */
+.gs-collab-badge {
+	position: absolute;
+	top: 18px;
+	padding: 6px 14px;
+	border-radius: 8px;
+	font-size: 0.9rem;
+	font-weight: 800;
+	letter-spacing: 1px;
+	opacity: 0;
+	pointer-events: none;
+	transition: opacity 0.08s ease;
+}
+
+.gs-collab-badge-like {
+	right: 18px;
+	color: #67ffb0;
+	border: 2px solid #67ffb0;
+	transform: rotate( 12deg );
+	background: rgba( 40, 90, 60, 0.35 );
+}
+
+.gs-collab-badge-pass {
+	left: 18px;
+	color: #ff8a8a;
+	border: 2px solid #ff8a8a;
+	transform: rotate( -12deg );
+	background: rgba( 90, 40, 40, 0.35 );
+}
+
+/* ------------------------------------------------------------------ */
+/* Fly-off animation (commit)                                          */
+/* ------------------------------------------------------------------ */
+.gs-collab-card.gs-collab-fly-right {
+	transform: translateX( 120% ) rotate( 18deg ) !important;
+	opacity: 0;
+	transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+.gs-collab-card.gs-collab-fly-left {
+	transform: translateX( -120% ) rotate( -18deg ) !important;
+	opacity: 0;
+	transition: transform 0.25s ease, opacity 0.25s ease;
+}
+
+/* ------------------------------------------------------------------ */
+/* On-screen swipe buttons                                             */
+/* ------------------------------------------------------------------ */
+.gs-collab-btn {
+	transition: transform 0.1s ease, background 0.15s ease, box-shadow 0.15s ease;
+	-webkit-backdrop-filter: blur( 10px );
+	backdrop-filter: blur( 10px );
+	min-width: 120px;
+}
+
+.gs-collab-btn:hover:not( :disabled ) {
+	transform: translateY( -2px );
+	box-shadow: 0 8px 20px rgba( 4, 8, 22, 0.4 );
+}
+
+.gs-collab-btn:active:not( :disabled ) {
+	transform: translateY( 0 );
+}
+
+.gs-collab-btn:disabled {
+	opacity: 0.4;
+	cursor: default;
+}
+
+.gs-collab-pass:hover:not( :disabled ) {
+	background: rgba( 255, 90, 90, 0.28 ) !important;
+}
+
+.gs-collab-like:hover:not( :disabled ) {
+	background: rgba( 90, 220, 150, 0.3 ) !important;
+}
+
+/* ------------------------------------------------------------------ */
+/* Empty-state (SWIPE-06) + error line                                 */
+/* ------------------------------------------------------------------ */
+.gs-collab-empty {
+	display: block;
+	max-width: 360px;
+	margin: 0 auto;
+	padding: 28px 24px;
+	border-radius: 18px;
+	border: 1px dashed var( --gs-collab-border );
+	background: rgba( 18, 26, 48, 0.35 );
+	text-align: center;
+}
+
+.gs-collab-empty[ hidden ] {
+	display: none;
+}
+
+.gs-collab-deck-error {
+	max-width: 360px;
+	margin: 0 auto;
+	padding: 18px 20px;
+	border-radius: 14px;
+	border: 1px solid rgba( 255, 120, 120, 0.4 );
+	background: rgba( 90, 40, 40, 0.25 );
+	color: #ffb4b4;
+	text-align: center;
+	font-size: 0.88rem;
+}
+
+/* ------------------------------------------------------------------ */
+/* Responsive                                                          */
+/* ------------------------------------------------------------------ */
+@media ( max-width: 520px ) {
+	.gs-collab-tag-form .gs-collab-tag-grid {
+		flex-direction: column;
+		align-items: stretch;
+	}
+
+	.gs-collab-tag-form select,
+	.gs-collab-tag-form input[ type="text" ] {
+		min-width: 0 !important;
+		width: 100%;
+	}
+
+	#gs-collab-deck {
+		min-height: 320px;
+	}
+
+	.gs-collab-card {
+		max-width: 100%;
+	}
+
+	.gs-collab-btn {
+		flex: 1;
+		min-width: 0;
+	}
+}
+
+/* Respect reduced-motion. */
+@media ( prefers-reduced-motion: reduce ) {
+	.gs-collab-card,
+	.gs-collab-badge,
+	.gs-collab-btn {
+		transition: none !important;
+	}
+}
