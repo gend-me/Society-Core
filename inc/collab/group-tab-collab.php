@@ -176,6 +176,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 					<div class="gs-collab-controls" style="display:flex; justify-content:center; gap:18px; margin-top:16px;">
 						<button type="button" data-gs-collab-pass class="gs-collab-btn gs-collab-pass" aria-label="<?php echo esc_attr__( 'Pass', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(255,120,120,0.5); background:rgba(255,90,90,0.14); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Pass', 'gend-society' ); ?></button>
 						<button type="button" data-gs-collab-like class="gs-collab-btn gs-collab-like" aria-label="<?php echo esc_attr__( 'Interested', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(120,255,170,0.5); background:rgba(90,220,150,0.16); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Interested', 'gend-society' ); ?></button>
+						<button type="button" data-gs-collab-undo class="gs-collab-btn gs-collab-undo" disabled aria-label="<?php echo esc_attr__( 'Undo last swipe', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(160,170,255,0.45); background:rgba(120,130,255,0.14); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Undo', 'gend-society' ); ?></button>
 					</div>
 				</div>
 
