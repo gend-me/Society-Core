@@ -579,6 +579,156 @@ class Gend_GS_Collab_Contract {
 	}
 
 	/**
+	 * DGEN per Task Credit — MIRRORS Gend_CP_Task_Contract::rate()
+	 * (contracts-and-payments/includes/class-task-contract.php:44-46). Replicated
+	 * (not called) because that method, while public, keys off the SAME option, and
+	 * the reversal must compute the identical DGEN figure escrow() moved so the
+	 * refund is exact (1:1 CAD peg preserved).
+	 *
+	 * @return int DGEN per credit (>=1).
+	 */
+	private static function dgen_rate() : int {
+		return max( 1, (int) get_option( 'psoo_contract_exchange_rate', 15 ) );
+	}
+
+	/**
+	 * Escrow-holder user id — MIRRORS Gend_CP_Task_Contract::escrow_user_id()
+	 * (private there; class-task-contract.php:49-54). The wallet that RECEIVED the
+	 * escrowed DGEN in escrow(); the reversal debits it. Configured operator, else
+	 * first administrator, else 1.
+	 *
+	 * @return int Escrow-holder user id.
+	 */
+	private static function escrow_holder_uid() : int {
+		$opt = (int) get_option( 'gend_cp_hub_fee_user_id', 0 );
+		if ( $opt > 0 ) {
+			return $opt;
+		}
+		$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID' ) );
+		return ! empty( $admins ) ? (int) $admins[0] : 1;
+	}
+
+	/**
+	 * REVERSE_ESCROW — the compensating, chain-anchored, idempotent money reversal.
+	 *
+	 * This is the ONE genuinely-new bit of money code in Phase 84. Gend_CP_Task_Contract
+	 * has NO public un-escrow primitive (verified in 84-RESEARCH — the only refund
+	 * methods live in the unrelated affiliate-contract class, a different table; DO NOT
+	 * call those). So the both-sided ALL-OR-NOTHING rollback (accept_both_sided, below)
+	 * needs its OWN compensating move that MIRRORS escrow()'s money-move + chain-anchor
+	 * discipline (class-task-contract.php:77-131,185-196), reversed:
+	 *
+	 *   escrow():  debit payer -$dgen 'transact', credit escrow-holder +$dgen 'transact'
+	 *   reverse(): debit escrow-holder -$dgen 'transact', credit payer +$dgen 'transact'
+	 *
+	 * Idempotency (belt-and-suspenders, like escrow's _contract_dgen_escrowed guard):
+	 * a _contract_dgen_reversed='1' meta is set FIRST — BEFORE any DGEN moves — so a
+	 * mid-rollback retry can NEVER double-refund. A <=0 escrow reading (never funded /
+	 * already reversed) is a clean no-op.
+	 *
+	 * Undoes ONE side's escrow (the both-sided rollback undoes side A when side B fails),
+	 * returning the DGEN to the payer and chain-anchoring a compensating
+	 * chain.contract.escrow.reversal tx. Every mycred/PSOO/chain call is
+	 * class_exists/function_exists-guarded so a partial deploy degrades cleanly.
+	 *
+	 * @param int $task_id    The task whose escrow is being reversed.
+	 * @param int $project_id The task's project (for meta writes + chain payload).
+	 * @param int $payer_user The user whose DGEN was escrowed (gets it back).
+	 * @return true|WP_Error true on success or clean no-op; WP_Error only on an
+	 *                       unrecoverable state (e.g. myCRED absent while DGEN is held).
+	 */
+	public static function reverse_escrow( int $task_id, int $project_id, int $payer_user ) {
+		$task_id    = (int) $task_id;
+		$project_id = (int) $project_id;
+		$payer_user = (int) $payer_user;
+
+		if ( $task_id <= 0 ) {
+			return true; // nothing to reverse.
+		}
+
+		// PSOO meta bridge is how escrow() recorded _contract_dgen_escrowed. Without it
+		// we cannot read/zero the escrow meta — but no money can have been moved through
+		// a path we can undo either, so treat as a clean no-op.
+		if ( ! class_exists( 'PSOO_PM_Contracts' )
+			|| ! method_exists( 'PSOO_PM_Contracts', 'get_task_meta' )
+			|| ! method_exists( 'PSOO_PM_Contracts', 'set_task_meta' ) ) {
+			error_log( '[gs_collab_contract] reverse_escrow: PSOO_PM_Contracts meta bridge unavailable for task ' . $task_id . ' — no-op' );
+			return true;
+		}
+
+		// 1. Read what was escrowed. <=0 -> never escrowed (or already reversed/zeroed) -> no-op.
+		$dgen = (float) PSOO_PM_Contracts::get_task_meta( $task_id, '_contract_dgen_escrowed' );
+		if ( $dgen <= 0 ) {
+			return true;
+		}
+
+		// 2. Idempotency guard — set BEFORE any money moves so a retry can't double-refund.
+		if ( '1' === (string) PSOO_PM_Contracts::get_task_meta( $task_id, '_contract_dgen_reversed' ) ) {
+			return true; // already reversed.
+		}
+		PSOO_PM_Contracts::set_task_meta( $task_id, $project_id, '_contract_dgen_reversed', '1' );
+
+		// myCRED must be present to move DGEN back. If it's gone while DGEN is held, we
+		// have set the guard but cannot complete — surface a hard error (do NOT clear the
+		// guard: a later retry with myCRED present would double-refund; manual review).
+		if ( ! function_exists( 'mycred_add' ) ) {
+			error_log( '[gs_collab_contract] reverse_escrow: myCRED absent while ' . $dgen . ' DGEN held in escrow for task ' . $task_id . ' — manual review required' );
+			return new WP_Error( 'gs_collab_reverse_no_mycred', 'myCRED unavailable — escrow reversal could not complete', array( 'status' => 500 ) );
+		}
+
+		$escrow_holder = self::escrow_holder_uid();
+		$log_data      = array( 'project_id' => $project_id, 'task_id' => $task_id );
+
+		// 3. Reverse the two escrow legs (mirror class-task-contract.php:109-114, reversed):
+		//    escrow-holder -$dgen 'transact', payer +$dgen 'transact'.
+		mycred_add(
+			'collab_bond_reverse_debit',
+			$escrow_holder,
+			-$dgen,
+			sprintf( 'Collaboration bond escrow reversed (rollback) — Task #%d', $task_id ),
+			$task_id,
+			$log_data,
+			'transact'
+		);
+		mycred_add(
+			'collab_bond_reverse_credit',
+			$payer_user,
+			$dgen,
+			sprintf( 'Collaboration bond returned (rollback) — Task #%d', $task_id ),
+			$task_id,
+			$log_data,
+			'transact'
+		);
+
+		// 4. Zero the escrow meta so the contract no longer reads as funded (and a later
+		//    reverse_escrow is an immediate <=0 no-op).
+		PSOO_PM_Contracts::set_task_meta( $task_id, $project_id, '_contract_dgen_escrowed', '0' );
+
+		// 5. Chain-anchor the compensating reversal tx — mirror the anchor discipline in
+		//    class-task-contract.php:185-196 (guarded by class_exists/method_exists).
+		if ( class_exists( 'Gend_Chain_Validator' ) && method_exists( 'Gend_Chain_Validator', 'submit_tx' ) ) {
+			Gend_Chain_Validator::submit_tx( array(
+				'type'         => 'chain.contract.escrow.reversal',
+				'from_app_id'  => '',
+				'from_user_id' => $payer_user > 0 ? $payer_user : $escrow_holder,
+				'payload'      => array(
+					'task_id'    => $task_id,
+					'project_id' => $project_id,
+					'payer'      => $payer_user,
+					'holder'     => $escrow_holder,
+					'dgen'       => $dgen,
+					'rate'       => self::dgen_rate(),
+					'reason'     => 'both_sided_all_or_nothing_rollback',
+				),
+				'ts'           => time(),
+			) );
+		}
+
+		do_action( 'gend_gs_collab_escrow_reversed', $task_id, $payer_user, $dgen );
+		return true;
+	}
+
+	/**
 	 * Render the agreed milestones into the contract brief / task description HTML.
 	 *
 	 * @param mixed  $milestones Decoded milestones (array) or null.
