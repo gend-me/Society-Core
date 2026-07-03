@@ -68,6 +68,16 @@ class Gend_GS_Collab_REST {
 			),
 		) );
 
+		// POST /collab/undo — single-step undo of the actor group's last swipe (SWIPE-07).
+		register_rest_route( self::NS, '/collab/undo', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_undo' ),
+			'permission_callback' => array( __CLASS__, 'can_act_for_group' ), // reused verbatim
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ),
+			),
+		) );
+
 		// GET /collab/tags — the group's own tags + opt-in + enum labels.
 		register_rest_route( self::NS, '/collab/tags', array(
 			array(
@@ -196,6 +206,71 @@ class Gend_GS_Collab_REST {
 		// Idempotent: a repeat swipe is still ok:true. `matched` is true only when THIS
 		// swipe created a brand-new match row.
 		return rest_ensure_response( array( 'ok' => true, 'matched' => $matched ) );
+	}
+
+	/**
+	 * POST /collab/undo — single-step undo of the actor group's LAST swipe (SWIPE-07).
+	 *
+	 * Deletes exactly the most-recent gs_collab_swipes row for the acting group (by its
+	 * explicit id — race-safe, never "delete latest"), which un-decides the card because
+	 * SWIPE-04's never-re-show invariant is keyed on the row's EXISTENCE, so removing it
+	 * re-enters the card into the deck. The JS then re-inserts the returned card at the
+	 * front of the deck.
+	 *
+	 * REFUSED (locked anti-abuse/consistency rule) if the actor group's pair with the
+	 * swipe target already has a match row: a formed match + its intro thread must never
+	 * be torn down. This is a pure pair-existence check against gs_collab_matches'
+	 * UNIQUE(group_a,group_b) — NO schema change, no created_by_swipe_id column needed
+	 * (a match for the pair can only exist because that decision completed it).
+	 *
+	 * Single-step: this deletes only the one last row; the JS disables Undo until the
+	 * next commit. Reuses can_act_for_group verbatim as its permission_callback (admin/
+	 * mod/super-admin), so a logged-out call correctly 401s — no oauth allow-list entry.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_undo( WP_REST_Request $req ) {
+		global $wpdb;
+
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+			return new WP_Error( 'gs_collab_no_schema', 'collab schema unavailable', array( 'status' => 500 ) );
+		}
+
+		$from    = (int) $req->get_param( 'group_id' );
+		$swipes  = Gend_GS_Collab_Schema::swipes_table();
+		$matches = Gend_GS_Collab_Schema::matches_table();
+
+		// 1. Find this group's most-recent swipe (highest id — monotonic AUTO_INCREMENT).
+		$last = $wpdb->get_row( $wpdb->prepare(
+			"SELECT id, to_group_id, decision FROM {$swipes}
+			  WHERE from_group_id = %d ORDER BY id DESC LIMIT 1", $from ) );
+		if ( ! $last ) {
+			return new WP_Error( 'gs_collab_nothing_to_undo', 'No swipe to undo', array( 'status' => 409 ) );
+		}
+
+		// 2. REFUSE if this pair is already matched (locked rule). Normalized pair against
+		//    UNIQUE(group_a,group_b) — pure pair-existence, no new column.
+		$a       = min( $from, (int) $last->to_group_id );
+		$b       = max( $from, (int) $last->to_group_id );
+		$matched = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT id FROM {$matches} WHERE group_a = %d AND group_b = %d LIMIT 1", $a, $b ) );
+		if ( $matched > 0 ) {
+			return new WP_Error( 'gs_collab_undo_after_match',
+				'That swipe created a match — it can’t be undone.', array( 'status' => 409 ) );
+		}
+
+		// 3. Delete by EXPLICIT id (race-safe) → the card re-enters the deck.
+		$deleted = $wpdb->delete( $swipes, array( 'id' => (int) $last->id ), array( '%d' ) );
+		if ( false === $deleted ) {
+			return new WP_Error( 'gs_collab_undo_failed', 'Could not undo', array( 'status' => 500 ) );
+		}
+
+		return rest_ensure_response( array(
+			'ok'       => true,
+			'to_group' => (int) $last->to_group_id, // JS re-inserts this card at the deck front
+			'decision' => (string) $last->decision,
+		) );
 	}
 
 	/**
