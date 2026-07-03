@@ -46,7 +46,7 @@ class Gend_GS_Collab_Schema {
 	 * Schema version. Bump on any dbDelta change; maybe_install() will
 	 * re-run dbDelta on every blog whose option is below this value.
 	 */
-	const DB_VERSION     = '1.1.0';
+	const DB_VERSION     = '1.2.0';
 	const DB_VERSION_OPT = 'gs_collab_db_version';
 
 	/**
@@ -240,6 +240,38 @@ class Gend_GS_Collab_Schema {
 				KEY idx_status (prop_status)
 			) {$charset_collate};"
 		);
+
+		// Table 4: gs_collab_contract_outcomes — Phase 85 (RESOLVE-03) DARK
+		// terminal-outcome recorder store. Every CONTRACTED match's terminal
+		// contract state (success|fail|void) is recorded here exactly once,
+		// keyed UNIQUE(contract_task_id) — THE idempotency spine: a hook firing
+		// AND the 15-min cron sweep for the same contract collapse to ONE row
+		// (Gend_GS_Collab_Resolver::record() writes via INSERT IGNORE, and only
+		// audits + chain-anchors when rows_affected===1). Recorded REGARDLESS of
+		// GS_COLLAB_MARKET_PUBLIC (runs dark). NO money moves in Phase 85 — the
+		// future market (Phase 86) resolves off these rows; payout is Phase 88.
+		//   outcome ENUM('success','fail','void'): paid=>success, forfeited/
+		//     expired=>fail, cancelled(mutual)=>void.
+		//   reason VARCHAR: completed | forfeited | expired | cancelled.
+		//   source ENUM('hook','cron'): which observer recorded it first.
+		//   chain_tx_id: Gend_Chain_Validator::submit_tx id (nullable/backfillable).
+		//   match_id denormalized in for cheap Phase-86/88 joins.
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_contract_outcomes (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				match_id BIGINT UNSIGNED NOT NULL,
+				contract_task_id BIGINT UNSIGNED NOT NULL,
+				outcome ENUM('success','fail','void') NOT NULL,
+				reason VARCHAR(64) NOT NULL DEFAULT '',
+				source ENUM('hook','cron') NOT NULL DEFAULT 'hook',
+				chain_tx_id VARCHAR(64) NULL,
+				recorded_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_contract (contract_task_id),
+				KEY idx_match (match_id),
+				KEY idx_outcome (outcome)
+			) {$charset_collate};"
+		);
 	}
 
 	/**
@@ -268,6 +300,16 @@ class Gend_GS_Collab_Schema {
 	public static function proposals_table() : string {
 		global $wpdb;
 		return $wpdb->prefix . 'gs_collab_proposals';
+	}
+
+	/**
+	 * Helper: fully-qualified contract-outcomes table name for the current blog.
+	 * Phase 85 (Gend_GS_Collab_Resolver) record()/sweep() use this.
+	 * UNIQUE(contract_task_id) means one recorded terminal outcome per contract.
+	 */
+	public static function contract_outcomes_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_contract_outcomes';
 	}
 
 	/**
