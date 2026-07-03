@@ -103,6 +103,202 @@ class Gend_GS_Collab_REST {
 				),
 			),
 		) );
+
+		// ---------------------------------------------------------------
+		// Phase 84 (COLLAB-01) — contract escalation. Three HUB-ONLY routes.
+		// Tier A / PUBLIC (NOT GS_COLLAB_MARKET_PUBLIC-gated) but money-careful:
+		// the accept path moves DGEN so hub-only is enforced in the engine
+		// (is_main_node) AND in can_accept_contract. Auth model:
+		//   propose/decline → can_act_for_group (act for your OWN group_id)
+		//   accept          → can_accept_contract (must be admin/mod of the
+		//                     COUNTERPARTY group; proposer self-accept rejected)
+		// ---------------------------------------------------------------
+
+		// POST /collab/match/{id}/contract/propose — store a PENDING proposal.
+		register_rest_route( self::NS, '/collab/match/(?P<id>\d+)/contract/propose', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_contract_propose' ),
+			'permission_callback' => array( __CLASS__, 'can_act_for_group' ),
+			'args'                => array(
+				'group_id'     => array( 'required' => true, 'sanitize_callback' => 'absint' ), // proposer_group
+				'payer_group'  => array( 'sanitize_callback' => 'absint' ),
+				'payee_group'  => array( 'sanitize_callback' => 'absint' ),
+				'escrow_model' => array( 'sanitize_callback' => 'sanitize_key' ),
+				'credits'      => array( 'sanitize_callback' => 'absint' ),
+				'milestones'   => array( 'sanitize_callback' => array( __CLASS__, 'sanitize_milestones' ) ),
+			),
+		) );
+
+		// POST /collab/match/{id}/contract/accept — counterparty accepts → contract + escrow.
+		register_rest_route( self::NS, '/collab/match/(?P<id>\d+)/contract/accept', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_contract_accept' ),
+			'permission_callback' => array( __CLASS__, 'can_accept_contract' ),
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ), // acceptor's COUNTERPARTY group
+			),
+		) );
+
+		// POST /collab/match/{id}/contract/decline — either side declines / proposer cancels.
+		register_rest_route( self::NS, '/collab/match/(?P<id>\d+)/contract/decline', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_contract_decline' ),
+			'permission_callback' => array( __CLASS__, 'can_act_for_group' ),
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ),
+				'mode'     => array( 'sanitize_callback' => 'sanitize_key' ), // 'declined' | 'cancelled'
+			),
+		) );
+	}
+
+	/**
+	 * Sanitize the milestones REST arg: keep a JSON string as-is (the engine
+	 * decode/re-encodes to validate); wp_kses_post any plain-text brief.
+	 *
+	 * @param mixed $value Raw milestones param.
+	 * @return string
+	 */
+	public static function sanitize_milestones( $value ) : string {
+		if ( is_array( $value ) ) {
+			return (string) wp_json_encode( $value );
+		}
+		$value = (string) $value;
+		$trim  = trim( $value );
+		// A JSON array/object → pass through untouched (engine validates).
+		if ( '' !== $trim && ( '[' === $trim[0] || '{' === $trim[0] ) ) {
+			return $value;
+		}
+		return wp_kses_post( $value );
+	}
+
+	/**
+	 * REST-SAFE permission gate for ACCEPT: the acceptor must be an admin/mod (or
+	 * super-admin) of the COUNTERPARTY group — the matched group that is NOT the
+	 * proposal's proposer_group — AND must not be self-accepting. Hub-only: a
+	 * container call is unauthorized (the money route never runs off the hub).
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return bool
+	 */
+	public static function can_accept_contract( WP_REST_Request $req ) : bool {
+		global $wpdb;
+
+		$uid = (int) get_current_user_id();
+		$gid = (int) $req->get_param( 'group_id' ); // the COUNTERPARTY group the acceptor represents
+		if ( $uid <= 0 || $gid <= 0 ) {
+			return false;
+		}
+
+		// Hub-only: DGEN/chain live on the hub; a container accept is unauthorized.
+		$is_hub = ! class_exists( 'Gend_CP_OAuth_Resource' )
+			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
+			|| Gend_CP_OAuth_Resource::is_main_node();
+		if ( ! $is_hub ) {
+			return false;
+		}
+
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+			return false;
+		}
+
+		$match_id = (int) $req->get_param( 'id' );
+		if ( $match_id <= 0 ) {
+			return false;
+		}
+
+		// Resolve the proposal's proposer_group + the match's two groups.
+		$proposals      = Gend_GS_Collab_Schema::proposals_table();
+		$proposer_group = (int) $wpdb->get_var( $wpdb->prepare(
+			"SELECT proposer_group FROM {$proposals} WHERE match_id = %d AND prop_status = 'pending' LIMIT 1",
+			$match_id
+		) );
+		if ( $proposer_group <= 0 ) {
+			return false; // no pending proposal → nothing to accept
+		}
+
+		$matches = Gend_GS_Collab_Schema::matches_table();
+		$match   = $wpdb->get_row( $wpdb->prepare(
+			"SELECT group_a, group_b FROM {$matches} WHERE id = %d LIMIT 1", $match_id ) );
+		if ( ! $match ) {
+			return false;
+		}
+		$group_a = (int) $match->group_a;
+		$group_b = (int) $match->group_b;
+
+		// The acceptor's group MUST be the COUNTERPARTY (the matched group that is NOT
+		// the proposer_group) — this rejects a proposer trying to self-accept.
+		$counterparty = ( $proposer_group === $group_a ) ? $group_b : $group_a;
+		if ( $gid !== $counterparty || $gid === $proposer_group ) {
+			return false;
+		}
+
+		// Now the standard two-arg admin/mod check on the counterparty group.
+		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) {
+			return true;
+		}
+		return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )
+			|| ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $uid, $gid ) );
+	}
+
+	/**
+	 * POST /collab/match/{id}/contract/propose — store a PENDING proposal (COLLAB-01).
+	 * No contract, no project, no DGEN. Delegates to Gend_GS_Collab_Contract::propose.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_contract_propose( WP_REST_Request $req ) {
+		if ( ! class_exists( 'Gend_GS_Collab_Contract' ) ) {
+			return new WP_Error( 'gs_collab_no_engine', 'contract engine unavailable', array( 'status' => 500 ) );
+		}
+		$match_id       = (int) $req->get_param( 'id' );
+		$proposer_group = (int) $req->get_param( 'group_id' );
+		$args           = array(
+			'payer_group'  => (int) $req->get_param( 'payer_group' ),
+			'payee_group'  => (int) $req->get_param( 'payee_group' ),
+			'escrow_model' => (string) $req->get_param( 'escrow_model' ),
+			'credits'      => (int) $req->get_param( 'credits' ),
+			'milestones'   => $req->get_param( 'milestones' ),
+		);
+		$res = Gend_GS_Collab_Contract::propose( $match_id, $proposer_group, $args );
+		return rest_ensure_response( $res );
+	}
+
+	/**
+	 * POST /collab/match/{id}/contract/accept — the COUNTERPARTY admin accepts →
+	 * exactly one contract + one-sided DGEN escrow + thread linkage + match flip
+	 * (COLLAB-01/02). Auth (counterparty admin/mod, no self-accept) is enforced in
+	 * can_accept_contract. Delegates to Gend_GS_Collab_Contract::accept.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_contract_accept( WP_REST_Request $req ) {
+		if ( ! class_exists( 'Gend_GS_Collab_Contract' ) ) {
+			return new WP_Error( 'gs_collab_no_engine', 'contract engine unavailable', array( 'status' => 500 ) );
+		}
+		$match_id       = (int) $req->get_param( 'id' );
+		$acceptor_group = (int) $req->get_param( 'group_id' );
+		$res            = Gend_GS_Collab_Contract::accept( $match_id, $acceptor_group, (int) get_current_user_id() );
+		return rest_ensure_response( $res );
+	}
+
+	/**
+	 * POST /collab/match/{id}/contract/decline — either side declines / proposer
+	 * cancels a pending proposal. No contract, no funds. Delegates to
+	 * Gend_GS_Collab_Contract::decline.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_contract_decline( WP_REST_Request $req ) {
+		if ( ! class_exists( 'Gend_GS_Collab_Contract' ) ) {
+			return new WP_Error( 'gs_collab_no_engine', 'contract engine unavailable', array( 'status' => 500 ) );
+		}
+		$match_id = (int) $req->get_param( 'id' );
+		$mode     = (string) $req->get_param( 'mode' );
+		$res      = Gend_GS_Collab_Contract::decline( $match_id, $mode ?: 'declined' );
+		return rest_ensure_response( $res );
 	}
 
 	/**

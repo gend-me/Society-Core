@@ -163,6 +163,17 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-match.php' ) ) {
 	require_once GS_DIR . 'inc/collab/class-collab-match.php';
 }
 
+// GenD Match (v12.0 Phase 84) — collaboration-contract escalation engine. Pure
+// static class (propose/accept/decline) called by Gend_GS_Collab_REST's contract
+// routes; must load BEFORE rest_api_init fires so the routes' callbacks resolve.
+// Turns a Phase-83 match into a real Gend_CP_Task_Contract with one-sided DGEN
+// escrow by replaying the projects/C&P public API (no edit to those plugins — every
+// cross-plugin call is class_exists-guarded). No hooks — require is enough.
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-contract.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-contract.php';
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
