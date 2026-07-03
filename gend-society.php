@@ -153,6 +153,16 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Collab_REST', 'register_routes' ) );
 }
 
+// GenD Match (v12.0 Phase 83) — mutual-match engine. Populates gs_collab_matches
+// on a reciprocal right swipe (called thinly from Gend_GS_Collab_REST::route_swipe).
+// Seeds the BP intro thread + fires in-app + a guarded/debounced batched member-inbox
+// email (em_inbox_send_as is called guarded — NO email-manager edit; gend-society-only).
+// No hooks — a pure static logic class; require is enough. file_exists-guarded
+// (hub PVC .no-plugin-sync quirk; classes-before-entrypoint deploy discipline).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-match.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-match.php';
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
