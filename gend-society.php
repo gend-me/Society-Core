@@ -174,6 +174,20 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-contract.php' ) ) {
 	require_once GS_DIR . 'inc/collab/class-collab-contract.php';
 }
 
+// GenD Match (v12.0 Phase 85-02) — DARK terminal-outcome recorder + 15-min cron
+// backstop (RESOLVE-03). Subscribes to gend_cp_task_contract_paid (success) and the
+// Plan-01 gend_cp_task_contract_terminated (fail|void) actions, records every
+// CONTRACTED match's terminal contract state exactly once to gs_collab_contract_outcomes
+// (audit + chain-anchor), and a gs_collab_resolve_sweep cron backfills any a missed
+// hook left unrecorded (incl. deadline expiry). Runs DARK (records regardless of the
+// Phase-86+ market flag), hub-only, moves NO money. init() wires the hooks + cron.
+// Loaded AFTER class-collab-contract.php so the match/contract helpers exist first.
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-resolver.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-resolver.php';
+	Gend_GS_Collab_Resolver::init();
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
