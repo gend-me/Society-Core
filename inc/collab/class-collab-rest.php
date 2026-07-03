@@ -146,10 +146,16 @@ class Gend_GS_Collab_REST {
 	}
 
 	/**
-	 * POST /collab/swipe — idempotent ledger write (SWIPE-03). Records a decision
-	 * via Gend_GS_Collab_Schema::record_swipe (INSERT IGNORE) — a re-swipe on the
-	 * same (from,to) pair is still ok:true, no error. NEVER writes gs_collab_matches
-	 * (Phase 83 owns match creation — Tier A / money-free here).
+	 * POST /collab/swipe — idempotent ledger write (SWIPE-03) + mutual-match step
+	 * (Phase 83, MATCH-01/02/03). Records the decision via
+	 * Gend_GS_Collab_Schema::record_swipe (INSERT IGNORE) — a re-swipe on the same
+	 * (from,to) pair is still ok:true, no error. Then, ONLY on a 'right' swipe, calls
+	 * the (class_exists-guarded) Gend_GS_Collab_Match::maybe_create_match, which
+	 * race-safely creates a match on a reciprocal right swipe and — on a brand-new
+	 * match — seeds the BP intro thread + fires the in-app + guarded/debounced
+	 * batched-email notification. Still Tier A / money-free (no contract/market code).
+	 * The response gains a `matched` flag: true ONLY when THIS swipe created a
+	 * brand-new match (the JS shows an "It's a match!" toast + pre-disables Undo).
 	 *
 	 * @param WP_REST_Request $req Request.
 	 * @return WP_REST_Response|WP_Error
@@ -174,8 +180,22 @@ class Gend_GS_Collab_REST {
 			return new WP_Error( 'gs_collab_write_failed', 'could not record swipe', array( 'status' => 500 ) );
 		}
 
-		// Idempotent: a repeat swipe is still ok:true. NO match row is created here.
-		return rest_ensure_response( array( 'ok' => true ) );
+		// Mutual-match step (Phase 83). THIN call — all logic (reciprocal detection,
+		// race-safe insert, intro-thread seed, in-app + batched-email notify fan-out)
+		// lives in Gend_GS_Collab_Match. class_exists-guarded so a partial deploy (match
+		// class not yet on the PVC) degrades to Phase-82 record-only behavior instead of
+		// fataling.
+		$matched = false;
+		if ( 'right' === $decision && class_exists( 'Gend_GS_Collab_Match' ) ) {
+			// Returns a match id ONLY when THIS swipe created a NEW match row
+			// (rows_affected===1 winner). A left swipe / no-reciprocal / race-loser => 0.
+			$match_id = Gend_GS_Collab_Match::maybe_create_match( $from, $to );
+			$matched  = ( $match_id > 0 );
+		}
+
+		// Idempotent: a repeat swipe is still ok:true. `matched` is true only when THIS
+		// swipe created a brand-new match row.
+		return rest_ensure_response( array( 'ok' => true, 'matched' => $matched ) );
 	}
 
 	/**
