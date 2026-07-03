@@ -46,7 +46,7 @@ class Gend_GS_Collab_Schema {
 	 * Schema version. Bump on any dbDelta change; maybe_install() will
 	 * re-run dbDelta on every blog whose option is below this value.
 	 */
-	const DB_VERSION     = '1.0.0';
+	const DB_VERSION     = '1.1.0';
 	const DB_VERSION_OPT = 'gs_collab_db_version';
 
 	/**
@@ -210,6 +210,36 @@ class Gend_GS_Collab_Schema {
 				UNIQUE KEY uniq_pair (group_a, group_b)
 			) {$charset_collate};"
 		);
+
+		// Table 3: gs_collab_proposals — Phase 84 (COLLAB-01) PENDING-proposal
+		// state for the two-party propose→accept→decline escalation handshake.
+		// One LIVE proposal per match: UNIQUE(match_id) — a re-propose/amend
+		// clears the same row back to prop_status='pending' (engine, Task 2),
+		// never a second row. NO contract, NO project, NO DGEN is moved on
+		// propose; the money move happens ONLY on accept (engine). Added here
+		// (not on gs_collab_matches) to keep the match spine stable and isolate
+		// proposal churn — DB_VERSION 1.1.0 self-heals via maybe_install().
+		//   escrow_model ENUM('one_sided','both_sided'): both_sided is stored
+		//   but hard-rejected (clean 400) by the engine until Plan 84-02 lands.
+		//   prop_status ENUM('pending','accepted','declined','cancelled').
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_proposals (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				match_id BIGINT UNSIGNED NOT NULL,
+				proposer_group BIGINT UNSIGNED NOT NULL,
+				payer_group BIGINT UNSIGNED NOT NULL,
+				payee_group BIGINT UNSIGNED NOT NULL,
+				escrow_model ENUM('one_sided','both_sided') NOT NULL DEFAULT 'one_sided',
+				credits INT UNSIGNED NOT NULL DEFAULT 0,
+				milestones_json LONGTEXT NULL,
+				prop_status ENUM('pending','accepted','declined','cancelled') NOT NULL DEFAULT 'pending',
+				proposer_uid BIGINT UNSIGNED NOT NULL,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_match (match_id),
+				KEY idx_status (prop_status)
+			) {$charset_collate};"
+		);
 	}
 
 	/**
@@ -228,6 +258,16 @@ class Gend_GS_Collab_Schema {
 	public static function matches_table() : string {
 		global $wpdb;
 		return $wpdb->prefix . 'gs_collab_matches';
+	}
+
+	/**
+	 * Helper: fully-qualified proposals table name for the current blog.
+	 * Phase 84 (Gend_GS_Collab_Contract) propose/accept/decline use this.
+	 * UNIQUE(match_id) means one live proposal per match.
+	 */
+	public static function proposals_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_proposals';
 	}
 
 	/**
