@@ -59,6 +59,7 @@
 	// --- Related DOM nodes (all optional except the deck mount). ---
 	var passBtn  = document.querySelector( '[data-gs-collab-pass]' );
 	var likeBtn  = document.querySelector( '[data-gs-collab-like]' );
+	var undoBtn  = document.querySelector( '[data-gs-collab-undo]' );
 	var emptyEl  = document.querySelector( '.gs-collab-empty' );
 	var tagForm  = document.getElementById( 'gs-collab-tag-form' );
 	var catSel   = document.querySelector( '[data-gs-collab-category]' );
@@ -74,6 +75,7 @@
 	var hasMore  = true;   // false once the server reports no further pages
 	var busy     = false;  // guards concurrent commit()/loadMore()
 	var facets   = {};     // active facet filters (TAG-03), if any controls exist
+	var lastSwiped = null; // {card, decision} of the last committed swipe (SWIPE-07 undo)
 
 	var SWIPE_THRESHOLD = 90; // px, or 25% of card width — see pointerup
 
@@ -308,6 +310,17 @@
 			body: { group_id: groupId, to_group: card.group_id, decision: decision }
 		} ).then( function ( res ) {
 			if ( res.ok && res.data && res.data.ok ) {
+				// SWIPE-07: remember this card so the Undo button can pop it back.
+				lastSwiped = { card: card, decision: decision };
+				if ( res.data.matched === true ) {
+					// A match formed — the server will refuse an undo, so pre-disable
+					// it for a snappier UX (server still enforces the refusal).
+					lastSwiped = null;
+					if ( undoBtn ) { undoBtn.disabled = true; }
+					setStatus( 'It’s a match!', false );
+				} else if ( undoBtn ) {
+					undoBtn.disabled = false;
+				}
 				// Committed — drop the card and advance.
 				queue.shift();
 				busy = false;
@@ -330,6 +343,34 @@
 	}
 	if ( likeBtn ) {
 		likeBtn.addEventListener( 'click', function () { commit( 'right' ); } );
+	}
+
+	// --- Undo (SWIPE-07): single-step undo of the last swipe. Pops the last card
+	// back to the front of the deck on success; on a 409 (match formed / nothing to
+	// undo) it surfaces the server message and leaves the card gone. ---
+	if ( undoBtn ) {
+		undoBtn.addEventListener( 'click', function () {
+			if ( busy || undoBtn.disabled ) {
+				return;
+			}
+			busy = true;
+			api( '/collab/undo', { method: 'POST', body: { group_id: groupId } } ).then( function ( res ) {
+				busy = false;
+				if ( res.ok && res.data && res.data.ok ) {
+					if ( lastSwiped && lastSwiped.card ) {
+						queue.unshift( lastSwiped.card ); // card returns to deck front
+					}
+					lastSwiped = null;
+					undoBtn.disabled = true; // single-step: disable until next swipe
+					setStatus( 'Undone.', false );
+					renderTop();
+				} else {
+					// 409 gs_collab_undo_after_match / nothing-to-undo — surface, card stays gone.
+					setStatus( ( res.data && res.data.message ) || 'Nothing to undo.', true );
+					undoBtn.disabled = true;
+				}
+			} );
+		} );
 	}
 
 	// --- Keyboard (SWIPE-01 a11y): only act when a card is rendered and not
@@ -419,6 +460,9 @@
 				hasMore = true;
 				busy    = false;
 				facets  = readFacets();
+				// SWIPE-07: a reloaded deck starts with undo disabled.
+				lastSwiped = null;
+				if ( undoBtn ) { undoBtn.disabled = true; }
 				if ( emptyEl ) {
 					emptyEl.hidden = true;
 					emptyEl.setAttribute( 'hidden', 'hidden' );
