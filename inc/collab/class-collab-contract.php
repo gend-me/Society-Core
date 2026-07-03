@@ -25,7 +25,10 @@
  *                'contracted' + store contract_task_id (WHERE contract_task_id IS NULL
  *                for race-safety) -> mark proposal accepted. Insufficient DGEN aborts
  *                cleanly (delete the just-created task, return WP_Error, no partial
- *                state). BOTH-SIDED is a clean 400 STUB until Plan 84-02 lands.
+ *                state). BOTH-SIDED (Plan 84-02) dispatches to accept_both_sided():
+ *                TWO linked one-sided escrows with ALL-OR-NOTHING rollback — if side B
+ *                fails, side A's escrow is REVERSED (reverse_escrow) so no half-funded
+ *                state can exist; the match only flips 'contracted' when BOTH funded.
  *   decline()  — either side declines ('declined') / the proposer cancels
  *                ('cancelled') a pending proposal. No contract, no funds.
  *
@@ -271,12 +274,10 @@ class Gend_GS_Collab_Contract {
 			return new WP_Error( 'gs_collab_no_proposal', 'no pending proposal to accept', array( 'status' => 404 ) );
 		}
 
-		// 4. both_sided is a clean 400 STUB until Plan 84-02 supplies accept_both_sided().
+		// 4. both_sided -> TWO linked escrows + all-or-nothing rollback (Plan 84-02).
+		//    Replaces the 84-01 "coming soon" 400 stub — dispatch is now unconditional.
 		if ( 'both_sided' === (string) $proposal->escrow_model ) {
-			if ( method_exists( __CLASS__, 'accept_both_sided' ) ) {
-				return self::accept_both_sided( $match, $proposal, $acceptor_uid );
-			}
-			return new WP_Error( 'gs_collab_both_sided_pending', 'both-sided escrow coming soon', array( 'status' => 400 ) );
+			return self::accept_both_sided( $match, $proposal, $acceptor_uid );
 		}
 
 		// 5. ONE-SIDED path — replay the proven create+escrow sequence.
@@ -404,6 +405,268 @@ class Gend_GS_Collab_Contract {
 			'contract_task_id' => $task_id,
 			'project_id'       => $project_id,
 			'intro_thread_id'  => $intro_thread_id,
+		);
+	}
+
+	/**
+	 * (C-both) ACCEPT_BOTH_SIDED — the commitment-bond escalation, realized as TWO
+	 * linked one-sided Gend_CP_Task_Contract::escrow calls with ALL-OR-NOTHING rollback.
+	 *
+	 * escrow side A (group_a's admin funds task A), then side B (group_b's admin funds
+	 * task B). Each side escrows an EQUAL commitment bond of `credits`. If side B fails
+	 * (insufficient DGEN / any error, INCLUDING being unable to create side B's task/
+	 * project), side A is REVERSED via reverse_escrow() — DGEN returned to side A's payer,
+	 * chain-anchored — so NO half-funded escrow can ever exist. On a failed both-sided
+	 * accept: BOTH sides end unfunded, NO contract is created/left, the match stays
+	 * 'matched', and DGEN is made whole. Only when BOTH escrows succeed is the match
+	 * flipped to 'contracted', the thread linked, and both task ids recorded.
+	 *
+	 * Called (only) from accept() when the stored escrow_model is 'both_sided'. accept()
+	 * has already run the hub gate, the contract_task_id-IS-NULL idempotency short-circuit,
+	 * and loaded the pending proposal — so this is invoked exactly once per live proposal.
+	 *
+	 * Signature mirrors the 84-01 dispatch: accept() passes the loaded ($match, $proposal)
+	 * rows plus the accepting user id (context / fallback payer).
+	 *
+	 * @param object $match      The loaded match row (id, group_a, group_b, intro_thread_id, ...).
+	 * @param object $proposal   The loaded pending proposal row (credits, escrow_model, ...).
+	 * @param int    $acceptor_uid The accepting user id (counterparty group admin/mod).
+	 * @return array|WP_Error
+	 */
+	public static function accept_both_sided( $match, $proposal, int $acceptor_uid ) {
+		global $wpdb;
+
+		if ( ! is_object( $match ) || ! is_object( $proposal ) ) {
+			return new WP_Error( 'gs_collab_bad_state', 'invalid match/proposal state', array( 'status' => 500 ) );
+		}
+
+		// Cross-plugin availability — a partial deploy degrades to a clean WP_Error
+		// (never a fatal that would auto-deactivate gend-society). NO DGEN has moved yet.
+		if ( ! class_exists( 'PSOO_PM_Projects' ) || ! class_exists( 'PSOO_PM_Tasks' ) || ! class_exists( 'PSOO_PM_Contracts' ) ) {
+			return new WP_Error( 'gs_collab_pm_unavailable', 'projects plugin unavailable on this node', array( 'status' => 500 ) );
+		}
+		if ( ! class_exists( 'Gend_CP_Task_Contract' ) || ! method_exists( 'Gend_CP_Task_Contract', 'escrow' ) ) {
+			return new WP_Error( 'gs_collab_escrow_unavailable', 'contract escrow primitive unavailable on this node', array( 'status' => 500 ) );
+		}
+
+		$match_id = (int) $match->id;
+		$group_a  = (int) $match->group_a;
+		$group_b  = (int) $match->group_b;
+		$credits  = (int) $proposal->credits;
+
+		$name_a          = self::group_name( $group_a );
+		$name_b          = self::group_name( $group_b );
+		$milestones      = json_decode( (string) $proposal->milestones_json, true );
+		$milestones_html = self::milestones_html( $milestones, $name_a, $name_b );
+
+		// Each side's payer = first admin of that group; fall back to the acceptor if a
+		// group has no resolvable admin (defensive — the bond still lands on a real user).
+		$payer_a = self::first_group_admin( $group_a );
+		if ( $payer_a <= 0 ) {
+			$payer_a = $acceptor_uid;
+		}
+		$payer_b = self::first_group_admin( $group_b );
+		if ( $payer_b <= 0 ) {
+			$payer_b = $acceptor_uid;
+		}
+
+		// ---- SIDE A: project + task + escrow ---------------------------------------
+		$proj_a = self::ensure_group_project( $group_a, $name_a, $name_b );
+		if ( is_wp_error( $proj_a ) ) {
+			return $proj_a; // nothing funded — clean abort.
+		}
+		$project_a = (int) $proj_a;
+
+		$task_a = PSOO_PM_Tasks::create( array(
+			'title'       => sprintf( 'Collaboration bond — %s', $name_a ),
+			'project_id'  => $project_a,
+			'description' => $milestones_html,
+		) );
+		if ( is_wp_error( $task_a ) || (int) $task_a <= 0 ) {
+			return is_wp_error( $task_a )
+				? $task_a
+				: new WP_Error( 'gs_collab_task_failed', 'could not create side-A collaboration task', array( 'status' => 500 ) );
+		}
+		$task_a = (int) $task_a;
+
+		$escrow_a = Gend_CP_Task_Contract::escrow( $task_a, $project_a, $credits, $payer_a );
+		if ( is_wp_error( $escrow_a ) ) {
+			// Side A never funded — no rollback needed; just delete the draft task.
+			self::delete_task( $task_a );
+			return $escrow_a; // clean abort — nothing funded, match untouched.
+		}
+
+		// ---- SIDE B: project + task + escrow (ALL-OR-NOTHING from here) -------------
+		// Any failure below MUST reverse side A's escrow so no half-funded state exists.
+		$proj_b = self::ensure_group_project( $group_b, $name_a, $name_b );
+		if ( is_wp_error( $proj_b ) ) {
+			return self::rollback_side_a( $task_a, $project_a, $payer_a, $proj_b,
+				'side B project creation failed' );
+		}
+		$project_b = (int) $proj_b;
+
+		$task_b = PSOO_PM_Tasks::create( array(
+			'title'       => sprintf( 'Collaboration bond — %s', $name_b ),
+			'project_id'  => $project_b,
+			'description' => $milestones_html,
+		) );
+		if ( is_wp_error( $task_b ) || (int) $task_b <= 0 ) {
+			$err = is_wp_error( $task_b )
+				? $task_b
+				: new WP_Error( 'gs_collab_task_failed', 'could not create side-B collaboration task', array( 'status' => 500 ) );
+			return self::rollback_side_a( $task_a, $project_a, $payer_a, $err,
+				'side B task creation failed' );
+		}
+		$task_b = (int) $task_b;
+
+		$escrow_b = Gend_CP_Task_Contract::escrow( $task_b, $project_b, $credits, $payer_b );
+		if ( is_wp_error( $escrow_b ) ) {
+			// THE first-class rollback path: side B's escrow failed (e.g. insufficient
+			// DGEN) — reverse side A, delete side B's draft task, leave the match unflipped.
+			self::delete_task( $task_b );
+			return self::rollback_side_a( $task_a, $project_a, $payer_a, $escrow_b,
+				'side B escrow failed (insufficient DGEN or error)' );
+		}
+
+		// ---- BOTH SIDES FUNDED: commit the contract ---------------------------------
+		if ( method_exists( 'PSOO_PM_Contracts', 'save_contract' ) ) {
+			PSOO_PM_Contracts::save_contract( $task_a, $project_a, array(
+				'brief'      => $milestones_html,
+				'credits'    => $credits,
+				'status'     => 'open',
+				'offered_by' => $payer_a,
+			) );
+			PSOO_PM_Contracts::save_contract( $task_b, $project_b, array(
+				'brief'      => $milestones_html,
+				'credits'    => $credits,
+				'status'     => 'open',
+				'offered_by' => $payer_b,
+			) );
+		}
+
+		// Link the intro thread ONCE, to the primary (side A) project. Logged + swallowed.
+		$intro_thread_id = (int) $match->intro_thread_id;
+		if ( $intro_thread_id > 0 ) {
+			self::link_thread_to_project( $intro_thread_id, $project_a );
+		}
+
+		// Flip the match — race-safe WHERE contract_task_id IS NULL. contract_task_id =
+		// side A's task; side B's task id is stored as match meta (planner's discretion —
+		// gs_collab_matches has no second column and we avoid a DDL change for one field).
+		update_option( 'gs_collab_match_' . $match_id . '_task_b', $task_b, false );
+
+		$matches = Gend_GS_Collab_Schema::matches_table();
+		$flipped = $wpdb->query( $wpdb->prepare(
+			"UPDATE {$matches} SET status = 'contracted', contract_task_id = %d
+			  WHERE id = %d AND contract_task_id IS NULL",
+			$task_a,
+			$match_id
+		) );
+
+		// Lost the flip race -> a concurrent accept already contracted this match. Both
+		// escrow() calls self-guarded _contract_dgen_escrowed so no double-debit occurred;
+		// return the winner's id.
+		if ( 0 === (int) $flipped ) {
+			$fresh = self::get_match( $match_id );
+			if ( $fresh && ! empty( $fresh->contract_task_id ) ) {
+				return array(
+					'ok'                 => true,
+					'already'            => true,
+					'escrow_model'       => 'both_sided',
+					'contract_task_id'   => (int) $fresh->contract_task_id,
+					'contract_task_id_b' => $task_b,
+					'project_id'         => $project_a,
+					'intro_thread_id'    => $intro_thread_id,
+				);
+			}
+		}
+
+		// Mark the proposal accepted.
+		$proposals = Gend_GS_Collab_Schema::proposals_table();
+		$wpdb->update(
+			$proposals,
+			array( 'prop_status' => 'accepted' ),
+			array( 'match_id' => $match_id ),
+			array( '%s' ),
+			array( '%d' )
+		);
+
+		return array(
+			'ok'                 => true,
+			'escrow_model'       => 'both_sided',
+			'contract_task_id'   => $task_a,
+			'contract_task_id_b' => $task_b,
+			'project_id'         => $project_a,
+			'project_id_b'       => $project_b,
+			'intro_thread_id'    => $intro_thread_id,
+		);
+	}
+
+	/**
+	 * Ensure a project exists for a group (reuse the group's project or create one).
+	 * Shared by both sides of accept_both_sided.
+	 *
+	 * @param int    $gid    Group id.
+	 * @param string $name_a Group A display name (for the project title).
+	 * @param string $name_b Group B display name.
+	 * @return int|WP_Error Project id, or WP_Error.
+	 */
+	private static function ensure_group_project( int $gid, string $name_a, string $name_b ) {
+		$existing = PSOO_PM_Projects::get_for_group( $gid );
+		if ( ! empty( $existing ) && isset( $existing[0]->id ) ) {
+			return (int) $existing[0]->id;
+		}
+		$project_id = PSOO_PM_Projects::create( array(
+			'title'    => sprintf( '%s x %s collaboration', $name_a, $name_b ),
+			'group_id' => $gid,
+		) );
+		if ( is_wp_error( $project_id ) || (int) $project_id <= 0 ) {
+			return is_wp_error( $project_id )
+				? $project_id
+				: new WP_Error( 'gs_collab_project_failed', 'could not create collaboration project', array( 'status' => 500 ) );
+		}
+		return (int) $project_id;
+	}
+
+	/**
+	 * ALL-OR-NOTHING rollback of side A: reverse side A's escrow (DGEN back to payer A,
+	 * chain-anchored), delete side A's draft task, and return a WP_Error that makes clear
+	 * side A was rolled back due to a side-B failure. NO match flip, NO thread linkage,
+	 * NO proposal-accepted write — the match stays 'matched', DGEN is whole.
+	 *
+	 * @param int      $task_a    Side A task id (its escrow is reversed).
+	 * @param int      $project_a Side A project id.
+	 * @param int      $payer_a   Side A payer (gets DGEN back).
+	 * @param WP_Error $cause     The side-B failure that triggered the rollback.
+	 * @param string   $reason    Human-readable rollback reason (for the error + log).
+	 * @return WP_Error
+	 */
+	private static function rollback_side_a( int $task_a, int $project_a, int $payer_a, $cause, string $reason ) {
+		$reversed = self::reverse_escrow( $task_a, $project_a, $payer_a );
+		if ( is_wp_error( $reversed ) ) {
+			// The reversal itself could not complete (e.g. myCRED vanished) — this is a
+			// genuinely stuck money state; surface it loudly, do NOT swallow.
+			error_log( '[gs_collab_contract] accept_both_sided: side-A rollback FAILED for task ' . $task_a . ' (' . $reason . '): ' . $reversed->get_error_message() );
+			return new WP_Error(
+				'gs_collab_rollback_failed',
+				sprintf( 'Both-sided accept failed (%s) AND side-A escrow reversal could not complete — manual review required.', $reason ),
+				array( 'status' => 500 )
+			);
+		}
+
+		self::delete_task( $task_a );
+
+		$cause_msg  = is_wp_error( $cause ) ? $cause->get_error_message() : (string) $cause;
+		$cause_code = is_wp_error( $cause ) ? $cause->get_error_code() : 'gs_collab_both_sided_failed';
+		$cause_data = is_wp_error( $cause ) ? (array) $cause->get_error_data() : array();
+		$status     = isset( $cause_data['status'] ) ? (int) $cause_data['status'] : 400;
+
+		error_log( '[gs_collab_contract] accept_both_sided: rolled back side A (task ' . $task_a . ') — ' . $reason . ': ' . $cause_msg );
+
+		return new WP_Error(
+			$cause_code,
+			sprintf( 'Both-sided escrow aborted (%s). Side A was rolled back — no contract created, DGEN returned.', $reason ),
+			array( 'status' => $status )
 		);
 	}
 
