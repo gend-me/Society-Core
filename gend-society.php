@@ -18,6 +18,16 @@ define('GS_VERSION', '1.1.4');
 define('GS_DIR', plugin_dir_path(__FILE__));
 define('GS_URL', plugin_dir_url(__FILE__));
 
+// GenD Match v12.0 Phase 86 — Tier B counsel gate (default false, DOM-absent +
+// route-404 when off). Market auto-creation + subsidy funding are gated on this;
+// the engine METHODS and the outcome recorder run flag-independent. Guarded so an
+// operator can pre-define it truthy in wp-config without being clobbered, and so a
+// re-define never fires. Defined BEFORE the collab requires so every collab class
+// sees it.
+if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) ) {
+    define( 'GS_COLLAB_MARKET_PUBLIC', false );
+}
+
 // Core includes
 require_once GS_DIR . 'inc/admin-style.php';
 require_once GS_DIR . 'inc/admin-menu.php';
