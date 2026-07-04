@@ -52,7 +52,8 @@ class Gend_GS_Collab_Schema {
 	// gs_collab_positions.realized_dgen for sell-back realized P/L.
 	// 1.5.0 (Phase 88-01): gs_collab_positions.paid/paid_at/payout_dgen (resumable settlement
 	// idempotency) + gs_collab_markets.resolved_outcome/resolved_at/paid_at (resolve metadata).
-	const DB_VERSION     = '1.5.0';
+	// 1.6.0 (Phase 89-01): gs_collab_outbox (container push retry) + gs_collab_federated_business (hub contribute-up shadow).
+	const DB_VERSION     = '1.6.0';
 	const DB_VERSION_OPT = 'gs_collab_db_version';
 
 	/**
@@ -412,6 +413,75 @@ class Gend_GS_Collab_Schema {
 				KEY idx_market_user (market_id, user_id)
 			) {$charset_collate};"
 		);
+
+		// Table 9: gs_collab_outbox — Phase 89 (FED-01) CONTAINER-side push retry
+		// queue. Each cross-app swipe/business-contribute is pushed to the hub over
+		// the gend-pm-sync/v1 ed25519 rail fire-and-forget (blocking=false); on a
+		// synchronous WP_Error / skip it is enqueued here and re-sent by the
+		// container-side drain on the existing gs_fifteen_min cadence (NO new cron
+		// interval). UNIQUE(event_id) makes a re-enqueue an idempotent no-op — the
+		// event_id is a STABLE id (install_id:local_swipe_row_id) so a retry never
+		// double-queues; downstream hub ingest is ALSO idempotent (record_swipe
+		// INSERT IGNORE), so an occasional double-send is harmless. P2 SAFETY: the
+		// outbox is best-effort mirror ONLY — the local swipe ledger is written
+		// FIRST/locally regardless, so a hub hiccup never blocks the local loop.
+		//   endpoint: the rail path to POST ('/collab/swipe' | '/collab/business').
+		//   payload_json: the exact body to (re-)sign + POST.
+		//   attempts/next_try_at: drain backoff cursor; idx_due drives the drain
+		//     `WHERE next_try_at <= now` index scan (LIMIT-batched per tick).
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_outbox (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				event_id VARCHAR(96) NOT NULL,
+				endpoint VARCHAR(64) NOT NULL,
+				payload_json LONGTEXT NOT NULL,
+				attempts INT UNSIGNED NOT NULL DEFAULT 0,
+				next_try_at INT UNSIGNED NOT NULL DEFAULT 0,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_event (event_id),
+				KEY idx_due (next_try_at)
+			) {$charset_collate};"
+		);
+
+		// Table 10: gs_collab_federated_business — Phase 89 (FED-01) HUB-side
+		// contribute-up shadow of a CONTAINER's business group, mirroring the
+		// gend_pm_shadow_* keying pattern (install_id + remote entity id UNIQUE,
+		// data_json forward-compat blob). Pushed up the SAME rail whenever a
+		// container business toggles opt-in / edits its collab tags, so the ONE
+		// hub-held pool (hub businesses ∪ federated container businesses) is
+		// discoverable by every connected business + matchable by the Phase-83
+		// engine. UNIQUE(install_id,remote_group_id) makes a re-contribute an
+		// idempotent upsert (never a double-insert of the same container business).
+		//   install_id: the origin_app_id (which container contributed this).
+		//   remote_group_id: the business group id ON the container.
+		//   hub_group_id: the container's LINKED hub group — the MATCHABLE id the
+		//     cross-app deck swipes resolve to (keeps maybe_create_match unchanged,
+		//     it only needs group ids); the card renders the shadow's OWN name/tags.
+		//   optin: hub deck UNION arm filters optin=1 (idx_optin).
+		//   data_json: forward-compat blob for future contributed fields.
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_federated_business (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				install_id VARCHAR(64) NOT NULL,
+				remote_group_id BIGINT UNSIGNED NOT NULL,
+				hub_group_id BIGINT UNSIGNED NOT NULL,
+				name VARCHAR(500) NULL,
+				tagline TEXT NULL,
+				avatar_url TEXT NULL,
+				category VARCHAR(64) NULL,
+				industry VARCHAR(64) NULL,
+				location VARCHAR(191) NULL,
+				optin TINYINT(1) NOT NULL DEFAULT 1,
+				data_json LONGTEXT NULL,
+				last_synced_at INT UNSIGNED NOT NULL DEFAULT 0,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_remote (install_id, remote_group_id),
+				KEY idx_hub_group (hub_group_id),
+				KEY idx_optin (optin)
+			) {$charset_collate};"
+		);
 	}
 
 	/**
@@ -492,6 +562,29 @@ class Gend_GS_Collab_Schema {
 	public static function bet_idem_table() : string {
 		global $wpdb;
 		return $wpdb->prefix . 'gs_collab_bet_idem';
+	}
+
+	/**
+	 * Helper: fully-qualified outbox table name for the current blog.
+	 * Phase 89 (FED-01) container-side push retry queue — the sync push enqueues
+	 * a failed/skipped cross-app push here and the container-side drain re-sends
+	 * it on the existing gs_fifteen_min cadence. UNIQUE(event_id) makes a
+	 * re-enqueue idempotent.
+	 */
+	public static function outbox_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_outbox';
+	}
+
+	/**
+	 * Helper: fully-qualified federated-business shadow table name for the current
+	 * blog. Phase 89 (FED-01) hub-side contribute-up shadow of a container's
+	 * business group. UNIQUE(install_id,remote_group_id) means one shadow row per
+	 * contributed container business; hub_group_id is the matchable hub group id.
+	 */
+	public static function federated_business_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_federated_business';
 	}
 
 	/**
