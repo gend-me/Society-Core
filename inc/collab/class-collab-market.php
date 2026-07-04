@@ -652,6 +652,88 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 		}
 
 		/* -----------------------------------------------------------------
+		 * Lifecycle subscribers (Phase 86-04) — thin statics the entrypoint
+		 * wires to the collab do_actions. on_contracted is the ONLY gated
+		 * caller; on_outcome_recorded runs flag-independent (locking a dark
+		 * market is harmless + keeps the FSM correct for when the flag flips).
+		 * ----------------------------------------------------------------- */
+
+		/**
+		 * gend_gs_collab_contracted subscriber (MARKET-01). GATED on
+		 * GS_COLLAB_MARKET_PUBLIC — while dark a new contract creates NO market
+		 * and drains NO treasury subsidy. create_market is idempotent
+		 * (UNIQUE(match_id)) so a hook + sweep double-fire collapses to one market.
+		 *
+		 * @param int $match_id Contracted match id.
+		 * @param int $task_id  Contract task id (unused; create_market re-reads the match).
+		 * @return void
+		 */
+		public static function on_contracted( $match_id, $task_id = 0 ) : void {
+			if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC ) {
+				return; // dark: no market, no subsidy.
+			}
+			self::create_market( (int) $match_id ); // idempotent; return value ignored.
+		}
+
+		/**
+		 * gend_gs_collab_outcome_recorded subscriber (MARKET-05). FLAG-INDEPENDENT:
+		 * look up the market for this match and lock() it (idempotent CAS). No-ops if
+		 * no market exists (dark = none created). Trading must halt once a terminal
+		 * outcome is known so nobody trades on a decided result.
+		 *
+		 * @param int    $match_id Match id.
+		 * @param string $outcome  'success' | 'fail' | 'void' (unused — any terminal outcome locks).
+		 * @return void
+		 */
+		public static function on_outcome_recorded( $match_id, $outcome = '' ) : void {
+			$market = self::get_market_by_match( (int) $match_id );
+			if ( is_object( $market ) && isset( $market->id ) ) {
+				self::lock( (int) $market->id ); // CAS open->locked; no-op if already locked/void.
+			}
+		}
+
+		/**
+		 * Public accessor: the OPEN market row for a match, or null. Used by the
+		 * Phase-85 sweep deadline-lock (get_market_by_match is private). Returns null
+		 * unless a market exists AND is in state='open'.
+		 *
+		 * @param int $match_id Match id.
+		 * @return object|null
+		 */
+		public static function get_open_market_for_match( int $match_id ) {
+			$market = self::get_market_by_match( (int) $match_id );
+			if ( is_object( $market ) && isset( $market->state ) && 'open' === (string) $market->state ) {
+				return $market;
+			}
+			return null;
+		}
+
+		/**
+		 * READ-ONLY market-state snapshot for the dark REST surface (MARKET-04/05). Unlike
+		 * quote(), this reads ANY state (open OR locked) so a locked market still surfaces
+		 * its final implied probability. Neutral labels only — NO bet/odds/wager/payout.
+		 *
+		 * @param int $market_id Market id.
+		 * @return array|WP_Error ['market_id','state','resolve_by','implied_probability'=>['yes','no']] or WP_Error.
+		 */
+		public static function state_snapshot( int $market_id ) {
+			$m = self::get_market( (int) $market_id );
+			if ( ! is_object( $m ) ) {
+				return new WP_Error( 'gs_market_not_found', 'Market not found.', array( 'status' => 404 ) );
+			}
+			$price = Gend_GS_BC_Math::price( (string) $m->q_yes, (string) $m->q_no, self::market_b( $m ) );
+			return array(
+				'market_id'           => (int) $m->id,
+				'state'               => (string) $m->state,
+				'resolve_by'          => isset( $m->resolve_by ) ? (int) $m->resolve_by : 0,
+				'implied_probability' => array(
+					'yes' => $price['p_yes'],
+					'no'  => $price['p_no'],
+				),
+			);
+		}
+
+		/* -----------------------------------------------------------------
 		 * quote (MARKET-04) + trade (RESOLVE-05 concurrency + escrow-invariant
 		 * hard gate + STAKE-03 insider) — the indivisible money core.
 		 * ----------------------------------------------------------------- */

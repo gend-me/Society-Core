@@ -198,6 +198,38 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-resolver.php' ) ) {
 	Gend_GS_Collab_Resolver::init();
 }
 
+// GenD Match (v12.0 Phase 86) — LMSR collaboration prediction-market ENGINE.
+//   - class-collab-bc-math.php (86-01): Gend_GS_BC_Math — the float-free bcmath
+//     exp/ln/price/cost money math every quote/cost/subsidy routes through.
+//   - class-collab-market.php (86-03): Gend_GS_Collab_Market — the indivisible engine
+//     (create_market/fund_subsidy/quote/trade/lock + on_contracted/on_outcome_recorded
+//     lifecycle subscribers). Loaded AFTER the resolver so match/contract/resolver
+//     helpers exist first.
+//   - class-collab-market-rest.php (86-04): Gend_GS_Collab_Market_REST — the DARK,
+//     flag+hub-gated READ-ONLY market REST surface. Its register_routes() self-gates on
+//     is_main_node() AND GS_COLLAB_MARKET_PUBLIC, so the routes are ABSENT (404) when off.
+// Wiring (86-04): the two lifecycle do_actions from contract.php/resolver.php drive the
+// engine's on_* subscribers — on_contracted is GATED on GS_COLLAB_MARKET_PUBLIC (auto-create
+// only when public), on_outcome_recorded is flag-INDEPENDENT (lock a dark market harmlessly).
+// GS_COLLAB_MARKET_PUBLIC is defined default-false at the top of this file (86-02).
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint deploy).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-bc-math.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-bc-math.php';
+}
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-market.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-market.php';
+	// MARKET-01: auto-create on the contracted flip (gated inside on_contracted).
+	add_action( 'gend_gs_collab_contracted', array( 'Gend_GS_Collab_Market', 'on_contracted' ), 10, 2 );
+	// MARKET-05: lock on any recorded terminal outcome (flag-independent CAS).
+	add_action( 'gend_gs_collab_outcome_recorded', array( 'Gend_GS_Collab_Market', 'on_outcome_recorded' ), 10, 2 );
+}
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-market-rest.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-market-rest.php';
+	// The class self-gates on is_main_node() AND GS_COLLAB_MARKET_PUBLIC — routes are
+	// NEVER registered (404 route-absent, not 403) when the counsel flag is off.
+	add_action( 'rest_api_init', array( 'Gend_GS_Collab_Market_REST', 'register_routes' ) );
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
