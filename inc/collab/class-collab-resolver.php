@@ -333,6 +333,64 @@ class Gend_GS_Collab_Resolver {
 				}
 			}
 		}
+
+		// GenD Match (Phase 88-03): settlement drain — two flag-INDEPENDENT market-level
+		// branches that run ONCE per sweep (NOT per contracted-match row above — these query
+		// gs_collab_markets directly, and the payout drain is over markets that DO have an
+		// outcome, so they can't live inside the o.id-IS-NULL foreach). Both are
+		// class_exists/method_exists-guarded so a partial deploy without the 88-02 engine
+		// degrades cleanly, and both are batch-limited (LIMIT 50) so a hub 10-25s cold-start
+		// is tolerated — any backlog drains over successive 15-min ticks. NO new cron, NO new
+		// hook; this is the resumable payout rail the 88-02 engine was built for.
+		$has_market_engine = class_exists( 'Gend_GS_Collab_Market' );
+
+		// (c) DEADLINE-VOID (RESOLVE-04) — auto-VOID any open/locked market past its
+		// resolve_by with NO recorded contract outcome. Distinct from the Phase-85 contract
+		// deadline fail(expired) above (that is the CONTRACT deadline); this is the MARKET
+		// deadline, the safe default (never a forced guess). resolve($id,'void') lock-then-
+		// resolves the market DIRECTLY — no round-trip through the contract (avoids a
+		// self-trigger loop; mirrors the fail(expired) DIRECT-record idiom above).
+		if ( $has_market_engine && method_exists( 'Gend_GS_Collab_Market', 'resolve' ) ) {
+			$markets_t  = Gend_GS_Collab_Schema::markets_table();
+			$outcomes_t = Gend_GS_Collab_Schema::contract_outcomes_table();
+			$due_void   = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT m.id FROM {$markets_t} m
+					   LEFT JOIN {$outcomes_t} o ON o.contract_task_id = m.contract_task_id
+					  WHERE m.state IN ('open','locked')
+					    AND m.resolve_by IS NOT NULL AND m.resolve_by < %d
+					    AND o.id IS NULL
+					  LIMIT %d",
+					time(),
+					50
+				)
+			);
+			foreach ( (array) $due_void as $mv ) {
+				// resolve() lock-then-resolves to VOID directly (idempotent CAS). RESOLVE-04.
+				Gend_GS_Collab_Market::resolve( (int) $mv->id, 'void' );
+			}
+		}
+
+		// (d) RESUMABLE PAYOUT-DRAIN (RESOLVE-02/04) — for every market still in state
+		// 'resolved' (outcome known, not yet fully paid), drain a batch of unpaid positions.
+		// pay_market_batch() claims each position (paid=1 WHERE paid=0) BEFORE the mycred_add
+		// (position id = MyCred ref_id -> dedup), then flips resolved->paid + returns
+		// rake/residual to the treasury once ALL positions are settled. A cold-start mid-batch
+		// RESUMES on the next tick and NEVER double-pays (idx_market_paid batch scan). NO
+		// transaction wrapper (88-RESEARCH anti-pattern). A market VOID'd in (c) this tick
+		// becomes 'resolved' and is drained here this tick or the next — both correct (resumable).
+		if ( $has_market_engine && method_exists( 'Gend_GS_Collab_Market', 'pay_market_batch' ) ) {
+			$markets_t = Gend_GS_Collab_Schema::markets_table();
+			$to_pay    = $wpdb->get_col(
+				$wpdb->prepare(
+					"SELECT id FROM {$markets_t} WHERE state='resolved' LIMIT %d",
+					50
+				)
+			);
+			foreach ( (array) $to_pay as $rmid ) {
+				Gend_GS_Collab_Market::pay_market_batch( (int) $rmid );
+			}
+		}
 	}
 
 	/**
