@@ -56,6 +56,13 @@ class Gend_GS_Collab_Resolver {
 	const CRON_HOOK     = 'gs_collab_resolve_sweep';
 
 	/**
+	 * Container-side outbox-drain hook (Phase 89-02, FED-01). Reuses the EXISTING
+	 * gs_fifteen_min interval — NO new cron interval. init() (hub) drains nothing here;
+	 * this is a SEPARATE hook because sweep() is hub-only (early-returns on a container).
+	 */
+	const OUTBOX_HOOK = 'gs_collab_outbox_drain';
+
+	/**
 	 * Wire hooks + the 15-min cron. Hub-only (is_hub()); NOT gated on the
 	 * Phase-86+ market counsel flag (locked — run dark). Called from
 	 * gend-society.php after the collab requires.
@@ -74,6 +81,34 @@ class Gend_GS_Collab_Resolver {
 		add_action( self::CRON_HOOK, array( __CLASS__, 'sweep' ) );
 		if ( ! wp_next_scheduled( self::CRON_HOOK ) ) {
 			wp_schedule_event( time() + 5 * MINUTE_IN_SECONDS, self::CRON_INTERVAL, self::CRON_HOOK );
+		}
+	}
+
+	/**
+	 * CONTAINER-side wiring (Phase 89-02, FED-01) — schedule the outbox drain on the
+	 * EXISTING gs_fifteen_min interval (NO new interval). Self-gates on ! is_hub() (init()
+	 * is hub-only and won't run here). The interval is registered by register_interval();
+	 * the hub adds that filter in init(), but a container never calls init(), so we add
+	 * the SAME idempotent filter here too or gs_fifteen_min would not resolve. The drain
+	 * LOGIC lives in Gend_GS_Collab_Sync::drain_outbox (best-effort, non-blocking).
+	 *
+	 * Called from gend-society.php.
+	 */
+	public static function init_container() : void {
+		if ( self::is_hub() ) {
+			return; // the outbox lives on containers only.
+		}
+
+		// Ensure the gs_fifteen_min interval resolves on a container (idempotent filter;
+		// register_interval only adds the slug if unset — reused, NOT a new interval).
+		add_filter( 'cron_schedules', array( __CLASS__, 'register_interval' ) );
+
+		// Bind the drain + schedule it on the existing 15-min cadence.
+		if ( class_exists( 'Gend_GS_Collab_Sync' ) ) {
+			add_action( self::OUTBOX_HOOK, array( 'Gend_GS_Collab_Sync', 'drain_outbox' ) );
+		}
+		if ( ! wp_next_scheduled( self::OUTBOX_HOOK ) ) {
+			wp_schedule_event( time() + 5 * MINUTE_IN_SECONDS, self::CRON_INTERVAL, self::OUTBOX_HOOK );
 		}
 	}
 

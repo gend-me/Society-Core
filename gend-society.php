@@ -263,6 +263,39 @@ if ( file_exists( GS_DIR . 'inc/collab/member-markets.php' ) ) {
 	require_once GS_DIR . 'inc/collab/member-markets.php'; // self-registers its dark-guarded bp_setup_nav tab.
 }
 
+// GenD Match (v12.0 Phase 89-02, FED-01) — cross-app federation of the swipe/match pool.
+//   - class-collab-sync-crypto.php (89-01): Gend_GS_Collab_Sync_Crypto — the standalone
+//     ed25519 sign/verify primitive (local re-impl of the gend-pm-sync rail; NO c-and-p edit).
+//     Pure helper, no hooks — require only.
+//   - class-collab-sync.php (89-02): Gend_GS_Collab_Sync — ONE self-gating class (is_hub()).
+//     HUB registers the receive route under the existing gend-pm-sync/v1 namespace (cross-plugin
+//     registration proven at contracts-and-payments class-pm-sync-push.php:66-83); auth is the
+//     ed25519 sig verified in-callback. CONTAINER pushes each local swipe fire-and-forget
+//     (blocking=false, timeout 0.5) AFTER the local record_swipe, enqueues to gs_collab_outbox
+//     on failure, and drains it on the existing gs_fifteen_min cadence.
+// P2 (load-bearing): register_receive self-gates on is_hub(); on_local_swipe no-ops on the hub;
+// init_container no-ops on the hub — the SAME entrypoint runs correctly on BOTH sides. A hub
+// hiccup/cold-start/bad-sig can NEVER block or error the local swipe (the push is a downstream
+// best-effort mirror, the deck falls back to local).
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint deploy;
+// memory: project_hub_plugin_sync_gotcha).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-sync-crypto.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-sync-crypto.php';
+}
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-sync.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-sync.php';
+	// HUB: receive route under the existing gend-pm-sync/v1 namespace (self-gates on is_hub()).
+	add_action( 'rest_api_init', array( 'Gend_GS_Collab_Sync', 'register_receive' ) );
+	// CONTAINER: push after every local swipe — fires AFTER the unconditional local record_swipe
+	// in route_swipe (P2). No-ops on the hub. Priority 10, 4 args.
+	add_action( 'gend_gs_collab_swiped', array( 'Gend_GS_Collab_Sync', 'on_local_swipe' ), 10, 4 );
+	// CONTAINER: schedule the outbox drain on the EXISTING gs_fifteen_min interval (NO new
+	// interval). init_container() self-gates on ! is_hub() — harmless on the hub.
+	if ( class_exists( 'Gend_GS_Collab_Resolver' ) && method_exists( 'Gend_GS_Collab_Resolver', 'init_container' ) ) {
+		Gend_GS_Collab_Resolver::init_container();
+	}
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).

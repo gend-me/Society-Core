@@ -727,6 +727,12 @@ class Gend_GS_Collab_REST {
 			$matched  = ( $match_id > 0 );
 		}
 
+		// FED-01 (Phase 89-02, P2): fire the federation push downstream — AFTER the
+		// unconditional LOCAL record_swipe/match above. Gend_GS_Collab_Sync::on_local_swipe
+		// (container-only, try/catch, fire-and-forget) subscribes; it can NEVER block or
+		// error this response. The local ledger stays first + authoritative regardless.
+		do_action( 'gend_gs_collab_swiped', $from, $to, $decision, (int) get_current_user_id() );
+
 		// Idempotent: a repeat swipe is still ok:true. `matched` is true only when THIS
 		// swipe created a brand-new match row.
 		return rest_ensure_response( array( 'ok' => true, 'matched' => $matched ) );
