@@ -39,7 +39,7 @@
  * class_exists/function_exists/method_exists-guarded (house idiom — a partial deploy
  * degrades cleanly, never fatals; memory: project_wp_fatal_auto_deactivation).
  *
- * The engine METHODS are flag-INDEPENDENT plain statics (no GS_COLLAB_MARKET_PUBLIC guard
+ * The engine METHODS are flag-INDEPENDENT plain statics (no counsel-gate constant guard
  * inside) so the crown UAT (86-05) can prove the math regardless of the flag; the flag gates
  * the CALLERS (auto-create hook, sweep, REST routes) in 86-04.
  *
@@ -563,8 +563,11 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 			}
 
 			// BALANCE CHECK: an underfunded treasury cannot open the market (MARKET-03).
-			$balance = (float) mycred_get_users_balance( $treasury, 'transact' );
-			if ( bccomp( (string) $balance, $subsidy_dgen, 0 ) < 0 ) {
+			// The (float) is confined to the myCRED balance API boundary; number_format
+			// renders it to a plain fixed-point string (no scientific notation) so bccomp
+			// stays correct for large balances. The escrow/subsidy math itself is float-free.
+			$balance_str = number_format( (float) mycred_get_users_balance( $treasury, 'transact' ), 0, '.', '' );
+			if ( bccomp( $balance_str, $subsidy_dgen, 0 ) < 0 ) {
 				return new WP_Error(
 					'gs_market_subsidy_unfunded',
 					'Treasury cannot fund the market subsidy.',
@@ -646,6 +649,263 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 			}
 			// Already locked / not open -> idempotent no-op.
 			return false;
+		}
+
+		/* -----------------------------------------------------------------
+		 * quote (MARKET-04) + trade (RESOLVE-05 concurrency + escrow-invariant
+		 * hard gate + STAKE-03 insider) — the indivisible money core.
+		 * ----------------------------------------------------------------- */
+
+		/**
+		 * Insider check (STAKE-03): admin/mod of EITHER matched group is barred from that
+		 * market (they control whether the contract completes -> the fatal self-collusion
+		 * vector). Two-arg role check, function_exists-guarded, on BOTH groups. Mirrors
+		 * class-collab-rest.php:291-292 / 489-490 / 651-652.
+		 *
+		 * @param int $uid     Bettor user id.
+		 * @param int $group_a Matched group A.
+		 * @param int $group_b Matched group B.
+		 * @return bool True when the user is an admin/mod of either matched group.
+		 */
+		private static function is_matched_insider( int $uid, int $group_a, int $group_b ) : bool {
+			if ( $uid <= 0 ) {
+				return false;
+			}
+			foreach ( array( $group_a, $group_b ) as $gid ) {
+				if ( $gid <= 0 ) {
+					continue;
+				}
+				if ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) ) {
+					return true;
+				}
+				if ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $uid, $gid ) ) {
+					return true;
+				}
+			}
+			return false;
+		}
+
+		/**
+		 * QUOTE (MARKET-04) — READ-ONLY live implied YES/NO odds + the DGEN cost of buying
+		 * $delta_shares of $outcome. No lock (nothing is mutated). Refuses a non-open market.
+		 *
+		 * cost = ceil( cost(q') - cost(q) ) — maker-favor UP so escrow collects >= exact.
+		 * implied = price(q') -> p_yes/p_no as implied-probability fixed-point strings.
+		 *
+		 * NOTE: a quote is advisory; the AUTHORITATIVE price is re-computed inside trade()
+		 * off the LOCKED q (a quote can go stale between read and trade — trade() never
+		 * trusts the caller's q).
+		 *
+		 * @param int    $market_id    Market id.
+		 * @param string $outcome      'yes' or 'no'.
+		 * @param string $delta_shares Micro-shares to buy (positive integer string).
+		 * @return array|WP_Error ['cost_dgen','p_yes','p_no'] or WP_Error.
+		 */
+		public static function quote( int $market_id, string $outcome, string $delta_shares ) {
+			$outcome = ( 'no' === strtolower( (string) $outcome ) ) ? 'no' : 'yes';
+
+			$m = self::get_market( (int) $market_id );
+			if ( ! is_object( $m ) ) {
+				return new WP_Error( 'gs_market_not_found', 'Market not found.', array( 'status' => 404 ) );
+			}
+			if ( 'open' !== (string) $m->state ) {
+				return new WP_Error( 'gs_market_not_open', 'Market is not open for quoting.', array( 'status' => 409 ) );
+			}
+
+			$b     = self::market_b( $m );
+			$q_yes = (string) $m->q_yes;
+			$q_no  = (string) $m->q_no;
+
+			$q_yes_new = ( 'yes' === $outcome ) ? bcadd( $q_yes, (string) $delta_shares, 0 ) : $q_yes;
+			$q_no_new  = ( 'no' === $outcome ) ? bcadd( $q_no, (string) $delta_shares, 0 ) : $q_no;
+
+			$cost = Gend_GS_BC_Math::bc_ceil(
+				bcsub(
+					Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
+					Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+					Gend_GS_BC_Math::SCALE
+				)
+			);
+
+			$price = Gend_GS_BC_Math::price( $q_yes_new, $q_no_new, $b );
+
+			return array(
+				'cost_dgen' => $cost,
+				'p_yes'     => $price['p_yes'],
+				'p_no'      => $price['p_no'],
+			);
+		}
+
+		/**
+		 * TRADE — the guarded, transactional, invariant-enforced money core (RESOLVE-05 +
+		 * STAKE-03). Mirrors the proven START TRANSACTION + SELECT ... FOR UPDATE primitive
+		 * in contracts-and-payments/class-ydgen-ledger.php:503-515.
+		 *
+		 * SCOPE (Phase 86): the stake ledger is SIMULATED — the position row records the
+		 * would-be holding but Phase 86 does NOT debit the real bettor's DGEN. The ONLY real
+		 * DGEN move is the treasury subsidy (fund_subsidy). Phase 87 adds the real bettor
+		 * debit. The concurrency + invariant + insider machinery is real and proven here.
+		 *
+		 * Flow:
+		 *   1. ENTRY GATE (pre-transaction): insider (admin/mod of either matched group) -> reject.
+		 *   2. START TRANSACTION; SELECT ... WHERE id AND state='open' FOR UPDATE.
+		 *   3. RE-QUOTE off the LOCKED q (never the stale q the caller saw).
+		 *   4. HARD GATE: escrow_new < max_payout(q_new) -> ROLLBACK + reject (NEVER mint).
+		 *   5. Optimistic version guard: UPDATE ... version=version+1 WHERE version=%d; !=1 -> ROLLBACK.
+		 *   6. Upsert the SIMULATED position; append a 'trade' event.
+		 *   7. COMMIT (ROLLBACK on any Throwable).
+		 *   8. AFTER commit (outside the lock): audit.
+		 *
+		 * @param int    $market_id    Market id.
+		 * @param int    $user_id      Bettor user id.
+		 * @param string $outcome      'yes' or 'no'.
+		 * @param string $delta_shares Micro-shares to buy (positive integer string).
+		 * @return array|WP_Error ['cost_dgen','q_yes','q_no','escrow_dgen','p_yes','p_no'] or WP_Error.
+		 */
+		public static function trade( int $market_id, int $user_id, string $outcome, string $delta_shares ) {
+			global $wpdb;
+
+			$market_id = (int) $market_id;
+			$user_id   = (int) $user_id;
+			$outcome   = ( 'no' === strtolower( (string) $outcome ) ) ? 'no' : 'yes';
+
+			if ( bccomp( (string) $delta_shares, '0', 0 ) <= 0 ) {
+				return new WP_Error( 'gs_market_bad_delta', 'Trade size must be positive.', array( 'status' => 400 ) );
+			}
+			if ( ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+				return new WP_Error( 'gs_market_no_schema', 'Collab schema unavailable.', array( 'status' => 500 ) );
+			}
+
+			// --- 1. ENTRY GATE (before ANY transaction): matched-group insider (STAKE-03). ---
+			$pre = self::get_market( $market_id );
+			if ( ! is_object( $pre ) ) {
+				return new WP_Error( 'gs_market_not_found', 'Market not found.', array( 'status' => 404 ) );
+			}
+			$match = self::get_match( (int) $pre->match_id );
+			if ( is_object( $match ) ) {
+				if ( self::is_matched_insider( $user_id, (int) $match->group_a, (int) $match->group_b ) ) {
+					return new WP_Error(
+						'gs_market_insider',
+						'Admins and moderators of a matched group cannot stake on that collaboration market.',
+						array( 'status' => 403 )
+					);
+				}
+			}
+
+			$markets   = Gend_GS_Collab_Schema::markets_table();
+			$positions = Gend_GS_Collab_Schema::positions_table();
+			$b         = self::market_b( $pre );
+
+			// --- 2. START TRANSACTION + FOR UPDATE on the market row. ---
+			$wpdb->query( 'START TRANSACTION' );
+			try {
+				$m = $wpdb->get_row( $wpdb->prepare(
+					"SELECT * FROM {$markets} WHERE id = %d AND state = 'open' FOR UPDATE",
+					$market_id
+				) );
+				if ( ! is_object( $m ) ) {
+					$wpdb->query( 'ROLLBACK' );
+					return new WP_Error( 'gs_market_not_open', 'Market is not open for trading.', array( 'status' => 409 ) );
+				}
+
+				// --- 3. RE-QUOTE off the LOCKED q (never the stale q shown to the caller). ---
+				$q_yes = (string) $m->q_yes;
+				$q_no  = (string) $m->q_no;
+				$q_yes_new = ( 'yes' === $outcome ) ? bcadd( $q_yes, (string) $delta_shares, 0 ) : $q_yes;
+				$q_no_new  = ( 'no' === $outcome ) ? bcadd( $q_no, (string) $delta_shares, 0 ) : $q_no;
+
+				$cost = Gend_GS_BC_Math::bc_ceil(
+					bcsub(
+						Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
+						Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+						Gend_GS_BC_Math::SCALE
+					)
+				);
+				$escrow_new = bcadd( (string) $m->escrow_dgen, $cost, 0 );
+
+				// --- 4. ESCROW-INVARIANT HARD GATE (RESOLVE-05). ---
+				// escrow_new >= GROSS max_payout(q_new) (rake ignored -> worst case). By LMSR
+				// construction this always holds; firing means a bug -> REJECT, NEVER mint.
+				$max_payout = self::max_payout( $q_yes_new, $q_no_new );
+				if ( bccomp( $escrow_new, $max_payout, 0 ) < 0 ) {
+					$wpdb->query( 'ROLLBACK' );
+					return new WP_Error(
+						'gs_market_invariant',
+						'Escrow-invariant violation: escrow would be less than the maximum possible payout. Trade rejected.',
+						array( 'status' => 409, 'escrow' => $escrow_new, 'max_payout' => $max_payout )
+					);
+				}
+
+				// --- 5. Optimistic version guard (secondary to FOR UPDATE). ---
+				$upd = $wpdb->query( $wpdb->prepare(
+					"UPDATE {$markets} SET q_yes=%d, q_no=%d, escrow_dgen=%s, version=version+1
+					 WHERE id=%d AND version=%d AND state='open'",
+					$q_yes_new,
+					$q_no_new,
+					$escrow_new,
+					$market_id,
+					(int) $m->version
+				) );
+				if ( 1 !== (int) $upd ) {
+					$wpdb->query( 'ROLLBACK' );
+					return new WP_Error( 'gs_market_conflict', 'Concurrent update conflict; retry.', array( 'status' => 409 ) );
+				}
+
+				// --- 6. Upsert the SIMULATED position (Phase 87 adds the REAL bettor debit). ---
+				$now = time();
+				$wpdb->query( $wpdb->prepare(
+					"INSERT INTO {$positions} (market_id, user_id, outcome, shares, cost_dgen, created_at, updated_at)
+					 VALUES (%d, %d, %s, %d, %s, %d, %d)
+					 ON DUPLICATE KEY UPDATE shares = shares + VALUES(shares),
+					                         cost_dgen = cost_dgen + VALUES(cost_dgen),
+					                         updated_at = VALUES(updated_at)",
+					$market_id,
+					$user_id,
+					$outcome,
+					(string) $delta_shares,
+					$cost,
+					$now,
+					$now
+				) );
+
+				self::market_event( $market_id, 'trade', array(
+					'user_id'  => $user_id,
+					'outcome'  => $outcome,
+					'delta'    => (string) $delta_shares,
+					'cost'     => $cost,
+					'q_yes'    => $q_yes_new,
+					'q_no'     => $q_no_new,
+					'escrow'   => $escrow_new,
+					'simulated' => true,
+				) );
+
+				// --- 7. COMMIT. ---
+				$wpdb->query( 'COMMIT' );
+			} catch ( \Throwable $e ) {
+				$wpdb->query( 'ROLLBACK' );
+				return new WP_Error( 'gs_market_trade_failed', $e->getMessage(), array( 'status' => 500 ) );
+			}
+
+			// --- 8. AFTER commit (outside the lock): audit + final read. ---
+			self::audit( 'collab.market.trade', array(
+				'market_id' => $market_id,
+				'user_id'   => $user_id,
+				'outcome'   => $outcome,
+				'delta'     => (string) $delta_shares,
+				'cost_dgen' => $cost,
+				'simulated' => true,
+			) );
+
+			$price = Gend_GS_BC_Math::price( $q_yes_new, $q_no_new, $b );
+
+			return array(
+				'cost_dgen'   => $cost,
+				'q_yes'       => $q_yes_new,
+				'q_no'        => $q_no_new,
+				'escrow_dgen' => $escrow_new,
+				'p_yes'       => $price['p_yes'],
+				'p_no'        => $price['p_no'],
+			);
 		}
 	}
 }
