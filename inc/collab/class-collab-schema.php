@@ -50,7 +50,9 @@ class Gend_GS_Collab_Schema {
 	// gs_collab_markets / gs_collab_positions / gs_collab_market_events.
 	// 1.4.0 (Phase 87-01): gs_collab_bet_idem per-bet idempotency guard +
 	// gs_collab_positions.realized_dgen for sell-back realized P/L.
-	const DB_VERSION     = '1.4.0';
+	// 1.5.0 (Phase 88-01): gs_collab_positions.paid/paid_at/payout_dgen (resumable settlement
+	// idempotency) + gs_collab_markets.resolved_outcome/resolved_at/paid_at (resolve metadata).
+	const DB_VERSION     = '1.5.0';
 	const DB_VERSION_OPT = 'gs_collab_db_version';
 
 	/**
@@ -293,6 +295,10 @@ class Gend_GS_Collab_Schema {
 		//   rake_bps      reserved for the Phase-88 losing-pool skim; the
 		//                 invariant already reserves it (0 default → global).
 		//   state         open→locked→resolved→paid FSM (+ void auto-void/refund).
+		//   resolved_outcome/resolved_at/paid_at (Phase 88-01): resolve metadata -
+		//     the winning side (yes|no) or void, the resolve-CAS timestamp, and the
+		//     resolved->paid flip timestamp. NULL until settlement; the state ENUM
+		//     already carries resolved/paid/void so NO ENUM change is needed.
 		//   subsidy_funded idempotency guard so a retried create never double-
 		//                 debits the treasury.
 		//   resolve_by    deadline; the Phase-85 sweep locks a market past this.
@@ -309,6 +315,9 @@ class Gend_GS_Collab_Schema {
 				escrow_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
 				rake_bps INT UNSIGNED NOT NULL DEFAULT 0,
 				state ENUM('open','locked','resolved','paid','void') NOT NULL DEFAULT 'open',
+				resolved_outcome ENUM('yes','no','void') NULL,
+				resolved_at INT UNSIGNED NULL,
+				paid_at INT UNSIGNED NULL,
 				subsidy_funded TINYINT(1) NOT NULL DEFAULT 0,
 				resolve_by INT UNSIGNED NULL,
 				version INT UNSIGNED NOT NULL DEFAULT 0,
@@ -330,6 +339,15 @@ class Gend_GS_Collab_Schema {
 		//   the AMM (avg-cost basis); portfolio realized P/L = realized_dgen −
 		//   cost-basis-of-sold-shares. dbDelta ALTERs an existing 1.3.0 table
 		//   additively, so this column self-heals onto a live positions table.
+		//   paid/paid_at/payout_dgen (Phase 88-01): resumable-settlement idempotency.
+		//   `paid` is THE load-bearing cursor for the Phase-88 payout batch - a CAS
+		//   `UPDATE ... SET paid=1 WHERE id=? AND paid=0` claims a position before the
+		//   mycred_add, so a mid-batch hub cold-start (10-25s) RESUMES and never
+		//   double-pays. payout_dgen holds the WHOLE-DGEN credited (winner payout OR
+		//   void refund; 0 for a loser) - BIGINT UNSIGNED to mirror the money columns,
+		//   only ever SET to a computed non-negative value (never decremented, no
+		//   underflow). idx_market_paid makes the batch drain `WHERE market_id=? AND
+		//   paid=0` an index scan. All three ALTER-add additively (dbDelta).
 		dbDelta(
 			"CREATE TABLE {$wpdb->prefix}gs_collab_positions (
 				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -339,11 +357,15 @@ class Gend_GS_Collab_Schema {
 				shares BIGINT UNSIGNED NOT NULL DEFAULT 0,
 				cost_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
 				realized_dgen BIGINT NOT NULL DEFAULT 0,
+				paid TINYINT(1) NOT NULL DEFAULT 0,
+				paid_at INT UNSIGNED NULL,
+				payout_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
 				created_at INT UNSIGNED NOT NULL DEFAULT 0,
 				updated_at INT UNSIGNED NOT NULL DEFAULT 0,
 				PRIMARY KEY (id),
 				UNIQUE KEY uniq_pos (market_id, user_id, outcome),
-				KEY idx_user (user_id)
+				KEY idx_user (user_id),
+				KEY idx_market_paid (market_id, paid)
 			) {$charset_collate};"
 		);
 
