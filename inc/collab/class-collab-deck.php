@@ -63,10 +63,18 @@ class Gend_GS_Collab_Deck {
 	const META_LOCATION = '_gs_collab_location';
 
 	/**
-	 * Build the swipe deck for $from_group.
+	 * Build the swipe deck for $from_group — the FED-01 (Phase 89) federation-aware
+	 * dispatcher.
 	 *
-	 * Deck = opted-in groups MINUS self MINUS already-decided, ranked
-	 * complementary-first, optionally facet-filtered, sliced by $batch/$offset.
+	 *   HUB (is_hub()): the deck is the FULL cross-app pool — local opted-in BP groups
+	 *     UNION opted-in federated container businesses (gs_collab_federated_business,
+	 *     optin=1). No fetch needed (the hub IS the source of truth).
+	 *   CONTAINER (! is_hub()): fetch the hub's cross-app deck (cached, short TTL) and
+	 *     GRACEFULLY FALL BACK to the LOCAL Phase-82 deck (build_deck_local) on any hub
+	 *     failure — so swiping ALWAYS works, hub up or down (P2, load-bearing).
+	 *
+	 * The Phase-82 behaviour is preserved verbatim in build_deck_local() (the standalone
+	 * local query is ALSO the container fallback). Callers are unchanged.
 	 *
 	 * @param int   $from_group Acting group id (swiping on its own behalf).
 	 * @param array $facets     ['category'=>?, 'industry'=>?, 'location'=>?]; each
@@ -74,12 +82,50 @@ class Gend_GS_Collab_Deck {
 	 *                          enum key; location is free-text (case-insensitive LIKE).
 	 * @param int   $batch      Page size (default 15).
 	 * @param int   $offset     Page offset into the RANKED result (default 0).
+	 * @return array ['cards'=>array<int,array>, 'has_more'=>bool].
+	 */
+	public static function build_deck( int $from_group, array $facets = array(), int $batch = 15, int $offset = 0 ) : array {
+		if ( self::is_hub() ) {
+			return self::build_deck_hub_pool( $from_group, $facets, $batch, $offset );
+		}
+		// Container: cross-app deck from the hub, with a local fallback baked in.
+		return self::fetch_cross_app_deck( $from_group, $facets, $batch, $offset );
+	}
+
+	/**
+	 * The hub-side FULL-POOL deck: the standalone local query PLUS the federated
+	 * container businesses (optin=1) merged in BEFORE the complementary usort so
+	 * never-re-show / self-exclusion / rank apply uniformly. On a lone hub with no
+	 * federated rows this is byte-for-byte the Phase-82 deck.
+	 *
+	 * @param int   $from_group Acting group id.
+	 * @param array $facets     Facet filters.
+	 * @param int   $batch      Page size.
+	 * @param int   $offset     Page offset.
+	 * @return array ['cards'=>array,'has_more'=>bool]
+	 */
+	private static function build_deck_hub_pool( int $from_group, array $facets, int $batch, int $offset ) : array {
+		return self::build_deck_local( $from_group, $facets, $batch, $offset, true );
+	}
+
+	/**
+	 * The Phase-82 STANDALONE deck query — opted-in BP groups MINUS self MINUS
+	 * already-decided, complementary-ranked, facet-filtered, paginated. This is ALSO
+	 * the container's local fallback (it needs only the local swipes table + local BP
+	 * groups). When $with_federated is true (hub only) opted-in federated container
+	 * businesses are merged into the scored candidate set before the usort.
+	 *
+	 * @param int   $from_group     Acting group id (swiping on its own behalf).
+	 * @param array $facets         Facet filters.
+	 * @param int   $batch          Page size (default 15).
+	 * @param int   $offset         Page offset into the RANKED result (default 0).
+	 * @param bool  $with_federated Merge gs_collab_federated_business (hub only).
 	 * @return array ['cards'=>array<int,array>, 'has_more'=>bool]. Empty deck →
 	 *               ['cards'=>[], 'has_more'=>false] (SWIPE-06 rendering is the JS
 	 *               layer's job; the engine returns an empty list, never loops,
 	 *               never re-includes a decided card).
 	 */
-	public static function build_deck( int $from_group, array $facets = array(), int $batch = 15, int $offset = 0 ) : array {
+	public static function build_deck_local( int $from_group, array $facets = array(), int $batch = 15, int $offset = 0, bool $with_federated = false ) : array {
 		global $wpdb;
 
 		$from_group = (int) $from_group;
@@ -201,6 +247,13 @@ class Gend_GS_Collab_Deck {
 			);
 		}
 
+		// FED-01 (hub only): merge opted-in federated container businesses into the
+		// scored set BEFORE the usort so never-re-show / self-exclusion / complementary
+		// rank apply uniformly across the cross-app pool.
+		if ( $with_federated ) {
+			$scored = self::merge_federated_candidates( $from_group, $scored, $actor );
+		}
+
 		// Sort score DESC, stable tiebreak on group id DESC (mirror
 		// calendar-events-rest.php:101 usort idiom).
 		usort(
@@ -219,6 +272,13 @@ class Gend_GS_Collab_Deck {
 
 		$cards = array();
 		foreach ( $page as $entry ) {
+			// FED-01: a federated candidate carries its OWN card fields (its name/tagline
+			// live on the shadow row, not on a hub BP group) but still swipes to its
+			// hub_group_id. Native candidates assemble from the BP group as before.
+			if ( ! empty( $entry['federated'] ) && is_array( $entry['federated'] ) ) {
+				$cards[] = self::assemble_federated_card( (int) $entry['group_id'], $entry['federated'], $entry['candidate'], (int) $entry['score'] );
+				continue;
+			}
 			$card = self::assemble_card( $entry['group_id'], $entry['candidate'], (int) $entry['score'] );
 			if ( null !== $card ) {
 				$cards[] = $card;
@@ -226,6 +286,219 @@ class Gend_GS_Collab_Deck {
 		}
 
 		return array( 'cards' => $cards, 'has_more' => $has_more );
+	}
+
+	/**
+	 * Hub-vs-container gate — copied VERBATIM from class-collab-resolver.php:403-407.
+	 * The full cross-app pool renders on the hub; a container fetches + falls back.
+	 *
+	 * @return bool
+	 */
+	private static function is_hub() : bool {
+		return ! class_exists( 'Gend_CP_OAuth_Resource' )
+			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
+			|| Gend_CP_OAuth_Resource::is_main_node();
+	}
+
+	/**
+	 * FED-01 (hub only) — merge opted-in federated container businesses into the scored
+	 * candidate set. Each gs_collab_federated_business row (optin=1) is mapped to its
+	 * hub_group_id as the matchable id but carries its OWN name/tagline/tags for the
+	 * card. Skipped if (a) the hub_group_id is already present in $scored (dedupe against
+	 * a native BP group) OR (b) the (from_group, hub_group_id) pair is already decided in
+	 * the ledger (the SAME never-re-show guard the native query uses). Scored with the
+	 * SAME complementary_score so ranking is uniform.
+	 *
+	 * @param int   $from_group Acting group id.
+	 * @param array $scored     The native scored set (mutated + returned).
+	 * @param array $actor      The actor's tags (for complementary scoring).
+	 * @return array The merged scored set.
+	 */
+	private static function merge_federated_candidates( int $from_group, array $scored, array $actor ) : array {
+		global $wpdb;
+
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' )
+			|| ! method_exists( 'Gend_GS_Collab_Schema', 'federated_business_table' )
+			|| ! method_exists( 'Gend_GS_Collab_Schema', 'swipes_table' ) ) {
+			return $scored;
+		}
+
+		$fb_tbl     = Gend_GS_Collab_Schema::federated_business_table();
+		$swipes_tbl = Gend_GS_Collab_Schema::swipes_table();
+
+		// Never-re-show: exclude any hub_group_id already decided by this actor (same
+		// guard as the native query at :126). Self-exclusion via hub_group_id != from.
+		$rows = $wpdb->get_results(
+			$wpdb->prepare(
+				"SELECT hub_group_id, name, tagline, avatar_url, category, industry, location
+				 FROM {$fb_tbl}
+				 WHERE optin = 1
+				   AND hub_group_id > 0
+				   AND hub_group_id != %d
+				   AND hub_group_id NOT IN ( SELECT s.to_group_id FROM {$swipes_tbl} s WHERE s.from_group_id = %d )",
+				$from_group,
+				$from_group
+			),
+			ARRAY_A
+		);
+		if ( ! is_array( $rows ) || empty( $rows ) ) {
+			return $scored;
+		}
+
+		// Dedupe against native BP-group candidates already in $scored.
+		$seen = array();
+		foreach ( $scored as $entry ) {
+			$seen[ (int) $entry['group_id'] ] = true;
+		}
+
+		foreach ( $rows as $row ) {
+			$gid = (int) $row['hub_group_id'];
+			if ( $gid <= 0 || isset( $seen[ $gid ] ) ) {
+				continue; // already in the pool as a native group (dedupe).
+			}
+			$seen[ $gid ] = true;
+			$candidate = array(
+				'category' => (string) ( $row['category'] ?? '' ),
+				'industry' => (string) ( $row['industry'] ?? '' ),
+				'location' => (string) ( $row['location'] ?? '' ),
+			);
+			$scored[] = array(
+				'group_id'  => $gid,
+				'score'     => (int) Gend_GS_Collab_Taxonomy::complementary_score( $actor, $candidate ),
+				'candidate' => $candidate,
+				'federated' => array(
+					'name'       => (string) ( $row['name'] ?? '' ),
+					'tagline'    => (string) ( $row['tagline'] ?? '' ),
+					'avatar_url' => (string) ( $row['avatar_url'] ?? '' ),
+				),
+			);
+		}
+
+		return $scored;
+	}
+
+	/**
+	 * Assemble a swipe card for a FEDERATED container business — its display fields come
+	 * from the shadow row (not a hub BP group), but group_id is the matchable
+	 * hub_group_id so a right-swipe resolves through the normal ledger/match path.
+	 *
+	 * @param int   $hub_group_id The matchable hub group id.
+	 * @param array $fed          ['name','tagline','avatar_url'] from the shadow row.
+	 * @param array $tags         ['category','industry','location'].
+	 * @param int   $score        Complementary score.
+	 * @return array Card array.
+	 */
+	private static function assemble_federated_card( int $hub_group_id, array $fed, array $tags, int $score ) : array {
+		return array(
+			'group_id'  => (int) $hub_group_id,
+			'name'      => (string) ( $fed['name'] ?? '' ),
+			'tagline'   => wp_trim_words( (string) ( $fed['tagline'] ?? '' ), 24 ),
+			'avatar'    => (string) ( $fed['avatar_url'] ?? '' ),
+			'permalink' => '',
+			'tags'      => array(
+				'category' => (string) ( $tags['category'] ?? '' ),
+				'industry' => (string) ( $tags['industry'] ?? '' ),
+				'location' => (string) ( $tags['location'] ?? '' ),
+			),
+			'score'     => (int) $score,
+			'federated' => true,
+		);
+	}
+
+	/**
+	 * FED-01 (container only) — fetch the hub's cross-app deck (read-only, cached with a
+	 * short TTL) and GRACEFULLY FALL BACK to the LOCAL Phase-82 deck on ANY hub failure
+	 * (WP_Error / non-2xx / no hub URL / unreachable). P2, load-bearing: swiping works
+	 * hub up OR down. The fallback calls build_deck_local() directly (never build_deck)
+	 * so there is NO recursion.
+	 *
+	 * Uses a bounded (~3s) authenticated member read against the hub deck route (member-
+	 * scoped, per 89-RESEARCH Open-Q2: an authed gs/v1 read, NOT the machine rail).
+	 *
+	 * @param int   $from_group Acting group id.
+	 * @param array $facets     Facet filters.
+	 * @param int   $batch      Page size.
+	 * @param int   $offset     Page offset.
+	 * @return array ['cards'=>array,'has_more'=>bool]
+	 */
+	public static function fetch_cross_app_deck( int $from_group, array $facets = array(), int $batch = 15, int $offset = 0 ) : array {
+		$hub = self::hub_url();
+		if ( '' === $hub ) {
+			return self::build_deck_local( $from_group, $facets, $batch, $offset ); // no hub -> local.
+		}
+
+		$cache_key = 'gs_collab_xdeck_' . (int) $from_group . '_' . md5( wp_json_encode( $facets ) . '|' . (int) $batch . '|' . (int) $offset );
+		$cached    = get_transient( $cache_key );
+		if ( is_array( $cached ) ) {
+			return $cached;
+		}
+
+		$args = array(
+			'category' => isset( $facets['category'] ) ? (string) $facets['category'] : '',
+			'industry' => isset( $facets['industry'] ) ? (string) $facets['industry'] : '',
+			'location' => isset( $facets['location'] ) ? (string) $facets['location'] : '',
+			'group_id' => (int) $from_group,
+			'batch'    => (int) $batch,
+			'offset'   => (int) $offset,
+		);
+		$url = add_query_arg( array_filter( $args, static function ( $v ) { return '' !== $v && 0 !== $v; } ), $hub . '/wp-json/gs/v1/collab/deck' );
+
+		$resp = wp_remote_get(
+			$url,
+			array(
+				'timeout'   => 3,
+				'headers'   => self::hub_auth_headers(),
+			)
+		);
+		if ( is_wp_error( $resp ) ) {
+			return self::build_deck_local( $from_group, $facets, $batch, $offset ); // unreachable -> local.
+		}
+		$code = (int) wp_remote_retrieve_response_code( $resp );
+		if ( $code < 200 || $code >= 300 ) {
+			return self::build_deck_local( $from_group, $facets, $batch, $offset ); // non-2xx -> local.
+		}
+		$decoded = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
+		if ( ! is_array( $decoded ) || ! isset( $decoded['cards'] ) || ! is_array( $decoded['cards'] ) ) {
+			return self::build_deck_local( $from_group, $facets, $batch, $offset ); // malformed -> local.
+		}
+
+		$deck = array(
+			'cards'    => $decoded['cards'],
+			'has_more' => ! empty( $decoded['has_more'] ),
+		);
+		set_transient( $cache_key, $deck, 90 ); // short TTL; a fresh swipe removes the card client-side.
+		return $deck;
+	}
+
+	/**
+	 * Best-effort auth headers for the container->hub member deck read. If the container
+	 * holds a member bearer via the AIPA/gend.me OAuth bridge, forward it; otherwise an
+	 * unauthenticated read may 401 on the hub and fetch_cross_app_deck falls back to the
+	 * LOCAL deck — swiping still works. Never fatals.
+	 *
+	 * @return array
+	 */
+	private static function hub_auth_headers() : array {
+		$headers = array( 'Accept' => 'application/json' );
+		if ( class_exists( 'AIPA_GenD_OAuth' ) && method_exists( 'AIPA_GenD_OAuth', 'member_bearer' ) ) {
+			$token = (string) AIPA_GenD_OAuth::member_bearer();
+			if ( '' !== $token ) {
+				$headers['Authorization'] = 'Bearer ' . $token;
+			}
+		}
+		return $headers;
+	}
+
+	/**
+	 * The hub base URL for this container (mirrors class-pm-sync-push.php:262-267).
+	 *
+	 * @return string Hub base (no trailing slash), or '' if unresolvable.
+	 */
+	private static function hub_url() : string {
+		if ( class_exists( 'AIPA_GenD_OAuth' ) && method_exists( 'AIPA_GenD_OAuth', 'hub_url' ) ) {
+			return rtrim( (string) AIPA_GenD_OAuth::hub_url(), '/' );
+		}
+		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' );
 	}
 
 	/**
