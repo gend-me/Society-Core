@@ -1,0 +1,165 @@
+/**
+ * gend-society — GenD Match Collaborations (markets + private portfolio) styling.
+ * Phase 87-03 (v12.0). Glassmorphic tokens consistent with the existing gend-society
+ * member surfaces (frosted card, subtle border, backdrop blur). Neutral copy surface.
+ * No external font/lib.
+ */
+
+.gs-collab-markets-root {
+	display: grid;
+	grid-template-columns: 1fr;
+	gap: 18px;
+	width: 100%;
+	box-sizing: border-box;
+	color: #e6ecf5;
+}
+
+@media ( min-width: 1024px ) {
+	.gs-collab-markets-root {
+		grid-template-columns: 1.2fr 1fr;
+		align-items: start;
+	}
+}
+
+/* Frosted glass card base (markets + portfolio panels). */
+.gs-collab-market-card,
+.gs-collab-portfolio-panel {
+	background: rgba( 22, 28, 40, 0.55 );
+	border: 1px solid rgba( 255, 255, 255, 0.10 );
+	border-radius: 16px;
+	backdrop-filter: blur( 14px );
+	-webkit-backdrop-filter: blur( 14px );
+	box-shadow: 0 8px 30px rgba( 0, 0, 0, 0.25 );
+	padding: 16px 18px;
+	margin-bottom: 14px;
+}
+
+.gs-collab-markets-list {
+	display: flex;
+	flex-direction: column;
+	gap: 14px;
+}
+
+.gs-collab-market-head {
+	display: flex;
+	justify-content: space-between;
+	align-items: baseline;
+	margin-bottom: 8px;
+}
+
+.gs-collab-market-id { font-weight: 600; letter-spacing: 0.2px; }
+
+.gs-collab-market-state {
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: 0.6px;
+	color: #9fb0c8;
+	padding: 2px 8px;
+	border-radius: 999px;
+	background: rgba( 255, 255, 255, 0.06 );
+}
+
+.gs-collab-odds { display: flex; gap: 10px; margin: 6px 0 10px; }
+
+.gs-collab-odd {
+	flex: 1;
+	text-align: center;
+	padding: 8px 0;
+	border-radius: 10px;
+	font-weight: 600;
+	background: rgba( 255, 255, 255, 0.05 );
+	border: 1px solid rgba( 255, 255, 255, 0.08 );
+}
+
+.gs-collab-odd-yes { color: #7fe0a8; }
+.gs-collab-odd-no  { color: #f0a0a0; }
+
+.gs-collab-your-pos { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 8px; }
+
+.gs-collab-inline-pos {
+	font-size: 12px;
+	padding: 3px 8px;
+	border-radius: 8px;
+	background: rgba( 120, 180, 255, 0.12 );
+	border: 1px solid rgba( 120, 180, 255, 0.25 );
+	color: #cfe0ff;
+}
+
+.gs-collab-controls {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	align-items: center;
+	margin-bottom: 8px;
+}
+
+.gs-collab-controls select,
+.gs-collab-controls input {
+	background: rgba( 12, 16, 24, 0.6 );
+	border: 1px solid rgba( 255, 255, 255, 0.14 );
+	border-radius: 8px;
+	color: #e6ecf5;
+	padding: 6px 8px;
+	font-size: 13px;
+}
+
+.gs-collab-controls input { width: 88px; }
+
+.gs-collab-controls button {
+	border: 1px solid rgba( 255, 255, 255, 0.16 );
+	border-radius: 8px;
+	padding: 6px 12px;
+	font-size: 13px;
+	cursor: pointer;
+	color: #e6ecf5;
+	background: rgba( 120, 180, 255, 0.18 );
+	transition: background 0.15s ease;
+}
+
+.gs-collab-controls button:hover { background: rgba( 120, 180, 255, 0.30 ); }
+
+.gs-collab-quote-out,
+.gs-collab-stake-status {
+	font-size: 12px;
+	color: #b7c4d8;
+	min-height: 16px;
+	margin-top: 4px;
+}
+
+/* STAKE-05 rake disclosure — always visible before a stake is confirmed. */
+.gs-collab-rake {
+	font-size: 12px;
+	color: #d8c48a;
+	margin: 8px 0 4px;
+	padding: 6px 10px;
+	border-radius: 8px;
+	background: rgba( 216, 196, 138, 0.08 );
+	border: 1px solid rgba( 216, 196, 138, 0.20 );
+}
+
+.gs-collab-pf-title { margin: 12px 0 8px; font-size: 15px; }
+
+.gs-collab-pf-table {
+	width: 100%;
+	border-collapse: collapse;
+	font-size: 12.5px;
+}
+
+.gs-collab-pf-table th,
+.gs-collab-pf-table td {
+	text-align: left;
+	padding: 6px 8px;
+	border-bottom: 1px solid rgba( 255, 255, 255, 0.07 );
+}
+
+.gs-collab-pf-table th { color: #9fb0c8; font-weight: 600; }
+
+.gs-collab-pf-totals {
+	margin-top: 10px;
+	font-size: 12.5px;
+	color: #cdd8e8;
+}
+
+.gs-collab-pl-chart { width: 100% !important; margin-bottom: 10px; }
+
+.gs-collab-empty { color: #8b98ac; font-size: 13px; }
