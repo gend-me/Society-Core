@@ -48,7 +48,9 @@ class Gend_GS_Collab_Schema {
 	 */
 	// 1.3.0 (Phase 86-02): added the three LMSR market tables
 	// gs_collab_markets / gs_collab_positions / gs_collab_market_events.
-	const DB_VERSION     = '1.3.0';
+	// 1.4.0 (Phase 87-01): gs_collab_bet_idem per-bet idempotency guard +
+	// gs_collab_positions.realized_dgen for sell-back realized P/L.
+	const DB_VERSION     = '1.4.0';
 	const DB_VERSION_OPT = 'gs_collab_db_version';
 
 	/**
@@ -324,6 +326,10 @@ class Gend_GS_Collab_Schema {
 		// makes a member's YES/NO holding a single upsertable row (never a second
 		// row on a repeat stake). shares = scaled-int micro-shares; cost_dgen =
 		// cumulative integer DGEN paid (avg cost = cost_dgen/shares).
+		//   realized_dgen (Phase 87-01): cumulative DGEN realized on sell-backs to
+		//   the AMM (avg-cost basis); portfolio realized P/L = realized_dgen −
+		//   cost-basis-of-sold-shares. dbDelta ALTERs an existing 1.3.0 table
+		//   additively, so this column self-heals onto a live positions table.
 		dbDelta(
 			"CREATE TABLE {$wpdb->prefix}gs_collab_positions (
 				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -332,6 +338,7 @@ class Gend_GS_Collab_Schema {
 				outcome ENUM('yes','no') NOT NULL,
 				shares BIGINT UNSIGNED NOT NULL DEFAULT 0,
 				cost_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				realized_dgen BIGINT NOT NULL DEFAULT 0,
 				created_at INT UNSIGNED NOT NULL DEFAULT 0,
 				updated_at INT UNSIGNED NOT NULL DEFAULT 0,
 				PRIMARY KEY (id),
@@ -356,6 +363,31 @@ class Gend_GS_Collab_Schema {
 				PRIMARY KEY (id),
 				KEY idx_market (market_id),
 				KEY idx_event (event)
+			) {$charset_collate};"
+		);
+
+		// Table 8: gs_collab_bet_idem — Phase 87 (STAKE-01) per-bet idempotency
+		// guard. The checkout mycred-log dedup (ref+ref_id+user_id+ctype) is TOO
+		// COARSE for repeat bets on ONE market (identical across legitimate stakes),
+		// so real member bets need their own per-bet key store. UNIQUE(idem_key) is
+		// THE idempotency spine: place_bet() INSERT IGNOREs the key as the FIRST
+		// statement inside its FOR-UPDATE transaction; a collision (rows_affected
+		// ===0) means a replay -> read the stored result_json and return it verbatim
+		// (NO double-debit). result_json holds the exact prior response, stored
+		// post-commit; a same-key retry that lands before the first commit is
+		// impossible because both serialize on the market-row FOR UPDATE lock.
+		// Mirrors the INSERT IGNORE house idiom (swipes / create_market / outcomes).
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_bet_idem (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				idem_key VARCHAR(64) NOT NULL,
+				market_id BIGINT UNSIGNED NOT NULL,
+				user_id BIGINT UNSIGNED NOT NULL,
+				result_json LONGTEXT NULL,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_idem (idem_key),
+				KEY idx_market_user (market_id, user_id)
 			) {$charset_collate};"
 		);
 	}
@@ -426,6 +458,40 @@ class Gend_GS_Collab_Schema {
 	public static function market_events_table() : string {
 		global $wpdb;
 		return $wpdb->prefix . 'gs_collab_market_events';
+	}
+
+	/**
+	 * Helper: fully-qualified bet-idempotency guard table name for the current
+	 * blog. Phase 87 (Gend_GS_Collab_Market::place_bet) INSERT IGNOREs the
+	 * per-bet idem_key here as the FIRST statement inside its FOR-UPDATE
+	 * transaction; a collision (rows_affected===0) replays the stored result_json.
+	 * UNIQUE(idem_key) means one recorded outcome per bet key.
+	 */
+	public static function bet_idem_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_bet_idem';
+	}
+
+	/**
+	 * Per-member per-market position cap in whole DGEN (STAKE-01 discretion).
+	 * Row→option→const precedence mirrors Gend_GS_Collab_Market::market_b() /
+	 * rake_bps(). Enforced INSIDE the FOR-UPDATE lock on a BUY: reject a buy
+	 * that pushes SUM(cost_dgen) over this cap (TOCTOU-safe). Selling never hits it.
+	 *
+	 * FAIL-SAFE: a 0/unset option means "use the default", NOT "unlimited" — a
+	 * missing config must NEVER silently disable the whale-manipulation dampener.
+	 *
+	 * @return string Cap as a whole-DGEN decimal string.
+	 */
+	public static function position_cap_dgen() : string {
+		$opt = (int) get_option( 'gs_collab_position_cap_dgen', 0 );
+		if ( $opt > 0 ) {
+			return (string) $opt;
+		}
+		if ( defined( 'GS_COLLAB_POSITION_CAP_DGEN' ) && (int) GS_COLLAB_POSITION_CAP_DGEN > 0 ) {
+			return (string) (int) GS_COLLAB_POSITION_CAP_DGEN;
+		}
+		return '10000'; // finite fail-safe default (10000 DGEN = 10000 CAD) — dampens whale manipulation.
 	}
 
 	/**
