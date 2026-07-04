@@ -69,6 +69,13 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 		/** Anchored when the treasury subsidy is really debited into escrow. */
 		const TX_SUBSIDY = 'chain.market.subsidy';
 
+		/**
+		 * Anchored (from_uid = the bettor) AFTER a real member bet commits
+		 * (Phase 87 — place_bet buy debit / sell refund). Unlike TX_SUBSIDY (from
+		 * the treasury), this carries the staking member as the originating uid.
+		 */
+		const TX_BET = 'chain.market.bet';
+
 		/** Anchored on the open->locked FSM transition. */
 		const TX_LOCKED = 'chain.market.locked';
 
@@ -820,23 +827,20 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 
 		/**
 		 * TRADE — the guarded, transactional, invariant-enforced money core (RESOLVE-05 +
-		 * STAKE-03). Mirrors the proven START TRANSACTION + SELECT ... FOR UPDATE primitive
-		 * in contracts-and-payments/class-ydgen-ledger.php:503-515.
+		 * STAKE-03). SIMULATED path (Phase 86 crown-UAT surface): NO real bettor DGEN moves.
 		 *
-		 * SCOPE (Phase 86): the stake ledger is SIMULATED — the position row records the
-		 * would-be holding but Phase 86 does NOT debit the real bettor's DGEN. The ONLY real
-		 * DGEN move is the treasury subsidy (fund_subsidy). Phase 87 adds the real bettor
-		 * debit. The concurrency + invariant + insider machinery is real and proven here.
+		 * SINGLE SOURCE OF TRUTH (Phase 87-01): the locked body (START TRANSACTION + FOR
+		 * UPDATE + re-quote + escrow-invariant HARD GATE + version guard + position upsert +
+		 * COMMIT) lives in ONE private method — do_trade_locked() — shared by BOTH this
+		 * trade() (money_leg = null -> simulated, behaviour byte-identical to Phase 86 so the
+		 * 86 crown UAT still passes) AND place_bet() (money_leg = real closure). There is NO
+		 * second copy of the invariant/lock/insider gate that could drift.
 		 *
 		 * Flow:
 		 *   1. ENTRY GATE (pre-transaction): insider (admin/mod of either matched group) -> reject.
-		 *   2. START TRANSACTION; SELECT ... WHERE id AND state='open' FOR UPDATE.
-		 *   3. RE-QUOTE off the LOCKED q (never the stale q the caller saw).
-		 *   4. HARD GATE: escrow_new < max_payout(q_new) -> ROLLBACK + reject (NEVER mint).
-		 *   5. Optimistic version guard: UPDATE ... version=version+1 WHERE version=%d; !=1 -> ROLLBACK.
-		 *   6. Upsert the SIMULATED position; append a 'trade' event.
-		 *   7. COMMIT (ROLLBACK on any Throwable).
-		 *   8. AFTER commit (outside the lock): audit.
+		 *   2. delta > 0 (buys only, as Phase 86).
+		 *   3. do_trade_locked( ..., $delta_shares, null )  [SIMULATED].
+		 *   4. AFTER commit (outside the lock): audit + shape-identical return.
 		 *
 		 * @param int    $market_id    Market id.
 		 * @param int    $user_id      Bettor user id.
@@ -845,8 +849,6 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 		 * @return array|WP_Error ['cost_dgen','q_yes','q_no','escrow_dgen','p_yes','p_no'] or WP_Error.
 		 */
 		public static function trade( int $market_id, int $user_id, string $outcome, string $delta_shares ) {
-			global $wpdb;
-
 			$market_id = (int) $market_id;
 			$user_id   = (int) $user_id;
 			$outcome   = ( 'no' === strtolower( (string) $outcome ) ) ? 'no' : 'yes';
@@ -859,6 +861,50 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 			}
 
 			// --- 1. ENTRY GATE (before ANY transaction): matched-group insider (STAKE-03). ---
+			$insider = self::insider_gate( $market_id, $user_id );
+			if ( is_wp_error( $insider ) ) {
+				return $insider;
+			}
+
+			// --- 2/3. Delegate to the shared locked core (SIMULATED: money_leg = null). ---
+			$res = self::do_trade_locked( $market_id, $user_id, $outcome, (string) $delta_shares, null );
+			if ( is_wp_error( $res ) ) {
+				return $res;
+			}
+
+			// --- 4. AFTER commit (outside the lock): audit + shape-identical Phase-86 return. ---
+			self::audit( 'collab.market.trade', array(
+				'market_id' => $market_id,
+				'user_id'   => $user_id,
+				'outcome'   => $outcome,
+				'delta'     => (string) $delta_shares,
+				'cost_dgen' => $res['cost'],
+				'simulated' => true,
+			) );
+
+			$b     = self::market_b( $res['market_row'] );
+			$price = Gend_GS_BC_Math::price( $res['q_yes_new'], $res['q_no_new'], $b );
+
+			return array(
+				'cost_dgen'   => $res['cost'],
+				'q_yes'       => $res['q_yes_new'],
+				'q_no'        => $res['q_no_new'],
+				'escrow_dgen' => $res['escrow_new'],
+				'p_yes'       => $price['p_yes'],
+				'p_no'        => $price['p_no'],
+			);
+		}
+
+		/**
+		 * Pre-transaction matched-group insider gate (STAKE-03), shared by trade() and
+		 * place_bet() so both use IDENTICAL insider machinery (single source of truth).
+		 * Returns null when clear, or a WP_Error to reject.
+		 *
+		 * @param int $market_id Market id.
+		 * @param int $user_id   Bettor user id.
+		 * @return null|WP_Error
+		 */
+		private static function insider_gate( int $market_id, int $user_id ) {
 			$pre = self::get_market( $market_id );
 			if ( ! is_object( $pre ) ) {
 				return new WP_Error( 'gs_market_not_found', 'Market not found.', array( 'status' => 404 ) );
@@ -873,10 +919,51 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 					);
 				}
 			}
+			return null;
+		}
+
+		/**
+		 * THE SINGLE SOURCE OF TRUTH for the money-safety invariant (Phase 87-01).
+		 *
+		 * Contains VERBATIM the Phase-86 locked body — START TRANSACTION + SELECT ... FOR
+		 * UPDATE + re-quote off the locked q + escrow-invariant HARD GATE + optimistic
+		 * version guard + position upsert + COMMIT — as ONE method called by BOTH the
+		 * SIMULATED trade() (money_leg = null) and the REAL place_bet() (money_leg = closure).
+		 * Never let two copies of the invariant/lock drift. Opens EXACTLY ONE transaction;
+		 * callers must NOT wrap it in another (MySQL does not nest — Pitfall 1).
+		 *
+		 * Seams vs Phase 86:
+		 *   - The pre-transaction insider gate stays in the public entry methods (insider_gate).
+		 *   - $signed_delta is a SIGNED integer string so a SELL (negative delta) is supported.
+		 *     Defence in depth: q_*_new >= 0 is asserted here (ROLLBACK gs_market_bad_delta).
+		 *   - BUY (positive delta): $cost = bc_ceil( C(q') - C(q) )  (maker-favor UP).
+		 *     SELL (negative delta): $refund = bc_floor( -( C(q') - C(q) ) )  (maker-favor DOWN
+		 *     so escrow shrinks by <= exact, never more).
+		 *   - Escrow: escrow_new = escrow + cost (buy) OR escrow - refund (sell). The SAME
+		 *     `escrow_new < max_payout(q_new) -> ROLLBACK` gate runs on BOTH paths (belt+braces).
+		 *   - $money_leg (if not null) is invoked INSIDE the txn AFTER the version-bumped UPDATE
+		 *     and BEFORE the position upsert, receiving [is_buy, cost, refund, q_yes_new,
+		 *     q_no_new, escrow_new, market_row]. If it returns a WP_Error (insufficient DGEN,
+		 *     cap, idem-replay, debit-fail) do_trade_locked ROLLBACKs and returns it unchanged
+		 *     (clean abort — no partial state, no debit). null money_leg -> SIMULATED (skipped).
+		 *   - Position upsert: BUY shares += |delta|, cost_dgen += cost. SELL shares -= |delta|,
+		 *     cost_dgen -= (avg_cost * |delta|) (bcmath floor off the row's cost_dgen/shares),
+		 *     realized_dgen += refund. shares/cost_dgen never go negative (clamped).
+		 *
+		 * @param int      $market_id    Market id.
+		 * @param int      $user_id      Bettor user id.
+		 * @param string   $outcome      'yes' or 'no'.
+		 * @param string   $signed_delta Signed micro-shares (negative = sell).
+		 * @param callable|null $money_leg null = simulated; closure(array):null|WP_Error = real.
+		 * @return array|WP_Error Locked-core result array (see keys below) or WP_Error.
+		 */
+		private static function do_trade_locked( int $market_id, int $user_id, string $outcome, string $signed_delta, $money_leg = null ) {
+			global $wpdb;
 
 			$markets   = Gend_GS_Collab_Schema::markets_table();
 			$positions = Gend_GS_Collab_Schema::positions_table();
-			$b         = self::market_b( $pre );
+			$is_buy    = ( bccomp( $signed_delta, '0', 0 ) >= 0 );
+			$abs_delta = ( '-' === substr( $signed_delta, 0, 1 ) ) ? substr( $signed_delta, 1 ) : $signed_delta;
 
 			// --- 2. START TRANSACTION + FOR UPDATE on the market row. ---
 			$wpdb->query( 'START TRANSACTION' );
@@ -890,22 +977,46 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 					return new WP_Error( 'gs_market_not_open', 'Market is not open for trading.', array( 'status' => 409 ) );
 				}
 
+				$b = self::market_b( $m );
+
 				// --- 3. RE-QUOTE off the LOCKED q (never the stale q shown to the caller). ---
 				$q_yes = (string) $m->q_yes;
 				$q_no  = (string) $m->q_no;
-				$q_yes_new = ( 'yes' === $outcome ) ? bcadd( $q_yes, (string) $delta_shares, 0 ) : $q_yes;
-				$q_no_new  = ( 'no' === $outcome ) ? bcadd( $q_no, (string) $delta_shares, 0 ) : $q_no;
+				$q_yes_new = ( 'yes' === $outcome ) ? bcadd( $q_yes, $signed_delta, 0 ) : $q_yes;
+				$q_no_new  = ( 'no' === $outcome ) ? bcadd( $q_no, $signed_delta, 0 ) : $q_no;
 
-				$cost = Gend_GS_BC_Math::bc_ceil(
-					bcsub(
-						Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
-						Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
-						Gend_GS_BC_Math::SCALE
-					)
+				// Defence in depth: a sell must never drive a q vector negative.
+				if ( bccomp( $q_yes_new, '0', 0 ) < 0 || bccomp( $q_no_new, '0', 0 ) < 0 ) {
+					$wpdb->query( 'ROLLBACK' );
+					return new WP_Error( 'gs_market_bad_delta', 'Trade would drive a share vector negative.', array( 'status' => 400 ) );
+				}
+
+				// delta_cost = C(q') - C(q). BUY: cost = ceil(delta_cost) (UP). SELL:
+				// refund = floor( -delta_cost ) (DOWN — escrow shrinks by <= exact, never more).
+				$delta_cost = bcsub(
+					Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
+					Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+					Gend_GS_BC_Math::SCALE
 				);
-				$escrow_new = bcadd( (string) $m->escrow_dgen, $cost, 0 );
+				$cost   = '0';
+				$refund = '0';
+				if ( $is_buy ) {
+					$cost       = Gend_GS_BC_Math::bc_ceil( $delta_cost );
+					$escrow_new = bcadd( (string) $m->escrow_dgen, $cost, 0 );
+				} else {
+					// -delta_cost is the positive refund magnitude; floor DOWN (maker-favor).
+					$refund     = Gend_GS_BC_Math::bc_floor( bcmul( $delta_cost, '-1', Gend_GS_BC_Math::SCALE ) );
+					if ( bccomp( $refund, '0', 0 ) < 0 ) {
+						$refund = '0';
+					}
+					$escrow_new = bcsub( (string) $m->escrow_dgen, $refund, 0 );
+					if ( bccomp( $escrow_new, '0', 0 ) < 0 ) {
+						$wpdb->query( 'ROLLBACK' );
+						return new WP_Error( 'gs_market_invariant', 'Sell would drive escrow negative. Rejected.', array( 'status' => 409 ) );
+					}
+				}
 
-				// --- 4. ESCROW-INVARIANT HARD GATE (RESOLVE-05). ---
+				// --- 4. ESCROW-INVARIANT HARD GATE (RESOLVE-05) — runs on BOTH paths. ---
 				// escrow_new >= GROSS max_payout(q_new) (rake ignored -> worst case). By LMSR
 				// construction this always holds; firing means a bug -> REJECT, NEVER mint.
 				$max_payout = self::max_payout( $q_yes_new, $q_no_new );
@@ -933,32 +1044,90 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 					return new WP_Error( 'gs_market_conflict', 'Concurrent update conflict; retry.', array( 'status' => 409 ) );
 				}
 
-				// --- 6. Upsert the SIMULATED position (Phase 87 adds the REAL bettor debit). ---
+				// --- 5b. REAL money leg (place_bet) — inside the lock, after the version bump,
+				// before the position upsert. A returned WP_Error aborts cleanly (no debit,
+				// no partial state). null (trade) -> SIMULATED, skipped. ---
+				if ( null !== $money_leg ) {
+					$leg = call_user_func( $money_leg, array(
+						'is_buy'     => $is_buy,
+						'cost'       => $cost,
+						'refund'     => $refund,
+						'q_yes_new'  => $q_yes_new,
+						'q_no_new'   => $q_no_new,
+						'escrow_new' => $escrow_new,
+						'market_row' => $m,
+					) );
+					if ( is_wp_error( $leg ) ) {
+						$wpdb->query( 'ROLLBACK' );
+						return $leg;
+					}
+				}
+
+				// --- 6. Position upsert (BUY: add; SELL: reduce + realize). ---
 				$now = time();
-				$wpdb->query( $wpdb->prepare(
-					"INSERT INTO {$positions} (market_id, user_id, outcome, shares, cost_dgen, created_at, updated_at)
-					 VALUES (%d, %d, %s, %d, %s, %d, %d)
-					 ON DUPLICATE KEY UPDATE shares = shares + VALUES(shares),
-					                         cost_dgen = cost_dgen + VALUES(cost_dgen),
-					                         updated_at = VALUES(updated_at)",
-					$market_id,
-					$user_id,
-					$outcome,
-					(string) $delta_shares,
-					$cost,
-					$now,
-					$now
-				) );
+				if ( $is_buy ) {
+					$wpdb->query( $wpdb->prepare(
+						"INSERT INTO {$positions} (market_id, user_id, outcome, shares, cost_dgen, realized_dgen, created_at, updated_at)
+						 VALUES (%d, %d, %s, %d, %s, 0, %d, %d)
+						 ON DUPLICATE KEY UPDATE shares = shares + VALUES(shares),
+						                         cost_dgen = cost_dgen + VALUES(cost_dgen),
+						                         updated_at = VALUES(updated_at)",
+						$market_id,
+						$user_id,
+						$outcome,
+						$abs_delta,
+						$cost,
+						$now,
+						$now
+					) );
+				} else {
+					// SELL: reduce shares by |delta|, drop cost basis by avg_cost*|delta|,
+					// accrue realized_dgen += refund. Read the CURRENT row inside the lock.
+					$pos = $wpdb->get_row( $wpdb->prepare(
+						"SELECT shares, cost_dgen, realized_dgen FROM {$positions}
+						 WHERE market_id=%d AND user_id=%d AND outcome=%s",
+						$market_id,
+						$user_id,
+						$outcome
+					) );
+					$held      = is_object( $pos ) ? (string) $pos->shares : '0';
+					$basis     = is_object( $pos ) ? (string) $pos->cost_dgen : '0';
+					// avg-cost basis of the sold shares = floor( cost_dgen * |delta| / shares ).
+					$cost_out  = ( bccomp( $held, '0', 0 ) > 0 )
+						? Gend_GS_BC_Math::bc_floor( bcdiv( bcmul( $basis, $abs_delta, 0 ), $held, Gend_GS_BC_Math::SCALE ) )
+						: '0';
+					$new_shares = bcsub( $held, $abs_delta, 0 );
+					if ( bccomp( $new_shares, '0', 0 ) < 0 ) {
+						$new_shares = '0';
+					}
+					$new_basis  = bcsub( $basis, $cost_out, 0 );
+					if ( bccomp( $new_basis, '0', 0 ) < 0 ) {
+						$new_basis = '0';
+					}
+					$wpdb->query( $wpdb->prepare(
+						"UPDATE {$positions}
+						 SET shares=%s, cost_dgen=%s, realized_dgen=realized_dgen+%s, updated_at=%d
+						 WHERE market_id=%d AND user_id=%d AND outcome=%s",
+						$new_shares,
+						$new_basis,
+						$refund,
+						$now,
+						$market_id,
+						$user_id,
+						$outcome
+					) );
+				}
 
 				self::market_event( $market_id, 'trade', array(
-					'user_id'  => $user_id,
-					'outcome'  => $outcome,
-					'delta'    => (string) $delta_shares,
-					'cost'     => $cost,
-					'q_yes'    => $q_yes_new,
-					'q_no'     => $q_no_new,
-					'escrow'   => $escrow_new,
-					'simulated' => true,
+					'user_id'   => $user_id,
+					'outcome'   => $outcome,
+					'delta'     => $signed_delta,
+					'cost'      => $is_buy ? $cost : $refund,
+					'is_buy'    => $is_buy,
+					'q_yes'     => $q_yes_new,
+					'q_no'      => $q_no_new,
+					'escrow'    => $escrow_new,
+					'simulated' => ( null === $money_leg ),
 				) );
 
 				// --- 7. COMMIT. ---
@@ -968,26 +1137,261 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 				return new WP_Error( 'gs_market_trade_failed', $e->getMessage(), array( 'status' => 500 ) );
 			}
 
-			// --- 8. AFTER commit (outside the lock): audit + final read. ---
-			self::audit( 'collab.market.trade', array(
+			return array(
+				'is_buy'     => $is_buy,
+				'cost'       => $cost,
+				'refund'     => $refund,
+				'q_yes_new'  => $q_yes_new,
+				'q_no_new'   => $q_no_new,
+				'escrow_new' => $escrow_new,
+				'market_row' => $m,
+			);
+		}
+
+		/* -----------------------------------------------------------------
+		 * place_bet (STAKE-01) — the REAL member DGEN debit/credit path.
+		 * Shares do_trade_locked()'s invariant/lock/version machinery; adds
+		 * the money leg (mycred_subtract buy / mycred_add sell), per-bet
+		 * idempotency (gs_collab_bet_idem INSERT IGNORE), the position cap,
+		 * and the chain.market.bet anchor after commit.
+		 * ----------------------------------------------------------------- */
+
+		/**
+		 * PLACE_BET (STAKE-01) — a REAL member stake. Buy debits the member's DGEN via the
+		 * MyCred↔chain bridge (mycred_subtract on 'transact'), adds the LMSR cost to escrow,
+		 * upserts the position; sell refunds C(q)-C(q') (maker-favor DOWN) to the SAME member,
+		 * reduces the position, shrinks escrow safely. ALL inside the Phase-86 FOR UPDATE lock
+		 * (via do_trade_locked), after the escrow-invariant gate. Idempotent per idem_key
+		 * (a cold-start retry NEVER double-debits). chain.market.bet anchored AFTER commit.
+		 *
+		 * STAKE-04 (non-transferable): the AMM is the SOLE counterparty. The sell credit goes
+		 * to $user_id (the authenticated bettor) ONLY — there is NO recipient param anywhere.
+		 * STAKE-05 (rake disclosure): the response carries rake_bps + a plain-language string;
+		 * Phase 87 does NOT skim (Phase 88 does), so no invariant change.
+		 *
+		 * @param int    $market_id    Market id.
+		 * @param int    $user_id      Authenticated bettor user id (the ONLY money endpoint).
+		 * @param string $outcome      'yes' or 'no'.
+		 * @param string $direction    'buy' | 'sell'.
+		 * @param string $delta_shares Positive micro-shares to buy/sell (integer string).
+		 * @param string $idem_key     Per-bet idempotency key (<=64 chars; derived if empty).
+		 * @return array|WP_Error Bet result (cost/refund, q, escrow, prices, position, rake) or WP_Error.
+		 */
+		public static function place_bet( int $market_id, int $user_id, string $outcome, string $direction, string $delta_shares, string $idem_key = '' ) {
+			global $wpdb;
+
+			$market_id = (int) $market_id;
+			$user_id   = (int) $user_id;
+			$outcome   = ( 'no' === strtolower( (string) $outcome ) ) ? 'no' : 'yes';
+			$direction = ( 'sell' === strtolower( (string) $direction ) ) ? 'sell' : 'buy';
+			$is_buy    = ( 'buy' === $direction );
+
+			// --- 1. Validate. ---
+			if ( bccomp( (string) $delta_shares, '0', 0 ) <= 0 ) {
+				return new WP_Error( 'gs_market_bad_delta', 'Stake size must be positive.', array( 'status' => 400 ) );
+			}
+			if ( ! class_exists( 'Gend_GS_Collab_Schema' ) || ! method_exists( 'Gend_GS_Collab_Schema', 'bet_idem_table' ) ) {
+				return new WP_Error( 'gs_market_no_schema', 'Collab schema unavailable.', array( 'status' => 500 ) );
+			}
+			if ( ! function_exists( 'mycred_subtract' ) || ! function_exists( 'mycred_add' ) || ! function_exists( 'mycred_get_users_balance' ) ) {
+				return new WP_Error( 'gs_market_no_mycred', 'myCRED unavailable — stake cannot be settled.', array( 'status' => 500 ) );
+			}
+
+			// Prefer a client-supplied key (so a retry reuses it); else derive one.
+			$idem_key = trim( (string) $idem_key );
+			if ( '' === $idem_key ) {
+				$idem_key = hash( 'sha256', $market_id . '|' . $user_id . '|' . $outcome . '|' . $direction . '|' . $delta_shares . '|' . microtime( true ) );
+			}
+			$idem_key = substr( $idem_key, 0, 64 );
+
+			// --- 2. Pre-transaction insider gate (SAME machinery as trade() — STAKE-03). ---
+			$insider = self::insider_gate( $market_id, $user_id );
+			if ( is_wp_error( $insider ) ) {
+				return $insider;
+			}
+
+			$idem_table = Gend_GS_Collab_Schema::bet_idem_table();
+			$positions  = Gend_GS_Collab_Schema::positions_table();
+
+			// Replay carrier — the money-leg stashes a prior result here so place_bet can
+			// return it verbatim (a replay is NOT an error).
+			$replay = array( 'hit' => false, 'result' => null );
+
+			// --- 3. Signed delta (sell = negative). ---
+			$signed_delta = $is_buy ? (string) $delta_shares : ( '-' . (string) $delta_shares );
+
+			// --- 4. Real money leg, invoked INSIDE do_trade_locked's transaction. ---
+			$money_leg = function ( $ctx ) use ( $wpdb, $idem_table, $positions, $market_id, $user_id, $outcome, $direction, $idem_key, &$replay ) {
+				$is_buy = (bool) $ctx['is_buy'];
+				$cost   = (string) $ctx['cost'];
+				$refund = (string) $ctx['refund'];
+
+				// a. IDEMPOTENCY FIRST: INSERT IGNORE the key. rows_affected===0 -> replay.
+				$now = time();
+				$wpdb->query( $wpdb->prepare(
+					"INSERT IGNORE INTO {$idem_table} (idem_key, market_id, user_id, created_at)
+					 VALUES (%s, %d, %d, %d)",
+					$idem_key,
+					$market_id,
+					$user_id,
+					$now
+				) );
+				if ( 0 === (int) $wpdb->rows_affected ) {
+					// A prior bet with this key already committed — return the stored result.
+					$prior = $wpdb->get_var( $wpdb->prepare(
+						"SELECT result_json FROM {$idem_table} WHERE idem_key = %s",
+						$idem_key
+					) );
+					$replay['hit']    = true;
+					$replay['result'] = is_string( $prior ) ? json_decode( $prior, true ) : null;
+					return new WP_Error( 'gs_market_idem_replay', 'Idempotent replay.', array( 'status' => 200 ) );
+				}
+
+				if ( $is_buy ) {
+					// b. POSITION CAP (TOCTOU-safe — inside the lock). SUM(cost_dgen) over BOTH
+					// outcomes for this member on this market + this buy's cost <= cap.
+					$existing = (string) $wpdb->get_var( $wpdb->prepare(
+						"SELECT COALESCE(SUM(cost_dgen),0) FROM {$positions} WHERE market_id=%d AND user_id=%d",
+						$market_id,
+						$user_id
+					) );
+					$cap = Gend_GS_Collab_Schema::position_cap_dgen();
+					if ( bccomp( bcadd( $existing, $cost, 0 ), $cap, 0 ) > 0 ) {
+						return new WP_Error(
+							'gs_market_position_cap',
+							'This stake would exceed your per-market limit.',
+							array( 'status' => 422, 'cap' => $cap )
+						);
+					}
+
+					// c. BALANCE precheck (insufficient DGEN -> clean abort, NO debit).
+					$balance_str = number_format( (float) mycred_get_users_balance( $user_id, 'transact' ), 0, '.', '' );
+					if ( bccomp( $balance_str, $cost, 0 ) < 0 ) {
+						return new WP_Error(
+							'gs_market_insufficient_dgen',
+							'Insufficient DGEN balance to place this stake.',
+							array( 'status' => 402, 'needed' => $cost )
+						);
+					}
+
+					// d. MONEY MOVE — real debit. FLOAT DISCIPLINE: $cost is whole-integer DGEN
+					// (bc_ceil to 0dp); assert no fractional part, then (float) ONLY at the
+					// myCRED boundary. All escrow/LMSR math stayed bcmath strings.
+					if ( false !== strpos( $cost, '.' ) ) {
+						return new WP_Error( 'gs_market_debit_failed', 'Non-integer stake cost.', array( 'status' => 500 ) );
+					}
+					$r = mycred_subtract(
+						'gend_gs_market_bet',
+						$user_id,
+						(float) $cost,
+						sprintf( 'Collaboration market stake — Market #%d', $market_id ),
+						$market_id,
+						array( 'idem' => $idem_key, 'outcome' => $outcome, 'dir' => 'buy' ),
+						'transact'
+					);
+					if ( false === $r ) {
+						return new WP_Error( 'gs_market_debit_failed', 'DGEN debit failed.', array( 'status' => 500 ) );
+					}
+				} else {
+					// SELL: refund C(q)-C(q') to the SAME bettor (STAKE-04 — sole counterparty).
+					if ( false !== strpos( $refund, '.' ) ) {
+						return new WP_Error( 'gs_market_credit_failed', 'Non-integer refund.', array( 'status' => 500 ) );
+					}
+					if ( bccomp( $refund, '0', 0 ) > 0 ) {
+						$r = mycred_add(
+							'gend_gs_market_sell',
+							$user_id,
+							(float) $refund,
+							sprintf( 'Collaboration market early exit — Market #%d', $market_id ),
+							$market_id,
+							array( 'idem' => $idem_key, 'outcome' => $outcome, 'dir' => 'sell' ),
+							'transact'
+						);
+						if ( false === $r ) {
+							return new WP_Error( 'gs_market_credit_failed', 'DGEN refund failed.', array( 'status' => 500 ) );
+						}
+					}
+				}
+
+				return null; // money leg OK — do_trade_locked proceeds to the position upsert + COMMIT.
+			};
+
+			// --- 5. Run the shared locked core with the real money leg. ---
+			$res = self::do_trade_locked( $market_id, $user_id, $outcome, $signed_delta, $money_leg );
+
+			// --- 6. Idempotent replay: return the exact prior result (NO second debit). ---
+			if ( is_wp_error( $res ) ) {
+				if ( 'gs_market_idem_replay' === $res->get_error_code() && $replay['hit'] ) {
+					return is_array( $replay['result'] ) ? $replay['result'] : array( 'idempotent_replay' => true );
+				}
+				return $res; // all other WP_Errors (cap, insufficient, invariant, conflict) as-is.
+			}
+
+			// --- 7. AFTER commit: build the response, persist result_json, anchor, audit. ---
+			$b      = self::market_b( $res['market_row'] );
+			$price  = Gend_GS_BC_Math::price( $res['q_yes_new'], $res['q_no_new'], $b );
+			$market = self::get_market( $market_id );
+			$rake   = self::rake_bps( is_object( $market ) ? $market : $res['market_row'] );
+
+			// Current position snapshot (post-trade) for the response.
+			$pos = $wpdb->get_row( $wpdb->prepare(
+				"SELECT shares, cost_dgen, realized_dgen FROM {$positions}
+				 WHERE market_id=%d AND user_id=%d AND outcome=%s",
+				$market_id,
+				$user_id,
+				$outcome
+			) );
+
+			$response = array(
+				'direction'   => $direction,
+				'outcome'     => $outcome,
+				'cost_dgen'   => $is_buy ? $res['cost'] : '0',
+				'refund_dgen' => $is_buy ? '0' : $res['refund'],
+				'q_yes'       => $res['q_yes_new'],
+				'q_no'        => $res['q_no_new'],
+				'escrow_dgen' => $res['escrow_new'],
+				'p_yes'       => $price['p_yes'],
+				'p_no'        => $price['p_no'],
+				'position'    => array(
+					'shares'        => is_object( $pos ) ? (string) $pos->shares : '0',
+					'cost_dgen'     => is_object( $pos ) ? (string) $pos->cost_dgen : '0',
+					'realized_dgen' => is_object( $pos ) ? (string) $pos->realized_dgen : '0',
+				),
+				'rake_bps'    => $rake,
+				'rake_disclosure' => sprintf(
+					'Platform fee: %s%% — skimmed from the losing pool at resolution (not charged now).',
+					rtrim( rtrim( number_format( $rake / 100, 2, '.', '' ), '0' ), '.' )
+				),
+			);
+
+			// Persist result_json for future idempotent replays.
+			$wpdb->query( $wpdb->prepare(
+				"UPDATE {$idem_table} SET result_json=%s WHERE idem_key=%s",
+				wp_json_encode( $response ),
+				$idem_key
+			) );
+
+			// Chain-anchor chain.market.bet AFTER commit, outside the lock (from_uid = bettor).
+			$tx = self::anchor( self::TX_BET, $user_id, array(
+				'market_id' => $market_id,
+				'outcome'   => $outcome,
+				'dir'       => $direction,
+				'delta'     => (string) $delta_shares,
+				'cost'      => $is_buy ? $res['cost'] : $res['refund'],
+			) );
+
+			self::audit( 'collab.market.bet', array(
 				'market_id' => $market_id,
 				'user_id'   => $user_id,
 				'outcome'   => $outcome,
+				'dir'       => $direction,
 				'delta'     => (string) $delta_shares,
-				'cost_dgen' => $cost,
-				'simulated' => true,
-			) );
+				'cost'      => $is_buy ? $res['cost'] : $res['refund'],
+				'simulated' => false,
+			), $tx );
 
-			$price = Gend_GS_BC_Math::price( $q_yes_new, $q_no_new, $b );
-
-			return array(
-				'cost_dgen'   => $cost,
-				'q_yes'       => $q_yes_new,
-				'q_no'        => $q_no_new,
-				'escrow_dgen' => $escrow_new,
-				'p_yes'       => $price['p_yes'],
-				'p_no'        => $price['p_no'],
-			);
+			$response['chain_tx_id'] = $tx;
+			return $response;
 		}
 	}
 }
