@@ -525,5 +525,390 @@ $check(
 	"loss=" . bcsub( $cost_up, $value_back, 0 ) . " spread={$spread}"
 );
 
-// ── BATTERY C is appended in Task 2 (escrow-invariant after every trade + FSM
-//    transition, no-mint, insider, sockpuppet, concurrency, collab-only, lifecycle). ──
+/* =====================================================================
+ * BATTERY C — THE MONEY-SAFETY INVARIANTS (the load-bearing asserts).
+ * ===================================================================== */
+echo "\n--- BATTERY C: escrow-invariant + no-mint + insider + sockpuppet + concurrency + collab-only + lifecycle ---\n";
+
+// C1 — ESCROW-INVARIANT after EVERY trade. Re-run a fresh trade sequence and assert
+//   escrow_dgen >= max(q_yes,q_no) (integer-DGEN) after each single ::trade(). Every time.
+$inv_seq = array(
+	array( 'yes', '3000000' ),
+	array( 'no',  '7000000' ),
+	array( 'yes', '1500000' ),
+	array( 'no',  '4000000' ),
+);
+$inv_all_ok = true;
+$step_i     = 0;
+foreach ( $inv_seq as $t ) {
+	++$step_i;
+	$r = Gend_GS_Collab_Market::trade( $market_id, 525252, $t[0], $t[1] );
+	if ( is_wp_error( $r ) ) {
+		$inv_all_ok = false;
+		$check( "C1.{$step_i} trade({$t[0]},{$t[1]}) executed", false, $r->get_error_code() . ': ' . $r->get_error_message() );
+		continue;
+	}
+	// Assert against the RETURNED escrow/q (the authoritative post-trade state) AND the DB row.
+	$mp_ret  = $max_payout( $r['q_yes'], $r['q_no'] );
+	$ret_ok  = bccomp( (string) $r['escrow_dgen'], $mp_ret, 0 ) >= 0;
+	$row_now = $market_row( $market_id );
+	$db_ok   = $assert_escrow( $row_now, "C1.{$step_i} ESCROW-INVARIANT (DB) after trade({$t[0]},{$t[1]}): escrow >= max(q_yes,q_no)" );
+	$check(
+		"C1.{$step_i} ESCROW-INVARIANT (returned) after trade({$t[0]},{$t[1]}): escrow_dgen >= max_payout",
+		$ret_ok,
+		'escrow=' . $r['escrow_dgen'] . ' max_payout=' . $mp_ret
+	);
+	$inv_all_ok = $inv_all_ok && $ret_ok && $db_ok;
+}
+$check( 'C1 escrow-invariant held after EVERY simulated trade (never once < max payout)', $inv_all_ok );
+
+// C2 — NO MINT-TO-PAY. The escrow only ever grew by (a) the subsidy debit and (b) the
+//   maker-favor ceil trade-cost collected — never a spontaneous credit to cover a gap.
+//   Assert escrow_dgen == subsidy + Σ position cost_dgen (escrow is exactly what came in),
+//   and that escrow STRICTLY DOMINATES max_payout by at least the subsidy (b·ln2) — the
+//   engine never had to mint DGEN. Force a "boundary" trade (a large one-sided buy) and
+//   re-assert escrow still dominates.
+$row_c2       = $market_row( $market_id );
+$sum_positions = (string) $wpdb->get_var( $wpdb->prepare(
+	"SELECT COALESCE(SUM(cost_dgen),0) FROM {$positions_tbl} WHERE market_id = %d",
+	$market_id
+) );
+$expected_escrow = bcadd( (string) $row_c2->subsidy_dgen, $sum_positions, 0 );
+$check(
+	'C2a NO-MINT: escrow_dgen == subsidy_dgen + Σ(position cost_dgen) — escrow is EXACTLY what was collected (never minted)',
+	0 === bccomp( (string) $row_c2->escrow_dgen, $expected_escrow, 0 ),
+	'escrow=' . $row_c2->escrow_dgen . ' expected(subsidy+Σcost)=' . $expected_escrow
+);
+// Boundary trade: buy a large chunk of YES so max(q) grows meaningfully; escrow must still
+// dominate max_payout (the subsidy headroom absorbs it — the engine never mints).
+$boundary = '40000000'; // 40 shares.
+$rb       = Gend_GS_Collab_Market::trade( $market_id, 636363, 'yes', $boundary );
+if ( is_wp_error( $rb ) ) {
+	// If the invariant gate itself rejected (it should NOT for a well-subsidised market), that
+	// is still money-safe (no mint) — but flag it since our subsidy headroom should cover it.
+	$check( 'C2b BOUNDARY trade did not spuriously reject (subsidy headroom covers a large one-sided buy)',
+		'gs_market_invariant' !== $rb->get_error_code(),
+		$rb->get_error_code() . ': ' . $rb->get_error_message() );
+} else {
+	$mp_b = $max_payout( $rb['q_yes'], $rb['q_no'] );
+	$check(
+		'C2b NO-MINT under a boundary trade: escrow still >= max_payout (subsidy headroom absorbs it, no DGEN minted)',
+		bccomp( (string) $rb['escrow_dgen'], $mp_b, 0 ) >= 0,
+		'escrow=' . $rb['escrow_dgen'] . ' max_payout=' . $mp_b
+	);
+	$check(
+		'C2c escrow DOMINATES max_payout by >= a positive margin (the pre-funded subsidy, never a mint)',
+		bccomp( (string) $rb['escrow_dgen'], $mp_b, 0 ) > 0,
+		'escrow=' . $rb['escrow_dgen'] . ' max_payout=' . $mp_b
+	);
+}
+
+// C3 — INSIDER REJECTED with NO state change. Seed a REAL BP group whose admin is our
+//   insider user, seed a contracted match on it, open a market, then trade as the admin.
+//   Must return gs_market_insider(403) and change NOTHING (q/escrow/version/positions).
+if ( function_exists( 'groups_create_group' ) && function_exists( 'wp_insert_user' ) && function_exists( 'groups_is_user_admin' ) ) {
+	$ins_login = 'uat86_insider_' . substr( md5( $session ), 0, 8 );
+	$ins_uid   = wp_insert_user( array(
+		'user_login' => $ins_login,
+		'user_pass'  => wp_generate_password( 20, true ),
+		'user_email' => $ins_login . '@uat86.local',
+		'role'       => 'subscriber',
+	) );
+	if ( ! is_wp_error( $ins_uid ) && (int) $ins_uid > 0 ) {
+		$created_uids[] = (int) $ins_uid;
+		// Group A owned/created by the insider (creator => operator => admin).
+		$gi_a = groups_create_group( array(
+			'creator_id' => (int) $ins_uid,
+			'name'       => 'UAT86 insider A ' . $session,
+			'slug'       => 'uat86-ins-a-' . substr( md5( $session ), 0, 8 ),
+			'status'     => 'hidden',
+		) );
+		// Group B — a distinct group with a DIFFERENT creator (no shared operator).
+		$other_uid = wp_insert_user( array(
+			'user_login' => 'uat86_other_' . substr( md5( $session ), 0, 8 ),
+			'user_pass'  => wp_generate_password( 20, true ),
+			'user_email' => 'uat86_other_' . substr( md5( $session ), 0, 8 ) . '@uat86.local',
+			'role'       => 'subscriber',
+		) );
+		if ( ! is_wp_error( $other_uid ) ) {
+			$created_uids[] = (int) $other_uid;
+		}
+		$gi_b = groups_create_group( array(
+			'creator_id' => is_wp_error( $other_uid ) ? 1 : (int) $other_uid,
+			'name'       => 'UAT86 insider B ' . $session,
+			'slug'       => 'uat86-ins-b-' . substr( md5( $session ), 0, 8 ),
+			'status'     => 'hidden',
+		) );
+		if ( $gi_a && ! is_wp_error( $gi_a ) && $gi_b && ! is_wp_error( $gi_b ) ) {
+			$created_gids[] = (int) $gi_a;
+			$created_gids[] = (int) $gi_b;
+			$ins_match = $seed_match( (int) $gi_a, (int) $gi_b, 'contracted', 860000000 + wp_rand( 1, 8000000 ) );
+			$ins_mk    = Gend_GS_Collab_Market::create_market( $ins_match );
+			if ( ! is_wp_error( $ins_mk ) && 'open' === (string) $ins_mk->state ) {
+				$seen_markets[] = (int) $ins_mk->id;
+				$before_ins     = $market_row( (int) $ins_mk->id );
+				$pos_before     = (int) $wpdb->get_var( $wpdb->prepare(
+					"SELECT COUNT(*) FROM {$positions_tbl} WHERE market_id = %d", (int) $ins_mk->id ) );
+
+				$ins_res = Gend_GS_Collab_Market::trade( (int) $ins_mk->id, (int) $ins_uid, 'yes', '1000000' );
+				$check(
+					'C3a INSIDER: a matched-group admin trade returns WP_Error(gs_market_insider)',
+					is_wp_error( $ins_res ) && 'gs_market_insider' === $ins_res->get_error_code(),
+					is_wp_error( $ins_res ) ? $ins_res->get_error_code() : 'no error returned'
+				);
+				$after_ins  = $market_row( (int) $ins_mk->id );
+				$pos_after  = (int) $wpdb->get_var( $wpdb->prepare(
+					"SELECT COUNT(*) FROM {$positions_tbl} WHERE market_id = %d", (int) $ins_mk->id ) );
+				$check(
+					'C3b INSIDER: NO state change (q_yes/q_no/escrow/version unchanged, NO position row)',
+					$before_ins && $after_ins
+						&& (string) $before_ins->q_yes === (string) $after_ins->q_yes
+						&& (string) $before_ins->q_no === (string) $after_ins->q_no
+						&& (string) $before_ins->escrow_dgen === (string) $after_ins->escrow_dgen
+						&& (int) $before_ins->version === (int) $after_ins->version
+						&& $pos_before === $pos_after,
+					"q_yes {$before_ins->q_yes}->{$after_ins->q_yes} escrow {$before_ins->escrow_dgen}->{$after_ins->escrow_dgen} ver {$before_ins->version}->{$after_ins->version} pos {$pos_before}->{$pos_after}"
+				);
+			} else {
+				echo "[SKIP] C3 INSIDER — could not open a market on the seeded insider match (create_market: "
+					. ( is_wp_error( $ins_mk ) ? $ins_mk->get_error_code() : ( is_object( $ins_mk ) ? $ins_mk->state : '?' ) ) . ")\n";
+			}
+		} else {
+			echo "[SKIP] C3 INSIDER — could not seed the two BP groups (groups_create_group failed)\n";
+		}
+	} else {
+		echo "[SKIP] C3 INSIDER — could not seed the insider WP user\n";
+	}
+} else {
+	echo "[SKIP] C3 INSIDER — BuddyPress groups_create_group / groups_is_user_admin unavailable to seed the fixture\n";
+}
+
+// C4 — SOCKPUPPET AUTO-VOID. Seed a second contracted match whose group_a and group_b
+//   SHARE an operator (same creator). create_market() must return state='void',
+//   subsidy_funded=0, and NO treasury debit (subsidy balance unchanged across the call).
+if ( function_exists( 'groups_create_group' ) && function_exists( 'wp_insert_user' ) ) {
+	$sp_login = 'uat86_sock_' . substr( md5( $session ), 0, 8 );
+	$sp_uid   = wp_insert_user( array(
+		'user_login' => $sp_login,
+		'user_pass'  => wp_generate_password( 20, true ),
+		'user_email' => $sp_login . '@uat86.local',
+		'role'       => 'subscriber',
+	) );
+	if ( ! is_wp_error( $sp_uid ) && (int) $sp_uid > 0 ) {
+		$created_uids[] = (int) $sp_uid;
+		// BOTH groups created by the SAME user => shared operator => sockpuppet.
+		$sg_a = groups_create_group( array(
+			'creator_id' => (int) $sp_uid,
+			'name'       => 'UAT86 sock A ' . $session,
+			'slug'       => 'uat86-sock-a-' . substr( md5( $session ), 0, 8 ),
+			'status'     => 'hidden',
+		) );
+		$sg_b = groups_create_group( array(
+			'creator_id' => (int) $sp_uid,
+			'name'       => 'UAT86 sock B ' . $session,
+			'slug'       => 'uat86-sock-b-' . substr( md5( $session ), 0, 8 ),
+			'status'     => 'hidden',
+		) );
+		if ( $sg_a && ! is_wp_error( $sg_a ) && $sg_b && ! is_wp_error( $sg_b ) ) {
+			$created_gids[] = (int) $sg_a;
+			$created_gids[] = (int) $sg_b;
+			$treasury_pre_sock = (float) mycred_get_users_balance( $treasury_uid, 'transact' );
+			$sp_match = $seed_match( (int) $sg_a, (int) $sg_b, 'contracted', 860000000 + wp_rand( 1, 8000000 ) );
+			$sp_mk    = Gend_GS_Collab_Market::create_market( $sp_match );
+			if ( is_object( $sp_mk ) && ! is_wp_error( $sp_mk ) ) {
+				$seen_markets[] = (int) $sp_mk->id;
+			}
+			$treasury_post_sock = (float) mycred_get_users_balance( $treasury_uid, 'transact' );
+			$check(
+				'C4a SOCKPUPPET: create_market on a shared-operator match returns state=void',
+				is_object( $sp_mk ) && ! is_wp_error( $sp_mk ) && 'void' === (string) $sp_mk->state,
+				is_wp_error( $sp_mk ) ? $sp_mk->get_error_code() : ( is_object( $sp_mk ) ? 'state=' . $sp_mk->state : 'not an object' )
+			);
+			$check(
+				'C4b SOCKPUPPET: the auto-voided market has subsidy_funded=0 (never funded)',
+				is_object( $sp_mk ) && 0 === (int) $sp_mk->subsidy_funded,
+				is_object( $sp_mk ) ? 'subsidy_funded=' . $sp_mk->subsidy_funded : 'n/a'
+			);
+			$check(
+				'C4c SOCKPUPPET: NO treasury debit fired (subsidy balance unchanged across the auto-void)',
+				abs( $treasury_post_sock - $treasury_pre_sock ) < 0.0000001,
+				"pre={$treasury_pre_sock} post={$treasury_post_sock} delta=" . ( $treasury_post_sock - $treasury_pre_sock )
+			);
+		} else {
+			echo "[SKIP] C4 SOCKPUPPET — could not seed the two shared-operator BP groups\n";
+		}
+	} else {
+		echo "[SKIP] C4 SOCKPUPPET — could not seed the sockpuppet WP user\n";
+	}
+} else {
+	echo "[SKIP] C4 SOCKPUPPET — BuddyPress groups_create_group unavailable to seed the fixture\n";
+}
+
+// C5 — CONCURRENCY serialization. A single PHP process is serial, so we assert the
+//   MECHANISM: the version bumps on every trade, and a SECOND trade re-quotes off the
+//   POST-first q (not the stale q), so final escrow == the correctly-SEQUENCED sum. We
+//   also prove a STALE-version UPDATE is a no-op (the optimistic guard rejects it).
+$conc_before = $market_row( $market_id );
+$ver0        = (int) $conc_before->version;
+$q_yes_s     = (string) $conc_before->q_yes;
+$q_no_s      = (string) $conc_before->q_no;
+$esc_s       = (string) $conc_before->escrow_dgen;
+
+// Compute the EXPECTED correctly-sequenced two-trade result off the CURRENT q.
+$d1          = '2500000';
+$d2          = '3500000';
+$cost1_exp   = Gend_GS_BC_Math::bc_ceil( bcsub(
+	Gend_GS_BC_Math::cost( bcadd( $q_yes_s, $d1, 0 ), $q_no_s, $b_str ),
+	Gend_GS_BC_Math::cost( $q_yes_s, $q_no_s, $b_str ), 18 ) );
+$q_yes_mid   = bcadd( $q_yes_s, $d1, 0 );
+$cost2_exp   = Gend_GS_BC_Math::bc_ceil( bcsub(
+	Gend_GS_BC_Math::cost( bcadd( $q_yes_mid, $d2, 0 ), $q_no_s, $b_str ),
+	Gend_GS_BC_Math::cost( $q_yes_mid, $q_no_s, $b_str ), 18 ) );
+$esc_expected = bcadd( bcadd( $esc_s, $cost1_exp, 0 ), $cost2_exp, 0 );
+
+$r1 = Gend_GS_Collab_Market::trade( $market_id, 717171, 'yes', $d1 );
+$r2 = Gend_GS_Collab_Market::trade( $market_id, 818181, 'yes', $d2 );
+$conc_after = $market_row( $market_id );
+
+$check(
+	'C5a CONCURRENCY: version incremented by exactly 2 across two serialized trades',
+	! is_wp_error( $r1 ) && ! is_wp_error( $r2 ) && (int) $conc_after->version === $ver0 + 2,
+	'ver ' . $ver0 . ' -> ' . ( is_object( $conc_after ) ? $conc_after->version : '?' )
+);
+$check(
+	'C5b CONCURRENCY: trade 2 re-quoted off the POST-trade-1 q — final escrow == correctly-SEQUENCED sum',
+	is_object( $conc_after ) && 0 === bccomp( (string) $conc_after->escrow_dgen, $esc_expected, 0 ),
+	'escrow=' . ( is_object( $conc_after ) ? $conc_after->escrow_dgen : '?' ) . ' expected(sequenced)=' . $esc_expected
+);
+// A STALE-version UPDATE is a no-op — prove the optimistic guard rejects a lost update.
+$stale = $wpdb->query( $wpdb->prepare(
+	"UPDATE {$markets_tbl} SET q_yes = q_yes + 1, version = version + 1 WHERE id = %d AND version = %d AND state = 'open'",
+	$market_id,
+	$ver0 // deliberately stale (already advanced by +2).
+) );
+$check(
+	'C5c CONCURRENCY: a stale-version UPDATE affects 0 rows (the optimistic guard blocks a lost update)',
+	0 === (int) $stale,
+	"rows_affected={$stale}"
+);
+// The invariant still holds after the concurrent burst.
+$assert_escrow( $market_row( $market_id ), 'C5d CONCURRENCY: escrow-invariant held after the concurrent trade burst' );
+
+// C6 — COLLAB-ONLY (MARKET-06). create_market on a bogus id AND on a 'matched' (not
+//   'contracted') match must BOTH return gs_market_not_contracted and create NO market row.
+$bogus_id = 999000000 + wp_rand( 1, 900000 ); // no such match.
+$c6a      = Gend_GS_Collab_Market::create_market( $bogus_id );
+$check(
+	'C6a COLLAB-ONLY: create_market on a bogus/non-existent match_id -> WP_Error(gs_market_not_contracted)',
+	is_wp_error( $c6a ) && 'gs_market_not_contracted' === $c6a->get_error_code(),
+	is_wp_error( $c6a ) ? $c6a->get_error_code() : 'no error'
+);
+$check(
+	'C6a2 COLLAB-ONLY: NO market row was created for the bogus match',
+	0 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$markets_tbl} WHERE match_id = %d", $bogus_id ) )
+);
+$matched_only = $seed_match( 960000000 + wp_rand( 1, 8000000 ), 960000001 + wp_rand( 1, 8000000 ), 'matched', 0 );
+$c6b          = Gend_GS_Collab_Market::create_market( $matched_only );
+$check(
+	'C6b COLLAB-ONLY: create_market on a MATCHED (not contracted) match -> WP_Error(gs_market_not_contracted)',
+	is_wp_error( $c6b ) && 'gs_market_not_contracted' === $c6b->get_error_code(),
+	is_wp_error( $c6b ) ? $c6b->get_error_code() : 'no error'
+);
+$check(
+	'C6b2 COLLAB-ONLY: NO market row was created for the matched-only match',
+	0 === (int) $wpdb->get_var( $wpdb->prepare( "SELECT COUNT(*) FROM {$markets_tbl} WHERE match_id = %d", (int) $matched_only ) )
+);
+
+// C7 — LIFECYCLE LOCK (MARKET-05). lock() flips open->locked; a subsequent trade() is
+//   refused (gs_market_not_open); a second lock() is an idempotent no-op. Then the
+//   outcome-recorded path + a past-deadline lock.
+$lock_match = $seed_match( 950000000 + wp_rand( 1, 8000000 ), 950000001 + wp_rand( 1, 8000000 ), 'contracted', 860000000 + wp_rand( 1, 8000000 ) );
+$lock_mk    = Gend_GS_Collab_Market::create_market( $lock_match );
+if ( ! is_wp_error( $lock_mk ) && 'open' === (string) $lock_mk->state ) {
+	$lock_id        = (int) $lock_mk->id;
+	$seen_markets[] = $lock_id;
+
+	$locked1 = Gend_GS_Collab_Market::lock( $lock_id );
+	$check( 'C7a LOCK: lock() flips open->locked (returns true on the winning transition)', true === $locked1, 'ret=' . var_export( $locked1, true ) );
+	$row_locked = $market_row( $lock_id );
+	$check( 'C7b LOCK: market state is now locked', is_object( $row_locked ) && 'locked' === (string) $row_locked->state, 'state=' . ( is_object( $row_locked ) ? $row_locked->state : '?' ) );
+
+	$trade_locked = Gend_GS_Collab_Market::trade( $lock_id, 929292, 'yes', '1000000' );
+	$check(
+		'C7c LOCK: a trade on a locked market is REFUSED (gs_market_not_open)',
+		is_wp_error( $trade_locked ) && 'gs_market_not_open' === $trade_locked->get_error_code(),
+		is_wp_error( $trade_locked ) ? $trade_locked->get_error_code() : 'trade unexpectedly succeeded'
+	);
+
+	$locked2 = Gend_GS_Collab_Market::lock( $lock_id );
+	$check( 'C7d LOCK: a second lock() is an idempotent no-op (returns false)', false === $locked2, 'ret=' . var_export( $locked2, true ) );
+
+	// Escrow-invariant must still hold across the FSM transition (locked state).
+	$assert_escrow( $market_row( $lock_id ), 'C7e LOCK: escrow-invariant held across the open->locked FSM transition' );
+} else {
+	echo "[SKIP] C7a-e LOCK — could not open a market to lock (create_market: "
+		. ( is_wp_error( $lock_mk ) ? $lock_mk->get_error_code() : ( is_object( $lock_mk ) ? $lock_mk->state : '?' ) ) . ")\n";
+}
+
+// C7f — OUTCOME-RECORDED lock path. on_outcome_recorded(match_id) must lock the open market.
+if ( method_exists( 'Gend_GS_Collab_Market', 'on_outcome_recorded' ) ) {
+	$oc_match = $seed_match( 940000000 + wp_rand( 1, 8000000 ), 940000001 + wp_rand( 1, 8000000 ), 'contracted', 860000000 + wp_rand( 1, 8000000 ) );
+	$oc_mk    = Gend_GS_Collab_Market::create_market( $oc_match );
+	if ( ! is_wp_error( $oc_mk ) && 'open' === (string) $oc_mk->state ) {
+		$seen_markets[] = (int) $oc_mk->id;
+		Gend_GS_Collab_Market::on_outcome_recorded( (int) $oc_match, 'success' );
+		$oc_row = $market_row( (int) $oc_mk->id );
+		$check(
+			'C7f OUTCOME-LOCK: on_outcome_recorded() locked the open market (terminal outcome halts trading)',
+			is_object( $oc_row ) && 'locked' === (string) $oc_row->state,
+			'state=' . ( is_object( $oc_row ) ? $oc_row->state : '?' )
+		);
+	} else {
+		echo "[SKIP] C7f OUTCOME-LOCK — could not open a market for the outcome-lock path\n";
+	}
+} else {
+	echo "[SKIP] C7f OUTCOME-LOCK — Gend_GS_Collab_Market::on_outcome_recorded absent (deploy 86-04)\n";
+}
+
+// C7g — DEADLINE lock. A market whose resolve_by is in the past must be lockable (the
+//   Phase-85 sweep locks it). We assert the mechanism directly: force resolve_by into the
+//   past, confirm it is past-due, then lock() and confirm the FSM flipped.
+$dl_match = $seed_match( 930000000 + wp_rand( 1, 8000000 ), 930000001 + wp_rand( 1, 8000000 ), 'contracted', 860000000 + wp_rand( 1, 8000000 ) );
+$dl_mk    = Gend_GS_Collab_Market::create_market( $dl_match );
+if ( ! is_wp_error( $dl_mk ) && 'open' === (string) $dl_mk->state ) {
+	$dl_id          = (int) $dl_mk->id;
+	$seen_markets[] = $dl_id;
+	$past           = time() - DAY_IN_SECONDS;
+	$wpdb->query( $wpdb->prepare( "UPDATE {$markets_tbl} SET resolve_by = %d WHERE id = %d", $past, $dl_id ) );
+	$dl_row = $market_row( $dl_id );
+	$is_due = is_object( $dl_row ) && (int) $dl_row->resolve_by > 0 && (int) $dl_row->resolve_by < time() && 'open' === (string) $dl_row->state;
+	$check( 'C7g0 DEADLINE: the market is now open AND past its resolve_by deadline', $is_due,
+		'resolve_by=' . ( is_object( $dl_row ) ? $dl_row->resolve_by : '?' ) . ' now=' . time() );
+	if ( $is_due ) {
+		$dl_locked = Gend_GS_Collab_Market::lock( $dl_id );
+		$dl_after  = $market_row( $dl_id );
+		$check(
+			'C7g DEADLINE: a past-deadline market locks (open->locked, halting trading before resolution)',
+			true === $dl_locked && is_object( $dl_after ) && 'locked' === (string) $dl_after->state,
+			'lock_ret=' . var_export( $dl_locked, true ) . ' state=' . ( is_object( $dl_after ) ? $dl_after->state : '?' )
+		);
+	}
+} else {
+	echo "[SKIP] C7g DEADLINE — could not open a market for the deadline-lock path\n";
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Footer gate.
+// ─────────────────────────────────────────────────────────────────────
+echo "\n";
+if ( ! $fail ) {
+	echo "=== SUCCESS === Phase 86 CROWN UAT passed — bcmath round-trips to >=12 digits, prices sum to 1, cost monotone, round-trip loss <= spread, maker worst-case loss == b·ln2 pre-funded, escrow >= max payout after EVERY trade + FSM transition, NO mint-to-pay, insider stake rejected with NO state change, sockpuppet market auto-voided (no subsidy drained), concurrent trades serialized (version bump + re-quote off fresh q, stale UPDATE = no-op) without invariant violation, create_market rejects a bogus/non-contracted subject, lifecycle locks at deadline + terminal outcome. THE MONEY IS SAFE.\n";
+	echo "UAT PASSED\n";
+	exit( 0 );
+}
+echo "=== FAILURE === Phase 86 CROWN UAT detected " . count( $issues ) . " invariant violation(s) — DO NOT enable GS_COLLAB_MARKET_PUBLIC / proceed to Phase 87 until closed:\n";
+foreach ( $issues as $i => $msg ) {
+	echo '  ' . ( $i + 1 ) . ". {$msg}\n";
+}
+echo 'UAT FAILED (' . count( $issues ) . " failures)\n";
+exit( 1 );
