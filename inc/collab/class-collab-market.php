@@ -83,6 +83,27 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 		const TX_VOID = 'chain.market.void';
 
 		/**
+		 * Anchored (from_uid = the winning bettor) when a winning position is credited
+		 * its bc_floor( shares × (1 − rake) ) DGEN payout at settlement (Phase 88 —
+		 * pay_market_batch). One anchor per credited winner position.
+		 */
+		const TX_PAYOUT = 'chain.market.payout';
+
+		/**
+		 * Anchored (from_uid = 0 system) when the residual escrow (subsidy-not-lost +
+		 * withheld rake + per-winner floor dust) drains to the treasury on the final
+		 * resolved→paid flip (Phase 88). Carries {residual_dgen, rake_bps}.
+		 */
+		const TX_RESIDUAL = 'chain.market.residual';
+
+		/**
+		 * Anchored (from_uid = the bettor) when a position is VOID-refunded its
+		 * cost_dgen verbatim (no rake) on a voided market — mutual-cancel outcome or a
+		 * resolve_by deadline with no recorded outcome (Phase 88, RESOLVE-04).
+		 */
+		const TX_REFUND = 'chain.market.refund';
+
+		/**
 		 * Global default liquidity depth `b` (scaled-int micro-units, 1e6/share) used
 		 * when neither the market row nor the gs_collab_market_default_b option supplies
 		 * one. Higher b = deeper/steadier odds + larger subsidy (b·ln2).
@@ -1392,6 +1413,383 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 
 			$response['chain_tx_id'] = $tx;
 			return $response;
+		}
+
+		/* -----------------------------------------------------------------
+		 * SETTLEMENT (Phase 88) — the LAST money-moving code in the milestone.
+		 * resolve() (deterministic oracle read + idempotent CAS locked->resolved
+		 * + deadline-VOID) / pay_market_batch() (resumable per-position
+		 * CAS-before-credit payout / VOID refund + rake+residual escrow-drain-to-0,
+		 * NO-MINT) / settle() (the hook orchestration: lock-then-resolve).
+		 *
+		 * ALL flag-INDEPENDENT plain statics (no GS_COLLAB_MARKET_PUBLIC guard
+		 * inside — see the class docblock at the top): once a market exists with
+		 * real stakes, turning the flag OFF must NEVER strand a bettor's DGEN. The
+		 * flag gates the CALLERS (the 88-03 hook/sweep wiring), not the engine.
+		 * ----------------------------------------------------------------- */
+
+		/**
+		 * RESOLVE (RESOLVE-01 / RESOLVE-04) — deterministic, idempotent market
+		 * resolution. Reads the Phase-85 recorded outcome (NO human/admin oracle
+		 * path anywhere) and CASes the FSM locked->resolved. NO funds move here;
+		 * per-position payout is the resumable pay_market_batch() run from the
+		 * 88-03 sweep (the locked "resolve synchronously, PAY in a cron-batch"
+		 * decision). Flag-INDEPENDENT.
+		 *
+		 * Outcome mapping (the ONLY inputs are the recorded outcome + the deadline):
+		 *   - $forced_outcome === 'void'  -> VOID directly (the deadline-VOID branch,
+		 *     RESOLVE-04; recorded DIRECTLY to avoid a contract self-trigger loop,
+		 *     mirror resolver.php:323-325).
+		 *   - else read gs_collab_contract_outcomes: success=>'yes', fail=>'no',
+		 *     void=>'void'; a NULL/unknown outcome => the SAFE default 'void'.
+		 *
+		 * Idempotency: the CAS `... SET state='resolved' WHERE id=%d AND state='locked'`
+		 * with rows_affected===1 gates ALL anchor/event/audit writes. A duplicate
+		 * resolve (hook + sweep both firing) sees rows_affected===0 and is a pure
+		 * no-op — NO funds move, NO re-anchor. NOT wrapped in a transaction (a simple
+		 * CAS + metadata write; do_trade_locked opens its own START TRANSACTION and
+		 * MySQL does not nest — 88-RESEARCH anti-pattern).
+		 *
+		 * @param int         $market_id      Market id.
+		 * @param string|null $forced_outcome Pass 'void' to force the deadline-VOID path.
+		 * @return bool true on the winning locked->resolved transition; false on a no-op
+		 *              (missing market, not lockable, or already resolved).
+		 */
+		public static function resolve( int $market_id, $forced_outcome = null ) : bool {
+			global $wpdb;
+
+			$market_id = (int) $market_id;
+			if ( $market_id <= 0 || ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+				return false;
+			}
+
+			// 1. Load the market row.
+			$market = self::get_market( $market_id );
+			if ( ! is_object( $market ) ) {
+				return false;
+			}
+			// Already terminal (resolved/paid/void) -> idempotent no-op.
+			$state = (string) $market->state;
+			if ( 'resolved' === $state || 'paid' === $state || 'void' === $state ) {
+				return false;
+			}
+
+			// 2. Determine the winning outcome — deterministic, no human oracle.
+			if ( null !== $forced_outcome && 'void' === (string) $forced_outcome ) {
+				// RESOLVE-04 deadline-VOID: recorded DIRECTLY (no contract round-trip).
+				$resolved_outcome = 'void';
+			} else {
+				$contract_task_id = (int) $market->contract_task_id;
+				$recorded         = null;
+				if ( $contract_task_id > 0 && method_exists( 'Gend_GS_Collab_Schema', 'contract_outcomes_table' ) ) {
+					$outcomes = Gend_GS_Collab_Schema::contract_outcomes_table();
+					$recorded = $wpdb->get_var( $wpdb->prepare(
+						"SELECT outcome FROM {$outcomes} WHERE contract_task_id = %d LIMIT 1",
+						$contract_task_id
+					) );
+				}
+				$map = array( 'success' => 'yes', 'fail' => 'no', 'void' => 'void' );
+				// NULL/unknown -> the SAFE default VOID (RESOLVE-04, never a forced guess).
+				$resolved_outcome = ( is_string( $recorded ) && isset( $map[ $recorded ] ) ) ? $map[ $recorded ] : 'void';
+			}
+
+			$markets = Gend_GS_Collab_Schema::markets_table();
+
+			// 3. DEFENSIVE lock-first (88-RESEARCH Pitfall 5): if still 'open', run the
+			//    idempotent open->locked CAS so the resolve CAS has its precondition. A
+			//    market already 'locked' skips this (lock() is a no-op there).
+			if ( 'open' === $state ) {
+				self::lock( $market_id ); // idempotent CAS; leaves it 'locked'.
+			}
+
+			// 4. IDEMPOTENT resolve CAS (RESOLVE-01) — mirror lock() rows_affected===1.
+			$won = $wpdb->query( $wpdb->prepare(
+				"UPDATE {$markets} SET state='resolved', resolved_outcome=%s, resolved_at=%d
+				 WHERE id=%d AND state='locked'",
+				$resolved_outcome,
+				time(),
+				$market_id
+			) );
+			if ( 1 !== (int) $won ) {
+				// Already resolved (hook+sweep collapse) or not lockable -> no-op. NO funds move.
+				return false;
+			}
+
+			// 5. ONLY on the winning transition: anchor + event + audit (NO payout here).
+			// A resolve to VOID anchors chain.market.void; a yes/no resolve anchors the
+			// generic locked-family lifecycle tx (payout/residual anchor at pay time).
+			$tx = self::anchor(
+				'void' === $resolved_outcome ? self::TX_VOID : self::TX_LOCKED,
+				0,
+				array(
+					'market_id'        => $market_id,
+					'match_id'         => (int) $market->match_id,
+					'resolved_outcome' => $resolved_outcome,
+					'event'            => 'resolved',
+				)
+			);
+			self::audit( 'collab.market.resolved', array(
+				'market_id'        => $market_id,
+				'match_id'         => (int) $market->match_id,
+				'resolved_outcome' => $resolved_outcome,
+				'forced'           => ( null !== $forced_outcome ),
+			), $tx );
+			self::market_event( $market_id, 'resolved', array(
+				'resolved_outcome' => $resolved_outcome,
+				'forced'           => ( null !== $forced_outcome ),
+			), $tx );
+
+			return true;
+		}
+
+		/**
+		 * PAY_MARKET_BATCH (RESOLVE-02 / RESOLVE-04) — the resumable per-position
+		 * settlement drain. For each UNPAID position on a 'resolved' market:
+		 * CAS-claim `paid=1 WHERE paid=0` FIRST (rows_affected===1), THEN mycred_add
+		 * (claim-before-credit — mirror fund_subsidy :587-595) so a mid-batch hub
+		 * cold-start RESUMES and NEVER double-pays (the position id is the MyCred
+		 * ref_id, unique per position, dedup-safe). Batch-limited. When NO unpaid
+		 * positions remain: skim the residual (subsidy-not-lost + withheld rake +
+		 * floor dust) to the treasury and drain escrow_dgen to exactly 0, flipping
+		 * the FSM resolved->paid. Flag-INDEPENDENT.
+		 *
+		 * Payout math (whole DGEN, NO native float, maker-favor DOWN):
+		 *   - WINNER (pos->outcome === resolved_outcome):
+		 *       bc_floor( shares × (10000 − rake_bps)/10000 / 1e6 )
+		 *   - VOID   (resolved_outcome === 'void', RESOLVE-04): cost_dgen verbatim, NO rake.
+		 *   - LOSER: 0 (still claimed paid=1 so it is not re-scanned).
+		 *
+		 * NO-MINT (88-RESEARCH §The No-Mint Proof): the Phase-86 escrow-invariant
+		 * escrow_dgen >= floor(max(q_yes,q_no)/1e6) = Σ winning shares guarantees
+		 * escrow covers every payout (minus-rake is strictly safe). NEVER add a
+		 * mint/top-up path — if escrow were somehow short, FAIL LOUDLY and bail.
+		 *
+		 * @param int $market_id Market id.
+		 * @param int $limit     Positions paid per run (default 50, mirrors the sweep).
+		 * @return array ['done'=>bool,'status'=>string,'paid'=>int,'market_id'=>int,...].
+		 */
+		public static function pay_market_batch( int $market_id, int $limit = 50 ) : array {
+			global $wpdb;
+
+			$market_id = (int) $market_id;
+			$limit     = $limit > 0 ? (int) $limit : 50;
+			if ( $market_id <= 0 || ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+				return array( 'done' => false, 'status' => 'bad_id', 'paid' => 0, 'market_id' => $market_id );
+			}
+
+			// 1. Load the market; require state='resolved'.
+			$market = self::get_market( $market_id );
+			if ( ! is_object( $market ) ) {
+				return array( 'done' => false, 'status' => 'not_found', 'paid' => 0, 'market_id' => $market_id );
+			}
+			$state = (string) $market->state;
+			if ( 'paid' === $state ) {
+				return array( 'done' => true, 'status' => 'already_paid', 'paid' => 0, 'market_id' => $market_id );
+			}
+			if ( 'resolved' !== $state ) {
+				return array( 'done' => false, 'status' => 'not_resolved', 'paid' => 0, 'market_id' => $market_id );
+			}
+			if ( ! function_exists( 'mycred_add' ) ) {
+				return array( 'done' => false, 'status' => 'no_mycred', 'paid' => 0, 'market_id' => $market_id );
+			}
+
+			$resolved_outcome = (string) $market->resolved_outcome;
+			$is_void          = ( 'void' === $resolved_outcome );
+			$rake_bps         = self::rake_bps( $market );
+			$positions        = Gend_GS_Collab_Schema::positions_table();
+			$markets          = Gend_GS_Collab_Schema::markets_table();
+
+			// 2. Select up to $limit UNPAID positions (uses idx_market_paid).
+			$rows = $wpdb->get_results( $wpdb->prepare(
+				"SELECT id, user_id, outcome, shares, cost_dgen FROM {$positions}
+				 WHERE market_id=%d AND paid=0 LIMIT %d",
+				$market_id,
+				$limit
+			) );
+
+			$paid_count = 0;
+
+			foreach ( (array) $rows as $pos ) {
+				// a. Compute this position's payout (whole DGEN, bcmath — NO float).
+				if ( $is_void ) {
+					// RESOLVE-04: refund the net cost basis verbatim (net of Phase-87 sells). NO rake.
+					$payout_dgen = (string) $pos->cost_dgen;
+				} elseif ( (string) $pos->outcome === $resolved_outcome ) {
+					// WINNER: shares × (10000 − rake)/10000 / 1e6, floor DOWN (maker-favor).
+					$net_num      = bcmul( (string) $pos->shares, (string) ( 10000 - $rake_bps ), 0 );
+					$payout_micro = bcdiv( $net_num, '10000', Gend_GS_BC_Math::SCALE );
+					$payout_dgen  = Gend_GS_BC_Math::bc_floor( bcdiv( $payout_micro, '1000000', Gend_GS_BC_Math::SCALE ) );
+				} else {
+					// LOSER: 0 (still claimed below so it is not re-scanned).
+					$payout_dgen = '0';
+				}
+
+				// b. CLAIM-BEFORE-CREDIT (RESOLVE-02/04 idempotency — mirror fund_subsidy).
+				$claimed = $wpdb->query( $wpdb->prepare(
+					"UPDATE {$positions} SET paid=1, paid_at=%d, payout_dgen=%s WHERE id=%d AND paid=0",
+					time(),
+					$payout_dgen,
+					(int) $pos->id
+				) );
+				if ( 1 !== (int) $claimed ) {
+					// Another run already paid this position — NEVER double-pay.
+					continue;
+				}
+				$paid_count++;
+
+				// c. CREDIT — only when payout > 0. A loser (0) is marked paid, no credit/anchor.
+				if ( bccomp( $payout_dgen, '0', 0 ) <= 0 ) {
+					continue;
+				}
+				// Whole-integer DGEN discipline: (float) ONLY at the myCRED boundary.
+				if ( false !== strpos( $payout_dgen, '.' ) ) {
+					// Should never happen (bc_floor / cost_dgen are integers) — bail this position.
+					continue;
+				}
+
+				if ( $is_void ) {
+					mycred_add(
+						'gend_gs_market_refund',
+						(int) $pos->user_id,
+						(float) $payout_dgen,
+						sprintf( 'Collaboration market voided — refund, Market #%d', $market_id ),
+						(int) $pos->id, // ref_id = position id -> myCRED dedup on re-credit.
+						array( 'market_id' => $market_id, 'position_id' => (int) $pos->id ),
+						'transact'
+					);
+					$tx = self::anchor( self::TX_REFUND, (int) $pos->user_id, array(
+						'market_id'   => $market_id,
+						'position_id' => (int) $pos->id,
+						'refund_dgen' => $payout_dgen,
+					) );
+					self::audit( 'collab.market.refund', array(
+						'market_id'   => $market_id,
+						'position_id' => (int) $pos->id,
+						'user_id'     => (int) $pos->user_id,
+						'refund_dgen' => $payout_dgen,
+					), $tx );
+				} else {
+					mycred_add(
+						'gend_gs_market_payout',
+						(int) $pos->user_id,
+						(float) $payout_dgen,
+						sprintf( 'Collaboration market payout — Market #%d', $market_id ),
+						(int) $pos->id, // ref_id = position id -> myCRED dedup on re-credit.
+						array( 'market_id' => $market_id, 'position_id' => (int) $pos->id, 'outcome' => (string) $pos->outcome ),
+						'transact'
+					);
+					$tx = self::anchor( self::TX_PAYOUT, (int) $pos->user_id, array(
+						'market_id'   => $market_id,
+						'position_id' => (int) $pos->id,
+						'outcome'     => (string) $pos->outcome,
+						'payout_dgen' => $payout_dgen,
+					) );
+					self::audit( 'collab.market.payout', array(
+						'market_id'   => $market_id,
+						'position_id' => (int) $pos->id,
+						'user_id'     => (int) $pos->user_id,
+						'outcome'     => (string) $pos->outcome,
+						'payout_dgen' => $payout_dgen,
+					), $tx );
+				}
+			}
+
+			// 4. Any positions still unpaid? -> the next sweep run drains the rest.
+			$remaining = (int) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COUNT(*) FROM {$positions} WHERE market_id=%d AND paid=0",
+				$market_id
+			) );
+			if ( $remaining > 0 ) {
+				return array(
+					'done'      => false,
+					'status'    => 'batch_paid',
+					'paid'      => $paid_count,
+					'remaining' => $remaining,
+					'market_id' => $market_id,
+				);
+			}
+
+			// 5. NONE remain — ESCROW DRAIN TO 0 + FSM resolved->paid (88-RESEARCH Pattern 3).
+			//    Re-read the CURRENT escrow: the rake was WITHHELD from winner payouts so it is
+			//    already inside the remaining escrow; a VOID's full subsidy is likewise the
+			//    remaining escrow. Do NOT run a live per-winner `escrow = escrow - payout`
+			//    (BIGINT UNSIGNED underflow, Pitfall 1) — this ONE re-read residual is the drain.
+			$fresh    = self::get_market( $market_id );
+			$residual = is_object( $fresh ) ? (string) $fresh->escrow_dgen : '0';
+
+			if ( bccomp( $residual, '0', 0 ) > 0 && false === strpos( $residual, '.' ) ) {
+				mycred_add(
+					'gend_gs_market_residual',
+					self::treasury_uid(),
+					(float) $residual,
+					sprintf( 'Collaboration market residual + rake to treasury — Market #%d', $market_id ),
+					$market_id,
+					array( 'market_id' => $market_id, 'residual_dgen' => $residual, 'rake_bps' => $rake_bps ),
+					'transact'
+				);
+				$rtx = self::anchor( self::TX_RESIDUAL, 0, array(
+					'market_id'     => $market_id,
+					'residual_dgen' => $residual,
+					'rake_bps'      => $rake_bps,
+				) );
+				self::audit( 'collab.market.residual', array(
+					'market_id'     => $market_id,
+					'treasury'      => self::treasury_uid(),
+					'residual_dgen' => $residual,
+					'rake_bps'      => $rake_bps,
+				), $rtx );
+			}
+
+			// FLIP resolved->paid + escrow_dgen=0 (single final UPDATE; rows_affected===1 gate).
+			$flipped = $wpdb->query( $wpdb->prepare(
+				"UPDATE {$markets} SET escrow_dgen=0, state='paid', paid_at=%d WHERE id=%d AND state='resolved'",
+				time(),
+				$market_id
+			) );
+			if ( 1 === (int) $flipped ) {
+				self::market_event( $market_id, 'paid', array(
+					'resolved_outcome' => $resolved_outcome,
+					'residual_dgen'    => $residual,
+				) );
+			}
+
+			return array(
+				'done'      => true,
+				'status'    => 'paid',
+				'paid'      => $paid_count,
+				'residual'  => $residual,
+				'market_id' => $market_id,
+			);
+		}
+
+		/**
+		 * SETTLE — the flag-INDEPENDENT hook orchestration (lock-then-resolve). The
+		 * 88-03 wiring binds this to gend_gs_collab_outcome_recorded at a priority
+		 * AFTER the Phase-86 on_outcome_recorded lock subscriber (a SEPARATE
+		 * subscriber — Phase-86 on_outcome_recorded is left UNTOUCHED). Does ONLY
+		 * the synchronous deterministic resolve(); the resumable per-position PAYOUT
+		 * is left to the gs_fifteen_min sweep (88-03), per the locked "resolve
+		 * synchronously, PAY in a cron-batch" decision — keeps the hook cheap.
+		 *
+		 * Hub-only (money), but NO GS_COLLAB_MARKET_PUBLIC guard — a bettor's DGEN
+		 * must settle even with the flag off (mirror the Phase-85 recorder + Phase-86
+		 * on_outcome_recorded flag-independence).
+		 *
+		 * @param int    $match_id Match id whose terminal outcome was recorded.
+		 * @param string $outcome  'success'|'fail'|'void' (unused — resolve() re-reads it).
+		 * @return void
+		 */
+		public static function settle( $match_id, $outcome = '' ) : void {
+			if ( ! self::is_hub() ) {
+				return; // hub-only money.
+			}
+			$market = self::get_market_by_match( (int) $match_id );
+			if ( ! is_object( $market ) || ! isset( $market->id ) ) {
+				return; // no market ever opened for this contract.
+			}
+			// resolve() reads the recorded outcome itself + lock-then-resolves idempotently.
+			// The authoritative per-position drain is the 88-03 sweep (keep settle() fast).
+			self::resolve( (int) $market->id );
 		}
 	}
 }
