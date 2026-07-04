@@ -149,6 +149,58 @@ class Gend_GS_Collab_REST {
 				'mode'     => array( 'sanitize_callback' => 'sanitize_key' ), // 'declined' | 'cancelled'
 			),
 		) );
+
+		// ---------------------------------------------------------------
+		// Phase 85 (COLLAB-03 consumer half) — the NON-SUCCESS terminal
+		// TRIGGERS. These reach Gend_CP_Task_Contract::terminate() (Plan
+		// 85-01) so the Plan 85-02 resolver can record FAIL / VOID. Money-
+		// free: they only fire terminate(), which sets a guard meta + fires
+		// gend_cp_task_contract_terminated. NO DGEN moves here.
+		//
+		// The escalation contract routes above turn a MATCH into a contract
+		// (status='contracted', contract_task_id set). These routes only act
+		// on such a contracted match:
+		//   forfeit          → terminate('forfeited') → resolver records FAIL.
+		//                      SELF-declared: ONE matched-group admin forfeits
+		//                      their own side (can_act_for_group).
+		//   cancel/propose   → store a pending mutual-cancel intent. NO terminate.
+		//                      ONE matched-group admin (can_act_for_group).
+		//   cancel/accept    → the COUNTERPARTY admin acks the pending intent
+		//                      (can_accept_contract) → terminate('cancelled') →
+		//                      resolver records VOID. A one-sided propose that is
+		//                      never accepted NEVER terminates — no unilateral VOID
+		//                      (that would be a forfeit=FAIL). RESEARCH Pitfall 5.
+		// ---------------------------------------------------------------
+
+		// POST /collab/match/{id}/contract/forfeit — SELF-forfeit (→ FAIL).
+		register_rest_route( self::NS, '/collab/match/(?P<id>\d+)/contract/forfeit', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_contract_forfeit' ),
+			'permission_callback' => array( __CLASS__, 'can_act_for_group' ),
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ),
+			),
+		) );
+
+		// POST /collab/match/{id}/contract/cancel/propose — propose a mutual cancel.
+		register_rest_route( self::NS, '/collab/match/(?P<id>\d+)/contract/cancel/propose', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_contract_cancel_propose' ),
+			'permission_callback' => array( __CLASS__, 'can_act_for_group' ),
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ), // proposer group
+			),
+		) );
+
+		// POST /collab/match/{id}/contract/cancel/accept — counterparty acks → VOID.
+		register_rest_route( self::NS, '/collab/match/(?P<id>\d+)/contract/cancel/accept', array(
+			'methods'             => WP_REST_Server::CREATABLE,
+			'callback'            => array( __CLASS__, 'route_contract_cancel_accept' ),
+			'permission_callback' => array( __CLASS__, 'can_ack_cancel' ),
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ), // acceptor's COUNTERPARTY group
+			),
+		) );
 	}
 
 	/**
@@ -299,6 +351,282 @@ class Gend_GS_Collab_REST {
 		$mode     = (string) $req->get_param( 'mode' );
 		$res      = Gend_GS_Collab_Contract::decline( $match_id, $mode ?: 'declined' );
 		return rest_ensure_response( $res );
+	}
+
+	// ---------------------------------------------------------------------
+	// Phase 85 (COLLAB-03 consumer half) — forfeit + mutual-cancel triggers.
+	// ---------------------------------------------------------------------
+
+	/**
+	 * Option key holding a match's PENDING mutual-cancel intent. Mirrors the
+	 * existing per-match option convention (gs_collab_match_{id}_task_b at
+	 * class-collab-contract.php:556) — no schema/DDL change for one transient
+	 * field. Stores an array( proposer_group, proposer_uid, ts ).
+	 *
+	 * @param int $match_id Match id.
+	 * @return string Option name.
+	 */
+	private static function cancel_intent_key( int $match_id ) : string {
+		return 'gs_collab_cancel_intent_' . $match_id;
+	}
+
+	/**
+	 * Hub-only gate. Mirrors can_accept_contract @:193-196 /
+	 * class-collab-contract.php:66-70 — true on the main node (or when the OAuth
+	 * resource isn't present at all), false on a container.
+	 *
+	 * @return bool
+	 */
+	private static function is_hub() : bool {
+		return ! class_exists( 'Gend_CP_OAuth_Resource' )
+			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
+			|| Gend_CP_OAuth_Resource::is_main_node();
+	}
+
+	/**
+	 * Load the contracted match's row (id, group_a, group_b, status,
+	 * contract_task_id), or null. Mirrors get_match @class-collab-contract.php:78-96.
+	 *
+	 * @param int $match_id Match id.
+	 * @return object|null
+	 */
+	private static function load_match( int $match_id ) {
+		global $wpdb;
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' ) || $match_id <= 0 ) {
+			return null;
+		}
+		$matches = Gend_GS_Collab_Schema::matches_table();
+		return $wpdb->get_row( $wpdb->prepare(
+			"SELECT id, group_a, group_b, status, contract_task_id
+			   FROM {$matches} WHERE id = %d LIMIT 1",
+			$match_id
+		) );
+	}
+
+	/**
+	 * Guard shared by all three Phase-85 trigger routes: hub-only, the match
+	 * exists, is 'contracted', and has a contract_task_id set (there is a
+	 * contract to terminate). Returns the match row on success, or a WP_Error.
+	 *
+	 * @param int $match_id Match id.
+	 * @return object|WP_Error
+	 */
+	private static function require_contracted_match( int $match_id ) {
+		if ( ! self::is_hub() ) {
+			return new WP_Error( 'gs_collab_hub_only', 'termination is hub-only', array( 'status' => 404 ) );
+		}
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+			return new WP_Error( 'gs_collab_no_schema', 'collab schema unavailable', array( 'status' => 500 ) );
+		}
+		$match = self::load_match( $match_id );
+		if ( ! $match ) {
+			return new WP_Error( 'gs_collab_no_match', 'match not found', array( 'status' => 404 ) );
+		}
+		if ( 'contracted' !== (string) $match->status || empty( $match->contract_task_id ) ) {
+			return new WP_Error( 'gs_collab_not_contracted', 'this match has no contract to terminate', array( 'status' => 409 ) );
+		}
+		return $match;
+	}
+
+	/**
+	 * REST-SAFE permission gate for cancel/accept: the acceptor must be an
+	 * admin/mod (or super-admin) of the COUNTERPARTY matched group — the matched
+	 * group that is NOT the one that PROPOSED the pending cancel-intent — and must
+	 * not be the proposer. Hub-only. Distinct from can_accept_contract because a
+	 * CONTRACTED match no longer has a 'pending' proposal row; the two-party gate
+	 * keys off the stored cancel-intent + the match's own two groups.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return bool
+	 */
+	public static function can_ack_cancel( WP_REST_Request $req ) : bool {
+		$uid = (int) get_current_user_id();
+		$gid = (int) $req->get_param( 'group_id' ); // the COUNTERPARTY group the acceptor represents
+		if ( $uid <= 0 || $gid <= 0 ) {
+			return false;
+		}
+
+		// Hub-only: the contract/chain live on the hub.
+		if ( ! self::is_hub() ) {
+			return false;
+		}
+
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+			return false;
+		}
+
+		$match_id = (int) $req->get_param( 'id' );
+		if ( $match_id <= 0 ) {
+			return false;
+		}
+
+		// There must be a PENDING cancel-intent to accept, proposed by the OTHER group.
+		$intent = get_option( self::cancel_intent_key( $match_id ), array() );
+		$proposer_group = is_array( $intent ) && ! empty( $intent['proposer_group'] ) ? (int) $intent['proposer_group'] : 0;
+		if ( $proposer_group <= 0 ) {
+			return false; // no pending cancel-intent → nothing to accept
+		}
+
+		$match = self::load_match( $match_id );
+		if ( ! $match ) {
+			return false;
+		}
+		$group_a = (int) $match->group_a;
+		$group_b = (int) $match->group_b;
+
+		// The acceptor's group MUST be the COUNTERPARTY (the matched group that is
+		// NOT the proposer of the cancel-intent) — this rejects the proposer trying
+		// to self-accept their own cancel (which would be a unilateral VOID).
+		$counterparty = ( $proposer_group === $group_a ) ? $group_b : $group_a;
+		if ( $gid !== $counterparty || $gid === $proposer_group ) {
+			return false;
+		}
+
+		// Standard two-arg admin/mod check on the counterparty group.
+		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) {
+			return true;
+		}
+		return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )
+			|| ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $uid, $gid ) );
+	}
+
+	/**
+	 * POST /collab/match/{id}/contract/forfeit — SELF-declared forfeit (→ FAIL).
+	 *
+	 * One matched-group admin (can_act_for_group) forfeits their own group's side
+	 * of a CONTRACTED match. Reaches Gend_CP_Task_Contract::terminate('forfeited')
+	 * (guarded), which fires gend_cp_task_contract_terminated so the Plan-02 resolver
+	 * records ONE fail. Hub-only + contracted-match guarded. NO money movement — the
+	 * outcome is recorded by the resolver via the fired action; nothing is debited here.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_contract_forfeit( WP_REST_Request $req ) {
+		$match_id = (int) $req->get_param( 'id' );
+		$match    = self::require_contracted_match( $match_id );
+		if ( is_wp_error( $match ) ) {
+			return $match;
+		}
+
+		$task_id = (int) $match->contract_task_id;
+		$fired   = false;
+		if ( class_exists( 'Gend_CP_Task_Contract' ) && method_exists( 'Gend_CP_Task_Contract', 'terminate' ) ) {
+			$fired = (bool) Gend_CP_Task_Contract::terminate( $task_id, 'forfeited', array(
+				'reason'   => 'forfeited',
+				'actor'    => get_current_user_id(),
+				'match_id' => $match_id,
+			) );
+		}
+
+		return rest_ensure_response( array(
+			'ok'               => true,
+			'outcome'          => 'forfeited',
+			'terminated'       => $fired, // false = already terminal (paid/terminated) no-op, or primitive absent
+			'match_id'         => $match_id,
+			'contract_task_id' => $task_id,
+		) );
+	}
+
+	/**
+	 * POST /collab/match/{id}/contract/cancel/propose — propose a mutual cancel.
+	 *
+	 * One matched-group admin (can_act_for_group) proposes calling the contracted
+	 * collaboration off. Stores a PENDING cancel-intent keyed to the match (a per-
+	 * match option: proposer_group + uid + ts). Does NOT terminate — a VOID requires
+	 * the COUNTERPARTY to accept (RESEARCH Pitfall 5). Hub-only + contracted guarded.
+	 * NO money movement.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_contract_cancel_propose( WP_REST_Request $req ) {
+		$match_id = (int) $req->get_param( 'id' );
+		$match    = self::require_contracted_match( $match_id );
+		if ( is_wp_error( $match ) ) {
+			return $match;
+		}
+
+		// The proposer must act for ONE of the two matched groups (can_act_for_group
+		// already verified admin/mod of group_id; here we bind that group to the match).
+		$proposer_group = (int) $req->get_param( 'group_id' );
+		$group_a        = (int) $match->group_a;
+		$group_b        = (int) $match->group_b;
+		if ( $proposer_group !== $group_a && $proposer_group !== $group_b ) {
+			return new WP_Error( 'gs_collab_not_matched_group', 'group_id is not part of this match', array( 'status' => 403 ) );
+		}
+
+		update_option( self::cancel_intent_key( $match_id ), array(
+			'proposer_group' => $proposer_group,
+			'proposer_uid'   => (int) get_current_user_id(),
+			'ts'             => time(),
+		), false );
+
+		$counterparty = ( $proposer_group === $group_a ) ? $group_b : $group_a;
+
+		return rest_ensure_response( array(
+			'ok'             => true,
+			'prop_status'    => 'pending',       // awaiting the counterparty's cancel/accept
+			'match_id'       => $match_id,
+			'proposer_group' => $proposer_group,
+			'counterparty'   => $counterparty,   // the group whose admin must cancel/accept to VOID
+		) );
+	}
+
+	/**
+	 * POST /collab/match/{id}/contract/cancel/accept — the COUNTERPARTY acks (→ VOID).
+	 *
+	 * The counterparty matched-group admin (can_ack_cancel — the two-party gate)
+	 * accepts a PENDING cancel-intent proposed by the OTHER group. ONLY this route
+	 * reaches Gend_CP_Task_Contract::terminate('cancelled') (guarded) → the resolver
+	 * records ONE void. A cancel-intent never accepted by the counterparty NEVER
+	 * terminates — so no single admin can unilaterally VOID. Clears the intent on
+	 * success. Hub-only + contracted guarded. NO money movement.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_contract_cancel_accept( WP_REST_Request $req ) {
+		$match_id = (int) $req->get_param( 'id' );
+		$match    = self::require_contracted_match( $match_id );
+		if ( is_wp_error( $match ) ) {
+			return $match;
+		}
+
+		// Belt-and-suspenders: re-assert a pending intent proposed by the OTHER group
+		// exists (can_ack_cancel already enforced it, but the guard is cheap + explicit).
+		$intent         = get_option( self::cancel_intent_key( $match_id ), array() );
+		$proposer_group = is_array( $intent ) && ! empty( $intent['proposer_group'] ) ? (int) $intent['proposer_group'] : 0;
+		if ( $proposer_group <= 0 ) {
+			return new WP_Error( 'gs_collab_no_cancel_intent', 'no pending mutual-cancel to accept', array( 'status' => 409 ) );
+		}
+		$acceptor_group = (int) $req->get_param( 'group_id' );
+		if ( $acceptor_group === $proposer_group ) {
+			// One-sided cancel is impossible: the proposer cannot also accept (that
+			// would be a unilateral VOID). A single-admin call-it-off is a forfeit=FAIL.
+			return new WP_Error( 'gs_collab_cancel_self_accept', 'the proposing group cannot accept its own cancel', array( 'status' => 403 ) );
+		}
+
+		$task_id = (int) $match->contract_task_id;
+		$fired   = false;
+		if ( class_exists( 'Gend_CP_Task_Contract' ) && method_exists( 'Gend_CP_Task_Contract', 'terminate' ) ) {
+			$fired = (bool) Gend_CP_Task_Contract::terminate( $task_id, 'cancelled', array(
+				'reason'   => 'cancelled',
+				'actor'    => get_current_user_id(),
+				'match_id' => $match_id,
+			) );
+		}
+
+		// Two-party ack complete — clear the intent (a re-accept finds nothing pending).
+		delete_option( self::cancel_intent_key( $match_id ) );
+
+		return rest_ensure_response( array(
+			'ok'               => true,
+			'outcome'          => 'cancelled',
+			'terminated'       => $fired, // false = already terminal no-op, or primitive absent
+			'match_id'         => $match_id,
+			'contract_task_id' => $task_id,
+		) );
 	}
 
 	/**
