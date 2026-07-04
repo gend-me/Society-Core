@@ -226,6 +226,14 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-market.php' ) ) {
 	add_action( 'gend_gs_collab_contracted', array( 'Gend_GS_Collab_Market', 'on_contracted' ), 10, 2 );
 	// MARKET-05: lock on any recorded terminal outcome (flag-independent CAS).
 	add_action( 'gend_gs_collab_outcome_recorded', array( 'Gend_GS_Collab_Market', 'on_outcome_recorded' ), 10, 2 );
+	// Phase 88 (RESOLVE-01/02/04): deterministic resolve on the SAME recorded-outcome hook,
+	// at priority 20 so the pri-10 lock CAS runs FIRST (lock-then-resolve — 88-RESEARCH Open-Q2):
+	// by the time settle()->resolve() runs the market is already `locked`. settle() is hub-only
+	// but FLAG-INDEPENDENT — a bettor's DGEN must settle even with GS_COLLAB_MARKET_PUBLIC off
+	// (money-safety); the flag gates only the member SURFACE, never existing-stake settlement.
+	// Lives inside this SAME require block that guards the market class, so a partial deploy
+	// without class-collab-market.php cannot fatal (class_exists implied by the file_exists gate).
+	add_action( 'gend_gs_collab_outcome_recorded', array( 'Gend_GS_Collab_Market', 'settle' ), 20, 2 );
 }
 if ( file_exists( GS_DIR . 'inc/collab/class-collab-market-rest.php' ) ) {
 	require_once GS_DIR . 'inc/collab/class-collab-market-rest.php';
