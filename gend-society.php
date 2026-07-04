@@ -205,9 +205,13 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-resolver.php' ) ) {
 //     (create_market/fund_subsidy/quote/trade/lock + on_contracted/on_outcome_recorded
 //     lifecycle subscribers). Loaded AFTER the resolver so match/contract/resolver
 //     helpers exist first.
-//   - class-collab-market-rest.php (86-04): Gend_GS_Collab_Market_REST — the DARK,
-//     flag+hub-gated READ-ONLY market REST surface. Its register_routes() self-gates on
-//     is_main_node() AND GS_COLLAB_MARKET_PUBLIC, so the routes are ABSENT (404) when off.
+//   - class-collab-market-rest.php (86-04 read + 87-02 write): Gend_GS_Collab_Market_REST —
+//     the DARK, flag+hub-gated market REST surface. Two GET read routes (86-04) PLUS the
+//     87-02 POST /market/{id}/bet WRITE route (buy/sell driving place_bet(); STAKE-04 bettor
+//     from get_current_user_id() only — no recipient param; STAKE-05 rake disclosed, not
+//     skimmed). Its register_routes() self-gates on is_main_node() AND GS_COLLAB_MARKET_PUBLIC
+//     BEFORE any register_rest_route call, so ALL routes (read AND bet) are ABSENT (404) when
+//     off. The write route lives in the SAME class — no extra require/add_action needed.
 // Wiring (86-04): the two lifecycle do_actions from contract.php/resolver.php drive the
 // engine's on_* subscribers — on_contracted is GATED on GS_COLLAB_MARKET_PUBLIC (auto-create
 // only when public), on_outcome_recorded is flag-INDEPENDENT (lock a dark market harmlessly).
