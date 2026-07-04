@@ -234,6 +234,27 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-market-rest.php' ) ) {
 	add_action( 'rest_api_init', array( 'Gend_GS_Collab_Market_REST', 'register_routes' ) );
 }
 
+// GenD Match (v12.0 Phase 87-03, STAKE-02) — the member READ surface.
+//   - class-collab-portfolio-rest.php: Gend_GS_Collab_Portfolio_REST — the DARK+hub-gated
+//     PRIVATE portfolio route GET gs/v1/portfolio. GATE-02: reads ONLY get_current_user_id()
+//     rows (no user_id arg, no public P/L leaderboard). register_routes() self-gates on
+//     is_main_node() AND GS_COLLAB_MARKET_PUBLIC -> route ABSENT (404) when off.
+//   - member-markets.php: the dark+hub-gated "Collaborations" BuddyPress member-nav tab
+//     (open markets + live odds + inline buy/sell POSTing the 87-02 bet route + inline
+//     position + the private portfolio + Chart.js P/L + the rake disclosure). It
+//     self-registers its own bp_setup_nav add_action at include time (the whole
+//     registration is dark-guarded inside), so it needs the require ONLY — no extra add_action.
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint deploy;
+// memory: project_hub_plugin_sync_gotcha).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-portfolio-rest.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-portfolio-rest.php';
+	// Self-gates on is_main_node() AND GS_COLLAB_MARKET_PUBLIC -> route absent (404) when off.
+	add_action( 'rest_api_init', array( 'Gend_GS_Collab_Portfolio_REST', 'register_routes' ) );
+}
+if ( file_exists( GS_DIR . 'inc/collab/member-markets.php' ) ) {
+	require_once GS_DIR . 'inc/collab/member-markets.php'; // self-registers its dark-guarded bp_setup_nav tab.
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
