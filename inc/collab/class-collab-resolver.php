@@ -221,6 +221,14 @@ class Gend_GS_Collab_Resolver {
 			}
 		}
 
+		// GenD Match (Phase 86-04, MARKET-05): a genuinely-new terminal outcome was just
+		// recorded — fire the market LOCK trigger. Gend_GS_Collab_Market::on_outcome_recorded
+		// looks up the market for this match and lock()s it (idempotent CAS). This runs
+		// FLAG-INDEPENDENT (the recorder already runs dark): locking a dark market is
+		// harmless and keeps the FSM correct for when GS_COLLAB_MARKET_PUBLIC flips on.
+		// The handler no-ops if no market exists (dark = none created).
+		do_action( 'gend_gs_collab_outcome_recorded', (int) $match_id, (string) $outcome );
+
 		// record() STOPS here — NO payout, NO market, NO money movement.
 	}
 
@@ -257,11 +265,43 @@ class Gend_GS_Collab_Resolver {
 		}
 
 		$has_contracts = class_exists( 'PSOO_PM_Contracts' ) && method_exists( 'PSOO_PM_Contracts', 'get_task_meta' );
+		$has_market    = class_exists( 'Gend_GS_Collab_Market' );
 
 		foreach ( $rows as $r ) {
 			$tid = (int) $r->contract_task_id;
 			if ( $tid <= 0 ) {
 				continue;
+			}
+
+			// GenD Match (Phase 86-04): MARKET-01 backstop-create + MARKET-05 deadline-lock.
+			// Additive to the outcome-recording branches below (which are unchanged). Every
+			// engine call is class_exists-guarded so a partial deploy degrades cleanly.
+			if ( $has_market ) {
+				$mid = (int) $r->match_id;
+
+				// (a) BACKSTOP-CREATE (MARKET-01) — GATED on GS_COLLAB_MARKET_PUBLIC (mirrors
+				// the on_contracted hook gate): if the flag is on and a contracted match has
+				// NO market yet (a missed hook), create one now. create_market is idempotent
+				// via UNIQUE(match_id); while dark this branch never runs (no market, no subsidy).
+				if ( defined( 'GS_COLLAB_MARKET_PUBLIC' ) && GS_COLLAB_MARKET_PUBLIC && $mid > 0 ) {
+					Gend_GS_Collab_Market::on_contracted( $mid, $tid );
+				}
+
+				// (b) DEADLINE-LOCK (MARKET-05) — FLAG-INDEPENDENT: lock any OPEN market whose
+				// contract due_date has passed so nobody trades on a soon-known outcome. Reuses
+				// the SAME due_date read as branch 3 below. lock() is an idempotent CAS.
+				if ( $mid > 0 && class_exists( 'PSOO_PM_Tasks' ) && method_exists( 'PSOO_PM_Tasks', 'get' ) ) {
+					$mkt = Gend_GS_Collab_Market::get_open_market_for_match( $mid );
+					if ( is_object( $mkt ) ) {
+						$mtask = PSOO_PM_Tasks::get( $tid );
+						if ( $mtask && ! empty( $mtask->due_date ) ) {
+							$mdue = strtotime( $mtask->due_date );
+							if ( $mdue && $mdue < time() ) {
+								Gend_GS_Collab_Market::lock( (int) $mkt->id );
+							}
+						}
+					}
+				}
 			}
 
 			// 1) Missed SUCCESS: contract already paid.

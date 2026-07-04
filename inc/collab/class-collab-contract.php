@@ -379,6 +379,12 @@ class Gend_GS_Collab_Contract {
 		if ( 0 === (int) $flipped ) {
 			$fresh = self::get_match( $match_id );
 			if ( $fresh && ! empty( $fresh->contract_task_id ) ) {
+				// GenD Match (Phase 86-04, MARKET-01): fire the contracted signal even on
+				// the already-contracted RACE branch — Gend_GS_Collab_Market::on_contracted
+				// (gated on GS_COLLAB_MARKET_PUBLIC) auto-creates the market and create_market
+				// is idempotent via UNIQUE(match_id), so a double-fire collapses to one market.
+				// Mirrors the do_action('gend_gs_collab_escrow_reversed',...) style below.
+				do_action( 'gend_gs_collab_contracted', (int) $match_id, (int) $fresh->contract_task_id );
 				return array(
 					'ok'               => true,
 					'already'          => true,
@@ -398,6 +404,11 @@ class Gend_GS_Collab_Contract {
 			array( '%s' ),
 			array( '%d' )
 		);
+
+		// GenD Match (Phase 86-04, MARKET-01): the match just flipped to 'contracted' —
+		// fire the auto-create signal. Gend_GS_Collab_Market::on_contracted (gated on
+		// GS_COLLAB_MARKET_PUBLIC) creates exactly one market; idempotent UNIQUE(match_id).
+		do_action( 'gend_gs_collab_contracted', (int) $match_id, (int) $task_id );
 
 		// 9. Result.
 		return array(
@@ -569,6 +580,9 @@ class Gend_GS_Collab_Contract {
 		if ( 0 === (int) $flipped ) {
 			$fresh = self::get_match( $match_id );
 			if ( $fresh && ! empty( $fresh->contract_task_id ) ) {
+				// GenD Match (Phase 86-04, MARKET-01): fire on the already-contracted RACE
+				// branch too — create_market is idempotent (UNIQUE(match_id)).
+				do_action( 'gend_gs_collab_contracted', (int) $match_id, (int) $fresh->contract_task_id );
 				return array(
 					'ok'                 => true,
 					'already'            => true,
@@ -590,6 +604,11 @@ class Gend_GS_Collab_Contract {
 			array( '%s' ),
 			array( '%d' )
 		);
+
+		// GenD Match (Phase 86-04, MARKET-01): the both-sided contract just flipped to
+		// 'contracted' — fire the auto-create signal (contract_task_id = side A's task).
+		// on_contracted (gated on GS_COLLAB_MARKET_PUBLIC) makes exactly one idempotent market.
+		do_action( 'gend_gs_collab_contracted', (int) $match_id, (int) $task_a );
 
 		return array(
 			'ok'                 => true,
