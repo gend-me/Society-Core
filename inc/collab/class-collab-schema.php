@@ -46,7 +46,9 @@ class Gend_GS_Collab_Schema {
 	 * Schema version. Bump on any dbDelta change; maybe_install() will
 	 * re-run dbDelta on every blog whose option is below this value.
 	 */
-	const DB_VERSION     = '1.2.0';
+	// 1.3.0 (Phase 86-02): added the three LMSR market tables
+	// gs_collab_markets / gs_collab_positions / gs_collab_market_events.
+	const DB_VERSION     = '1.3.0';
 	const DB_VERSION_OPT = 'gs_collab_db_version';
 
 	/**
@@ -272,6 +274,90 @@ class Gend_GS_Collab_Schema {
 				KEY idx_outcome (outcome)
 			) {$charset_collate};"
 		);
+
+		// Table 5: gs_collab_markets — Phase 86 (MARKET-01) the ONE binary
+		// succeed/fail LMSR market per CONTRACTED collaboration match; THE
+		// lockable InnoDB row the engine `SELECT ... FOR UPDATE`s (Phase-86
+		// concurrency + escrow-invariant substrate — the q-vector NEVER lives
+		// in wp_options). UNIQUE(match_id) enforces one market per collaboration
+		// at the DB layer (MARKET-01 spine; create_market() writes via
+		// INSERT IGNORE so a hook + sweep double-fire collapses to one row).
+		// All money/share columns are scaled BIGINT (never DECIMAL/float — the
+		// never-float-in-the-DB money rule):
+		//   q_yes/q_no    scaled-int micro-shares (1e6/share), the LMSR q-vector.
+		//   lmsr_b        scaled-int operator-set liquidity depth.
+		//   subsidy_dgen  = ceil(b·ln2), integer DGEN pre-funded before open.
+		//   escrow_dgen   running invariant LHS = subsidy + Σ collected.
+		//   rake_bps      reserved for the Phase-88 losing-pool skim; the
+		//                 invariant already reserves it (0 default → global).
+		//   state         open→locked→resolved→paid FSM (+ void auto-void/refund).
+		//   subsidy_funded idempotency guard so a retried create never double-
+		//                 debits the treasury.
+		//   resolve_by    deadline; the Phase-85 sweep locks a market past this.
+		//   version       optimistic secondary guard for the FOR UPDATE CAS.
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_markets (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				match_id BIGINT UNSIGNED NOT NULL,
+				contract_task_id BIGINT UNSIGNED NULL,
+				q_yes BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				q_no BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				lmsr_b BIGINT UNSIGNED NOT NULL,
+				subsidy_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				escrow_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				rake_bps INT UNSIGNED NOT NULL DEFAULT 0,
+				state ENUM('open','locked','resolved','paid','void') NOT NULL DEFAULT 'open',
+				subsidy_funded TINYINT(1) NOT NULL DEFAULT 0,
+				resolve_by INT UNSIGNED NULL,
+				version INT UNSIGNED NOT NULL DEFAULT 0,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_match (match_id),
+				KEY idx_state (state),
+				KEY idx_contract (contract_task_id)
+			) {$charset_collate};"
+		);
+
+		// Table 6: gs_collab_positions — per-bettor holdings. Phase 87 populates
+		// rows (the real DGEN-debit bet path); Phase 86 installs the SCHEMA + the
+		// engine's `trade()` upsert path only. UNIQUE(market_id,user_id,outcome)
+		// makes a member's YES/NO holding a single upsertable row (never a second
+		// row on a repeat stake). shares = scaled-int micro-shares; cost_dgen =
+		// cumulative integer DGEN paid (avg cost = cost_dgen/shares).
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_positions (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				market_id BIGINT UNSIGNED NOT NULL,
+				user_id BIGINT UNSIGNED NOT NULL,
+				outcome ENUM('yes','no') NOT NULL,
+				shares BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				cost_dgen BIGINT UNSIGNED NOT NULL DEFAULT 0,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				updated_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				UNIQUE KEY uniq_pos (market_id, user_id, outcome),
+				KEY idx_user (user_id)
+			) {$charset_collate};"
+		);
+
+		// Table 7: gs_collab_market_events — auditable lifecycle log. One row per
+		// market state transition (created/subsidy_funded/trade/locked/resolved/
+		// paid/void), with the JSON detail (q before/after, cost, actor) and the
+		// chain.* anchor tx id. idx_market/idx_event forward-fit the Phase-88
+		// resolve/payout audit trail.
+		dbDelta(
+			"CREATE TABLE {$wpdb->prefix}gs_collab_market_events (
+				id BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+				market_id BIGINT UNSIGNED NOT NULL,
+				event ENUM('created','subsidy_funded','trade','locked','resolved','paid','void') NOT NULL,
+				detail LONGTEXT NULL,
+				chain_tx_id VARCHAR(64) NULL,
+				created_at INT UNSIGNED NOT NULL DEFAULT 0,
+				PRIMARY KEY (id),
+				KEY idx_market (market_id),
+				KEY idx_event (event)
+			) {$charset_collate};"
+		);
 	}
 
 	/**
@@ -310,6 +396,36 @@ class Gend_GS_Collab_Schema {
 	public static function contract_outcomes_table() : string {
 		global $wpdb;
 		return $wpdb->prefix . 'gs_collab_contract_outcomes';
+	}
+
+	/**
+	 * Helper: fully-qualified markets table name for the current blog.
+	 * Phase 86 (Gend_GS_Collab_Market) create_market()/trade()/quote()/lock()
+	 * use this. UNIQUE(match_id) means one binary market per collaboration —
+	 * the lockable `SELECT ... FOR UPDATE` row.
+	 */
+	public static function markets_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_markets';
+	}
+
+	/**
+	 * Helper: fully-qualified positions table name for the current blog.
+	 * Phase 86 engine upsert path + Phase 87 bet path use this.
+	 * UNIQUE(market_id,user_id,outcome) means one upsertable holding per side.
+	 */
+	public static function positions_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_positions';
+	}
+
+	/**
+	 * Helper: fully-qualified market-events (lifecycle audit log) table name
+	 * for the current blog. Phase 86+ market state transitions append here.
+	 */
+	public static function market_events_table() : string {
+		global $wpdb;
+		return $wpdb->prefix . 'gs_collab_market_events';
 	}
 
 	/**
