@@ -2035,14 +2035,54 @@ function gs_invest_footer_assets() {
         .gci-ch-hz__pill { font-size:.66rem; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; padding:4px 12px; border-radius:999px; color:#00ff88; background:rgba(0,255,136,.1); border:1px solid rgba(0,255,136,.32); }
         .gci-ch-hz__desc { margin:0 0 16px; font-size:.85rem; line-height:1.55; color:#cbd5e1; max-width:820px; }
         .gci-ch-hz__table { width:100%; border-collapse:collapse; font-family:"Inter",sans-serif; }
-        .gci-ch-hz__table thead th { text-align:left; font-size:.65rem; letter-spacing:1.4px; text-transform:uppercase; color:#89C2E0; font-weight:700; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
-        .gci-ch-hz__table tbody td { padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.04); color:#cbd5e1; font-size:.9rem; }
-        .gci-ch-hz__table tbody tr:last-child td { border-bottom:0; }
-        .gci-ch-hz__table tbody tr:hover td { background:rgba(255,255,255,.03); }
-        .gci-ch-hz__label { color:#f8fafc; font-weight:700; }
-        .gci-ch-hz__ann { color:#94a3b8; font-family:monospace; }
-        .gci-ch-hz__cum strong { color:#00ff88; font-weight:800; font-family:monospace; }
-        .gci-ch-hz__example { color:#89C2E0; font-family:monospace; font-weight:700; }
+
+        /* ══ Youzify-override reset (beats body table { background:#cc0000 !important } from Youzify_Styling scheme-color) ══
+           Higher specificity via extra type selector `html body.buddypress` + inline
+           !important so nothing bleeds through from Youzify_Styling defaults. */
+        html body.buddypress .gci-ch-hz__table,
+        html body.buddypress .gci-ch-hz__table thead,
+        html body.buddypress .gci-ch-hz__table tbody,
+        html body.buddypress .gci-ch-hz__table tr,
+        html body.buddypress .gci-ch-hz__table th,
+        html body.buddypress .gci-ch-hz__table td {
+            background: transparent !important;
+            border: 0 !important;
+            color: inherit !important;
+            font-family: "Inter", sans-serif !important;
+        }
+        html body.buddypress .gci-ch-hz__table thead th {
+            text-align:left !important; font-size:.65rem !important; letter-spacing:1.4px !important;
+            text-transform:uppercase !important; color:#89C2E0 !important; font-weight:700 !important;
+            padding:12px 14px !important; border-bottom:1px solid rgba(255,255,255,.1) !important;
+            background: rgba(0,255,136,.06) !important;
+        }
+        html body.buddypress .gci-ch-hz__table tbody td {
+            padding:14px !important; border-bottom:1px solid rgba(255,255,255,.06) !important;
+            color:#cbd5e1 !important; font-size:.92rem !important;
+        }
+        html body.buddypress .gci-ch-hz__table tbody tr:last-child td { border-bottom:0 !important; }
+        html body.buddypress .gci-ch-hz__table tbody tr:hover td { background:rgba(255,255,255,.03) !important; }
+        html body.buddypress .gci-ch-hz__label { color:#f8fafc !important; font-weight:700 !important; }
+        html body.buddypress .gci-ch-hz__ann { color:#94a3b8 !important; font-family:monospace !important; }
+        html body.buddypress .gci-ch-hz__cum strong { color:#00ff88 !important; font-weight:800 !important; font-family:monospace !important; }
+        html body.buddypress .gci-ch-hz__example { color:#89C2E0 !important; font-family:monospace !important; font-weight:700 !important; }
+
+        /* Youzify also emits scheme-color on inputs + form buttons — force our tokens. */
+        html body.buddypress .gci-ch-optin__btn,
+        html body.buddypress .gci-topup-btn,
+        html body.buddypress .gci-webapp-action {
+            font-family: "Inter", sans-serif !important;
+        }
+        html body.buddypress .gci-topup-input {
+            background:rgba(11,14,20,.5) !important; color:#fff !important;
+            border:1px solid rgba(255,255,255,.15) !important;
+        }
+        /* Youzify tends to override form input focus rings with #cc0000 — keep ours. */
+        html body.buddypress .gci-topup-input:focus {
+            border-color:rgba(0,255,136,.55) !important;
+            box-shadow:0 0 0 3px rgba(0,255,136,.15) !important;
+            outline: 0 !important;
+        }
     </style>
     <?php
     // The yDGEN (Currency Hold) display uses contracts-and-payments styling.
