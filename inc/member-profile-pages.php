@@ -1087,15 +1087,15 @@ function gci_render_currency_hold( $uid ) {
 
 /**
  * Currency Hold › Auto Investor opt-in card. Reads member's active opt-in from
- * Gend_CP_Treasury_Member_Optin and renders a toggle form that posts to our
+ * Gend_CP_Strategy_Opt_In and renders a toggle form that posts to our
  * admin-post handler. Members can opt into "best" mode (auto-track champion).
  */
 function gci_render_currency_hold_optin( $uid ) {
-    if ( ! class_exists( 'Gend_CP_Treasury_Member_Optin' ) ) return '';
+    if ( ! class_exists( 'Gend_CP_Strategy_Opt_In' ) ) return '';
     $uid = (int) $uid;
     if ( ! $uid ) return '';
 
-    $active        = Gend_CP_Treasury_Member_Optin::get_active_opt_in( $uid );
+    $active        = Gend_CP_Strategy_Opt_In::get_active_opt_in( $uid );
     $opted_in      = is_array( $active );
     $mode          = $opted_in ? (string) ( $active['mode'] ?? 'best' ) : '';
     $strategy_id   = $opted_in ? (int) ( $active['strategy_post_id'] ?? 0 ) : 0;
@@ -1261,16 +1261,16 @@ function gci_currency_hold_toggle_handler() {
     if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['_wpnonce'] ), 'gci_currency_hold_toggle_' . $uid ) ) {
         wp_die( esc_html__( 'Invalid request.', 'gend-society' ) );
     }
-    if ( ! class_exists( 'Gend_CP_Treasury_Member_Optin' ) ) {
+    if ( ! class_exists( 'Gend_CP_Strategy_Opt_In' ) ) {
         wp_die( esc_html__( 'The Automatic Investor is not available.', 'gend-society' ) );
     }
     $mode    = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : '';
     $referer = wp_get_referer() ?: home_url( '/' );
     if ( $mode === 'opt_in_best' ) {
-        Gend_CP_Treasury_Member_Optin::opt_in( $uid, 'best', null );
+        Gend_CP_Strategy_Opt_In::opt_in( $uid, 'best', null );
         wp_safe_redirect( add_query_arg( 'gci_ch', 'in', $referer ) );
     } elseif ( $mode === 'opt_out' ) {
-        Gend_CP_Treasury_Member_Optin::opt_out( $uid );
+        Gend_CP_Strategy_Opt_In::opt_out( $uid );
         wp_safe_redirect( add_query_arg( 'gci_ch', 'out', $referer ) );
     } else {
         wp_safe_redirect( $referer );
