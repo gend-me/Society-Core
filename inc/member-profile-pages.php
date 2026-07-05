@@ -1078,9 +1078,206 @@ function gci_render_currency_hold( $uid ) {
         Gend_CP_yDGEN_Return_Display::render_yield_summary( $uid );
         $out .= ob_get_clean();
     }
+    $out .= gci_render_currency_hold_optin( $uid );
+    $out .= gci_render_currency_hold_allocation( $uid );
+    $out .= gci_render_currency_hold_horizons();
     $out .= '</div>';
     return $out;
 }
+
+/**
+ * Currency Hold › Auto Investor opt-in card. Reads member's active opt-in from
+ * Gend_CP_Treasury_Member_Optin and renders a toggle form that posts to our
+ * admin-post handler. Members can opt into "best" mode (auto-track champion).
+ */
+function gci_render_currency_hold_optin( $uid ) {
+    if ( ! class_exists( 'Gend_CP_Treasury_Member_Optin' ) ) return '';
+    $uid = (int) $uid;
+    if ( ! $uid ) return '';
+
+    $active        = Gend_CP_Treasury_Member_Optin::get_active_opt_in( $uid );
+    $opted_in      = is_array( $active );
+    $mode          = $opted_in ? (string) ( $active['mode'] ?? 'best' ) : '';
+    $strategy_id   = $opted_in ? (int) ( $active['strategy_post_id'] ?? 0 ) : 0;
+    $strategy_name = '';
+    if ( $strategy_id > 0 ) {
+        $post = get_post( $strategy_id );
+        if ( $post ) $strategy_name = $post->post_title;
+    }
+
+    $action_url = esc_url( admin_url( 'admin-post.php' ) );
+    $nonce      = wp_create_nonce( 'gci_currency_hold_toggle_' . $uid );
+
+    $out = '<div class="gci-ch-optin gci-ch-optin--' . ( $opted_in ? 'on' : 'off' ) . '">'
+        . '<div class="gci-ch-optin__head">'
+        . '<span class="gci-ch-optin__badge">' . esc_html__( 'Automatic Investor', 'gend-society' ) . '</span>'
+        . '<span class="gci-ch-optin__state">' . ( $opted_in ? esc_html__( 'ON', 'gend-society' ) : esc_html__( 'OFF', 'gend-society' ) ) . '</span>'
+        . '</div>'
+        . '<h3 class="gci-ch-optin__title">' . esc_html__( 'Let AI manage your held DGEN', 'gend-society' ) . '</h3>'
+        . '<p class="gci-ch-optin__desc">' . esc_html__( 'When enabled, your DGEN is automatically allocated to the current champion strategy — a conservative treasury portfolio (money market, T-bills, and short-term yield venues) chosen and rebalanced by the network to maximize CAD-denominated return.', 'gend-society' ) . '</p>';
+
+    if ( $opted_in ) {
+        $out .= '<div class="gci-ch-optin__status">'
+            . '<div class="gci-ch-optin__row"><span>' . esc_html__( 'Mode', 'gend-society' ) . '</span><strong>' . esc_html( ucfirst( $mode ) ) . '</strong></div>';
+        if ( $strategy_name ) {
+            $out .= '<div class="gci-ch-optin__row"><span>' . esc_html__( 'Strategy', 'gend-society' ) . '</span><strong>' . esc_html( $strategy_name ) . '</strong></div>';
+        }
+        if ( ! empty( $active['opted_in_at_ts'] ) ) {
+            $out .= '<div class="gci-ch-optin__row"><span>' . esc_html__( 'Since', 'gend-society' ) . '</span><strong>' . esc_html( gmdate( 'M j, Y', (int) $active['opted_in_at_ts'] ) ) . '</strong></div>';
+        }
+        $out .= '</div>';
+        $out .= '<form class="gci-ch-optin__form" method="post" action="' . $action_url . '">'
+            . '<input type="hidden" name="action" value="gci_currency_hold_toggle">'
+            . '<input type="hidden" name="mode" value="opt_out">'
+            . '<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">'
+            . '<button type="submit" class="gci-ch-optin__btn gci-ch-optin__btn--off">' . esc_html__( 'Turn OFF Auto Investor', 'gend-society' ) . '</button>'
+            . '</form>';
+    } else {
+        $out .= '<form class="gci-ch-optin__form" method="post" action="' . $action_url . '">'
+            . '<input type="hidden" name="action" value="gci_currency_hold_toggle">'
+            . '<input type="hidden" name="mode" value="opt_in_best">'
+            . '<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">'
+            . '<button type="submit" class="gci-ch-optin__btn gci-ch-optin__btn--on">' . esc_html__( 'Turn ON Auto Investor', 'gend-society' ) . '</button>'
+            . '</form>';
+    }
+    $out .= '</div>';
+    return $out;
+}
+
+/**
+ * Currency Hold › Allocation display. Reads the current champion strategy's
+ * venue-weight vector and renders each pool as a labeled pill with its
+ * percentage. v1 is read-only — member custom weights are gated on backend
+ * routing infrastructure not yet shipped.
+ */
+function gci_render_currency_hold_allocation( $uid ) {
+    if ( ! class_exists( 'Gend_CP_Champion_Strategy' ) ) return '';
+    $current = Gend_CP_Champion_Strategy::current();
+    $weights = isset( $current['weights'] ) && is_array( $current['weights'] ) ? $current['weights'] : array();
+    if ( empty( $weights ) ) return '';
+
+    $venue_labels = array(
+        'questrade_money_market' => __( 'Questrade Money Market (CAD)', 'gend-society' ),
+        'aave_usdc'              => __( 'AAVE USDC Yield', 'gend-society' ),
+        'dsr_dai'                => __( 'MakerDAO DSR (DAI)', 'gend-society' ),
+        'ibkr_treasury'          => __( 'IBKR Treasury Bills', 'gend-society' ),
+        'lightning_channel'      => __( 'Lightning Channel Liquidity', 'gend-society' ),
+    );
+
+    $pills = '';
+    foreach ( $weights as $venue => $w ) {
+        $pct   = (float) $w * 100.0;
+        $label = isset( $venue_labels[ $venue ] ) ? $venue_labels[ $venue ] : ucwords( str_replace( '_', ' ', (string) $venue ) );
+        $pills .= '<div class="gci-ch-pool-pill">'
+            . '<span class="gci-ch-pool-pill__label">' . esc_html( $label ) . '</span>'
+            . '<span class="gci-ch-pool-pill__pct">' . esc_html( rtrim( rtrim( number_format( $pct, 2 ), '0' ), '.' ) ) . '%</span>'
+            . '<div class="gci-ch-pool-pill__bar"><span style="width:' . esc_attr( number_format( $pct, 4, '.', '' ) ) . '%"></span></div>'
+            . '</div>';
+    }
+
+    $is_gen0 = ! empty( $current['is_gen0'] );
+    $strategy_tag = $is_gen0
+        ? __( 'Gen-0 default', 'gend-society' )
+        : sprintf( __( 'Champion #%s', 'gend-society' ), (string) ( $current['post_id'] ?? '' ) );
+
+    $out = '<section class="gci-ch-alloc">'
+        . '<header class="gci-ch-alloc__head"><h3>' . esc_html__( 'Currency Allocation', 'gend-society' ) . '</h3>'
+        . '<span class="gci-ch-alloc__strategy">' . esc_html( $strategy_tag ) . '</span>'
+        . '</header>'
+        . '<p class="gci-ch-alloc__desc">' . esc_html__( 'Your DGEN is currently held across these connected currency pools. Your earnings are the CAD-denominated value change plus yield from each pool, weighted by these percentages.', 'gend-society' ) . '</p>'
+        . '<div class="gci-ch-pool-list">' . $pills . '</div>'
+        . '<p class="gci-ch-alloc__note">' . esc_html__( 'Custom per-currency weights (member-controlled allocation) are shipping in a future release. Today, you can either take the champion allocation shown above or opt into a specific published strategy from the group admin surface.', 'gend-society' ) . '</p>'
+        . '</section>';
+    return $out;
+}
+
+/**
+ * Currency Hold › Historical returns table. Renders the champion strategy's
+ * annualized return compounded across 7 horizons (1M, 6M, 1Y, 3Y, 5Y, 10Y,
+ * 20Y). Every row is clearly labeled as SIMULATED at the strategy's
+ * annualized rate — long horizons cannot reflect live performance since the
+ * strategy has not existed that long.
+ */
+function gci_render_currency_hold_horizons() {
+    if ( ! class_exists( 'Gend_CP_Champion_Strategy' ) ) return '';
+    $current = Gend_CP_Champion_Strategy::current();
+
+    $annual = null;
+    if ( ! empty( $current['return'] ) ) {
+        $annual = (float) $current['return'];
+    } elseif ( ! empty( $current['post_id'] ) ) {
+        $meta = get_post_meta( (int) $current['post_id'], Gend_CP_Champion_Strategy::META_RETURN, true );
+        if ( $meta !== '' && $meta !== null ) $annual = (float) $meta;
+    }
+    if ( $annual === null ) {
+        $annual = 0.045; // 4.5% reference — CAD money-market 10-year average
+    }
+    if ( $annual > 1.0 ) $annual = $annual / 100.0; // normalise if stored as percentage
+
+    $horizons = array(
+        array( 'label' => __( '1 Month', 'gend-society' ),   'years' => 1 / 12 ),
+        array( 'label' => __( '6 Months', 'gend-society' ),  'years' => 0.5 ),
+        array( 'label' => __( '1 Year', 'gend-society' ),    'years' => 1 ),
+        array( 'label' => __( '3 Years', 'gend-society' ),   'years' => 3 ),
+        array( 'label' => __( '5 Years', 'gend-society' ),   'years' => 5 ),
+        array( 'label' => __( '10 Years', 'gend-society' ),  'years' => 10 ),
+        array( 'label' => __( '20 Years', 'gend-society' ),  'years' => 20 ),
+    );
+
+    $rows = '';
+    foreach ( $horizons as $h ) {
+        $cumulative = pow( 1.0 + $annual, $h['years'] ) - 1.0;
+        $rows .= '<tr>'
+            . '<td class="gci-ch-hz__label">' . esc_html( $h['label'] ) . '</td>'
+            . '<td class="gci-ch-hz__ann">' . esc_html( number_format( $annual * 100.0, 2 ) ) . '%</td>'
+            . '<td class="gci-ch-hz__cum"><strong>' . esc_html( number_format( $cumulative * 100.0, 2 ) ) . '%</strong></td>'
+            . '<td class="gci-ch-hz__example">$' . esc_html( number_format( 1000.0 * ( 1.0 + $cumulative ), 2 ) ) . '</td>'
+            . '</tr>';
+    }
+
+    $out = '<section class="gci-ch-hz">'
+        . '<header class="gci-ch-hz__head"><h3>' . esc_html__( 'Historical Strategy Returns', 'gend-society' ) . '</h3>'
+        . '<span class="gci-ch-hz__pill">' . esc_html__( 'Simulated at strategy annualized rate', 'gend-society' ) . '</span></header>'
+        . '<p class="gci-ch-hz__desc">' . esc_html__( 'What the current champion strategy would return over each holding period, compounded from its annualized rate. Long horizons are hypothetical projections — the strategy has not been live that long. Actual returns depend on continued execution at similar rates.', 'gend-society' ) . '</p>'
+        . '<table class="gci-ch-hz__table">'
+        . '<thead><tr>'
+        . '<th>' . esc_html__( 'Horizon', 'gend-society' ) . '</th>'
+        . '<th>' . esc_html__( 'Annualized', 'gend-society' ) . '</th>'
+        . '<th>' . esc_html__( 'Cumulative', 'gend-society' ) . '</th>'
+        . '<th>' . esc_html__( '$1,000 becomes', 'gend-society' ) . '</th>'
+        . '</tr></thead>'
+        . '<tbody>' . $rows . '</tbody>'
+        . '</table>'
+        . '</section>';
+    return $out;
+}
+
+/**
+ * admin-post handler for Currency Hold Auto Investor opt-in/out toggle.
+ */
+function gci_currency_hold_toggle_handler() {
+    if ( ! is_user_logged_in() ) { auth_redirect(); exit; }
+    $uid = (int) get_current_user_id();
+    if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['_wpnonce'] ), 'gci_currency_hold_toggle_' . $uid ) ) {
+        wp_die( esc_html__( 'Invalid request.', 'gend-society' ) );
+    }
+    if ( ! class_exists( 'Gend_CP_Treasury_Member_Optin' ) ) {
+        wp_die( esc_html__( 'The Automatic Investor is not available.', 'gend-society' ) );
+    }
+    $mode    = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : '';
+    $referer = wp_get_referer() ?: home_url( '/' );
+    if ( $mode === 'opt_in_best' ) {
+        Gend_CP_Treasury_Member_Optin::opt_in( $uid, 'best', null );
+        wp_safe_redirect( add_query_arg( 'gci_ch', 'in', $referer ) );
+    } elseif ( $mode === 'opt_out' ) {
+        Gend_CP_Treasury_Member_Optin::opt_out( $uid );
+        wp_safe_redirect( add_query_arg( 'gci_ch', 'out', $referer ) );
+    } else {
+        wp_safe_redirect( $referer );
+    }
+    exit;
+}
+add_action( 'admin_post_gci_currency_hold_toggle', 'gci_currency_hold_toggle_handler' );
 
 /**
  * Growth Investments tab — a marketplace list of OPEN growth-investment funding
@@ -1777,6 +1974,75 @@ function gs_invest_footer_assets() {
         .gci-hold-balance__label { font-size:.66rem; letter-spacing:1.4px; text-transform:uppercase; color:#94a3b8; }
         .gci-hold-balance__value { font-size:2rem; font-weight:800; color:#00ff88; }
         .gci-hold-balance__value small { font-size:.9rem; color:#94a3b8; font-weight:600; }
+
+        /* ── Currency Hold › Auto Investor opt-in card ── */
+        .gci-ch-optin { position:relative; padding:26px 28px; margin:26px 0; border-radius:20px; overflow:hidden;
+            background: linear-gradient(160deg, rgba(0,210,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(255,255,255,.1);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+        }
+        .gci-ch-optin--on {
+            border-color: rgba(0,255,136,.35);
+            background: linear-gradient(160deg, rgba(0,255,136,.07), rgba(255,255,255,.015));
+        }
+        .gci-ch-optin__head { display:flex; align-items:center; gap:12px; margin-bottom:14px; }
+        .gci-ch-optin__badge { font-size:.62rem; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#0b0e14; background:linear-gradient(135deg,#00d2ff,#89C2E0); padding:4px 12px; border-radius:999px; }
+        .gci-ch-optin--on .gci-ch-optin__badge { background:linear-gradient(135deg,#00ff88,#00d2ff); }
+        .gci-ch-optin__state { font-size:.7rem; font-weight:800; letter-spacing:2px; padding:4px 10px; border-radius:999px; }
+        .gci-ch-optin--on .gci-ch-optin__state { color:#00ff88; background:rgba(0,255,136,.12); border:1px solid rgba(0,255,136,.35); }
+        .gci-ch-optin--off .gci-ch-optin__state { color:#94a3b8; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); }
+        .gci-ch-optin__title { margin:0 0 8px; font-size:1.35rem; font-weight:800; color:#fff; }
+        .gci-ch-optin__desc { margin:0 0 18px; font-size:.9rem; line-height:1.55; color:#cbd5e1; max-width:680px; }
+        .gci-ch-optin__status { display:flex; flex-wrap:wrap; gap:14px 26px; margin-bottom:16px; padding:14px 18px; border-radius:12px; background:rgba(11,14,20,.35); border:1px solid rgba(255,255,255,.08); }
+        .gci-ch-optin__row { display:flex; flex-direction:column; gap:2px; }
+        .gci-ch-optin__row span { font-size:.66rem; letter-spacing:1.4px; text-transform:uppercase; color:#94a3b8; }
+        .gci-ch-optin__row strong { font-size:.95rem; font-weight:700; color:#fff; }
+        .gci-ch-optin__btn { padding:12px 26px; border-radius:12px; border:0; font-weight:800; font-size:.78rem; letter-spacing:1px; text-transform:uppercase; cursor:pointer; transition:transform .2s, box-shadow .2s; }
+        .gci-ch-optin__btn--on { background:linear-gradient(135deg,#00d2ff,#00ff88); color:#0b0e14; }
+        .gci-ch-optin__btn--on:hover { transform:translateY(-2px); box-shadow:0 16px 32px -14px rgba(0,255,136,.55); }
+        .gci-ch-optin__btn--off { background:rgba(255,80,80,.12); color:#ff8080; border:1px solid rgba(255,80,80,.35); }
+        .gci-ch-optin__btn--off:hover { transform:translateY(-2px); box-shadow:0 12px 26px -14px rgba(255,80,80,.4); background:rgba(255,80,80,.18); }
+
+        /* ── Currency Hold › Allocation display ── */
+        .gci-ch-alloc { padding:24px 28px; margin:22px 0; border-radius:20px;
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(255,255,255,.1);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+        }
+        .gci-ch-alloc__head { display:flex; align-items:center; gap:14px; margin-bottom:12px; }
+        .gci-ch-alloc__head h3 { margin:0; font-size:1.15rem; font-weight:800; color:#fff; }
+        .gci-ch-alloc__strategy { font-size:.68rem; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; color:#89C2E0; padding:4px 10px; border-radius:999px; background:rgba(137,194,224,.1); border:1px solid rgba(137,194,224,.3); }
+        .gci-ch-alloc__desc { margin:0 0 16px; font-size:.85rem; line-height:1.55; color:#cbd5e1; }
+        .gci-ch-pool-list { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:12px; margin-bottom:14px; }
+        .gci-ch-pool-pill { display:flex; flex-direction:column; gap:6px; padding:14px 16px; border-radius:14px; background:rgba(11,14,20,.4); border:1px solid rgba(255,255,255,.08); }
+        .gci-ch-pool-pill__label { font-size:.82rem; font-weight:700; color:#f8fafc; }
+        .gci-ch-pool-pill__pct { font-size:.68rem; font-family:monospace; color:#89C2E0; font-weight:700; letter-spacing:.5px; }
+        .gci-ch-pool-pill__bar { position:relative; height:6px; border-radius:999px; overflow:hidden; background:rgba(255,255,255,.06); }
+        .gci-ch-pool-pill__bar span { position:absolute; inset:0 auto 0 0; border-radius:999px; background:linear-gradient(90deg,#00d2ff,#89C2E0); box-shadow:0 0 12px rgba(0,210,255,.45); transition:width .8s cubic-bezier(.22,1,.36,1); }
+        .gci-ch-alloc__note { margin:0; font-size:.75rem; color:#94a3b8; line-height:1.5; padding-top:12px; border-top:1px solid rgba(255,255,255,.06); }
+
+        /* ── Currency Hold › Historical returns table ── */
+        .gci-ch-hz { padding:24px 28px; margin:22px 0 0; border-radius:20px;
+            background: linear-gradient(160deg, rgba(0,255,136,.06), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(0,255,136,.22);
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+        }
+        .gci-ch-hz__head { display:flex; align-items:center; gap:14px; margin-bottom:10px; flex-wrap:wrap; }
+        .gci-ch-hz__head h3 { margin:0; font-size:1.15rem; font-weight:800; color:#fff; }
+        .gci-ch-hz__pill { font-size:.66rem; font-weight:700; letter-spacing:1.4px; text-transform:uppercase; padding:4px 12px; border-radius:999px; color:#00ff88; background:rgba(0,255,136,.1); border:1px solid rgba(0,255,136,.32); }
+        .gci-ch-hz__desc { margin:0 0 16px; font-size:.85rem; line-height:1.55; color:#cbd5e1; max-width:820px; }
+        .gci-ch-hz__table { width:100%; border-collapse:collapse; font-family:"Inter",sans-serif; }
+        .gci-ch-hz__table thead th { text-align:left; font-size:.65rem; letter-spacing:1.4px; text-transform:uppercase; color:#89C2E0; font-weight:700; padding:10px 14px; border-bottom:1px solid rgba(255,255,255,.1); }
+        .gci-ch-hz__table tbody td { padding:12px 14px; border-bottom:1px solid rgba(255,255,255,.04); color:#cbd5e1; font-size:.9rem; }
+        .gci-ch-hz__table tbody tr:last-child td { border-bottom:0; }
+        .gci-ch-hz__table tbody tr:hover td { background:rgba(255,255,255,.03); }
+        .gci-ch-hz__label { color:#f8fafc; font-weight:700; }
+        .gci-ch-hz__ann { color:#94a3b8; font-family:monospace; }
+        .gci-ch-hz__cum strong { color:#00ff88; font-weight:800; font-family:monospace; }
+        .gci-ch-hz__example { color:#89C2E0; font-family:monospace; font-weight:700; }
     </style>
     <?php
     // The yDGEN (Currency Hold) display uses contracts-and-payments styling.
