@@ -1248,9 +1248,27 @@ function gci_render_marketing_fund_pool_summary( $viewer_id ) {
         ) ); // phpcs:ignore
         $share_pct = $total_pool > 0 ? ( $member_bal / $total_pool ) * 100.0 : 0.0;
 
+        // Latest chain-anchor status for this member's most recent fund event.
+        $latest_tx = $wpdb->get_var( $wpdb->prepare(
+            "SELECT chain_tx_id FROM `{$tbl}`
+              WHERE event_type = %s AND web_app_id = %d AND member_id = %d
+              ORDER BY id DESC LIMIT 1",
+            Gend_CP_Marketing_Pool::EVT_FUNDED,
+            $web_app_id,
+            $viewer_id
+        ) ); // phpcs:ignore
+        $chain_html = '';
+        if ( is_string( $latest_tx ) && $latest_tx !== '' ) {
+            $short      = substr( $latest_tx, 0, 10 );
+            $chain_html = '<span class="gci-pool-chain gci-pool-chain--anchored" title="' . esc_attr( $latest_tx ) . '">' . esc_html__( 'Chain-anchored', 'gend-society' ) . ' <code>' . esc_html( $short ) . '…</code></span>';
+        } else {
+            $chain_html = '<span class="gci-pool-chain gci-pool-chain--pending">' . esc_html__( 'Pending chain anchor', 'gend-society' ) . '</span>';
+        }
+
         $cards .= '<div class="gci-pool-card">'
             . '<div class="gci-pool-card__head"><span class="gci-pool-badge">' . esc_html__( 'Marketing Pool', 'gend-society' ) . '</span>'
             . '<span class="gci-pool-app">' . esc_html( $group_name ) . '</span></div>'
+            . $chain_html
             . '<div class="gci-pool-stat">'
             . '<div class="gci-pool-stat__value">' . esc_html( number_format_i18n( $member_bal, 2 ) ) . ' <small>DGEN</small></div>'
             . '<div class="gci-pool-stat__label">' . esc_html__( 'Your balance', 'gend-society' ) . '</div>'
@@ -1384,6 +1402,25 @@ function gs_invest_profile_screen_content() {
         @keyframes gciFade { from { opacity:0; transform:translateY(14px); } to { opacity:1; transform:none; } }
     </style>
     <div class="gend-invest-screen gend-contracts-tabbed">
+        <?php
+        // Persistent DGEN Top-Up bar — visible above every sub-tab so members can
+        // buy DGEN at any time without leaving the Contracts screen. Uses the
+        // existing Gend_CP_DGEN_Topup admin-post handler + nonce.
+        $topup_uid = (int) bp_displayed_user_id();
+        $topup_bal = function_exists( 'mycred_get_users_balance' ) ? (float) mycred_get_users_balance( $topup_uid, 'transact' ) : 0.0;
+        ?>
+        <div class="gci-topup-bar gi-reveal">
+            <div class="gci-topup-info">
+                <span class="gci-topup-label"><?php esc_html_e( 'Your DGEN balance', 'gend-society' ); ?></span>
+                <span class="gci-topup-value"><?php echo esc_html( number_format_i18n( $topup_bal, 2 ) ); ?> <small>DGEN</small></span>
+            </div>
+            <form class="gci-topup-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
+                <input type="hidden" name="action" value="gend_buy_dgen">
+                <?php wp_nonce_field( 'gend_buy_dgen' ); ?>
+                <input type="number" name="amount" min="1" step="0.01" placeholder="<?php esc_attr_e( 'Amount', 'gend-society' ); ?>" class="gci-topup-input" required>
+                <button type="submit" class="gci-topup-btn"><?php esc_html_e( 'Top Up DGEN', 'gend-society' ); ?></button>
+            </form>
+        </div>
         <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" checked>
         <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
@@ -1586,6 +1623,38 @@ function gs_invest_footer_assets() {
         .gci-pool-meta { font-size:.72rem; color:#94a3b8; font-family:monospace; }
         .gci-pool-link { margin-top:6px; align-self:flex-start; color:#ffd688; font-weight:700; font-size:.8rem; text-decoration:none; }
         .gci-pool-link:hover { text-decoration:underline; }
+        .gci-pool-chain { align-self:flex-start; font-size:.68rem; padding:3px 10px; border-radius:999px; letter-spacing:.5px; font-weight:700; }
+        .gci-pool-chain code { font-family:monospace; font-size:.65rem; margin-left:4px; opacity:.85; }
+        .gci-pool-chain--anchored { background:rgba(0,210,255,.12); border:1px solid rgba(0,210,255,.35); color:#00d2ff; }
+        .gci-pool-chain--pending { background:rgba(255,190,60,.12); border:1px solid rgba(255,190,60,.35); color:#ffd688; }
+
+        /* ── Persistent DGEN Top-Up bar (always at top of Contracts screen) ── */
+        .gci-topup-bar {
+            display:flex; align-items:center; gap:20px; padding:16px 20px; margin-bottom:22px; flex-wrap:wrap;
+            background: linear-gradient(160deg, rgba(0,255,136,.07), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(0,255,136,.22); border-radius:16px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+        }
+        .gci-topup-info { display:flex; flex-direction:column; gap:2px; margin-right:auto; }
+        .gci-topup-label { font-size:.66rem; letter-spacing:1.4px; text-transform:uppercase; color:#94a3b8; }
+        .gci-topup-value { font-size:1.5rem; font-weight:800; color:#00ff88; letter-spacing:.5px; }
+        .gci-topup-value small { font-size:.75rem; color:#94a3b8; font-weight:600; margin-left:4px; }
+        .gci-topup-form { display:flex; gap:10px; align-items:center; }
+        .gci-topup-input {
+            padding:11px 14px; border-radius:10px; border:1px solid rgba(255,255,255,.15);
+            background:rgba(11,14,20,.5); color:#fff; font-family:monospace; font-size:.95rem; width:140px;
+            transition:border-color .25s, box-shadow .25s;
+        }
+        .gci-topup-input::placeholder { color:#64748b; }
+        .gci-topup-input:focus { outline:0; border-color:rgba(0,255,136,.55); box-shadow:0 0 0 3px rgba(0,255,136,.15); }
+        .gci-topup-btn {
+            padding:11px 22px; border-radius:10px; border:0;
+            background: linear-gradient(135deg, #00d2ff, #00ff88); color:#0b0e14;
+            font-weight:800; font-size:.75rem; letter-spacing:1px; text-transform:uppercase;
+            cursor:pointer; transition:transform .2s, box-shadow .2s;
+        }
+        .gci-topup-btn:hover { transform:translateY(-2px); box-shadow:0 14px 30px -14px rgba(0,255,136,.6); }
 
         /* ── Currency Hold intro ── */
         .gci-hold-intro {
