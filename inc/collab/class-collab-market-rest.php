@@ -105,6 +105,24 @@ class Gend_GS_Collab_Market_REST {
 				'idempotency_key' => array( 'required' => false, 'sanitize_callback' => 'sanitize_text_field' ), // client UUID; derived if absent
 			),
 		) );
+
+		// GET /markets (?scope=hub) — the NEW hub-wide market LIST route (89-03, FED-02). Because
+		// register_routes() already self-gated on is_main_node() AND GS_COLLAB_MARKET_PUBLIC ABOVE
+		// (before any register_rest_route call), this READ-ONLY route is NEVER registered when the
+		// flag is off OR this is not the hub => GET gs/v1/markets 404s route-ABSENT (never 403). It
+		// lists open+locked markets with state_snapshot()-shaped implied odds PLUS the authenticated
+		// caller's OWN positions ONLY (GATE-02: no user_id arg, no public leaderboard). READ-ONLY:
+		// WP_REST_Server::READABLE — there is deliberately NO write route added here (money stays on
+		// the hub-only /market/{id}/bet above). The container market MIRROR (class-collab-market-
+		// mirror.php) fetches THIS route read-only and links bet/sell back to the hub.
+		register_rest_route( self::NS, '/markets', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'route_market_list' ),
+			'permission_callback' => array( __CLASS__, 'can_read' ),
+			'args'                => array(
+				'scope' => array( 'required' => false, 'sanitize_callback' => 'sanitize_key', 'default' => 'hub' ),
+			),
+		) );
 	}
 
 	/**
@@ -244,5 +262,99 @@ class Gend_GS_Collab_Market_REST {
 		// 200 — payload already carries cost_dgen|refund_dgen, q_yes/q_no, escrow_dgen,
 		// p_yes/p_no, position{...}, rake_bps + the disclosure string. Returned UNCHANGED.
 		return rest_ensure_response( $result );
+	}
+
+	/**
+	 * GET /markets (?scope=hub) — the READ-ONLY hub-wide market LIST (89-03, FED-02). Lists the
+	 * open+locked markets with state_snapshot()-shaped implied odds, and for the AUTHENTICATED
+	 * caller attaches THEIR OWN position on each market (GATE-02 discipline: own-user-only, no
+	 * user_id request arg, no other members' positions — no public leaderboard). Neutral labels
+	 * only (no bet/odds/wager/payout regulator-magnet strings). This is the hub source the
+	 * container market MIRROR fetches read-only; any actual bet/sell happens on the hub (money
+	 * stays hub-only). NO write path here.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_market_list( WP_REST_Request $req ) {
+		global $wpdb;
+
+		// Partial-deploy safe: never fatal if the schema/engine isn't on this node yet
+		// (memory: project_wp_fatal_auto_deactivation).
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' )
+			|| ! method_exists( 'Gend_GS_Collab_Schema', 'markets_table' )
+			|| ! method_exists( 'Gend_GS_Collab_Schema', 'positions_table' ) ) {
+			return new WP_Error( 'gs_market_no_schema', 'Market store unavailable.', array( 'status' => 500 ) );
+		}
+		if ( ! class_exists( 'Gend_GS_Collab_Market' )
+			|| ! method_exists( 'Gend_GS_Collab_Market', 'state_snapshot' ) ) {
+			return new WP_Error( 'gs_market_no_engine', 'Market engine unavailable.', array( 'status' => 500 ) );
+		}
+
+		$markets_table   = Gend_GS_Collab_Schema::markets_table();
+		$positions_table = Gend_GS_Collab_Schema::positions_table();
+
+		// The tradable list: open + locked markets (a locked market still surfaces its final implied
+		// probability, mirroring state_snapshot's read-any-state contract). Bounded LIMIT 100 — this
+		// is a read-only overview, not a paginated feed. Ordered newest-first.
+		$market_rows = $wpdb->get_col(
+			"SELECT id FROM {$markets_table}
+			 WHERE state IN ( 'open', 'locked' )
+			 ORDER BY id DESC
+			 LIMIT 100"
+		);
+		if ( ! is_array( $market_rows ) || empty( $market_rows ) ) {
+			return rest_ensure_response( array( 'markets' => array(), 'scope' => 'hub' ) );
+		}
+		$market_ids = array_map( 'intval', $market_rows );
+
+		// GATE-02: the caller's OWN positions ONLY — the WHERE user_id = get_current_user_id() clause
+		// is the privacy boundary. There is NO user_id request arg; no other member's position is
+		// ever read. Batched IN (...) over the bounded market list so it's ONE query, not N.
+		$uid          = (int) get_current_user_id();
+		$own_by_market = array();
+		if ( $uid > 0 ) {
+			$placeholders = implode( ',', array_fill( 0, count( $market_ids ), '%d' ) );
+			$params       = array_merge( $market_ids, array( $uid ) );
+			$pos_rows     = $wpdb->get_results(
+				$wpdb->prepare(
+					"SELECT market_id, outcome, shares
+					 FROM {$positions_table}
+					 WHERE market_id IN ( {$placeholders} ) AND user_id = %d AND shares > 0",
+					$params
+				)
+			);
+			if ( is_array( $pos_rows ) ) {
+				foreach ( $pos_rows as $pr ) {
+					$mid = (int) $pr->market_id;
+					if ( ! isset( $own_by_market[ $mid ] ) ) {
+						$own_by_market[ $mid ] = array( 'yes_shares' => 0, 'no_shares' => 0 );
+					}
+					if ( 'no' === (string) $pr->outcome ) {
+						$own_by_market[ $mid ]['no_shares'] = (int) $pr->shares;
+					} else {
+						$own_by_market[ $mid ]['yes_shares'] = (int) $pr->shares;
+					}
+				}
+			}
+		}
+
+		$items = array();
+		foreach ( $market_ids as $mid ) {
+			$snapshot = Gend_GS_Collab_Market::state_snapshot( $mid );
+			if ( is_wp_error( $snapshot ) || ! is_array( $snapshot ) ) {
+				continue; // skip a not-found/errored row — never a fatal.
+			}
+			$items[] = array(
+				'market_id'           => (int) $snapshot['market_id'],
+				'state'               => (string) $snapshot['state'],
+				'resolve_by'          => isset( $snapshot['resolve_by'] ) ? (int) $snapshot['resolve_by'] : 0,
+				'implied_probability' => isset( $snapshot['implied_probability'] ) ? $snapshot['implied_probability'] : array( 'yes' => null, 'no' => null ),
+				// GATE-02: the caller's own position only, or null if they hold none.
+				'my_position'         => isset( $own_by_market[ $mid ] ) ? $own_by_market[ $mid ] : null,
+			);
+		}
+
+		return rest_ensure_response( array( 'markets' => $items, 'scope' => 'hub' ) );
 	}
 }
