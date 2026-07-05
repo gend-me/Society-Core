@@ -1280,6 +1280,33 @@ function gci_currency_hold_toggle_handler() {
 add_action( 'admin_post_gci_currency_hold_toggle', 'gci_currency_hold_toggle_handler' );
 
 /**
+ * AJAX handler for the Auto Investor opt-in toggle. Same input contract as the
+ * admin-post fallback (nonce + mode) but returns JSON with the rebuilt opt-in
+ * card HTML so the client can replace it in-place without a full page reload
+ * (which would kick the user back to the default Fund sub-tab).
+ */
+function gci_currency_hold_toggle_ajax_handler() {
+    if ( ! is_user_logged_in() ) {
+        wp_send_json_error( array( 'message' => 'not_logged_in' ), 401 );
+    }
+    $uid = (int) get_current_user_id();
+    check_ajax_referer( 'gci_currency_hold_toggle_' . $uid, '_wpnonce' );
+    if ( ! class_exists( 'Gend_CP_Strategy_Opt_In' ) ) {
+        wp_send_json_error( array( 'message' => 'unavailable' ), 500 );
+    }
+    $mode = isset( $_POST['mode'] ) ? sanitize_key( wp_unslash( $_POST['mode'] ) ) : '';
+    if ( $mode === 'opt_in_best' ) {
+        Gend_CP_Strategy_Opt_In::opt_in( $uid, 'best', null );
+    } elseif ( $mode === 'opt_out' ) {
+        Gend_CP_Strategy_Opt_In::opt_out( $uid );
+    } else {
+        wp_send_json_error( array( 'message' => 'bad_mode' ), 400 );
+    }
+    wp_send_json_success( array( 'html' => gci_render_currency_hold_optin( $uid ) ) );
+}
+add_action( 'wp_ajax_gci_currency_hold_toggle', 'gci_currency_hold_toggle_ajax_handler' );
+
+/**
  * Growth Investments tab — a marketplace list of OPEN growth-investment funding
  * requests across every web app (group) that has put one out to market.
  */
@@ -2003,6 +2030,8 @@ function gs_invest_footer_assets() {
         .gci-ch-optin__btn--on:hover { transform:translateY(-2px); box-shadow:0 16px 32px -14px rgba(0,255,136,.55); }
         .gci-ch-optin__btn--off { background:rgba(255,80,80,.12); color:#ff8080; border:1px solid rgba(255,80,80,.35); }
         .gci-ch-optin__btn--off:hover { transform:translateY(-2px); box-shadow:0 12px 26px -14px rgba(255,80,80,.4); background:rgba(255,80,80,.18); }
+        .gci-ch-optin--busy { opacity:.7; pointer-events:none; transition:opacity .2s; }
+        .gci-ch-optin--busy .gci-ch-optin__btn { cursor:wait; }
 
         /* ── Currency Hold › Allocation display ── */
         .gci-ch-alloc { padding:24px 28px; margin:22px 0; border-radius:20px;
@@ -2103,6 +2132,49 @@ function gs_invest_footer_assets() {
                 if (!label) return;
                 var radio = document.getElementById(label.getAttribute('for'));
                 if (radio && !radio.checked) { radio.checked = true; }
+            });
+        }
+
+        // AJAX opt-in / opt-out for the Auto Investor. Prevents the plain form
+        // POST → redirect that would drop the user back onto the default Fund
+        // sub-tab. Server returns the freshly-rendered opt-in card HTML so we
+        // replace the DOM node in place without touching any other section.
+        if (!window.__gciOptinBound) {
+            window.__gciOptinBound = true;
+            var GCI_AJAX_URL = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+            document.addEventListener('submit', function (e) {
+                var form = e.target;
+                if (!form || !form.classList || !form.classList.contains('gci-ch-optin__form')) return;
+                e.preventDefault();
+                var card = form.closest('.gci-ch-optin');
+                var btn  = form.querySelector('button[type="submit"]');
+                if (btn) { btn.disabled = true; btn.dataset.origLabel = btn.textContent; btn.textContent = '…'; }
+                if (card) card.classList.add('gci-ch-optin--busy');
+                var fd = new FormData(form);
+                // Preserve action=gci_currency_hold_toggle so wp_ajax_ routes here.
+                fetch(GCI_AJAX_URL, { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (res) {
+                        if (res && res.success && res.data && res.data.html) {
+                            if (card && card.parentNode) {
+                                var tmp = document.createElement('div');
+                                tmp.innerHTML = res.data.html.trim();
+                                var fresh = tmp.firstElementChild;
+                                if (fresh) card.parentNode.replaceChild(fresh, card);
+                            }
+                        } else if (btn) {
+                            btn.disabled = false;
+                            if (btn.dataset.origLabel) btn.textContent = btn.dataset.origLabel;
+                            if (card) card.classList.remove('gci-ch-optin--busy');
+                        }
+                    })
+                    .catch(function () {
+                        if (btn) {
+                            btn.disabled = false;
+                            if (btn.dataset.origLabel) btn.textContent = btn.dataset.origLabel;
+                        }
+                        if (card) card.classList.remove('gci-ch-optin--busy');
+                    });
             });
         }
         function initReveal() {
