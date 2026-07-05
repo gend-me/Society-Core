@@ -2122,17 +2122,19 @@ function gs_invest_footer_assets() {
     ?>
     <script id="gci-js">
     (function () {
-        // Insurance: force-check the radio when its label is clicked. Native label
-        // activation already does this; this covers any interference. Switching
-        // itself is pure CSS (#radio:checked ~ .gci-panel--x).
-        if (!window.__gciRadioBound) {
-            window.__gciRadioBound = true;
-            document.addEventListener('click', function (e) {
-                var label = (e.target && e.target.closest) ? e.target.closest('label.gci-tab[for]') : null;
-                if (!label) return;
-                var radio = document.getElementById(label.getAttribute('for'));
-                if (radio && !radio.checked) { radio.checked = true; }
-            });
+        // Robust switching: find panels by descendant query (works even if the
+        // 184KB wallet's markup nests them so they're not radio siblings) and set
+        // display with inline !important (beats the stylesheet's display:none).
+        function gciApply(root) {
+            var checked = root.querySelector('.gci-radio:checked') || root.querySelector('.gci-radio');
+            if (!checked || !checked.id) return;
+            var key = checked.id.replace('gci-tab-', '');
+            var panels = root.querySelectorAll('.gci-panel');
+            for (var i = 0; i < panels.length; i++) {
+                var on = (' ' + panels[i].className + ' ').indexOf(' gci-panel--' + key + ' ') !== -1
+                         || panels[i].className.indexOf('gci-panel--' + key) !== -1;
+                panels[i].style.setProperty('display', on ? 'block' : 'none', 'important');
+            }
         }
 
         // AJAX opt-in / opt-out for the Auto Investor. Prevents the plain form
@@ -2177,6 +2179,31 @@ function gs_invest_footer_assets() {
                     });
             });
         }
+
+        function gciInit() {
+            var roots = document.querySelectorAll('.gend-contracts-tabbed');
+            for (var i = 0; i < roots.length; i++) {
+                (function (root) {
+                    if (root.__gciBound) return;
+                    root.__gciBound = true;
+                    var radios = root.querySelectorAll('.gci-radio');
+                    for (var j = 0; j < radios.length; j++) {
+                        radios[j].addEventListener('change', function () { gciApply(root); });
+                    }
+                    root.addEventListener('click', function (e) {
+                        var label = (e.target && e.target.closest) ? e.target.closest('label.gci-tab[for]') : null;
+                        if (!label) return;
+                        var radio = document.getElementById(label.getAttribute('for'));
+                        if (radio) { radio.checked = true; }
+                        gciApply(root);
+                    });
+                    gciApply(root);
+                })(roots[i]);
+            }
+        }
+        if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', gciInit);
+        else gciInit();
+
         function initReveal() {
             var screen = document.querySelector('.gend-contracts-tabbed');
             if (!screen || screen.dataset.giInit) return;
