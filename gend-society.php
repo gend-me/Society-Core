@@ -296,6 +296,21 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-sync.php' ) ) {
 	}
 }
 
+// GenD Match (v12.0 Phase 89-03, FED-02, Tier B) — the container READ-ONLY hub-wide market MIRROR.
+//   - class-collab-market-mirror.php: Gend_GS_Collab_Market_Mirror — on a CONTAINER (! is_hub())
+//     renders a READ-ONLY Collaborations member-nav tab that fetches the hub's gs/v1/markets?scope=hub
+//     list read-only (live implied odds + the member's OWN positions) and LINKS bet/sell to the hub
+//     Markets surface. There is NO money-adjacent POST on a container (no wp_remote_post, no local
+//     bet form) — ALL money movement stays hub-only. init() self-gates on GS_COLLAB_MARKET_PUBLIC
+//     AND ! is_hub(): DOM-absent when the flag is off (GATE-01) and no-op on the hub (where
+//     member-markets.php already renders the native tab).
+// file_exists-guarded (hub PVC .no-plugin-sync quirk; classes-before-entrypoint deploy;
+// memory: project_hub_plugin_sync_gotcha).
+if ( file_exists( GS_DIR . 'inc/collab/class-collab-market-mirror.php' ) ) {
+	require_once GS_DIR . 'inc/collab/class-collab-market-mirror.php';
+	Gend_GS_Collab_Market_Mirror::init(); // self-gates on GS_COLLAB_MARKET_PUBLIC + ! is_hub().
+}
+
 // Member calendar — Availability REST handler (Phase 28-02).
 // Routes: GET/PUT /wp-json/gs/v1/calendar/availability — AVAIL-01/02/03.
 // Reads/writes wp_gs_member_availability (installed by Plan 28-01 schema).
