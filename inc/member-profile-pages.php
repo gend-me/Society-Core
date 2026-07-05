@@ -1294,6 +1294,77 @@ function gci_render_marketing_fund_pool_summary( $viewer_id ) {
         . '</section>';
 }
 
+/**
+ * Setup mode — "Web Apps You Manage" quick-launch cards.
+ *
+ * When the viewer is a group admin of one or more BuddyPress groups that are
+ * bound to a connected web app (groupmeta _gend_cp_app_id), render a section
+ * that lists those web apps with quick-launch links to each contract-setup
+ * surface. This is the DUAL AUDIENCE half of the Contracts screen — the other
+ * sub-tabs are consumer-facing (invest / hold / browse); this section is
+ * author-facing (create / manage / configure).
+ *
+ * Rendered above the tab strip so it's discoverable regardless of which
+ * sub-tab is active. No-op when the viewer admins zero connected web apps.
+ */
+function gci_render_web_apps_you_manage( $viewer_id ) {
+    if ( ! function_exists( 'groups_get_user_groups' ) || ! function_exists( 'groups_is_user_admin' ) || ! function_exists( 'groups_get_groupmeta' ) ) {
+        return '';
+    }
+    $viewer_id = (int) $viewer_id;
+    if ( ! $viewer_id ) return '';
+
+    $user_groups = groups_get_user_groups( $viewer_id );
+    $group_ids   = isset( $user_groups['groups'] ) ? array_map( 'intval', (array) $user_groups['groups'] ) : array();
+    if ( empty( $group_ids ) ) return '';
+
+    $cards = '';
+    $count = 0;
+    foreach ( $group_ids as $gid ) {
+        if ( ! groups_is_user_admin( $viewer_id, $gid ) ) {
+            continue;
+        }
+        $app_id = groups_get_groupmeta( $gid, '_gend_cp_app_id', true );
+        if ( ! $app_id ) {
+            continue;
+        }
+        $group = function_exists( 'groups_get_group' ) ? groups_get_group( $gid ) : null;
+        if ( ! $group ) continue;
+        $name        = ! empty( $group->name ) ? $group->name : ( '#' . $gid );
+        $group_url   = function_exists( 'bp_get_group_permalink' ) ? bp_get_group_permalink( $group ) : '';
+        $plan_url    = $group_url ? trailingslashit( $group_url . 'business-plan' ) : '';
+        $manage_url  = $group_url ? trailingslashit( $group_url . 'admin' ) : '';
+        $count++;
+
+        $cards .= '<div class="gci-webapp-card">'
+            . '<div class="gci-webapp-card__head">'
+            . '<span class="gci-webapp-badge">' . esc_html__( 'Your web app', 'gend-society' ) . '</span>'
+            . '<span class="gci-webapp-app-id"><code>#' . esc_html( (string) $app_id ) . '</code></span>'
+            . '</div>'
+            . '<h4 class="gci-webapp-title">' . esc_html( $name ) . '</h4>'
+            . '<p class="gci-webapp-summary">' . esc_html__( 'Post funding requests, configure funnels, submit to marketing pools, and manage task contracts for this web app.', 'gend-society' ) . '</p>'
+            . '<div class="gci-webapp-actions">';
+        if ( $plan_url ) {
+            $cards .= '<a class="gci-webapp-action gci-webapp-action--primary" href="' . esc_url( $plan_url ) . '">' . esc_html__( 'Post funding request', 'gend-society' ) . '</a>';
+        }
+        if ( $manage_url ) {
+            $cards .= '<a class="gci-webapp-action" href="' . esc_url( $manage_url ) . '">' . esc_html__( 'Group admin', 'gend-society' ) . '</a>';
+        }
+        if ( $group_url ) {
+            $cards .= '<a class="gci-webapp-action" href="' . esc_url( $group_url ) . '">' . esc_html__( 'Open web app', 'gend-society' ) . '</a>';
+        }
+        $cards .= '</div></div>';
+    }
+
+    if ( $count === 0 ) return '';
+
+    return '<section class="gci-webapp-section">'
+        . '<header class="gci-webapp-header"><h3>' . esc_html__( 'Web Apps You Manage', 'gend-society' ) . '</h3>'
+        . '<span class="gci-webapp-pill">' . esc_html( sprintf( _n( '%s web app', '%s web apps', $count, 'gend-society' ), number_format_i18n( $count ) ) ) . '</span></header>'
+        . '<div class="gci-webapp-grid">' . $cards . '</div>'
+        . '</section>';
+}
+
 function gs_invest_profile_screen_content() {
     if ( ! bp_is_my_profile() ) {
         echo '<p>' . esc_html__( 'This is private.', 'gend-society' ) . '</p>';
@@ -1421,6 +1492,7 @@ function gs_invest_profile_screen_content() {
                 <button type="submit" class="gci-topup-btn"><?php esc_html_e( 'Top Up DGEN', 'gend-society' ); ?></button>
             </form>
         </div>
+        <?php echo gci_render_web_apps_you_manage( $topup_uid ); // phpcs:ignore ?>
         <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" checked>
         <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
@@ -1655,6 +1727,40 @@ function gs_invest_footer_assets() {
             cursor:pointer; transition:transform .2s, box-shadow .2s;
         }
         .gci-topup-btn:hover { transform:translateY(-2px); box-shadow:0 14px 30px -14px rgba(0,255,136,.6); }
+
+        /* ── "Web Apps You Manage" setup-mode cards (dual audience: authoring surface) ── */
+        .gci-webapp-section { margin-bottom:26px; }
+        .gci-webapp-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+        .gci-webapp-header h3 { color:#fff; font-size:1.05rem; font-weight:800; margin:0; letter-spacing:.5px; }
+        .gci-webapp-pill { background:rgba(204,30,225,.14); border:1px solid rgba(204,30,225,.4); color:#e879ff; font-size:.7rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:5px 12px; border-radius:100px; }
+        .gci-webapp-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(320px,1fr)); gap:16px; }
+        .gci-webapp-card {
+            display:flex; flex-direction:column; gap:10px; padding:22px;
+            background: linear-gradient(160deg, rgba(204,30,225,.07), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(204,30,225,.28); border-radius:18px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+            transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s, box-shadow .35s;
+        }
+        .gci-webapp-card:hover { transform:translateY(-4px); border-color:rgba(204,30,225,.55); box-shadow:0 26px 55px -24px rgba(204,30,225,.45); }
+        .gci-webapp-card__head { display:flex; align-items:center; gap:10px; justify-content:space-between; }
+        .gci-webapp-badge { font-size:.62rem; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#0b0e14; background:linear-gradient(135deg,#cc1ee1,#e879ff); padding:4px 10px; border-radius:999px; }
+        .gci-webapp-app-id { font-size:.7rem; color:#94a3b8; }
+        .gci-webapp-app-id code { font-family:monospace; color:#e879ff; background:rgba(255,255,255,.04); padding:2px 6px; border-radius:6px; }
+        .gci-webapp-title { margin:0; font-size:1.1rem; font-weight:800; color:#fff; }
+        .gci-webapp-summary { margin:0; font-size:.82rem; line-height:1.5; color:#94a3b8; }
+        .gci-webapp-actions { display:flex; flex-wrap:wrap; gap:8px; margin-top:6px; }
+        .gci-webapp-action {
+            padding:8px 14px; border-radius:10px; font-size:.72rem; font-weight:700; letter-spacing:.5px; text-transform:uppercase; text-decoration:none;
+            background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.12); color:#cbd5e1;
+            transition:transform .2s, border-color .2s, background .2s, color .2s;
+        }
+        .gci-webapp-action:hover { transform:translateY(-1px); border-color:rgba(232,121,255,.55); color:#fff; background:rgba(204,30,225,.15); }
+        .gci-webapp-action--primary {
+            background:linear-gradient(135deg,#cc1ee1,#e879ff); border-color:transparent; color:#fff;
+            box-shadow:0 10px 22px -12px rgba(204,30,225,.55);
+        }
+        .gci-webapp-action--primary:hover { color:#fff; background:linear-gradient(135deg,#e879ff,#cc1ee1); border-color:transparent; }
 
         /* ── Currency Hold intro ── */
         .gci-hold-intro {
