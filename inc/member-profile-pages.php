@@ -1190,6 +1190,92 @@ function gci_render_project_market() {
     return '<div class="gci-project-grid">' . $cards . '</div>';
 }
 
+/**
+ * Marketing Fund Pool summary — one glass card per web-app pool this viewer has
+ * funded. Shows member balance, total pool, share %, and CTA back to the group.
+ * Rendered ABOVE the Growth marketplace on the Growth tab. Gated on
+ * GS_MARKETING_FUND_POOL_PUBLIC; DOM-absent when off. No empty state.
+ */
+function gci_render_marketing_fund_pool_summary( $viewer_id ) {
+    if ( ! defined( 'GS_MARKETING_FUND_POOL_PUBLIC' ) || ! GS_MARKETING_FUND_POOL_PUBLIC ) {
+        return '';
+    }
+    if ( ! class_exists( 'Gend_CP_Marketing_Pool' ) ) {
+        return '';
+    }
+    $viewer_id = (int) $viewer_id;
+    if ( ! $viewer_id ) return '';
+
+    global $wpdb;
+    $tbl = Gend_CP_Marketing_Pool::ledger_table();
+    $rows = $wpdb->get_results( $wpdb->prepare(
+        "SELECT web_app_id, SUM(amount_dgen) AS member_balance FROM `{$tbl}`
+          WHERE event_type = %s AND member_id = %d
+          GROUP BY web_app_id
+          HAVING member_balance > 0
+          ORDER BY member_balance DESC",
+        Gend_CP_Marketing_Pool::EVT_FUNDED,
+        $viewer_id
+    ) ); // phpcs:ignore
+    if ( empty( $rows ) ) return '';
+
+    $cards = '';
+    foreach ( $rows as $r ) {
+        $web_app_id = (int) $r->web_app_id;
+        $member_bal = (float) $r->member_balance;
+
+        $group_id = 0;
+        if ( function_exists( 'groups_get_groups' ) ) {
+            $q = groups_get_groups( array(
+                'meta_query'      => array( array( 'key' => '_gend_cp_app_id', 'value' => (string) $web_app_id, 'compare' => '=' ) ),
+                'show_hidden'     => true,
+                'per_page'        => 1,
+                'populate_extras' => false,
+            ) );
+            if ( ! empty( $q['groups'] ) ) {
+                $group_id = (int) $q['groups'][0]->id;
+            }
+        }
+        $group      = ( $group_id && function_exists( 'groups_get_group' ) ) ? groups_get_group( $group_id ) : null;
+        $group_name = ( $group && ! empty( $group->name ) ) ? $group->name : ( 'Web app #' . $web_app_id );
+        $group_url  = ( $group && function_exists( 'bp_get_group_permalink' ) ) ? bp_get_group_permalink( $group ) : '';
+
+        $total_pool = (float) $wpdb->get_var( $wpdb->prepare(
+            "SELECT IFNULL(SUM(amount_dgen),0) FROM `{$tbl}`
+              WHERE event_type = %s AND web_app_id = %d",
+            Gend_CP_Marketing_Pool::EVT_FUNDED,
+            $web_app_id
+        ) ); // phpcs:ignore
+        $share_pct = $total_pool > 0 ? ( $member_bal / $total_pool ) * 100.0 : 0.0;
+
+        $cards .= '<div class="gci-pool-card">'
+            . '<div class="gci-pool-card__head"><span class="gci-pool-badge">' . esc_html__( 'Marketing Pool', 'gend-society' ) . '</span>'
+            . '<span class="gci-pool-app">' . esc_html( $group_name ) . '</span></div>'
+            . '<div class="gci-pool-stat">'
+            . '<div class="gci-pool-stat__value">' . esc_html( number_format_i18n( $member_bal, 2 ) ) . ' <small>DGEN</small></div>'
+            . '<div class="gci-pool-stat__label">' . esc_html__( 'Your balance', 'gend-society' ) . '</div>'
+            . '</div>';
+        if ( $total_pool > 0 ) {
+            $cards .= '<div class="gci-pool-share">'
+                . '<span class="gci-pool-share__label">' . esc_html__( 'Your share', 'gend-society' ) . '</span>'
+                . '<span class="gci-pool-share__value">' . esc_html( number_format_i18n( $share_pct, 2 ) ) . '%</span>'
+                . '</div>'
+                . '<div class="gci-pool-meta">' . esc_html( sprintf( __( 'Pool total: %s DGEN', 'gend-society' ), number_format_i18n( $total_pool, 2 ) ) ) . '</div>';
+        }
+        if ( $group_url ) {
+            $cards .= '<a class="gci-pool-link" href="' . esc_url( $group_url ) . '">' . esc_html__( 'Manage / invest more →', 'gend-society' ) . '</a>';
+        }
+        $cards .= '</div>';
+    }
+
+    $count = count( $rows );
+    return '<section class="gci-pool-section">'
+        . '<header class="gci-pool-header"><h3>' . esc_html__( 'Your Marketing Fund Pools', 'gend-society' ) . '</h3>'
+        . '<span class="gci-pool-pill">' . esc_html( sprintf( _n( '%s active pool', '%s active pools', $count, 'gend-society' ), number_format_i18n( $count ) ) ) . '</span></header>'
+        . '<div class="gci-pool-grid">' . $cards . '</div>'
+        . '</section>';
+}
+
 function gs_invest_profile_screen_content() {
     if ( ! bp_is_my_profile() ) {
         echo '<p>' . esc_html__( 'This is private.', 'gend-society' ) . '</p>';
@@ -1314,7 +1400,7 @@ function gs_invest_profile_screen_content() {
             <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
         <div class="gci-panel gci-panel--hold" role="tabpanel"><?php echo gci_render_currency_hold( (int) bp_displayed_user_id() ); // phpcs:ignore ?></div>
-        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gci_render_growth_market(); // phpcs:ignore ?></div>
+        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gci_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gci_render_growth_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gci_render_project_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--completed" role="tabpanel">
             <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
@@ -1472,6 +1558,34 @@ function gs_invest_footer_assets() {
         .gci-project-meta { display:flex; flex-wrap:wrap; gap:6px 16px; font-size:.74rem; color:#cbd5e1; font-family:monospace; }
         .gci-project-link { margin-top:6px; align-self:flex-start; color:#a4f0c8; font-weight:700; font-size:.8rem; text-decoration:none; }
         .gci-project-link:hover { text-decoration:underline; }
+
+        /* ── Marketing Fund Pool member-balance cards (Growth tab, above marketplace) ── */
+        .gci-pool-section { margin-bottom:28px; }
+        .gci-pool-header { display:flex; align-items:center; gap:14px; margin-bottom:16px; }
+        .gci-pool-header h3 { color:#fff; font-size:1.05rem; font-weight:800; margin:0; letter-spacing:.5px; }
+        .gci-pool-pill { background:rgba(255,190,60,.12); border:1px solid rgba(255,190,60,.35); color:#ffd688; font-size:.7rem; font-weight:700; letter-spacing:1px; text-transform:uppercase; padding:5px 12px; border-radius:100px; }
+        .gci-pool-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(280px,1fr)); gap:16px; }
+        .gci-pool-card {
+            display:flex; flex-direction:column; gap:12px; padding:22px;
+            background: linear-gradient(160deg, rgba(255,190,60,.06), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(16px) saturate(1.3); backdrop-filter: blur(16px) saturate(1.3);
+            border:1px solid rgba(255,190,60,.22); border-radius:18px;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.07), 0 22px 50px -28px rgba(0,0,0,.7);
+            transition: transform .35s cubic-bezier(.22,1,.36,1), border-color .35s, box-shadow .35s;
+        }
+        .gci-pool-card:hover { transform:translateY(-4px); border-color:rgba(255,190,60,.55); box-shadow:0 26px 55px -24px rgba(255,190,60,.45); }
+        .gci-pool-card__head { display:flex; align-items:center; gap:10px; }
+        .gci-pool-badge { font-size:.62rem; font-weight:800; letter-spacing:1.4px; text-transform:uppercase; color:#0b0e14; background:linear-gradient(135deg,#ffbe3c,#ff8a3c); padding:4px 10px; border-radius:999px; }
+        .gci-pool-app { font-size:.72rem; color:#94a3b8; letter-spacing:.5px; }
+        .gci-pool-stat__value { font-size:1.75rem; font-weight:800; color:#ffd688; }
+        .gci-pool-stat__value small { font-size:.8rem; color:#94a3b8; font-weight:600; }
+        .gci-pool-stat__label { font-size:.66rem; letter-spacing:1.4px; text-transform:uppercase; color:#94a3b8; }
+        .gci-pool-share { display:flex; align-items:baseline; justify-content:space-between; padding-top:8px; border-top:1px solid rgba(255,255,255,.08); }
+        .gci-pool-share__label { font-size:.7rem; color:#94a3b8; letter-spacing:.5px; }
+        .gci-pool-share__value { font-size:1rem; font-weight:700; color:#fff; }
+        .gci-pool-meta { font-size:.72rem; color:#94a3b8; font-family:monospace; }
+        .gci-pool-link { margin-top:6px; align-self:flex-start; color:#ffd688; font-weight:700; font-size:.8rem; text-decoration:none; }
+        .gci-pool-link:hover { text-decoration:underline; }
 
         /* ── Currency Hold intro ── */
         .gci-hold-intro {
