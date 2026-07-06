@@ -697,10 +697,12 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                                             <span class="gs-cg-cta-title"><?php esc_html_e( 'Connect Your Computer', 'gend-society' ); ?></span>
                                             <span class="gs-cg-cta-sub"><?php esc_html_e( 'via the GenD Desktop App', 'gend-society' ); ?></span>
                                         </button>
+                                        <?php if ( defined( 'GS_MOBILE_APP_PUBLIC' ) && GS_MOBILE_APP_PUBLIC ) : ?>
                                         <button type="button" class="gs-cg-cta gs-cg-cta--ghost" data-gs-cg-connect="mobile">
                                             <span class="gs-cg-cta-title"><?php esc_html_e( 'Get the Mobile App', 'gend-society' ); ?></span>
                                             <span class="gs-cg-cta-sub"><?php esc_html_e( 'iOS / Android', 'gend-society' ); ?></span>
                                         </button>
+                                        <?php endif; ?>
                                     </div>
                                 </div>
                             <?php endif; ?>
@@ -842,6 +844,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                             </div>
 
                             <!-- ─── Mobile panel ─── -->
+                            <?php if ( defined( 'GS_MOBILE_APP_PUBLIC' ) && GS_MOBILE_APP_PUBLIC ) : ?>
                             <div class="gs-cg-step-panel" data-gs-cg-panel="mobile" hidden>
                                 <p class="gs-cg-step-intro">
                                     <?php esc_html_e( "The GenD Mobile App turns your phone or tablet into a Gas Station whenever it's charging + on Wi-Fi. Earn fees overnight without touching your data plan or battery during the day.", 'gend-society' ); ?>
@@ -887,6 +890,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                                     </li>
                                 </ol>
                             </div>
+                            <?php endif; // GS_MOBILE_APP_PUBLIC ?>
 
                         </div>
                     </div>

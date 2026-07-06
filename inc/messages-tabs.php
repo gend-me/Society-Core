@@ -2014,7 +2014,10 @@ function gs_chat_tabs_footer() {
 
 			// Build the "Prompt Runs At" <select> options for a step: "Gend.me (hub)"
 			// first, then EVERY device the member has (psoo/v1/devices). Desktop
-			// devices are selectable; mobile/server are disabled (coming soon).
+			// devices are always selectable. Mobile/server devices are omitted
+			// entirely unless GS_MOBILE_APP_PUBLIC flips them on (v12.1 cleanup —
+			// no more "(coming soon)" placeholder options in a real form).
+			var GS_MOBILE_APP_PUBLIC = <?php echo ( defined( 'GS_MOBILE_APP_PUBLIC' ) && GS_MOBILE_APP_PUBLIC ) ? 'true' : 'false'; ?>;
 			function stepDeviceOptions(selectedId) {
 				var html = '<option value=""' + (selectedId ? '' : ' selected') + '>Gend.me (hub)</option>';
 				var list = Array.isArray(allDevices) ? allDevices : [];
@@ -2023,10 +2026,11 @@ function gs_chat_tabs_footer() {
 					if (!dev) continue;
 					var ref = String(dev.id != null ? dev.id : dev.device_id);
 					var isDesktop = dev.type === 'desktop';
-					var lbl = (dev.label || ref) + (isDesktop ? '' : ' (coming soon)');
+					if (!isDesktop && !GS_MOBILE_APP_PUBLIC) { continue; }
+					var lbl = (dev.label || ref) + (isDesktop || GS_MOBILE_APP_PUBLIC ? '' : ' (coming soon)');
 					html += '<option value="' + escAttr(ref) + '"'
-						+ (isDesktop ? '' : ' disabled')
-						+ (String(selectedId) === ref && isDesktop ? ' selected' : '') + '>'
+						+ (isDesktop || GS_MOBILE_APP_PUBLIC ? '' : ' disabled')
+						+ (String(selectedId) === ref && (isDesktop || GS_MOBILE_APP_PUBLIC) ? ' selected' : '') + '>'
 						+ escHtml(lbl) + '</option>';
 				}
 				return html;
