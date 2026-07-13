@@ -179,6 +179,20 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
         }
     }
 
+    /*
+     * v12.1 — Hide the standalone 'Connected Devices' (hosting) nav item.
+     * Its content is now the Storage tab under Compute Gas. Direct URL to
+     * /groups/{slug}/hosting/ still resolves for backward-compat (extension
+     * stays registered), but the header nav no longer surfaces the tab.
+     */
+    add_filter( 'psoo_bridge_header_nav_whitelist', 'gs_hide_hosting_from_bridge_header_nav', 100, 2 );
+    if ( ! function_exists( 'gs_hide_hosting_from_bridge_header_nav' ) ) {
+        function gs_hide_hosting_from_bridge_header_nav( $whitelist, $group = null ) {
+            if ( ! is_array( $whitelist ) ) return $whitelist;
+            return array_values( array_diff( $whitelist, array( 'hosting' ) ) );
+        }
+    }
+
     /**
      * Resolve the per-group, per-user gates that determine which of the
      * three Compute Gas stat panels are LIVE vs in their empty CTA state.
@@ -271,7 +285,75 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             $ajax_url = admin_url( 'admin-ajax.php' );
             $nonce    = wp_create_nonce( 'gs_membership_action' );
             $uid      = 'gs-cg-' . (int) $group_id;
+            // v12.1 — Deep-link support: /compute-gas/storage/ lands on the
+            // Storage tab (which hosts the migrated Connected Devices content).
+            $cg_active_tab = function_exists( 'bp_action_variable' ) ? (string) bp_action_variable( 0 ) : '';
+            if ( ! in_array( $cg_active_tab, array( 'power', 'storage' ), true ) ) {
+                $cg_active_tab = 'power';
+            }
             ?>
+            <style>
+                /* v12.1 — 2-tab top nav for Compute Gas (Power / Storage). */
+                .gs-cg-tabsuite {
+                    max-width: 1250px; margin: 0 auto; padding: 0 20px;
+                    box-sizing: border-box; font-family: Inter, system-ui, sans-serif;
+                }
+                .gs-cg-toptabs {
+                    display: flex; flex-wrap: wrap; gap: 8px;
+                    padding: 8px;
+                    background: linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.42));
+                    border: 1px solid rgba(125, 211, 252, .18);
+                    border-radius: 16px;
+                    margin: 20px 0 22px;
+                    -webkit-backdrop-filter: blur(14px) saturate(150%);
+                            backdrop-filter: blur(14px) saturate(150%);
+                    box-shadow: 0 22px 48px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+                }
+                .gs-cg-toptab {
+                    display: inline-flex; align-items: center; gap: 10px;
+                    padding: 11px 20px;
+                    background: transparent;
+                    color: rgba(203, 213, 225, .78);
+                    border: 1px solid transparent;
+                    border-radius: 12px;
+                    font-family: Inter, system-ui, sans-serif;
+                    font-weight: 700;
+                    font-size: .82rem;
+                    letter-spacing: .04em;
+                    text-transform: uppercase;
+                    cursor: pointer;
+                    min-height: 44px;
+                    transition: color .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease, transform .14s ease;
+                }
+                .gs-cg-toptab:hover { color: #f1f5f9; background: rgba(34,211,238,.08); border-color: rgba(34,211,238,.20); }
+                .gs-cg-toptab.is-active {
+                    color: #0b0e14;
+                    background: linear-gradient(135deg, #22d3ee, #7dd3fc);
+                    border-color: rgba(34,211,238,.55);
+                    box-shadow: 0 8px 24px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.35);
+                    transform: translateY(-1px);
+                }
+                .gs-cg-tabpanel { display: none; }
+                .gs-cg-tabpanel.is-active { display: block; }
+                .gs-cg-toptab-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
+            </style>
+            <div class="gs-cg-tabsuite" data-gs-cg-tabsuite>
+                <nav class="gs-cg-toptabs" role="tablist" aria-label="<?php esc_attr_e( 'Compute Gas sections', 'gend-society' ); ?>">
+                    <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'power' ? ' is-active' : ''; ?>" data-cg-tab="power" role="tab" aria-selected="<?php echo $cg_active_tab === 'power' ? 'true' : 'false'; ?>">
+                        <span class="gs-cg-toptab-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                        </span>
+                        <span><?php esc_html_e( 'Power', 'gend-society' ); ?></span>
+                    </button>
+                    <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'storage' ? ' is-active' : ''; ?>" data-cg-tab="storage" role="tab" aria-selected="<?php echo $cg_active_tab === 'storage' ? 'true' : 'false'; ?>">
+                        <span class="gs-cg-toptab-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="9" ry="3"/><path d="M3 6v12c0 1.7 4 3 9 3s9-1.3 9-3V6"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
+                        </span>
+                        <span><?php esc_html_e( 'Storage', 'gend-society' ); ?></span>
+                    </button>
+                </nav>
+
+                <div class="gs-cg-tabpanel<?php echo $cg_active_tab === 'power' ? ' is-active' : ''; ?>" data-cg-panel="power">
             <style>
                 /* All styles + selectors live under [data-gs-cg-scope] so
                    Youzify's frontend rules (red buttons, white panels,
@@ -1023,6 +1105,41 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                             .catch(function () { if (status) { status.className = 'gs-cg-waitlist-status is-err'; status.textContent = '<?php echo esc_js( __( 'Network error.', 'gend-society' ) ); ?>'; } });
                     });
                 }
+            })();
+            </script>
+                </div><!-- /.gs-cg-tabpanel[data-cg-panel="power"] -->
+
+                <div class="gs-cg-tabpanel<?php echo $cg_active_tab === 'storage' ? ' is-active' : ''; ?>" data-cg-panel="storage">
+                    <?php
+                    // v12.1 — Storage tab hosts the former standalone
+                    // 'Connected Devices' (hosting) content. Rendered by the
+                    // same helper the standalone Hosting nav item used to
+                    // call, so nothing about the Dashboard / Domains / Logs /
+                    // Tables / Containers / Backups side-nav changes — it
+                    // just lives under Compute Gas → Storage now.
+                    if ( function_exists( 'gs_group_render_hosting_suite' ) ) {
+                        gs_group_render_hosting_suite( (int) $group_id );
+                    }
+                    ?>
+                </div><!-- /.gs-cg-tabpanel[data-cg-panel="storage"] -->
+            </div><!-- /.gs-cg-tabsuite -->
+            <script>
+            (function () {
+                document.addEventListener('click', function (e) {
+                    var btn = e.target && e.target.closest && e.target.closest('.gs-cg-toptab');
+                    if (!btn) return;
+                    var suite = btn.closest('[data-gs-cg-tabsuite]');
+                    if (!suite) return;
+                    var key = btn.getAttribute('data-cg-tab');
+                    suite.querySelectorAll('.gs-cg-toptab').forEach(function (b) {
+                        var on = b === btn;
+                        b.classList.toggle('is-active', on);
+                        b.setAttribute('aria-selected', on ? 'true' : 'false');
+                    });
+                    suite.querySelectorAll('.gs-cg-tabpanel').forEach(function (p) {
+                        p.classList.toggle('is-active', p.getAttribute('data-cg-panel') === key);
+                    });
+                });
             })();
             </script>
             <?php
