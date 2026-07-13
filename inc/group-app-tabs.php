@@ -2359,6 +2359,114 @@ function gs_group_render_user_access_below_members() {
  * to the new controls so all hosting actions work the same as the
  * wp-admin surface — only the chrome changed.
  */
+/**
+ * v12.1 — Google Cloud Storage cost per GB per month, used as the base for
+ * container-plan pricing pass-through. Real-time-editable via the
+ * `gs_gcp_storage_cost_per_gb` filter (site admin can pin a live rate
+ * from a cron sync). Defaults per storage type mirror GCP's public rate
+ * card at the time of this ship:
+ *   - code:     Standard PD  ($0.040 / GB / mo → $0.04)
+ *   - media:    Object Storage Standard ($0.020 / GB / mo)
+ *   - database: SSD PD ($0.170 / GB / mo)
+ */
+function gs_gcp_storage_cost_per_gb( $storage_type = 'media' ) {
+    $rates = array( 'code' => 0.04, 'media' => 0.02, 'database' => 0.17 );
+    $rate  = isset( $rates[ $storage_type ] ) ? (float) $rates[ $storage_type ] : 0.02;
+    return (float) apply_filters( 'gs_gcp_storage_cost_per_gb', $rate, $storage_type );
+}
+
+/**
+ * v12.1 — Container-plan retail price given a size + storage type. Base =
+ * gs_gcp_storage_cost_per_gb() × size × markup multiplier. Markup default
+ * is 5× (recovers infra + provisioning + support overhead) and is filterable
+ * via `gs_container_plan_markup`. Returns cents-precise float in USD.
+ */
+function gs_compute_container_plan_price( $size_gb, $storage_type ) {
+    $size_gb = (float) $size_gb;
+    if ( $size_gb <= 0 ) return 0.0;
+    $base   = gs_gcp_storage_cost_per_gb( $storage_type ) * $size_gb;
+    $markup = (float) apply_filters( 'gs_container_plan_markup', 5.0, $storage_type );
+    return round( $base * $markup, 2 );
+}
+
+/**
+ * v12.1 — Fetch container plans tagged with a storage type, ordered by
+ * ascending size. Reads from WP Ultimo hosting products where the
+ * `wu_container_storage_type` meta matches. Falls back to a sensible
+ * default trio (Standard / Pro / Enterprise) when no products exist so
+ * the upgrade popup always has something to show.
+ *
+ * @param string $resource Frontend resource slug: 'media' | 'database' | 'codebase'
+ * @return array List of plans: [{ id, name, size_gb, size_label, price, price_label, is_default }]
+ */
+function gs_get_container_plans_for_resource( $resource ) {
+    $storage_type_map = array(
+        'media'    => 'media',
+        'database' => 'database',
+        'codebase' => 'code',
+    );
+    $storage_type = isset( $storage_type_map[ $resource ] ) ? $storage_type_map[ $resource ] : 'media';
+
+    $out = array();
+    if ( function_exists( 'wu_get_products' ) ) {
+        try {
+            $products = wu_get_products( array( 'number' => 200, 'active' => 1 ) );
+        } catch ( \Throwable $e ) {
+            $products = array();
+        }
+        foreach ( (array) $products as $p ) {
+            if ( ! is_object( $p ) || ! method_exists( $p, 'get_meta' ) ) continue;
+            $st = (string) $p->get_meta( 'wu_container_storage_type', '' );
+            if ( $st !== $storage_type ) continue;
+            $size_gb = (float) $p->get_meta( 'wu_container_tier_size_gb', 0 );
+            if ( $size_gb <= 0 ) continue;
+            $price = method_exists( $p, 'get_amount' ) ? (float) $p->get_amount() : 0.0;
+            if ( $price <= 0 ) {
+                $price = gs_compute_container_plan_price( $size_gb, $storage_type );
+            }
+            $out[] = array(
+                'id'          => method_exists( $p, 'get_id' ) ? (int) $p->get_id() : 0,
+                'name'        => method_exists( $p, 'get_name' ) ? (string) $p->get_name() : '',
+                'size_gb'     => (float) $size_gb,
+                'size_label'  => $size_gb >= 1024 ? number_format( $size_gb / 1024, 1 ) . ' TB' : number_format( $size_gb, 0 ) . ' GB',
+                'price'       => (float) $price,
+                'price_label' => '$' . number_format( (float) $price, 2 ) . ' / mo',
+                'is_default'  => false,
+                'gcp_base'    => round( gs_gcp_storage_cost_per_gb( $storage_type ) * $size_gb, 2 ),
+            );
+        }
+    }
+    // Sort ascending by size; middle tier becomes the pre-selected default.
+    usort( $out, function ( $a, $b ) { return $a['size_gb'] <=> $b['size_gb']; } );
+    if ( ! empty( $out ) ) {
+        $mid = (int) floor( count( $out ) / 2 );
+        $out[ $mid ]['is_default'] = true;
+    } else {
+        // Fallback trio (only when no WP Ultimo products exist for this type)
+        $defaults = array(
+            'media'    => array( 50, 200, 1024 ),
+            'database' => array( 10, 50, 250 ),
+            'codebase' => array( 5, 20, 100 ),
+        );
+        $tiers = isset( $defaults[ $resource ] ) ? $defaults[ $resource ] : array( 10, 50, 250 );
+        $names = array( __( 'Standard', 'gend-society' ), __( 'Pro', 'gend-society' ), __( 'Enterprise', 'gend-society' ) );
+        foreach ( $tiers as $i => $gb ) {
+            $price = gs_compute_container_plan_price( $gb, $storage_type );
+            $out[] = array(
+                'id'          => 0,
+                'name'        => $names[ $i ] ?? sprintf( __( 'Tier %d', 'gend-society' ), $i + 1 ),
+                'size_gb'     => (float) $gb,
+                'size_label'  => $gb >= 1024 ? number_format( $gb / 1024, 1 ) . ' TB' : number_format( $gb, 0 ) . ' GB',
+                'price'       => (float) $price,
+                'price_label' => '$' . number_format( $price, 2 ) . ' / mo',
+                'is_default'  => $i === 1,
+                'gcp_base'    => round( gs_gcp_storage_cost_per_gb( $storage_type ) * $gb, 2 ),
+            );
+        }
+    }
+    return $out;
+}
+
 function gs_group_render_hosting_suite( $group_id ) {
     $group_id  = (int) $group_id;
     $ajax_url  = admin_url( 'admin-ajax.php' );
@@ -3114,7 +3222,22 @@ function gs_group_render_hosting_suite( $group_id ) {
                         [data-gs-host-view="containers"] .gs-upg-secondary { padding: 12px 22px; background: rgba(11,14,20,.45); border: 1px solid rgba(125,211,252,.20); border-radius: 10px; color: #e2e8f0 !important; font-weight: 700; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
                         [data-gs-host-view="containers"] .gs-upg-secondary:hover { background: rgba(34,211,238,.10); color: #f1f5f9 !important; }
                     </style>
-                    <div class="gs-upg-modal" data-gs-upg-modal aria-hidden="true" role="dialog" aria-modal="true">
+                    <?php
+                    // v12.1 — Bake real plan data into the modal so the popup
+                    // shows actual vendor-app-manager container products
+                    // instead of hardcoded Standard/Pro/Enterprise stubs.
+                    // Prices flow through Google Cloud storage cost × 5×
+                    // markup (both filterable) so provisioning cost is
+                    // tracked and passed through automatically.
+                    $gs_plans_payload = array(
+                        'media'    => gs_get_container_plans_for_resource( 'media' ),
+                        'database' => gs_get_container_plans_for_resource( 'database' ),
+                        'codebase' => gs_get_container_plans_for_resource( 'codebase' ),
+                    );
+                    ?>
+                    <div class="gs-upg-modal" data-gs-upg-modal
+                         data-gs-plans="<?php echo esc_attr( wp_json_encode( $gs_plans_payload ) ); ?>"
+                         aria-hidden="true" role="dialog" aria-modal="true">
                         <div class="gs-upg-backdrop" data-gs-upg-close></div>
                         <div class="gs-upg-card">
                             <button type="button" class="gs-upg-close" data-gs-upg-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
@@ -3172,29 +3295,58 @@ function gs_group_render_hosting_suite( $group_id ) {
                         var lede    = modal.querySelector('[data-gs-upg-lede]');
                         var curEl   = modal.querySelector('[data-gs-upg-current]');
                         var capEl   = modal.querySelector('[data-gs-upg-cap]');
-                        var planEls = modal.querySelectorAll('[data-plan-tier]');
+                        var plansContainer = modal.querySelector('.gs-upg-plans');
                         var confirm = modal.querySelector('[data-gs-upg-confirm]');
+
+                        var PLANS = {};
+                        try { PLANS = JSON.parse(modal.getAttribute('data-gs-plans') || '{}'); } catch (e) { PLANS = {}; }
+
                         var COPY = {
-                            media:    { title: 'More room for uploads', lede: 'Every image, video, and file lands here. Bump the cap to keep publishing without cleanup runs.', tiers: { standard: '50 GB', pro: '200 GB', enterprise: '1 TB' } },
-                            database: { title: 'Bigger + faster database', lede: 'MySQL tables + indexes live here. A bigger plan means more rows before you hit the ceiling.',        tiers: { standard: '10 GB', pro: '50 GB',  enterprise: '250 GB' } },
-                            codebase: { title: 'Space for more plugins', lede: 'Ship more extensions + themes without pruning the wp-content tree.',                                  tiers: { standard: '5 GB',  pro: '20 GB',  enterprise: '100 GB' } }
+                            media:    { title: 'More room for uploads',       lede: 'Every image, video, and file lands here. Bump the cap to keep publishing without cleanup runs.' },
+                            database: { title: 'Bigger + faster database',    lede: 'MySQL tables + indexes live here. A bigger plan means more rows before you hit the ceiling.' },
+                            codebase: { title: 'Space for more plugins',      lede: 'Ship more extensions + themes without pruning the wp-content tree.' }
                         };
+
+                        var currentSlug = 'media';
+
+                        function renderPlanCards(slug) {
+                            if (!plansContainer) return;
+                            var tiers = PLANS[slug] || [];
+                            if (!tiers.length) {
+                                plansContainer.innerHTML = '<p style="grid-column: 1 / -1; color: rgba(226,232,240,.6); text-align: center; padding: 24px;">No plans configured for this resource yet.</p>';
+                                return;
+                            }
+                            var html = '';
+                            tiers.forEach(function (t, i) {
+                                var isActive = t.is_default ? ' is-active' : '';
+                                html +=
+                                    '<div class="gs-upg-plan' + isActive + '" data-plan-index="' + i + '" data-plan-id="' + (t.id || 0) + '" data-plan-size-gb="' + (t.size_gb || 0) + '">' +
+                                        '<p class="gs-upg-plan-name">' + escapeHtml(t.name) + '</p>' +
+                                        '<p class="gs-upg-plan-cap">' + escapeHtml(t.size_label) + '</p>' +
+                                        '<p class="gs-upg-plan-price">' + escapeHtml(t.price_label) + '</p>' +
+                                    '</div>';
+                            });
+                            plansContainer.innerHTML = html;
+                        }
+
+                        function escapeHtml(s) {
+                            return String(s == null ? '' : s).replace(/[&<>"']/g, function (c) {
+                                return { '&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;' }[c];
+                            });
+                        }
+
                         function openFor(btn) {
-                            var slug = btn.getAttribute('data-resource') || 'media';
+                            currentSlug = btn.getAttribute('data-resource') || 'media';
                             var label = btn.getAttribute('data-resource-label') || '';
                             var usedL = btn.getAttribute('data-used-label') || '—';
                             var capL  = btn.getAttribute('data-cap-label') || '—';
-                            var copy = COPY[slug] || COPY.media;
+                            var copy = COPY[currentSlug] || COPY.media;
                             eyebrow.textContent = label ? (label + ' — Upgrade') : 'Upgrade';
                             title.textContent = copy.title;
                             lede.textContent  = copy.lede;
                             curEl.textContent = usedL;
                             capEl.textContent = capL;
-                            planEls.forEach(function (el) {
-                                var tier = el.getAttribute('data-plan-tier');
-                                var capNode = el.querySelector('[data-plan-cap]');
-                                if (capNode) capNode.textContent = (copy.tiers && copy.tiers[tier]) || '—';
-                            });
+                            renderPlanCards(currentSlug);
                             modal.classList.add('is-open');
                             modal.setAttribute('aria-hidden', 'false');
                             document.body.style.overflow = 'hidden';
@@ -3211,15 +3363,19 @@ function gs_group_render_hosting_suite( $group_id ) {
                         modal.addEventListener('click', function (e) {
                             var closer = e.target && e.target.closest && e.target.closest('[data-gs-upg-close]');
                             if (closer) { e.preventDefault(); close(); return; }
-                            var tier = e.target && e.target.closest && e.target.closest('[data-plan-tier]');
-                            if (tier) modal.querySelectorAll('[data-plan-tier]').forEach(function (t) { t.classList.toggle('is-active', t === tier); });
+                            var tier = e.target && e.target.closest && e.target.closest('[data-plan-index]');
+                            if (tier) modal.querySelectorAll('[data-plan-index]').forEach(function (t) { t.classList.toggle('is-active', t === tier); });
                         });
                         document.addEventListener('keydown', function (e) {
                             if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
                         });
                         if (confirm) confirm.addEventListener('click', function () {
+                            var chosen = modal.querySelector('.gs-upg-plan.is-active');
+                            var planId = chosen ? parseInt(chosen.getAttribute('data-plan-id'), 10) : 0;
                             confirm.textContent = 'Redirecting to checkout…';
-                            setTimeout(function () { window.location.href = '/checkout/'; }, 400);
+                            var url = '/checkout/';
+                            if (planId > 0) url = '/checkout/?add-to-cart=' + planId;
+                            setTimeout(function () { window.location.href = url; }, 400);
                         });
                     })();
                     </script>
