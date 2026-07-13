@@ -1479,12 +1479,414 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                                 } elseif ( $dt_key === 'mobile' ) {
                                     esc_html_e( 'No mobile yet. Install the gend.me mobile app + turn on background compute to register this device.', 'gend-society' );
                                 } else {
-                                    esc_html_e( 'No server yet. Follow the Gas Station server docs (linked in the Power tab) to spin one up.', 'gend-society' );
+                                    esc_html_e( 'No server yet. Pick a server plan below to launch — every plan you run earns you gas and lets your web apps ride 0-fee.', 'gend-society' );
                                 }
                                 ?>
                             </p>
                             <?php endif; ?>
                         </div>
+
+                        <?php if ( $dt_key === 'server' ) :
+                            /* v12.1 — Server sub-tab wires into vendor-app-manager's
+                               hosting plan catalog + the group's active hosting
+                               membership. Shows: (1) currently-active server plan
+                               card, (2) grid of available server plans w/ order
+                               CTA, (3) per-app breakdown of which apps run on
+                               which plan, (4) hardcoded 4-category Google Cloud
+                               cost breakdown when this group is the gend.me
+                               main-site group. */
+                            $srv_current_plan = function_exists( 'psoo_get_group_hosting_plan' )
+                                ? psoo_get_group_hosting_plan( (int) $group_id )
+                                : array();
+                            $srv_all_plans = function_exists( 'gdc_get_plan_group_for_checkout' )
+                                ? (array) gdc_get_plan_group_for_checkout( 'hosting' )
+                                : array();
+                            $srv_server_plans = array_values( array_filter(
+                                $srv_all_plans,
+                                function ( $p ) { return isset( $p['subgroup'] ) && $p['subgroup'] === 'server'; }
+                            ) );
+                            $srv_group_apps = function_exists( 'psoo_get_group_apps' )
+                                ? (array) psoo_get_group_apps( (int) $group_id )
+                                : array();
+                            $srv_group = function_exists( 'groups_get_group' ) ? groups_get_group( (int) $group_id ) : null;
+                            $srv_is_gendme = $srv_group && isset( $srv_group->slug ) && $srv_group->slug === 'www-gend-me';
+                        ?>
+                        <style>
+                            /* Server sub-panel — plans, per-app, GCP breakdown. Scoped
+                               under the parent gas-stations panel so it doesn't leak
+                               into desktop/mobile subpanels. */
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-section {
+                                margin-top: 22px; padding: 26px 28px;
+                                background: linear-gradient(160deg, rgba(15,23,42,.72), rgba(15,23,42,.55));
+                                border: 1px solid rgba(125,211,252,.18);
+                                border-radius: 18px;
+                                box-shadow: 0 22px 48px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-title {
+                                display: flex; align-items: center; gap: 10px;
+                                margin: 0 0 6px !important;
+                                font-size: 1.15rem !important; font-weight: 900 !important;
+                                color: #f8fafc !important; letter-spacing: -.01em !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-lede {
+                                margin: 0 0 18px !important;
+                                color: rgba(226,232,240,.65) !important;
+                                font-size: .88rem !important; line-height: 1.55 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current {
+                                display: grid; grid-template-columns: 60px 1fr auto; gap: 16px;
+                                align-items: center;
+                                padding: 16px 18px;
+                                background: rgba(11,14,20,.5);
+                                border: 1px solid rgba(34,211,238,.30);
+                                border-radius: 12px;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current__badge {
+                                width: 60px; height: 60px; border-radius: 12px;
+                                background: linear-gradient(135deg, rgba(34,211,238,.20), rgba(99,102,241,.20));
+                                display: flex; align-items: center; justify-content: center;
+                                color: #22d3ee;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current__name {
+                                color: #f8fafc !important; font-weight: 800 !important;
+                                font-size: 1.05rem !important; margin: 0 0 4px !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current__meta {
+                                color: rgba(226,232,240,.6) !important; font-size: .82rem !important; margin: 0 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current__cta {
+                                padding: 10px 18px; border-radius: 10px;
+                                background: rgba(34,211,238,.14);
+                                border: 1px solid rgba(34,211,238,.35);
+                                color: #22d3ee !important; font-weight: 800 !important;
+                                font-size: .78rem !important; letter-spacing: .06em !important;
+                                text-transform: uppercase !important; text-decoration: none !important;
+                                transition: background .18s ease;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current__cta:hover {
+                                background: rgba(34,211,238,.22); color: #22d3ee !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-srv-current--empty {
+                                background: rgba(11,14,20,.4);
+                                border-color: rgba(148,163,184,.28);
+                                color: rgba(226,232,240,.65) !important;
+                                font-style: italic;
+                                grid-template-columns: 1fr;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-grid {
+                                display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+                                gap: 14px; margin-top: 14px;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card {
+                                position: relative; overflow: hidden;
+                                padding: 20px 22px;
+                                background: rgba(11,14,20,.55);
+                                border: 1px solid rgba(125,211,252,.18);
+                                border-radius: 14px;
+                                display: flex; flex-direction: column; gap: 10px;
+                                transition: border-color .2s ease, transform .18s ease, box-shadow .2s ease;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card:hover {
+                                border-color: rgba(34,211,238,.55);
+                                transform: translateY(-2px);
+                                box-shadow: 0 20px 45px rgba(34,211,238,.15);
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card__name {
+                                color: #f8fafc !important; font-weight: 900 !important;
+                                font-size: 1.05rem !important; margin: 0 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card__price {
+                                color: #4ade80 !important; font-weight: 900 !important;
+                                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                                font-size: 1.35rem !important; letter-spacing: -.02em !important;
+                                margin: 0 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card__desc {
+                                color: rgba(226,232,240,.62) !important;
+                                font-size: .82rem !important; line-height: 1.5 !important;
+                                margin: 0 !important; flex: 1;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card__cta {
+                                display: inline-flex; align-items: center; gap: 6px;
+                                padding: 10px 16px; border-radius: 10px;
+                                background: linear-gradient(135deg, #22d3ee, #7dd3fc);
+                                color: #0b0e14 !important; font-weight: 800 !important;
+                                font-size: .78rem !important; letter-spacing: .06em !important;
+                                text-transform: uppercase !important; text-decoration: none !important;
+                                transition: transform .15s ease, box-shadow .18s ease;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-plan-card__cta:hover {
+                                transform: translateY(-1px);
+                                box-shadow: 0 12px 32px rgba(34,211,238,.35);
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-app-table {
+                                width: 100%; border-collapse: collapse;
+                                margin-top: 8px;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-app-table th,
+                            [data-cg-panel="gas-stations"] .gs-cg-app-table td {
+                                padding: 12px 14px !important;
+                                text-align: left !important;
+                                background: transparent !important;
+                                color: #e2e8f0 !important;
+                                border-bottom: 1px solid rgba(125,211,252,.12) !important;
+                                border-top: 0 !important; border-left: 0 !important; border-right: 0 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-app-table th {
+                                color: rgba(226,232,240,.55) !important;
+                                font-size: .68rem !important; text-transform: uppercase !important;
+                                letter-spacing: .12em !important; font-weight: 800 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-block {
+                                background: radial-gradient(600px 200px at 100% 0%, rgba(34,211,238,.08), transparent 60%),
+                                            linear-gradient(160deg, rgba(15,23,42,.75), rgba(15,23,42,.55));
+                                border-color: rgba(34,211,238,.30) !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-grid {
+                                display: grid; grid-template-columns: repeat(2, 1fr);
+                                gap: 16px; margin-top: 16px;
+                            }
+                            @media (max-width: 720px) {
+                                [data-cg-panel="gas-stations"] .gs-cg-gcp-grid { grid-template-columns: 1fr; }
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-card {
+                                padding: 18px 20px;
+                                background: rgba(11,14,20,.5);
+                                border: 1px solid rgba(125,211,252,.12);
+                                border-radius: 12px;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-card h4 {
+                                color: #22d3ee !important;
+                                font-size: .72rem !important; font-weight: 900 !important;
+                                text-transform: uppercase !important; letter-spacing: .1em !important;
+                                margin: 0 0 12px !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-card table {
+                                width: 100%; border-collapse: collapse;
+                                background: transparent !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-card td {
+                                background: transparent !important;
+                                border: none !important;
+                                padding: 7px 0 !important;
+                                color: rgba(226,232,240,.78) !important;
+                                font-size: .82rem !important; line-height: 1.4;
+                                border-bottom: 1px solid rgba(125,211,252,.08) !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-card td:last-child {
+                                text-align: right !important;
+                                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                                color: #f8fafc !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-card tr.gs-cg-gcp-subtotal td {
+                                font-weight: 900 !important;
+                                color: #22d3ee !important;
+                                padding-top: 12px !important;
+                                border-top: 1px solid rgba(34,211,238,.30) !important;
+                                border-bottom: none !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-total {
+                                margin-top: 20px;
+                                padding: 20px 24px;
+                                background: linear-gradient(135deg, rgba(34,211,238,.18), rgba(99,102,241,.18));
+                                border: 1px solid rgba(34,211,238,.40);
+                                border-radius: 14px;
+                                display: flex; align-items: center; justify-content: space-between; gap: 18px;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-total__label {
+                                color: rgba(226,232,240,.85) !important;
+                                font-size: .78rem !important; font-weight: 700 !important;
+                                text-transform: uppercase !important; letter-spacing: .1em !important;
+                                margin: 0 !important;
+                            }
+                            [data-cg-panel="gas-stations"] .gs-cg-gcp-total__value {
+                                color: #4ade80 !important;
+                                font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                                font-size: 1.8rem !important; font-weight: 950 !important;
+                                letter-spacing: -.03em !important;
+                                margin: 0 !important;
+                            }
+                        </style>
+
+                        <!-- Section 1: currently-active plan -->
+                        <section class="gs-cg-srv-section">
+                            <h3 class="gs-cg-srv-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#22d3ee"><path d="M20 6L9 17l-5-5"/></svg>
+                                <?php esc_html_e( 'Your Active Server Plan', 'gend-society' ); ?>
+                            </h3>
+                            <p class="gs-cg-srv-lede">
+                                <?php esc_html_e( 'The hosting subscription currently attached to this group\'s primary web app.', 'gend-society' ); ?>
+                            </p>
+                            <?php if ( ! empty( $srv_current_plan['plan_label'] ) ) : ?>
+                                <div class="gs-cg-srv-current">
+                                    <div class="gs-cg-srv-current__badge" aria-hidden="true">
+                                        <svg width="26" height="26" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="6" rx="2"/><rect x="2" y="15" width="20" height="6" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>
+                                    </div>
+                                    <div>
+                                        <p class="gs-cg-srv-current__name"><?php echo esc_html( $srv_current_plan['plan_label'] ); ?></p>
+                                        <p class="gs-cg-srv-current__meta">
+                                            <?php printf(
+                                                /* translators: 1: subgroup tier name */
+                                                esc_html__( 'Tier: %s · Membership active', 'gend-society' ),
+                                                esc_html( ucfirst( (string) $srv_current_plan['subgroup'] ) )
+                                            ); ?>
+                                        </p>
+                                    </div>
+                                    <?php if ( ! empty( $srv_current_plan['plan_url'] ) ) : ?>
+                                        <a class="gs-cg-srv-current__cta" href="<?php echo esc_url( $srv_current_plan['plan_url'] ); ?>">
+                                            <?php esc_html_e( 'Manage →', 'gend-society' ); ?>
+                                        </a>
+                                    <?php endif; ?>
+                                </div>
+                            <?php else : ?>
+                                <div class="gs-cg-srv-current gs-cg-srv-current--empty">
+                                    <?php esc_html_e( 'No active server subscription on this group. Pick a plan below to launch — you\'ll start earning gas the moment your server registers with the network.', 'gend-society' ); ?>
+                                </div>
+                            <?php endif; ?>
+                        </section>
+
+                        <!-- Section 2: available plans -->
+                        <?php if ( ! empty( $srv_server_plans ) ) : ?>
+                        <section class="gs-cg-srv-section">
+                            <h3 class="gs-cg-srv-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#22d3ee"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+                                <?php esc_html_e( 'Available Server Plans', 'gend-society' ); ?>
+                            </h3>
+                            <p class="gs-cg-srv-lede">
+                                <?php esc_html_e( 'Every server plan runs on the gend.me network and earns you gas fees for compute other apps consume. Upgrade any time — billing prorates through vendor-app-manager.', 'gend-society' ); ?>
+                            </p>
+                            <div class="gs-cg-plan-grid">
+                                <?php foreach ( $srv_server_plans as $srv_plan ) :
+                                    $plan_url = home_url( '/register/?pre-select=' . (int) ( $srv_plan['id'] ?? 0 ) );
+                                    if ( ! empty( $srv_plan['wc_product_id'] ) ) {
+                                        $plan_url = add_query_arg( 'add-to-cart', (int) $srv_plan['wc_product_id'], home_url( '/checkout/' ) );
+                                    }
+                                ?>
+                                    <div class="gs-cg-plan-card">
+                                        <p class="gs-cg-plan-card__name"><?php echo esc_html( (string) ( $srv_plan['name'] ?? '' ) ); ?></p>
+                                        <p class="gs-cg-plan-card__price"><?php echo esc_html( (string) ( $srv_plan['price'] ?? '' ) ); ?></p>
+                                        <?php if ( ! empty( $srv_plan['desc'] ) ) : ?>
+                                            <p class="gs-cg-plan-card__desc"><?php echo esc_html( (string) $srv_plan['desc'] ); ?></p>
+                                        <?php endif; ?>
+                                        <a class="gs-cg-plan-card__cta" href="<?php echo esc_url( $plan_url ); ?>">
+                                            <?php esc_html_e( 'Order this plan →', 'gend-society' ); ?>
+                                        </a>
+                                    </div>
+                                <?php endforeach; ?>
+                            </div>
+                        </section>
+                        <?php endif; ?>
+
+                        <!-- Section 3: per-app breakdown -->
+                        <?php if ( ! empty( $srv_group_apps ) ) : ?>
+                        <section class="gs-cg-srv-section">
+                            <h3 class="gs-cg-srv-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#22d3ee"><rect x="3" y="3" width="7" height="7" rx="1"/><rect x="14" y="3" width="7" height="7" rx="1"/><rect x="3" y="14" width="7" height="7" rx="1"/><rect x="14" y="14" width="7" height="7" rx="1"/></svg>
+                                <?php esc_html_e( 'Per-App Cost Breakdown', 'gend-society' ); ?>
+                            </h3>
+                            <p class="gs-cg-srv-lede">
+                                <?php esc_html_e( 'Every app connected to this group + which server plan it currently rides.', 'gend-society' ); ?>
+                            </p>
+                            <table class="gs-cg-app-table">
+                                <thead>
+                                    <tr>
+                                        <th><?php esc_html_e( 'App', 'gend-society' ); ?></th>
+                                        <th><?php esc_html_e( 'Site ID', 'gend-society' ); ?></th>
+                                        <th><?php esc_html_e( 'Hosting Plan', 'gend-society' ); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ( $srv_group_apps as $srv_app ) :
+                                        $ap_site_id = isset( $srv_app['site_id'] ) ? (int) $srv_app['site_id'] : 0;
+                                        $ap_plan_label = __( 'n/a', 'gend-society' );
+                                        if ( $ap_site_id > 0 && function_exists( 'wu_get_site' ) ) {
+                                            $ap_site = wu_get_site( $ap_site_id );
+                                            if ( $ap_site && method_exists( $ap_site, 'get_membership' ) ) {
+                                                $ap_membership = $ap_site->get_membership();
+                                                if ( $ap_membership && method_exists( $ap_membership, 'get_all_products' ) ) {
+                                                    foreach ( (array) $ap_membership->get_all_products() as $ap_row ) {
+                                                        $ap_prod = is_array( $ap_row ) && isset( $ap_row['product'] ) ? $ap_row['product'] : null;
+                                                        if ( is_object( $ap_prod ) && method_exists( $ap_prod, 'get_group' )
+                                                            && (string) $ap_prod->get_group() === 'hosting' ) {
+                                                            $ap_plan_label = method_exists( $ap_prod, 'get_name' )
+                                                                ? (string) $ap_prod->get_name()
+                                                                : __( 'Hosting', 'gend-society' );
+                                                            break;
+                                                        }
+                                                    }
+                                                }
+                                            }
+                                        }
+                                    ?>
+                                    <tr>
+                                        <td><?php echo esc_html( (string) ( $srv_app['name'] ?? '' ) ); ?></td>
+                                        <td><?php echo (int) $ap_site_id; ?></td>
+                                        <td><?php echo esc_html( $ap_plan_label ); ?></td>
+                                    </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        </section>
+                        <?php endif; ?>
+
+                        <!-- Section 4: gend.me GCP breakdown -->
+                        <?php if ( $srv_is_gendme ) : ?>
+                        <section class="gs-cg-srv-section gs-cg-gcp-block">
+                            <h3 class="gs-cg-srv-title">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="color:#22d3ee"><path d="M20 17.58A5 5 0 0 0 18 8h-1.26A8 8 0 1 0 4 16.25"/><polyline points="8 17 12 21 16 17"/><line x1="12" y1="12" x2="12" y2="21"/></svg>
+                                <?php esc_html_e( 'Google Cloud Cost Breakdown — gend.me Network', 'gend-society' ); ?>
+                            </h3>
+                            <p class="gs-cg-srv-lede">
+                                <?php esc_html_e( 'The complete monthly Google Cloud spend that powers the gend.me network — Compute + GKE, DNS + networking, storage + backups, and managed data. This is what the Server tier is running under the hood.', 'gend-society' ); ?>
+                            </p>
+                            <div class="gs-cg-gcp-grid">
+                                <div class="gs-cg-gcp-card">
+                                    <h4><?php esc_html_e( 'Compute Engine + GKE', 'gend-society' ); ?></h4>
+                                    <table>
+                                        <tr><td><?php esc_html_e( 'GKE cluster (3× n2-standard-8 nodes)', 'gend-society' ); ?></td><td>$1,247</td></tr>
+                                        <tr><td><?php esc_html_e( 'Regional load balancer', 'gend-society' ); ?></td><td>$189</td></tr>
+                                        <tr><td><?php esc_html_e( 'Node autoscale burst pool', 'gend-society' ); ?></td><td>$310</td></tr>
+                                        <tr><td><?php esc_html_e( 'wp-broker / cron / mta VMs', 'gend-society' ); ?></td><td>$92</td></tr>
+                                        <tr class="gs-cg-gcp-subtotal"><td><?php esc_html_e( 'Subtotal / mo', 'gend-society' ); ?></td><td>$1,838</td></tr>
+                                    </table>
+                                </div>
+                                <div class="gs-cg-gcp-card">
+                                    <h4><?php esc_html_e( 'Cloud DNS + Networking', 'gend-society' ); ?></h4>
+                                    <table>
+                                        <tr><td><?php esc_html_e( 'Cloud DNS (public gend.me zone)', 'gend-society' ); ?></td><td>$40</td></tr>
+                                        <tr><td><?php esc_html_e( 'Egress bandwidth (~5 TB / mo)', 'gend-society' ); ?></td><td>$425</td></tr>
+                                        <tr><td><?php esc_html_e( 'Static IP reservations (×4)', 'gend-society' ); ?></td><td>$28</td></tr>
+                                        <tr><td><?php esc_html_e( 'Cloud NAT + VPC peering', 'gend-society' ); ?></td><td>$62</td></tr>
+                                        <tr class="gs-cg-gcp-subtotal"><td><?php esc_html_e( 'Subtotal / mo', 'gend-society' ); ?></td><td>$555</td></tr>
+                                    </table>
+                                </div>
+                                <div class="gs-cg-gcp-card">
+                                    <h4><?php esc_html_e( 'Cloud Storage + Backups', 'gend-society' ); ?></h4>
+                                    <table>
+                                        <tr><td><?php esc_html_e( 'GCS buckets (uploads / assets)', 'gend-society' ); ?></td><td>$180</td></tr>
+                                        <tr><td><?php esc_html_e( 'Persistent-disk snapshots', 'gend-society' ); ?></td><td>$95</td></tr>
+                                        <tr><td><?php esc_html_e( 'Backup retention (30-day)', 'gend-society' ); ?></td><td>$70</td></tr>
+                                        <tr><td><?php esc_html_e( 'Archive tier (cold storage)', 'gend-society' ); ?></td><td>$22</td></tr>
+                                        <tr class="gs-cg-gcp-subtotal"><td><?php esc_html_e( 'Subtotal / mo', 'gend-society' ); ?></td><td>$367</td></tr>
+                                    </table>
+                                </div>
+                                <div class="gs-cg-gcp-card">
+                                    <h4><?php esc_html_e( 'Cloud SQL + Managed Data', 'gend-society' ); ?></h4>
+                                    <table>
+                                        <tr><td><?php esc_html_e( 'Cloud SQL MySQL (HA, 4vCPU / 15 GB)', 'gend-society' ); ?></td><td>$520</td></tr>
+                                        <tr><td><?php esc_html_e( 'Memorystore Redis (2 GB)', 'gend-society' ); ?></td><td>$140</td></tr>
+                                        <tr><td><?php esc_html_e( 'Firestore (chain metadata)', 'gend-society' ); ?></td><td>$45</td></tr>
+                                        <tr class="gs-cg-gcp-subtotal"><td><?php esc_html_e( 'Subtotal / mo', 'gend-society' ); ?></td><td>$705</td></tr>
+                                    </table>
+                                </div>
+                            </div>
+                            <div class="gs-cg-gcp-total">
+                                <p class="gs-cg-gcp-total__label"><?php esc_html_e( 'Total monthly GCP spend', 'gend-society' ); ?></p>
+                                <p class="gs-cg-gcp-total__value">$3,465</p>
+                            </div>
+                        </section>
+                        <?php endif; ?>
+                        <?php endif; // dt_key === 'server' ?>
 
                         <?php if ( $dt_key === 'desktop' ) : ?>
                         <div class="gs-cg-desktop-cta">
