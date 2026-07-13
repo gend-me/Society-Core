@@ -356,6 +356,88 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
          data-group-id="<?php echo esc_attr( $group_id ); ?>"
          data-known-monthly="<?php echo esc_attr( $known_monthly ); ?>">
 
+        <?php
+        /* v12.1 — Top-level 3-tab bar on the Davinci AI menu page per operator
+           directive. Tabs: Leo Tokens (default, wraps existing AI-spend command
+           center content), Brain (deep-links to /business-plan/brain/),
+           Wireframe (deep-links to /business-plan/wireframe/). The Brain +
+           Wireframe nav buttons were removed from the Business Plan tab in the
+           same commit; their panels stay renderable on the BP page so the
+           direct sub-URLs still resolve. */
+        $gs_bp_base = function_exists( 'bp_get_group_permalink' ) && function_exists( 'groups_get_group' )
+            ? trailingslashit( (string) bp_get_group_permalink( groups_get_group( $group_id ) ) ) . 'business-plan/'
+            : '';
+        ?>
+        <style>
+            [data-gs-dv-scope] .gs-dv-topnav {
+                display: flex; flex-wrap: wrap; gap: 8px;
+                padding: 8px;
+                background: linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.42));
+                border: 1px solid rgba(125, 211, 252, .18);
+                border-radius: 16px;
+                margin: 0 0 22px;
+                -webkit-backdrop-filter: blur(14px) saturate(150%);
+                        backdrop-filter: blur(14px) saturate(150%);
+                box-shadow: 0 22px 48px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+            }
+            [data-gs-dv-scope] .gs-dv-toptab {
+                display: inline-flex; align-items: center; gap: 10px;
+                padding: 11px 20px;
+                background: transparent;
+                color: rgba(203, 213, 225, .78);
+                border: 1px solid transparent;
+                border-radius: 12px;
+                font-family: Inter, system-ui, sans-serif;
+                font-weight: 700;
+                font-size: .82rem;
+                letter-spacing: .04em;
+                text-transform: uppercase;
+                cursor: pointer;
+                text-decoration: none;
+                min-height: 44px;
+                transition: color .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease, transform .14s ease;
+            }
+            [data-gs-dv-scope] .gs-dv-toptab:hover {
+                color: #f1f5f9;
+                background: rgba(34,211,238,.08);
+                border-color: rgba(34,211,238,.20);
+            }
+            [data-gs-dv-scope] .gs-dv-toptab.is-active {
+                color: #0b0e14;
+                background: linear-gradient(135deg, #22d3ee, #7dd3fc);
+                border-color: rgba(34,211,238,.55);
+                box-shadow: 0 8px 24px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.35);
+                transform: translateY(-1px);
+            }
+            [data-gs-dv-scope] .gs-dv-toptab-icon {
+                width: 20px; height: 20px;
+                display: inline-flex; align-items: center; justify-content: center;
+            }
+        </style>
+
+        <nav class="gs-dv-topnav" role="tablist" aria-label="<?php esc_attr_e( 'Davinci AI sections', 'gend-society' ); ?>">
+            <button type="button" class="gs-dv-toptab is-active" data-dv-toptab="leo-tokens" role="tab" aria-selected="true">
+                <span class="gs-dv-toptab-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 7v10M9 10a3 3 0 0 1 6 0c0 3-4 3-4 5"/></svg>
+                </span>
+                <span><?php esc_html_e( 'Leo Tokens', 'gend-society' ); ?></span>
+            </button>
+            <?php if ( $gs_bp_base ) : ?>
+            <a class="gs-dv-toptab" data-dv-toptab="brain" role="tab" href="<?php echo esc_url( $gs_bp_base . 'brain/' ); ?>">
+                <span class="gs-dv-toptab-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 3a4 4 0 0 0-4 4v1a3 3 0 0 0 0 6v3a3 3 0 0 0 4 3 4 4 0 0 0 3 1V3a3 3 0 0 0-3 0z"/><path d="M15 3a4 4 0 0 1 4 4v1a3 3 0 0 1 0 6v3a3 3 0 0 1-4 3 4 4 0 0 1-3 1V3a3 3 0 0 1 3 0z"/></svg>
+                </span>
+                <span><?php esc_html_e( 'Brain', 'gend-society' ); ?></span>
+            </a>
+            <a class="gs-dv-toptab" data-dv-toptab="wireframe" role="tab" href="<?php echo esc_url( $gs_bp_base . 'wireframe/' ); ?>">
+                <span class="gs-dv-toptab-icon" aria-hidden="true">
+                    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="4" width="18" height="16" rx="2"/><path d="M3 9h18M9 4v16M15 9v11"/></svg>
+                </span>
+                <span><?php esc_html_e( 'Wireframe', 'gend-society' ); ?></span>
+            </a>
+            <?php endif; ?>
+        </nav>
+
         <!-- ───────── Hero + spend summary ───────── -->
         <div class="gs-dv-hero">
             <div>
