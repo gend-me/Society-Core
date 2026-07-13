@@ -630,6 +630,14 @@ function gs_render_hosting_tab( $payload = array() ) {
                     </div>
                 </div>
 
+                <?php
+                // v12.1 — Upgrade buttons are group-admin gated so regular
+                // members don't see them. Site admins + super admins always
+                // see them.
+                $gs_can_upgrade = current_user_can( 'manage_options' )
+                    || is_super_admin()
+                    || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
+                ?>
                 <div class="gs-hosting__card" style="padding: 0; overflow: hidden;">
                     <?php foreach ( $resources as $r ) :
                         $pct  = gs_hosting_pct( (int) $r['used'], (int) $r['cap'] );
@@ -654,7 +662,19 @@ function gs_render_hosting_tab( $payload = array() ) {
                                             <?php echo (int) $pct; ?>% <?php esc_html_e( 'used', 'gend-society' ); ?>
                                         </div>
                                     </div>
-                                    <button type="button" class="gs-hosting__btn" data-gs-mship="upgrade-plan" data-group="hosting" data-resource="<?php echo esc_attr( $r['slug'] ); ?>" style="font-size: 0.75rem; padding: 7px 14px;"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></button>
+                                    <?php if ( $gs_can_upgrade ) : ?>
+                                    <button type="button"
+                                            class="gs-hosting__btn gs-upgrade-cta"
+                                            data-gs-upgrade-open
+                                            data-resource="<?php echo esc_attr( $r['slug'] ); ?>"
+                                            data-resource-label="<?php echo esc_attr( $r['label'] ); ?>"
+                                            data-used-label="<?php echo esc_attr( $r['used_label'] ); ?>"
+                                            data-cap-label="<?php echo esc_attr( $r['cap_label'] ); ?>"
+                                            data-pct="<?php echo esc_attr( (int) $pct ); ?>"
+                                            style="font-size: 0.75rem; padding: 7px 14px; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
+                                        <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
+                                    </button>
+                                    <?php endif; ?>
                                 </div>
                             </div>
                             <div class="gs-hosting__progress">
@@ -669,9 +689,303 @@ function gs_render_hosting_tab( $payload = array() ) {
 
                 <div style="margin-top: 14px; display: flex; gap: 8px;">
                     <button type="button" class="gs-hosting__btn" data-gs-hosting="media-rescan" style="background: rgba(255,255,255,0.08);"><?php esc_html_e( 'Rescan storage', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-hosting__btn" data-gs-mship="upgrade-plan" data-group="hosting"><?php esc_html_e( 'Upgrade container plan', 'gend-society' ); ?></button>
+                    <?php if ( $gs_can_upgrade ) : ?>
+                    <button type="button" class="gs-hosting__btn gs-upgrade-cta"
+                            data-gs-upgrade-open
+                            data-resource="plan"
+                            data-resource-label="<?php echo esc_attr__( 'Container Plan', 'gend-society' ); ?>"
+                            style="background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
+                        <?php esc_html_e( 'Upgrade container plan', 'gend-society' ); ?>
+                    </button>
+                    <?php endif; ?>
                 </div>
                 <div class="gs-hosting__feedback" data-gs-hosting-feedback="media"></div>
+
+                <?php if ( $gs_can_upgrade ) :
+                    // v12.1 — Rich staggered-entrance upgrade popup. Rendered
+                    // once per Containers panel; the Upgrade buttons above
+                    // dispatch data-gs-upgrade-open with the resource slug
+                    // + labels so the modal can show contextual pitch copy.
+                ?>
+                <style>
+                    /* ── Upgrade popup: backdrop + card + entrance stagger ── */
+                    .gs-upgrade-modal { position: fixed; inset: 0; z-index: 999999; display: none; align-items: center; justify-content: center; padding: 24px; }
+                    .gs-upgrade-modal.is-open { display: flex; }
+                    .gs-upgrade-modal__backdrop {
+                        position: absolute; inset: 0;
+                        background: radial-gradient(1200px 500px at 20% 10%, rgba(34,211,238,.10), transparent 60%),
+                                    radial-gradient(1000px 400px at 80% 90%, rgba(99,102,241,.10), transparent 55%),
+                                    rgba(2, 6, 23, .78);
+                        -webkit-backdrop-filter: blur(18px) saturate(160%);
+                                backdrop-filter: blur(18px) saturate(160%);
+                        opacity: 0;
+                        transition: opacity .32s cubic-bezier(.2,.9,.3,1);
+                    }
+                    .gs-upgrade-modal.is-open .gs-upgrade-modal__backdrop { opacity: 1; }
+                    .gs-upgrade-modal__card {
+                        position: relative;
+                        width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
+                        background: linear-gradient(160deg, rgba(15,23,42,.94), rgba(15,23,42,.78));
+                        border: 1px solid rgba(125, 211, 252, .28);
+                        border-radius: 24px;
+                        box-shadow: 0 48px 96px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
+                        color: #e2e8f0; font-family: Inter, system-ui, sans-serif;
+                        padding: 36px 40px;
+                        opacity: 0; transform: translateY(20px) scale(.98);
+                        transition: opacity .35s cubic-bezier(.2,.9,.3,1), transform .35s cubic-bezier(.2,.9,.3,1);
+                    }
+                    .gs-upgrade-modal.is-open .gs-upgrade-modal__card { opacity: 1; transform: none; }
+                    @media (max-width: 640px) { .gs-upgrade-modal__card { padding: 26px 22px; border-radius: 18px; } }
+
+                    .gs-upgrade-modal__close {
+                        position: absolute; top: 14px; right: 14px;
+                        width: 36px; height: 36px; border-radius: 50%;
+                        background: rgba(11,14,20,.5); border: 1px solid rgba(125,211,252,.20);
+                        color: #e2e8f0; font-size: 1.2rem; line-height: 1; cursor: pointer;
+                        transition: background .18s ease, transform .15s ease;
+                    }
+                    .gs-upgrade-modal__close:hover { background: rgba(239,68,68,.20); transform: rotate(90deg); }
+
+                    /* Reveal children: each direct child gets .gs-upg-in with a
+                       stagger index. Delays are 70ms × index. */
+                    .gs-upgrade-modal__card > .gs-upg-reveal {
+                        opacity: 0; transform: translateY(18px);
+                        filter: blur(4px);
+                        transition: opacity .55s cubic-bezier(.2,.9,.3,1),
+                                    transform .55s cubic-bezier(.2,.9,.3,1),
+                                    filter .55s ease;
+                    }
+                    .gs-upgrade-modal.is-open .gs-upgrade-modal__card > .gs-upg-reveal {
+                        opacity: 1; transform: none; filter: none;
+                    }
+                    .gs-upgrade-modal.is-open .gs-upgrade-modal__card > .gs-upg-reveal { transition-delay: calc(var(--gs-i, 0) * 70ms + 100ms); }
+                    @media (prefers-reduced-motion: reduce) {
+                        .gs-upgrade-modal__backdrop, .gs-upgrade-modal__card, .gs-upgrade-modal__card > .gs-upg-reveal {
+                            transition: none !important;
+                            transform: none !important;
+                            filter: none !important;
+                            opacity: 1 !important;
+                        }
+                    }
+
+                    .gs-upg-eyebrow {
+                        display: inline-flex; align-items: center; gap: 8px;
+                        padding: 6px 14px;
+                        background: rgba(34,211,238,.14);
+                        border: 1px solid rgba(34,211,238,.40);
+                        border-radius: 999px;
+                        color: #22d3ee;
+                        font-size: .66rem; font-weight: 900; letter-spacing: .18em;
+                        text-transform: uppercase; margin: 0 0 14px !important;
+                    }
+                    .gs-upg-title {
+                        font-size: 1.85rem !important; font-weight: 950 !important;
+                        color: #f8fafc !important;
+                        margin: 0 0 10px !important; letter-spacing: -.02em !important;
+                        background: transparent !important;
+                    }
+                    .gs-upg-lede {
+                        color: rgba(226,232,240,.8) !important;
+                        font-size: 1rem !important; line-height: 1.55 !important;
+                        margin: 0 0 22px !important;
+                    }
+                    .gs-upg-current {
+                        display: grid; grid-template-columns: 1fr 1fr; gap: 12px;
+                        padding: 18px 20px;
+                        background: rgba(11,14,20,.55);
+                        border: 1px solid rgba(125,211,252,.15);
+                        border-radius: 12px;
+                        margin-bottom: 22px;
+                    }
+                    .gs-upg-current-block__label {
+                        color: rgba(226,232,240,.55) !important;
+                        font-size: .62rem !important; font-weight: 800 !important;
+                        letter-spacing: .14em !important; text-transform: uppercase !important;
+                        margin: 0 0 6px !important;
+                    }
+                    .gs-upg-current-block__value {
+                        color: #f8fafc !important;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                        font-size: 1.2rem; font-weight: 900; letter-spacing: -.02em;
+                    }
+                    .gs-upg-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+                    @media (max-width: 640px) { .gs-upg-plans { grid-template-columns: 1fr; } }
+                    .gs-upg-plan {
+                        padding: 20px; border-radius: 14px;
+                        background: rgba(11,14,20,.55);
+                        border: 1px solid rgba(125,211,252,.15);
+                        cursor: pointer;
+                        transition: border-color .18s ease, transform .18s ease, box-shadow .2s ease;
+                    }
+                    .gs-upg-plan:hover, .gs-upg-plan.is-active {
+                        border-color: rgba(34,211,238,.55);
+                        transform: translateY(-3px);
+                        box-shadow: 0 20px 45px rgba(34,211,238,.20);
+                    }
+                    .gs-upg-plan.is-active { background: rgba(34,211,238,.08); }
+                    .gs-upg-plan__name {
+                        font-size: .74rem !important; font-weight: 900 !important;
+                        color: #22d3ee !important; text-transform: uppercase !important;
+                        letter-spacing: .12em !important; margin: 0 0 8px !important;
+                    }
+                    .gs-upg-plan__cap {
+                        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                        color: #f8fafc !important; font-size: 1.5rem !important;
+                        font-weight: 950 !important; margin: 0 0 4px !important;
+                        letter-spacing: -.03em !important;
+                    }
+                    .gs-upg-plan__price {
+                        color: #4ade80 !important; font-weight: 800 !important;
+                        font-size: .82rem !important; margin: 0 !important;
+                    }
+                    .gs-upg-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+                    .gs-upg-primary {
+                        display: inline-flex; align-items: center; gap: 8px;
+                        padding: 14px 26px;
+                        background: linear-gradient(135deg, #22d3ee, #6366f1);
+                        color: #0b0e14 !important;
+                        border: none; border-radius: 12px;
+                        font-family: Inter, system-ui, sans-serif;
+                        font-weight: 900; font-size: .88rem;
+                        letter-spacing: .06em; text-transform: uppercase;
+                        cursor: pointer; text-decoration: none;
+                        box-shadow: 0 14px 42px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.35);
+                        transition: transform .15s ease, box-shadow .18s ease;
+                    }
+                    .gs-upg-primary:hover { transform: translateY(-2px); box-shadow: 0 20px 52px rgba(34,211,238,.5); color: #0b0e14 !important; }
+                    .gs-upg-secondary {
+                        padding: 12px 22px;
+                        background: rgba(11,14,20,.45);
+                        border: 1px solid rgba(125,211,252,.20);
+                        border-radius: 10px;
+                        color: #e2e8f0 !important;
+                        font-weight: 700; font-size: .82rem;
+                        letter-spacing: .04em; text-transform: uppercase;
+                        cursor: pointer;
+                    }
+                    .gs-upg-secondary:hover { background: rgba(34,211,238,.10); color: #f1f5f9 !important; }
+                </style>
+                <div class="gs-upgrade-modal" data-gs-upgrade-modal aria-hidden="true" role="dialog" aria-modal="true">
+                    <div class="gs-upgrade-modal__backdrop" data-gs-upgrade-close></div>
+                    <div class="gs-upgrade-modal__card">
+                        <button type="button" class="gs-upgrade-modal__close" data-gs-upgrade-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                        <span class="gs-upg-reveal gs-upg-eyebrow" style="--gs-i:0">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                            <span data-gs-upg-eyebrow><?php esc_html_e( 'Container Upgrade', 'gend-society' ); ?></span>
+                        </span>
+                        <h3 class="gs-upg-reveal gs-upg-title" style="--gs-i:1" data-gs-upg-title>
+                            <?php esc_html_e( 'Grow past your current cap', 'gend-society' ); ?>
+                        </h3>
+                        <p class="gs-upg-reveal gs-upg-lede" style="--gs-i:2" data-gs-upg-lede>
+                            <?php esc_html_e( 'Bump this container to a bigger tier — settles into effect within a few minutes, no downtime, prorated on your existing membership.', 'gend-society' ); ?>
+                        </p>
+                        <div class="gs-upg-reveal gs-upg-current" style="--gs-i:3">
+                            <div>
+                                <p class="gs-upg-current-block__label"><?php esc_html_e( 'Current usage', 'gend-society' ); ?></p>
+                                <p class="gs-upg-current-block__value" data-gs-upg-current>—</p>
+                            </div>
+                            <div>
+                                <p class="gs-upg-current-block__label"><?php esc_html_e( 'Plan cap', 'gend-society' ); ?></p>
+                                <p class="gs-upg-current-block__value" data-gs-upg-cap>—</p>
+                            </div>
+                        </div>
+                        <div class="gs-upg-reveal gs-upg-plans" style="--gs-i:4" data-gs-upg-plans>
+                            <div class="gs-upg-plan" data-plan-tier="standard">
+                                <p class="gs-upg-plan__name"><?php esc_html_e( 'Standard', 'gend-society' ); ?></p>
+                                <p class="gs-upg-plan__cap" data-plan-cap>—</p>
+                                <p class="gs-upg-plan__price">$29 / mo</p>
+                            </div>
+                            <div class="gs-upg-plan is-active" data-plan-tier="pro">
+                                <p class="gs-upg-plan__name"><?php esc_html_e( 'Pro', 'gend-society' ); ?></p>
+                                <p class="gs-upg-plan__cap" data-plan-cap>—</p>
+                                <p class="gs-upg-plan__price">$79 / mo</p>
+                            </div>
+                            <div class="gs-upg-plan" data-plan-tier="enterprise">
+                                <p class="gs-upg-plan__name"><?php esc_html_e( 'Enterprise', 'gend-society' ); ?></p>
+                                <p class="gs-upg-plan__cap" data-plan-cap>—</p>
+                                <p class="gs-upg-plan__price">$249 / mo</p>
+                            </div>
+                        </div>
+                        <div class="gs-upg-reveal gs-upg-actions" style="--gs-i:5">
+                            <button type="button" class="gs-upg-primary" data-gs-upg-confirm>
+                                <?php esc_html_e( 'Confirm Upgrade', 'gend-society' ); ?>
+                                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
+                            </button>
+                            <button type="button" class="gs-upg-secondary" data-gs-upgrade-close><?php esc_html_e( 'Cancel', 'gend-society' ); ?></button>
+                        </div>
+                    </div>
+                </div>
+                <script>
+                (function () {
+                    var modal = document.querySelector('[data-gs-upgrade-modal]');
+                    if (!modal || modal.dataset.upgInited === '1') return;
+                    modal.dataset.upgInited = '1';
+                    var eyebrow = modal.querySelector('[data-gs-upg-eyebrow]');
+                    var title   = modal.querySelector('[data-gs-upg-title]');
+                    var lede    = modal.querySelector('[data-gs-upg-lede]');
+                    var curEl   = modal.querySelector('[data-gs-upg-current]');
+                    var capEl   = modal.querySelector('[data-gs-upg-cap]');
+                    var planEls = modal.querySelectorAll('[data-plan-tier]');
+                    var confirm = modal.querySelector('[data-gs-upg-confirm]');
+
+                    var COPY = {
+                        media:    { title: 'More room for uploads', lede: 'Every image, video, and file lands here. Bump the cap to keep publishing without cleanup runs.', tiers: { standard: '50 GB', pro: '200 GB', enterprise: '1 TB' } },
+                        database: { title: 'Bigger + faster database', lede: 'MySQL tables + indexes live here. A bigger plan means more rows before you hit the ceiling.',        tiers: { standard: '10 GB', pro: '50 GB',  enterprise: '250 GB' } },
+                        codebase: { title: 'Space for more plugins', lede: 'Ship more extensions + themes without pruning the wp-content tree.',                                  tiers: { standard: '5 GB',  pro: '20 GB',  enterprise: '100 GB' } },
+                        plan:     { title: 'Upgrade the whole container', lede: 'One click bumps every resource on this container — media, database, codebase, compute — to the next tier.', tiers: { standard: 'Standard bundle', pro: 'Pro bundle', enterprise: 'Enterprise bundle' } }
+                    };
+
+                    function openFor(btn) {
+                        var slug = btn.getAttribute('data-resource') || 'plan';
+                        var label = btn.getAttribute('data-resource-label') || '';
+                        var usedL = btn.getAttribute('data-used-label') || '—';
+                        var capL  = btn.getAttribute('data-cap-label') || '—';
+                        var copy = COPY[slug] || COPY.plan;
+                        eyebrow.textContent = label ? (label + ' — Upgrade') : 'Upgrade';
+                        title.textContent = copy.title;
+                        lede.textContent  = copy.lede;
+                        curEl.textContent = usedL;
+                        capEl.textContent = capL;
+                        planEls.forEach(function (el) {
+                            var tier = el.getAttribute('data-plan-tier');
+                            var capNode = el.querySelector('[data-plan-cap]');
+                            if (capNode) capNode.textContent = (copy.tiers && copy.tiers[tier]) || '—';
+                        });
+                        modal.classList.add('is-open');
+                        modal.setAttribute('aria-hidden', 'false');
+                        document.body.style.overflow = 'hidden';
+                    }
+                    function close() {
+                        modal.classList.remove('is-open');
+                        modal.setAttribute('aria-hidden', 'true');
+                        document.body.style.overflow = '';
+                    }
+                    document.addEventListener('click', function (e) {
+                        var open = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-open]');
+                        if (open) { e.preventDefault(); openFor(open); return; }
+                        var closer = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-close]');
+                        if (closer && modal.contains(closer)) { e.preventDefault(); close(); return; }
+                    });
+                    document.addEventListener('keydown', function (e) {
+                        if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+                    });
+                    modal.addEventListener('click', function (e) {
+                        var tier = e.target && e.target.closest && e.target.closest('[data-plan-tier]');
+                        if (!tier) return;
+                        modal.querySelectorAll('[data-plan-tier]').forEach(function (t) { t.classList.toggle('is-active', t === tier); });
+                    });
+                    if (confirm) confirm.addEventListener('click', function () {
+                        // Placeholder — the Confirm flow is wired to the shipped
+                        // upgrade-plan action in a follow-up. For now, close the
+                        // modal with a friendly hand-off.
+                        confirm.textContent = 'Redirecting to checkout…';
+                        setTimeout(function () {
+                            window.location.href = '/checkout/';
+                        }, 400);
+                    });
+                })();
+                </script>
+                <?php endif; ?>
             </section>
 
             <!-- ── Backups sub-panel ─────────────────────────────── -->
@@ -1619,19 +1933,30 @@ function gs_hosting_collect_container_resources( $media_data, $tables_data ) {
         ),
     );
 
-    // Compute (CPU / RAM). No reliable local source — hub-side fills this
-    // in when the route ships. Stub keeps the row visible with 0 / cap.
-    $compute_cap = (int) apply_filters( 'gs_hosting_compute_plan_minutes', 60 * 24 * 30 ); // 30 days CPU-minutes default cap
+    // v12.1 — Compute row moved to the Compute Gas → Power tab (that's where
+    // it belongs — hosting Containers now only tracks code + data + media).
+    // Codebase storage (plugins / themes / mu-plugins directories under
+    // wp-content). Real-time size walk cached for one hour so page loads
+    // don't hit the disk.
+    $code_data = gs_hosting_collect_codebase();
+    $code_used = (int) ( $code_data['bytes_used'] ?? 0 );
+    $code_cap  = (int) apply_filters( 'gs_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 ); // 2 GB default
     $resources[] = array(
-        'slug'       => 'compute',
-        'label'      => __( 'Compute (CPU · RAM)', 'gend-society' ),
-        'icon'       => 'dashicons-performance',
-        'hint'       => __( 'Container CPU-minutes consumed this billing period', 'gend-society' ),
-        'used'       => 0,
-        'cap'        => $compute_cap,
-        'used_label' => __( 'Reporting pending', 'gend-society' ),
-        'cap_label'  => sprintf( __( '%s CPU-min', 'gend-society' ), number_format_i18n( $compute_cap ) ),
-        'meta'       => __( 'Live compute reporting is wired to the hub — values populate once the install\'s metrics endpoint is provisioned.', 'gend-society' ),
+        'slug'       => 'codebase',
+        'label'      => __( 'Codebase Storage', 'gend-society' ),
+        'icon'       => 'dashicons-editor-code',
+        'hint'       => __( 'Plugins + themes + mu-plugins on this install', 'gend-society' ),
+        'used'       => $code_used,
+        'cap'        => $code_cap,
+        'used_label' => size_format( $code_used, 2 ),
+        'cap_label'  => size_format( $code_cap, 0 ),
+        'meta'       => sprintf(
+            /* translators: 1: plugin count, 2: theme count, 3: relative time since scan */
+            __( '%1$s plugins · %2$s themes · scanned %3$s ago', 'gend-society' ),
+            number_format_i18n( (int) ( $code_data['plugin_count'] ?? 0 ) ),
+            number_format_i18n( (int) ( $code_data['theme_count'] ?? 0 ) ),
+            human_time_diff( (int) ( $code_data['scanned_at'] ?? time() ), time() )
+        ),
     );
 
     /**
@@ -1651,6 +1976,58 @@ function gs_hosting_db_plan_bytes() {
 function gs_hosting_media_plan_bytes() {
     // Default 20 GB.
     return (int) apply_filters( 'gs_hosting_media_plan_bytes', 20 * 1024 * 1024 * 1024 );
+}
+
+/**
+ * v12.1 — Codebase storage collector. Walks WP_PLUGIN_DIR + WPMU_PLUGIN_DIR
+ * + wp-content/themes for total on-disk size + counts. Cached in a
+ * transient for 1 hour so page loads never trigger a live disk walk.
+ * @return array{bytes_used:int, plugin_count:int, theme_count:int, scanned_at:int}
+ */
+function gs_hosting_collect_codebase() {
+    $cache_key = 'gs_hosting_codebase_v1';
+    $cached = get_transient( $cache_key );
+    if ( is_array( $cached ) && isset( $cached['bytes_used'] ) ) {
+        return $cached;
+    }
+    $total_bytes = 0;
+    $plugin_count = 0;
+    $theme_count = 0;
+    $dirs = array();
+    if ( defined( 'WP_PLUGIN_DIR' ) )   $dirs['plugins']    = WP_PLUGIN_DIR;
+    if ( defined( 'WPMU_PLUGIN_DIR' ) ) $dirs['mu-plugins'] = WPMU_PLUGIN_DIR;
+    if ( defined( 'WP_CONTENT_DIR' ) )  $dirs['themes']     = WP_CONTENT_DIR . '/themes';
+    foreach ( $dirs as $bucket => $path ) {
+        if ( ! is_string( $path ) || $path === '' || ! is_dir( $path ) ) continue;
+        try {
+            $it = new RecursiveIteratorIterator(
+                new RecursiveDirectoryIterator( $path, FilesystemIterator::SKIP_DOTS | FilesystemIterator::FOLLOW_SYMLINKS ),
+                RecursiveIteratorIterator::SELF_FIRST
+            );
+            foreach ( $it as $file ) {
+                if ( $file->isFile() ) {
+                    $total_bytes += (int) $file->getSize();
+                }
+            }
+        } catch ( \Throwable $e ) {
+            /* symlink loops / permission denied — silent skip */
+        }
+    }
+    // Plugin count: top-level entries under WP_PLUGIN_DIR (dirs or single-file plugins)
+    if ( defined( 'WP_PLUGIN_DIR' ) && is_dir( WP_PLUGIN_DIR ) ) {
+        $plugin_count = count( array_diff( (array) scandir( WP_PLUGIN_DIR ), array( '.', '..' ) ) );
+    }
+    if ( defined( 'WP_CONTENT_DIR' ) && is_dir( WP_CONTENT_DIR . '/themes' ) ) {
+        $theme_count = count( array_diff( (array) scandir( WP_CONTENT_DIR . '/themes' ), array( '.', '..' ) ) );
+    }
+    $out = array(
+        'bytes_used'   => (int) $total_bytes,
+        'plugin_count' => (int) $plugin_count,
+        'theme_count'  => (int) $theme_count,
+        'scanned_at'   => (int) time(),
+    );
+    set_transient( $cache_key, $out, HOUR_IN_SECONDS );
+    return $out;
 }
 
 function gs_hosting_pct( $used, $cap ) {

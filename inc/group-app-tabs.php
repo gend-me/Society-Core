@@ -382,6 +382,116 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 </nav>
 
                 <div class="gs-cg-tabpanel<?php echo $cg_active_tab === 'power' ? ' is-active' : ''; ?>" data-cg-panel="power">
+                    <?php
+                    // v12.1 — Compute widget moved from Containers (Storage tab)
+                    // to the TOP of Power. This is where compute belongs — the
+                    // Power tab is the AI-spend + compute-gas command center.
+                    // Storage → Containers now shows Media / Database / Codebase
+                    // only (compute is here). Live compute reporting is wired to
+                    // the hub; values populate once the install's metrics
+                    // endpoint is provisioned.
+                    $cg_compute_cap = (int) apply_filters( 'gs_hosting_compute_plan_minutes', 60 * 24 * 30 );
+                    $cg_compute_used = 0;
+                    $cg_compute_pct = (int) apply_filters( 'gs_hosting_compute_pct', 0 );
+                    ?>
+                    <style>
+                        [data-cg-panel="power"] .gs-cg-compute-hero {
+                            max-width: 1250px; margin: 4px auto 24px; padding: 0 20px;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-card {
+                            position: relative; overflow: hidden;
+                            background: linear-gradient(160deg, rgba(15,23,42,.85), rgba(15,23,42,.65));
+                            border: 1px solid rgba(34,211,238,.30);
+                            border-radius: 22px;
+                            padding: 28px 32px;
+                            box-shadow: 0 30px 60px rgba(0,0,0,.45), inset 0 1px 0 rgba(255,255,255,.05);
+                            -webkit-backdrop-filter: blur(16px) saturate(160%);
+                                    backdrop-filter: blur(16px) saturate(160%);
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-card::before {
+                            content: ""; position: absolute; inset: 0; pointer-events: none;
+                            background: radial-gradient(600px 200px at 100% 0%, rgba(34,211,238,.10), transparent 60%);
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-head {
+                            display: flex; align-items: center; gap: 14px; margin-bottom: 16px;
+                            position: relative; z-index: 1;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-icon {
+                            width: 46px; height: 46px; border-radius: 12px;
+                            background: rgba(34,211,238,.16);
+                            border: 1px solid rgba(34,211,238,.35);
+                            color: #22d3ee;
+                            display: flex; align-items: center; justify-content: center;
+                            flex-shrink: 0;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-titles h3 {
+                            color: #f8fafc !important;
+                            font-size: 1.15rem !important; font-weight: 900 !important;
+                            margin: 0 0 3px !important; letter-spacing: -.01em !important;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-titles p {
+                            color: rgba(226,232,240,.6) !important;
+                            font-size: .82rem !important; margin: 0 !important;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-values {
+                            display: flex; justify-content: space-between; align-items: baseline;
+                            gap: 12px; margin-bottom: 12px; position: relative; z-index: 1;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-used {
+                            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                            color: #f8fafc; font-size: 1.6rem; font-weight: 950;
+                            letter-spacing: -.02em;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-cap {
+                            color: rgba(226,232,240,.5); font-size: .95rem;
+                            font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-bar {
+                            height: 8px; border-radius: 999px;
+                            background: rgba(11,14,20,.6); overflow: hidden;
+                            position: relative; z-index: 1;
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-bar-fill {
+                            height: 100%;
+                            background: linear-gradient(90deg, #22d3ee, #6366f1);
+                            border-radius: 999px;
+                            transition: width .6s cubic-bezier(.2,.9,.3,1);
+                        }
+                        [data-cg-panel="power"] .gs-cg-compute-meta {
+                            color: rgba(226,232,240,.55) !important;
+                            font-size: .8rem !important; line-height: 1.5 !important;
+                            margin: 12px 0 0 !important; position: relative; z-index: 1;
+                        }
+                    </style>
+                    <div class="gs-cg-compute-hero">
+                        <div class="gs-cg-compute-card">
+                            <div class="gs-cg-compute-head">
+                                <div class="gs-cg-compute-icon" aria-hidden="true">
+                                    <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="4" y="4" width="16" height="16" rx="2"/><rect x="9" y="9" width="6" height="6"/><path d="M9 2v2M15 2v2M9 20v2M15 20v2M2 9h2M2 15h2M20 9h2M20 15h2"/></svg>
+                                </div>
+                                <div class="gs-cg-compute-titles">
+                                    <h3><?php esc_html_e( 'Compute (CPU · RAM)', 'gend-society' ); ?></h3>
+                                    <p><?php esc_html_e( 'Container CPU-minutes consumed this billing period.', 'gend-society' ); ?></p>
+                                </div>
+                            </div>
+                            <div class="gs-cg-compute-values">
+                                <span class="gs-cg-compute-used"><?php
+                                    if ( $cg_compute_used > 0 ) {
+                                        printf( '%s %s', esc_html( number_format_i18n( $cg_compute_used ) ), esc_html__( 'CPU-min', 'gend-society' ) );
+                                    } else {
+                                        esc_html_e( 'Reporting pending', 'gend-society' );
+                                    }
+                                ?></span>
+                                <span class="gs-cg-compute-cap">/ <?php echo esc_html( number_format_i18n( $cg_compute_cap ) . ' ' . __( 'CPU-min', 'gend-society' ) ); ?></span>
+                            </div>
+                            <div class="gs-cg-compute-bar">
+                                <div class="gs-cg-compute-bar-fill" style="width: <?php echo (int) $cg_compute_pct; ?>%;"></div>
+                            </div>
+                            <p class="gs-cg-compute-meta">
+                                <?php esc_html_e( 'Live compute reporting is wired to the hub — values populate once the install\'s metrics endpoint is provisioned. Upgrade a plan any time from Storage → Containers.', 'gend-society' ); ?>
+                            </p>
+                        </div>
+                    </div>
             <style>
                 /* All styles + selectors live under [data-gs-cg-scope] so
                    Youzify's frontend rules (red buttons, white panels,
