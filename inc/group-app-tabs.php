@@ -2404,7 +2404,9 @@ function gs_group_render_hosting_suite( $group_id ) {
     };
     $media_pct    = $pct( 'media' );
     $database_pct = $pct( 'database' );
-    $compute_pct  = $pct( 'compute' );
+    // v12.1 — 'compute' row moved to Compute Gas → Power tab; 'codebase'
+    // is what the Containers panel now tracks in its place.
+    $codebase_pct = $pct( 'codebase' );
 
     $tables_count = (int) ( $tables_data['count']       ?? 0 );
     $tables_bytes = (int) ( $tables_data['total_bytes'] ?? 0 );
@@ -2949,16 +2951,16 @@ function gs_group_render_hosting_suite( $group_id ) {
 
                             <div class="linear-meter-row">
                                 <div class="linear-meter-head">
-                                    <span class="lm-name"><?php esc_html_e( 'Compute (CPU · RAM)', 'gend-society' ); ?></span>
+                                    <span class="lm-name"><?php esc_html_e( 'Codebase Storage', 'gend-society' ); ?></span>
                                     <span class="lm-readout">
                                         <?php
-                                        $c = $res_by_slug['compute'] ?? array();
-                                        echo esc_html( ( $c['used_label'] ?? '0' ) . ' / ' . ( $c['cap_label'] ?? '—' ) );
+                                        $c = $res_by_slug['codebase'] ?? array();
+                                        echo esc_html( ( $c['used_label'] ?? '0 B' ) . ' / ' . ( $c['cap_label'] ?? '—' ) );
                                         ?>
                                     </span>
                                 </div>
                                 <div class="linear-meter-track">
-                                    <div class="linear-meter-fill <?php echo $compute_pct >= 90 ? 'is-danger' : ''; ?>" data-meter-target="<?php echo esc_attr( $compute_pct ); ?>"></div>
+                                    <div class="linear-meter-fill <?php echo $codebase_pct >= 90 ? 'is-danger' : ''; ?>" data-meter-target="<?php echo esc_attr( $codebase_pct ); ?>"></div>
                                 </div>
                                 <div class="linear-meter-hint"><?php echo esc_html( $c['meta'] ?? '' ); ?></div>
                             </div>
