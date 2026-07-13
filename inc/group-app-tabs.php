@@ -285,11 +285,33 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             $ajax_url = admin_url( 'admin-ajax.php' );
             $nonce    = wp_create_nonce( 'gs_membership_action' );
             $uid      = 'gs-cg-' . (int) $group_id;
-            // v12.1 — Deep-link support: /compute-gas/storage/ lands on the
-            // Storage tab (which hosts the migrated Connected Devices content).
+            // v12.1 — Deep-link support: /compute-gas/storage/ or /gas-stations/
+            // lands on the matching tab. Anything else lands on Power.
             $cg_active_tab = function_exists( 'bp_action_variable' ) ? (string) bp_action_variable( 0 ) : '';
-            if ( ! in_array( $cg_active_tab, array( 'power', 'storage' ), true ) ) {
+            if ( ! in_array( $cg_active_tab, array( 'power', 'storage', 'gas-stations' ), true ) ) {
                 $cg_active_tab = 'power';
+            }
+            // Pre-compute per-device earning + savings for the Gas Stations tab.
+            // Source: Gend_Chain_Node_Scoring (per-device ledger). Falls through
+            // to 0 when the class isn't loaded or the user has no registered
+            // nodes — the UI still renders + explains the flow.
+            $gs_device_stats = array(
+                'server'  => array( 'earned' => 0.0, 'saved' => 0.0, 'count' => 0 ),
+                'desktop' => array( 'earned' => 0.0, 'saved' => 0.0, 'count' => 0 ),
+                'mobile'  => array( 'earned' => 0.0, 'saved' => 0.0, 'count' => 0 ),
+            );
+            if ( class_exists( 'Gend_Chain_Node_Scoring' )
+                && method_exists( 'Gend_Chain_Node_Scoring', 'device_type_summary' ) ) {
+                $summary = Gend_Chain_Node_Scoring::device_type_summary( get_current_user_id() );
+                if ( is_array( $summary ) ) {
+                    foreach ( array( 'server', 'desktop', 'mobile' ) as $dt ) {
+                        if ( isset( $summary[ $dt ] ) && is_array( $summary[ $dt ] ) ) {
+                            $gs_device_stats[ $dt ]['earned'] = (float) ( $summary[ $dt ]['earned_dgen'] ?? 0 );
+                            $gs_device_stats[ $dt ]['saved']  = (float) ( $summary[ $dt ]['saved_dgen']  ?? 0 );
+                            $gs_device_stats[ $dt ]['count']  = (int)   ( $summary[ $dt ]['count']       ?? 0 );
+                        }
+                    }
+                }
             }
             ?>
             <style>
@@ -350,6 +372,12 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="9" ry="3"/><path d="M3 6v12c0 1.7 4 3 9 3s9-1.3 9-3V6"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
                         </span>
                         <span><?php esc_html_e( 'Storage', 'gend-society' ); ?></span>
+                    </button>
+                    <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'gas-stations' ? ' is-active' : ''; ?>" data-cg-tab="gas-stations" role="tab" aria-selected="<?php echo $cg_active_tab === 'gas-stations' ? 'true' : 'false'; ?>">
+                        <span class="gs-cg-toptab-icon" aria-hidden="true">
+                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 22V6a2 2 0 0 1 2-2h7a2 2 0 0 1 2 2v16"/><path d="M4 22h11"/><path d="M15 8h3a2 2 0 0 1 2 2v8a1.5 1.5 0 0 1-3 0v-3l-2-2"/><path d="M6 14h7"/></svg>
+                        </span>
+                        <span><?php esc_html_e( 'Gas Stations', 'gend-society' ); ?></span>
                     </button>
                 </nav>
 
@@ -1122,6 +1150,438 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     }
                     ?>
                 </div><!-- /.gs-cg-tabpanel[data-cg-panel="storage"] -->
+
+                <?php /* v12.1 — Gas Stations tab: explains 0-gas web-app hosting
+                         + earning gas fees from unused compute. 3 sub-tabs (Server /
+                         Desktop / Mobile) each showing earned + saved DGEN and the
+                         connected-device count. Desktop tab has the cinematic
+                         download CTA + developer-tools list. */ ?>
+                <style>
+                    /* Gas Stations panel — same design tokens as the parent
+                       tabsuite. Scoped to [data-cg-panel='gas-stations'] so
+                       nothing bleeds into Power/Storage. */
+                    [data-cg-panel="gas-stations"] {
+                        max-width: 1250px; margin: 0 auto; padding: 20px;
+                        font-family: Inter, system-ui, sans-serif; color: #e2e8f0;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-hero {
+                        position: relative; overflow: hidden;
+                        background: radial-gradient(1200px 400px at 10% -10%, rgba(34,211,238,.10), transparent 60%),
+                                    radial-gradient(900px 400px at 100% 0%, rgba(99,102,241,.10), transparent 55%),
+                                    linear-gradient(160deg, rgba(15,23,42,.85), rgba(15,23,42,.60));
+                        border: 1px solid rgba(125,211,252,.20);
+                        border-radius: 22px;
+                        padding: 40px 44px;
+                        margin-bottom: 26px;
+                        -webkit-backdrop-filter: blur(20px) saturate(160%);
+                                backdrop-filter: blur(20px) saturate(160%);
+                        box-shadow: 0 36px 80px rgba(0,0,0,.5), inset 0 1px 0 rgba(255,255,255,.05);
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-hero__eyebrow {
+                        display: inline-flex; align-items: center; gap: 8px;
+                        padding: 6px 14px;
+                        background: rgba(34,211,238,.14);
+                        border: 1px solid rgba(34,211,238,.40);
+                        border-radius: 999px;
+                        color: #22d3ee;
+                        font-size: .68rem; font-weight: 900; letter-spacing: .18em;
+                        text-transform: uppercase;
+                        margin-bottom: 14px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-hero__title {
+                        font-size: 2rem !important; font-weight: 950 !important;
+                        line-height: 1.15 !important;
+                        color: #f8fafc !important;
+                        margin: 0 0 14px !important;
+                        letter-spacing: -.02em !important;
+                        background: transparent !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-hero__pitch {
+                        display: grid; grid-template-columns: repeat(2, 1fr);
+                        gap: 18px; margin-top: 20px;
+                    }
+                    @media (max-width: 720px) {
+                        [data-cg-panel="gas-stations"] .gs-cg-gas-hero__pitch { grid-template-columns: 1fr; }
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-pitch-card {
+                        padding: 18px 20px;
+                        background: rgba(15,23,42,.55);
+                        border: 1px solid rgba(125,211,252,.18);
+                        border-radius: 14px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-pitch-card h4 {
+                        margin: 0 0 8px !important;
+                        color: #22d3ee !important;
+                        font-size: .78rem !important;
+                        font-weight: 800 !important;
+                        text-transform: uppercase !important;
+                        letter-spacing: .1em !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-pitch-card p {
+                        margin: 0 !important;
+                        color: rgba(226,232,240,.82) !important;
+                        font-size: .92rem !important; line-height: 1.55 !important;
+                    }
+
+                    /* Sub-nav for device tabs */
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subnav {
+                        display: flex; flex-wrap: wrap; gap: 6px;
+                        padding: 6px;
+                        background: rgba(15,23,42,.4);
+                        border: 1px solid rgba(125,211,252,.14);
+                        border-radius: 14px;
+                        margin-bottom: 22px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subtab {
+                        display: inline-flex; align-items: center; gap: 10px;
+                        padding: 10px 18px;
+                        background: transparent;
+                        color: rgba(203,213,225,.78);
+                        border: 1px solid transparent;
+                        border-radius: 10px;
+                        font-family: Inter, system-ui, sans-serif;
+                        font-weight: 700; font-size: .78rem; letter-spacing: .04em;
+                        text-transform: uppercase;
+                        cursor: pointer; min-height: 40px;
+                        transition: color .22s ease, background .22s ease, border-color .22s ease, box-shadow .22s ease, transform .14s ease;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subtab:hover {
+                        color: #f1f5f9; background: rgba(34,211,238,.08); border-color: rgba(34,211,238,.18);
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subtab.is-active {
+                        color: #0b0e14;
+                        background: linear-gradient(135deg, #22d3ee, #7dd3fc);
+                        border-color: rgba(34,211,238,.55);
+                        box-shadow: 0 6px 20px rgba(34,211,238,.30), inset 0 1px 0 rgba(255,255,255,.35);
+                        transform: translateY(-1px);
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subtab-icon { width: 16px; height: 16px; display: inline-flex; }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subpanel { display: none; }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-subpanel.is-active { display: block; }
+
+                    /* Device summary card + stats */
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-device-card {
+                        background: linear-gradient(160deg, rgba(15,23,42,.75), rgba(15,23,42,.5));
+                        border: 1px solid rgba(125,211,252,.18);
+                        border-radius: 18px;
+                        padding: 28px 30px;
+                        box-shadow: 0 22px 48px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.05);
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-device-head {
+                        display: flex; align-items: center; gap: 14px; margin-bottom: 18px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-device-head h3 {
+                        margin: 0 !important; color: #f8fafc !important;
+                        font-size: 1.4rem !important; font-weight: 900 !important;
+                        letter-spacing: -.01em !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-device-icon {
+                        display: flex; align-items: center; justify-content: center;
+                        width: 44px; height: 44px; border-radius: 12px;
+                        background: rgba(34,211,238,.12);
+                        border: 1px solid rgba(34,211,238,.32);
+                        color: #22d3ee;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stats {
+                        display: grid; grid-template-columns: repeat(3, 1fr);
+                        gap: 12px; margin-top: 4px;
+                    }
+                    @media (max-width: 640px) {
+                        [data-cg-panel="gas-stations"] .gs-cg-gas-stats { grid-template-columns: 1fr; }
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stat {
+                        padding: 16px 18px;
+                        background: rgba(11,14,20,.55);
+                        border: 1px solid rgba(125,211,252,.12);
+                        border-radius: 12px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stat__label {
+                        font-size: .66rem !important; font-weight: 800 !important;
+                        text-transform: uppercase !important; letter-spacing: .12em !important;
+                        color: rgba(226,232,240,.55) !important; margin: 0 0 6px !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stat__value {
+                        font-size: 1.55rem; font-weight: 950;
+                        font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+                        line-height: 1; letter-spacing: -.02em;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stat--earned .gs-cg-gas-stat__value { color: #4ade80; }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stat--saved  .gs-cg-gas-stat__value { color: #22d3ee; }
+                    [data-cg-panel="gas-stations"] .gs-cg-gas-stat--count  .gs-cg-gas-stat__value { color: #f8fafc; }
+
+                    /* Desktop CTA + developer tools */
+                    [data-cg-panel="gas-stations"] .gs-cg-desktop-cta {
+                        margin-top: 24px;
+                        position: relative; overflow: hidden;
+                        background: linear-gradient(135deg, rgba(34,211,238,.18), rgba(99,102,241,.18));
+                        border: 1px solid rgba(34,211,238,.40);
+                        border-radius: 22px;
+                        padding: 34px 38px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-desktop-cta::before {
+                        content: ""; position: absolute; inset: 0;
+                        background: radial-gradient(600px 200px at 100% 0%, rgba(34,211,238,.15), transparent 60%);
+                        pointer-events: none;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-desktop-cta__inner { position: relative; z-index: 1; }
+                    [data-cg-panel="gas-stations"] .gs-cg-desktop-cta__title {
+                        font-size: 1.6rem !important; font-weight: 950 !important;
+                        color: #f8fafc !important; margin: 0 0 8px !important;
+                        letter-spacing: -.02em !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-desktop-cta__pitch {
+                        color: rgba(226,232,240,.82) !important;
+                        margin: 0 0 22px !important;
+                        font-size: 1rem !important; line-height: 1.55 !important;
+                        max-width: 720px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-download-btn {
+                        display: inline-flex; align-items: center; gap: 12px;
+                        padding: 16px 28px;
+                        background: linear-gradient(135deg, #22d3ee, #6366f1);
+                        color: #0b0e14 !important;
+                        border: none;
+                        border-radius: 14px;
+                        font-family: Inter, system-ui, sans-serif;
+                        font-weight: 900; font-size: .95rem; letter-spacing: .04em;
+                        text-transform: uppercase; text-decoration: none;
+                        cursor: pointer;
+                        box-shadow: 0 14px 42px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.35);
+                        transition: transform .18s ease, box-shadow .18s ease;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-download-btn:hover {
+                        transform: translateY(-2px);
+                        box-shadow: 0 20px 52px rgba(34,211,238,.5), inset 0 1px 0 rgba(255,255,255,.35);
+                        color: #0b0e14 !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-download-btn__icon {
+                        width: 22px; height: 22px; display: inline-flex;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-dev-tools {
+                        margin-top: 26px;
+                        display: grid; grid-template-columns: repeat(2, 1fr); gap: 14px;
+                    }
+                    @media (max-width: 720px) {
+                        [data-cg-panel="gas-stations"] .gs-cg-dev-tools { grid-template-columns: 1fr; }
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-dev-tool {
+                        display: flex; align-items: flex-start; gap: 12px;
+                        padding: 14px 16px;
+                        background: rgba(11,14,20,.42);
+                        border: 1px solid rgba(125,211,252,.14);
+                        border-radius: 12px;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-dev-tool__icon {
+                        color: #22d3ee; flex-shrink: 0;
+                        width: 22px; height: 22px; display: inline-flex;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-dev-tool__body strong {
+                        color: #f8fafc !important; font-size: .92rem !important;
+                        display: block; margin-bottom: 3px !important;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-dev-tool__body span {
+                        color: rgba(226,232,240,.65) !important;
+                        font-size: .82rem !important; line-height: 1.5;
+                    }
+                    [data-cg-panel="gas-stations"] .gs-cg-empty-note {
+                        color: rgba(226,232,240,.6) !important;
+                        font-size: .88rem !important;
+                        background: rgba(11,14,20,.3);
+                        border-left: 3px solid rgba(34,211,238,.45);
+                        padding: 10px 14px;
+                        border-radius: 0 8px 8px 0;
+                        margin-top: 16px;
+                    }
+                </style>
+                <div class="gs-cg-tabpanel<?php echo $cg_active_tab === 'gas-stations' ? ' is-active' : ''; ?>" data-cg-panel="gas-stations">
+
+                    <section class="gs-cg-gas-hero">
+                        <span class="gs-cg-gas-hero__eyebrow">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                            <?php esc_html_e( 'Gas Stations Network', 'gend-society' ); ?>
+                        </span>
+                        <h2 class="gs-cg-gas-hero__title"><?php esc_html_e( 'Run your web app on zero gas fees — and earn from unused compute.', 'gend-society' ); ?></h2>
+                        <div class="gs-cg-gas-hero__pitch">
+                            <div class="gs-cg-gas-pitch-card">
+                                <h4><?php esc_html_e( '0 Gas Fees on Your Own App', 'gend-society' ); ?></h4>
+                                <p><?php esc_html_e( 'When your connected device is powering the compute your web app needs (AI calls, chain writes, storage), the gas fee is zero — you\'re paying yourself instead of the network. Every request your device serves is a request you don\'t buy from anyone else.', 'gend-society' ); ?></p>
+                            </div>
+                            <div class="gs-cg-gas-pitch-card">
+                                <h4><?php esc_html_e( 'Earn from Unused Cycles', 'gend-society' ); ?></h4>
+                                <p><?php esc_html_e( 'Any spare capacity your device isn\'t using for you gets rented to the network — other apps pay gas that lands in your wallet. Turn idle CPU + storage into a passive DGEN stream while your gear does its normal work.', 'gend-society' ); ?></p>
+                            </div>
+                        </div>
+                    </section>
+
+                    <?php
+                    $gs_devices = array(
+                        'server' => array(
+                            'label'    => __( 'Server', 'gend-society' ),
+                            'blurb'    => __( 'Always-on rack or VPS — highest earning tier because it\'s available 24/7 and can handle heavy inference + large storage shards.', 'gend-society' ),
+                            'icon_svg' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="6" rx="2"/><rect x="2" y="15" width="20" height="6" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>',
+                            'icon_lg'  => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="6" rx="2"/><rect x="2" y="15" width="20" height="6" rx="2"/><path d="M6 6h.01M6 18h.01"/></svg>',
+                        ),
+                        'desktop' => array(
+                            'label'    => __( 'Desktop', 'gend-society' ),
+                            'blurb'    => __( 'Your workstation or gaming rig — high compute plus the desktop app unlocks the full developer toolkit (visual builder, container CLI, local AI models, chain wallet).', 'gend-society' ),
+                            'icon_svg' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+                            'icon_lg'  => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="3" width="20" height="14" rx="2"/><path d="M8 21h8M12 17v4"/></svg>',
+                        ),
+                        'mobile' => array(
+                            'label'    => __( 'Mobile', 'gend-society' ),
+                            'blurb'    => __( 'Phone or tablet — perfect for lightweight AI requests + acting as a mobile chain wallet. Earns while you carry it around.', 'gend-society' ),
+                            'icon_svg' => '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 18h.01"/></svg>',
+                            'icon_lg'  => '<svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="6" y="2" width="12" height="20" rx="3"/><path d="M12 18h.01"/></svg>',
+                        ),
+                    );
+                    ?>
+
+                    <nav class="gs-cg-gas-subnav" role="tablist" aria-label="<?php esc_attr_e( 'Connected device type', 'gend-society' ); ?>">
+                        <?php $first = true; foreach ( $gs_devices as $dt_key => $dt ) : ?>
+                        <button type="button" class="gs-cg-gas-subtab<?php echo $first ? ' is-active' : ''; ?>" data-gas-tab="<?php echo esc_attr( $dt_key ); ?>" role="tab" aria-selected="<?php echo $first ? 'true' : 'false'; ?>">
+                            <span class="gs-cg-gas-subtab-icon" aria-hidden="true"><?php echo $dt['icon_svg']; // phpcs:ignore ?></span>
+                            <span><?php echo esc_html( $dt['label'] ); ?></span>
+                        </button>
+                        <?php $first = false; endforeach; ?>
+                    </nav>
+
+                    <?php $first = true; foreach ( $gs_devices as $dt_key => $dt ) :
+                        $stats = $gs_device_stats[ $dt_key ];
+                    ?>
+                    <div class="gs-cg-gas-subpanel<?php echo $first ? ' is-active' : ''; ?>" data-gas-panel="<?php echo esc_attr( $dt_key ); ?>">
+                        <div class="gs-cg-gas-device-card">
+                            <div class="gs-cg-gas-device-head">
+                                <span class="gs-cg-gas-device-icon" aria-hidden="true"><?php echo $dt['icon_lg']; // phpcs:ignore ?></span>
+                                <h3><?php echo esc_html( $dt['label'] ); ?></h3>
+                            </div>
+                            <p style="margin:0 0 22px !important; color:rgba(226,232,240,.72) !important; font-size:.92rem !important; line-height:1.6;">
+                                <?php echo esc_html( $dt['blurb'] ); ?>
+                            </p>
+                            <div class="gs-cg-gas-stats">
+                                <div class="gs-cg-gas-stat gs-cg-gas-stat--earned">
+                                    <p class="gs-cg-gas-stat__label"><?php esc_html_e( 'Earned (all time)', 'gend-society' ); ?></p>
+                                    <div class="gs-cg-gas-stat__value"><?php echo number_format( $stats['earned'], 2 ); ?> <span style="font-size:.72rem;font-family:Inter,sans-serif;color:rgba(226,232,240,.5);">DGEN</span></div>
+                                </div>
+                                <div class="gs-cg-gas-stat gs-cg-gas-stat--saved">
+                                    <p class="gs-cg-gas-stat__label"><?php esc_html_e( 'Gas Saved (0-fee reqs)', 'gend-society' ); ?></p>
+                                    <div class="gs-cg-gas-stat__value"><?php echo number_format( $stats['saved'], 2 ); ?> <span style="font-size:.72rem;font-family:Inter,sans-serif;color:rgba(226,232,240,.5);">DGEN</span></div>
+                                </div>
+                                <div class="gs-cg-gas-stat gs-cg-gas-stat--count">
+                                    <p class="gs-cg-gas-stat__label"><?php esc_html_e( 'Connected devices', 'gend-society' ); ?></p>
+                                    <div class="gs-cg-gas-stat__value"><?php echo (int) $stats['count']; ?></div>
+                                </div>
+                            </div>
+                            <?php if ( $stats['count'] === 0 ) : ?>
+                            <p class="gs-cg-empty-note">
+                                <?php
+                                if ( $dt_key === 'desktop' ) {
+                                    esc_html_e( 'No desktop yet. Download the app below and it registers as a Gas Station on first launch.', 'gend-society' );
+                                } elseif ( $dt_key === 'mobile' ) {
+                                    esc_html_e( 'No mobile yet. Install the gend.me mobile app + turn on background compute to register this device.', 'gend-society' );
+                                } else {
+                                    esc_html_e( 'No server yet. Follow the Gas Station server docs (linked in the Power tab) to spin one up.', 'gend-society' );
+                                }
+                                ?>
+                            </p>
+                            <?php endif; ?>
+                        </div>
+
+                        <?php if ( $dt_key === 'desktop' ) : ?>
+                        <div class="gs-cg-desktop-cta">
+                            <div class="gs-cg-desktop-cta__inner">
+                                <h3 class="gs-cg-desktop-cta__title"><?php esc_html_e( 'Download the gend.me Desktop App', 'gend-society' ); ?></h3>
+                                <p class="gs-cg-desktop-cta__pitch">
+                                    <?php esc_html_e( 'The desktop app turns your machine into a Gas Station AND unlocks the full developer toolkit — every builder tool the network uses to ship digital businesses, running locally on your box.', 'gend-society' ); ?>
+                                </p>
+                                <a class="gs-cg-download-btn" href="https://gend.me/gas-station/desktop/" target="_blank" rel="noopener">
+                                    <span class="gs-cg-download-btn__icon" aria-hidden="true">
+                                        <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                    </span>
+                                    <?php esc_html_e( 'Download Desktop App', 'gend-society' ); ?>
+                                </a>
+                                <div class="gs-cg-dev-tools">
+                                    <div class="gs-cg-dev-tool">
+                                        <span class="gs-cg-dev-tool__icon" aria-hidden="true">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 3v18"/></svg>
+                                        </span>
+                                        <div class="gs-cg-dev-tool__body">
+                                            <strong><?php esc_html_e( 'Visual Web-App Builder', 'gend-society' ); ?></strong>
+                                            <span><?php esc_html_e( 'Drag-and-drop your entire site + backend, ship to your Gas Station in one click.', 'gend-society' ); ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="gs-cg-dev-tool">
+                                        <span class="gs-cg-dev-tool__icon" aria-hidden="true">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M8 3H5a2 2 0 0 0-2 2v3M16 3h3a2 2 0 0 1 2 2v3M8 21H5a2 2 0 0 1-2-2v-3M16 21h3a2 2 0 0 0 2-2v-3"/><path d="M9 12l3-3 3 3M9 12h6"/></svg>
+                                        </span>
+                                        <div class="gs-cg-dev-tool__body">
+                                            <strong><?php esc_html_e( 'Container CLI + Registry', 'gend-society' ); ?></strong>
+                                            <span><?php esc_html_e( 'Run + publish per-web-app WordPress containers straight from your desktop.', 'gend-society' ); ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="gs-cg-dev-tool">
+                                        <span class="gs-cg-dev-tool__icon" aria-hidden="true">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a5 5 0 0 0-5 5v3a5 5 0 0 0 10 0V7a5 5 0 0 0-5-5z"/><path d="M19 10a7 7 0 0 1-14 0M12 17v4M8 21h8"/></svg>
+                                        </span>
+                                        <div class="gs-cg-dev-tool__body">
+                                            <strong><?php esc_html_e( 'Local AI Models + Voice', 'gend-society' ); ?></strong>
+                                            <span><?php esc_html_e( 'Whisper transcription + Piper TTS + local LLM inference — private, zero-cost, no cloud round-trip.', 'gend-society' ); ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="gs-cg-dev-tool">
+                                        <span class="gs-cg-dev-tool__icon" aria-hidden="true">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="2" y="6" width="20" height="12" rx="2"/><path d="M2 10h20M6 14h4"/></svg>
+                                        </span>
+                                        <div class="gs-cg-dev-tool__body">
+                                            <strong><?php esc_html_e( 'Chain Wallet + Node Runner', 'gend-society' ); ?></strong>
+                                            <span><?php esc_html_e( 'Manage your DGEN, sign chain writes, and run a full network node to earn gas fees.', 'gend-society' ); ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="gs-cg-dev-tool">
+                                        <span class="gs-cg-dev-tool__icon" aria-hidden="true">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"/></svg>
+                                        </span>
+                                        <div class="gs-cg-dev-tool__body">
+                                            <strong><?php esc_html_e( 'Davinci Orchestration', 'gend-society' ); ?></strong>
+                                            <span><?php esc_html_e( 'Prompt-driven agent flows that build your business plan, wireframes, and marketing copy without leaving the app.', 'gend-society' ); ?></span>
+                                        </div>
+                                    </div>
+                                    <div class="gs-cg-dev-tool">
+                                        <span class="gs-cg-dev-tool__icon" aria-hidden="true">
+                                            <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><path d="M2 12h20M12 2a15 15 0 0 1 0 20M12 2a15 15 0 0 0 0 20"/></svg>
+                                        </span>
+                                        <div class="gs-cg-dev-tool__body">
+                                            <strong><?php esc_html_e( 'One-Click Deploy to Network', 'gend-society' ); ?></strong>
+                                            <span><?php esc_html_e( 'Push your web app to the gend.me hosting mesh, mapped to a custom domain, in a single click.', 'gend-society' ); ?></span>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        <?php endif; ?>
+                    </div>
+                    <?php $first = false; endforeach; ?>
+
+                    <script>
+                    (function () {
+                        var panel = document.querySelector('[data-cg-panel="gas-stations"]');
+                        if (!panel || panel.dataset.gasSubInited === '1') return;
+                        panel.dataset.gasSubInited = '1';
+                        panel.addEventListener('click', function (e) {
+                            var btn = e.target && e.target.closest && e.target.closest('.gs-cg-gas-subtab');
+                            if (!btn) return;
+                            var key = btn.getAttribute('data-gas-tab');
+                            panel.querySelectorAll('.gs-cg-gas-subtab').forEach(function (b) {
+                                var on = b === btn;
+                                b.classList.toggle('is-active', on);
+                                b.setAttribute('aria-selected', on ? 'true' : 'false');
+                            });
+                            panel.querySelectorAll('.gs-cg-gas-subpanel').forEach(function (p) {
+                                p.classList.toggle('is-active', p.getAttribute('data-gas-panel') === key);
+                            });
+                        });
+                    })();
+                    </script>
+                </div><!-- /.gs-cg-tabpanel[data-cg-panel="gas-stations"] -->
             </div><!-- /.gs-cg-tabsuite -->
             <script>
             (function () {
