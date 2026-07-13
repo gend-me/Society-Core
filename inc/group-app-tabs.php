@@ -2910,6 +2910,38 @@ function gs_group_render_hosting_suite( $group_id ) {
 
                 <!-- ── Containers ──────────────────────────────────────── -->
                 <section class="suite-stage-view" data-gs-host-view="containers">
+                    <?php
+                    // v12.1 — Access gate for upgrade buttons in this Containers
+                    // panel. Site admin / super admin / group admin (via the
+                    // shared helper).
+                    $gs_ct_can_upgrade = current_user_can( 'manage_options' )
+                        || is_super_admin()
+                        || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
+                    ?>
+                    <style>
+                        [data-gs-host-view="containers"] .linear-meter-row { position: relative; }
+                        [data-gs-host-view="containers"] .gs-lm-upgrade {
+                            position: absolute; top: 0; right: 0;
+                            display: inline-flex; align-items: center; gap: 6px;
+                            padding: 6px 14px;
+                            background: linear-gradient(135deg, #22d3ee, #7dd3fc);
+                            color: #0b0e14 !important;
+                            border: none; border-radius: 8px;
+                            font-family: Inter, system-ui, sans-serif;
+                            font-weight: 800; font-size: .68rem;
+                            letter-spacing: .06em; text-transform: uppercase;
+                            cursor: pointer;
+                            box-shadow: 0 6px 18px rgba(34,211,238,.30), inset 0 1px 0 rgba(255,255,255,.35);
+                            transition: transform .15s ease, box-shadow .2s ease;
+                            z-index: 3;
+                        }
+                        [data-gs-host-view="containers"] .gs-lm-upgrade:hover {
+                            transform: translateY(-1px);
+                            box-shadow: 0 12px 32px rgba(34,211,238,.42), inset 0 1px 0 rgba(255,255,255,.35);
+                            color: #0b0e14 !important;
+                        }
+                        [data-gs-host-view="containers"] .linear-meter-head { padding-right: 100px; }
+                    </style>
                     <div class="view-title-block a-node x1">
                         <h3><?php esc_html_e( 'Container Resources', 'gend-society' ); ?></h3>
                         <p><?php esc_html_e( 'Plan caps for storage and compute. Meters animate to the live values whenever the panel is opened.', 'gend-society' ); ?></p>
@@ -2931,6 +2963,15 @@ function gs_group_render_hosting_suite( $group_id ) {
                                     <div class="linear-meter-fill <?php echo $media_pct >= 90 ? 'is-danger' : ''; ?>" data-meter-target="<?php echo esc_attr( $media_pct ); ?>"></div>
                                 </div>
                                 <div class="linear-meter-hint"><?php echo esc_html( $m['meta'] ?? '' ); ?></div>
+                                <?php if ( $gs_ct_can_upgrade ) : ?>
+                                <button type="button" class="gs-lm-upgrade"
+                                        data-gs-upgrade-open
+                                        data-resource="media"
+                                        data-resource-label="<?php echo esc_attr__( 'Media Storage', 'gend-society' ); ?>"
+                                        data-used-label="<?php echo esc_attr( $m['used_label'] ?? '0 B' ); ?>"
+                                        data-cap-label="<?php echo esc_attr( $m['cap_label'] ?? '—' ); ?>"
+                                        data-pct="<?php echo esc_attr( (int) $media_pct ); ?>"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></button>
+                                <?php endif; ?>
                             </div>
 
                             <div class="linear-meter-row">
@@ -2947,6 +2988,15 @@ function gs_group_render_hosting_suite( $group_id ) {
                                     <div class="linear-meter-fill <?php echo $database_pct >= 90 ? 'is-danger' : ''; ?>" data-meter-target="<?php echo esc_attr( $database_pct ); ?>"></div>
                                 </div>
                                 <div class="linear-meter-hint"><?php echo esc_html( $db['meta'] ?? '' ); ?></div>
+                                <?php if ( $gs_ct_can_upgrade ) : ?>
+                                <button type="button" class="gs-lm-upgrade"
+                                        data-gs-upgrade-open
+                                        data-resource="database"
+                                        data-resource-label="<?php echo esc_attr__( 'Database Storage', 'gend-society' ); ?>"
+                                        data-used-label="<?php echo esc_attr( $db['used_label'] ?? '0 B' ); ?>"
+                                        data-cap-label="<?php echo esc_attr( $db['cap_label'] ?? '—' ); ?>"
+                                        data-pct="<?php echo esc_attr( (int) $database_pct ); ?>"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></button>
+                                <?php endif; ?>
                             </div>
 
                             <div class="linear-meter-row">
@@ -2963,6 +3013,15 @@ function gs_group_render_hosting_suite( $group_id ) {
                                     <div class="linear-meter-fill <?php echo $codebase_pct >= 90 ? 'is-danger' : ''; ?>" data-meter-target="<?php echo esc_attr( $codebase_pct ); ?>"></div>
                                 </div>
                                 <div class="linear-meter-hint"><?php echo esc_html( $c['meta'] ?? '' ); ?></div>
+                                <?php if ( $gs_ct_can_upgrade ) : ?>
+                                <button type="button" class="gs-lm-upgrade"
+                                        data-gs-upgrade-open
+                                        data-resource="codebase"
+                                        data-resource-label="<?php echo esc_attr__( 'Codebase Storage', 'gend-society' ); ?>"
+                                        data-used-label="<?php echo esc_attr( $c['used_label'] ?? '0 B' ); ?>"
+                                        data-cap-label="<?php echo esc_attr( $c['cap_label'] ?? '—' ); ?>"
+                                        data-pct="<?php echo esc_attr( (int) $codebase_pct ); ?>"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></button>
+                                <?php endif; ?>
                             </div>
                         </div>
                     </div>
@@ -2976,6 +3035,195 @@ function gs_group_render_hosting_suite( $group_id ) {
                             <button type="button" class="btn-action-node" data-gs-host-action="media-rescan"><?php esc_html_e( 'Rescan now', 'gend-society' ); ?></button>
                         </div>
                     </div>
+
+                    <?php if ( $gs_ct_can_upgrade ) : ?>
+                    <style>
+                        /* Cinematic upgrade popup — same design tokens as the
+                           dashboard-hosting.php variant. Scoped to
+                           [data-gs-host-view='containers'] so no bleed. */
+                        [data-gs-host-view="containers"] .gs-upg-modal { position: fixed; inset: 0; z-index: 999999; display: none; align-items: center; justify-content: center; padding: 24px; }
+                        [data-gs-host-view="containers"] .gs-upg-modal.is-open { display: flex; }
+                        [data-gs-host-view="containers"] .gs-upg-backdrop {
+                            position: absolute; inset: 0;
+                            background: radial-gradient(1200px 500px at 20% 10%, rgba(34,211,238,.10), transparent 60%),
+                                        radial-gradient(1000px 400px at 80% 90%, rgba(99,102,241,.10), transparent 55%),
+                                        rgba(2, 6, 23, .78);
+                            -webkit-backdrop-filter: blur(18px) saturate(160%);
+                                    backdrop-filter: blur(18px) saturate(160%);
+                            opacity: 0; transition: opacity .32s cubic-bezier(.2,.9,.3,1);
+                        }
+                        [data-gs-host-view="containers"] .gs-upg-modal.is-open .gs-upg-backdrop { opacity: 1; }
+                        [data-gs-host-view="containers"] .gs-upg-card {
+                            position: relative;
+                            width: 100%; max-width: 720px; max-height: 90vh; overflow-y: auto;
+                            background: linear-gradient(160deg, rgba(15,23,42,.94), rgba(15,23,42,.78));
+                            border: 1px solid rgba(125, 211, 252, .28);
+                            border-radius: 24px;
+                            box-shadow: 0 48px 96px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
+                            color: #e2e8f0; font-family: Inter, system-ui, sans-serif;
+                            padding: 36px 40px;
+                            opacity: 0; transform: translateY(20px) scale(.98);
+                            transition: opacity .35s cubic-bezier(.2,.9,.3,1), transform .35s cubic-bezier(.2,.9,.3,1);
+                        }
+                        [data-gs-host-view="containers"] .gs-upg-modal.is-open .gs-upg-card { opacity: 1; transform: none; }
+                        [data-gs-host-view="containers"] .gs-upg-close {
+                            position: absolute; top: 14px; right: 14px;
+                            width: 36px; height: 36px; border-radius: 50%;
+                            background: rgba(11,14,20,.5); border: 1px solid rgba(125,211,252,.20);
+                            color: #e2e8f0; font-size: 1.2rem; line-height: 1; cursor: pointer;
+                            transition: background .18s ease, transform .15s ease;
+                        }
+                        [data-gs-host-view="containers"] .gs-upg-close:hover { background: rgba(239,68,68,.20); transform: rotate(90deg); }
+                        [data-gs-host-view="containers"] .gs-upg-card > .gs-upg-reveal {
+                            opacity: 0; transform: translateY(18px); filter: blur(4px);
+                            transition: opacity .55s cubic-bezier(.2,.9,.3,1),
+                                        transform .55s cubic-bezier(.2,.9,.3,1),
+                                        filter .55s ease;
+                        }
+                        [data-gs-host-view="containers"] .gs-upg-modal.is-open .gs-upg-card > .gs-upg-reveal { opacity: 1; transform: none; filter: none; transition-delay: calc(var(--gs-i, 0) * 70ms + 100ms); }
+                        @media (prefers-reduced-motion: reduce) {
+                            [data-gs-host-view="containers"] .gs-upg-backdrop,
+                            [data-gs-host-view="containers"] .gs-upg-card,
+                            [data-gs-host-view="containers"] .gs-upg-card > .gs-upg-reveal {
+                                transition: none !important; transform: none !important; filter: none !important; opacity: 1 !important;
+                            }
+                        }
+                        [data-gs-host-view="containers"] .gs-upg-eyebrow {
+                            display: inline-flex; align-items: center; gap: 8px;
+                            padding: 6px 14px; background: rgba(34,211,238,.14);
+                            border: 1px solid rgba(34,211,238,.40); border-radius: 999px;
+                            color: #22d3ee; font-size: .66rem; font-weight: 900;
+                            letter-spacing: .18em; text-transform: uppercase; margin: 0 0 14px !important;
+                        }
+                        [data-gs-host-view="containers"] .gs-upg-title { font-size: 1.85rem !important; font-weight: 950 !important; color: #f8fafc !important; margin: 0 0 10px !important; letter-spacing: -.02em !important; background: transparent !important; }
+                        [data-gs-host-view="containers"] .gs-upg-lede { color: rgba(226,232,240,.8) !important; font-size: 1rem !important; line-height: 1.55 !important; margin: 0 0 22px !important; }
+                        [data-gs-host-view="containers"] .gs-upg-current { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; padding: 18px 20px; background: rgba(11,14,20,.55); border: 1px solid rgba(125,211,252,.15); border-radius: 12px; margin-bottom: 22px; }
+                        [data-gs-host-view="containers"] .gs-upg-cur-label { color: rgba(226,232,240,.55) !important; font-size: .62rem !important; font-weight: 800 !important; letter-spacing: .14em !important; text-transform: uppercase !important; margin: 0 0 6px !important; }
+                        [data-gs-host-view="containers"] .gs-upg-cur-val { color: #f8fafc !important; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 1.2rem; font-weight: 900; letter-spacing: -.02em; }
+                        [data-gs-host-view="containers"] .gs-upg-plans { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; margin-bottom: 24px; }
+                        @media (max-width: 640px) { [data-gs-host-view="containers"] .gs-upg-plans { grid-template-columns: 1fr; } }
+                        [data-gs-host-view="containers"] .gs-upg-plan { padding: 20px; border-radius: 14px; background: rgba(11,14,20,.55); border: 1px solid rgba(125,211,252,.15); cursor: pointer; transition: border-color .18s ease, transform .18s ease, box-shadow .2s ease; }
+                        [data-gs-host-view="containers"] .gs-upg-plan:hover, [data-gs-host-view="containers"] .gs-upg-plan.is-active { border-color: rgba(34,211,238,.55); transform: translateY(-3px); box-shadow: 0 20px 45px rgba(34,211,238,.20); }
+                        [data-gs-host-view="containers"] .gs-upg-plan.is-active { background: rgba(34,211,238,.08); }
+                        [data-gs-host-view="containers"] .gs-upg-plan-name { font-size: .74rem !important; font-weight: 900 !important; color: #22d3ee !important; text-transform: uppercase !important; letter-spacing: .12em !important; margin: 0 0 8px !important; }
+                        [data-gs-host-view="containers"] .gs-upg-plan-cap { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; color: #f8fafc !important; font-size: 1.5rem !important; font-weight: 950 !important; margin: 0 0 4px !important; letter-spacing: -.03em !important; }
+                        [data-gs-host-view="containers"] .gs-upg-plan-price { color: #4ade80 !important; font-weight: 800 !important; font-size: .82rem !important; margin: 0 !important; }
+                        [data-gs-host-view="containers"] .gs-upg-actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; }
+                        [data-gs-host-view="containers"] .gs-upg-primary { display: inline-flex; align-items: center; gap: 8px; padding: 14px 26px; background: linear-gradient(135deg, #22d3ee, #6366f1); color: #0b0e14 !important; border: none; border-radius: 12px; font-weight: 900; font-size: .88rem; letter-spacing: .06em; text-transform: uppercase; cursor: pointer; box-shadow: 0 14px 42px rgba(34,211,238,.35), inset 0 1px 0 rgba(255,255,255,.35); transition: transform .15s ease, box-shadow .18s ease; }
+                        [data-gs-host-view="containers"] .gs-upg-primary:hover { transform: translateY(-2px); box-shadow: 0 20px 52px rgba(34,211,238,.5); color: #0b0e14 !important; }
+                        [data-gs-host-view="containers"] .gs-upg-secondary { padding: 12px 22px; background: rgba(11,14,20,.45); border: 1px solid rgba(125,211,252,.20); border-radius: 10px; color: #e2e8f0 !important; font-weight: 700; font-size: .82rem; letter-spacing: .04em; text-transform: uppercase; cursor: pointer; }
+                        [data-gs-host-view="containers"] .gs-upg-secondary:hover { background: rgba(34,211,238,.10); color: #f1f5f9 !important; }
+                    </style>
+                    <div class="gs-upg-modal" data-gs-upg-modal aria-hidden="true" role="dialog" aria-modal="true">
+                        <div class="gs-upg-backdrop" data-gs-upg-close></div>
+                        <div class="gs-upg-card">
+                            <button type="button" class="gs-upg-close" data-gs-upg-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                            <span class="gs-upg-reveal gs-upg-eyebrow" style="--gs-i:0">
+                                <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><path d="M13 2 3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+                                <span data-gs-upg-eyebrow><?php esc_html_e( 'Container Upgrade', 'gend-society' ); ?></span>
+                            </span>
+                            <h3 class="gs-upg-reveal gs-upg-title" style="--gs-i:1" data-gs-upg-title><?php esc_html_e( 'Grow past your current cap', 'gend-society' ); ?></h3>
+                            <p class="gs-upg-reveal gs-upg-lede" style="--gs-i:2" data-gs-upg-lede><?php esc_html_e( 'Bump this container to a bigger tier — settles into effect within a few minutes, no downtime, prorated on your existing membership.', 'gend-society' ); ?></p>
+                            <div class="gs-upg-reveal gs-upg-current" style="--gs-i:3">
+                                <div>
+                                    <p class="gs-upg-cur-label"><?php esc_html_e( 'Current usage', 'gend-society' ); ?></p>
+                                    <p class="gs-upg-cur-val" data-gs-upg-current>—</p>
+                                </div>
+                                <div>
+                                    <p class="gs-upg-cur-label"><?php esc_html_e( 'Plan cap', 'gend-society' ); ?></p>
+                                    <p class="gs-upg-cur-val" data-gs-upg-cap>—</p>
+                                </div>
+                            </div>
+                            <div class="gs-upg-reveal gs-upg-plans" style="--gs-i:4">
+                                <div class="gs-upg-plan" data-plan-tier="standard">
+                                    <p class="gs-upg-plan-name"><?php esc_html_e( 'Standard', 'gend-society' ); ?></p>
+                                    <p class="gs-upg-plan-cap" data-plan-cap>—</p>
+                                    <p class="gs-upg-plan-price">$29 / mo</p>
+                                </div>
+                                <div class="gs-upg-plan is-active" data-plan-tier="pro">
+                                    <p class="gs-upg-plan-name"><?php esc_html_e( 'Pro', 'gend-society' ); ?></p>
+                                    <p class="gs-upg-plan-cap" data-plan-cap>—</p>
+                                    <p class="gs-upg-plan-price">$79 / mo</p>
+                                </div>
+                                <div class="gs-upg-plan" data-plan-tier="enterprise">
+                                    <p class="gs-upg-plan-name"><?php esc_html_e( 'Enterprise', 'gend-society' ); ?></p>
+                                    <p class="gs-upg-plan-cap" data-plan-cap>—</p>
+                                    <p class="gs-upg-plan-price">$249 / mo</p>
+                                </div>
+                            </div>
+                            <div class="gs-upg-reveal gs-upg-actions" style="--gs-i:5">
+                                <button type="button" class="gs-upg-primary" data-gs-upg-confirm>
+                                    <?php esc_html_e( 'Confirm Upgrade', 'gend-society' ); ?>
+                                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="9 6 15 12 9 18"/></svg>
+                                </button>
+                                <button type="button" class="gs-upg-secondary" data-gs-upg-close><?php esc_html_e( 'Cancel', 'gend-society' ); ?></button>
+                            </div>
+                        </div>
+                    </div>
+                    <script>
+                    (function () {
+                        var host = document.querySelector('[data-gs-host-view="containers"]');
+                        if (!host || host.dataset.upgInited === '1') return;
+                        host.dataset.upgInited = '1';
+                        var modal = host.querySelector('[data-gs-upg-modal]');
+                        if (!modal) return;
+                        var eyebrow = modal.querySelector('[data-gs-upg-eyebrow]');
+                        var title   = modal.querySelector('[data-gs-upg-title]');
+                        var lede    = modal.querySelector('[data-gs-upg-lede]');
+                        var curEl   = modal.querySelector('[data-gs-upg-current]');
+                        var capEl   = modal.querySelector('[data-gs-upg-cap]');
+                        var planEls = modal.querySelectorAll('[data-plan-tier]');
+                        var confirm = modal.querySelector('[data-gs-upg-confirm]');
+                        var COPY = {
+                            media:    { title: 'More room for uploads', lede: 'Every image, video, and file lands here. Bump the cap to keep publishing without cleanup runs.', tiers: { standard: '50 GB', pro: '200 GB', enterprise: '1 TB' } },
+                            database: { title: 'Bigger + faster database', lede: 'MySQL tables + indexes live here. A bigger plan means more rows before you hit the ceiling.',        tiers: { standard: '10 GB', pro: '50 GB',  enterprise: '250 GB' } },
+                            codebase: { title: 'Space for more plugins', lede: 'Ship more extensions + themes without pruning the wp-content tree.',                                  tiers: { standard: '5 GB',  pro: '20 GB',  enterprise: '100 GB' } }
+                        };
+                        function openFor(btn) {
+                            var slug = btn.getAttribute('data-resource') || 'media';
+                            var label = btn.getAttribute('data-resource-label') || '';
+                            var usedL = btn.getAttribute('data-used-label') || '—';
+                            var capL  = btn.getAttribute('data-cap-label') || '—';
+                            var copy = COPY[slug] || COPY.media;
+                            eyebrow.textContent = label ? (label + ' — Upgrade') : 'Upgrade';
+                            title.textContent = copy.title;
+                            lede.textContent  = copy.lede;
+                            curEl.textContent = usedL;
+                            capEl.textContent = capL;
+                            planEls.forEach(function (el) {
+                                var tier = el.getAttribute('data-plan-tier');
+                                var capNode = el.querySelector('[data-plan-cap]');
+                                if (capNode) capNode.textContent = (copy.tiers && copy.tiers[tier]) || '—';
+                            });
+                            modal.classList.add('is-open');
+                            modal.setAttribute('aria-hidden', 'false');
+                            document.body.style.overflow = 'hidden';
+                        }
+                        function close() {
+                            modal.classList.remove('is-open');
+                            modal.setAttribute('aria-hidden', 'true');
+                            document.body.style.overflow = '';
+                        }
+                        host.addEventListener('click', function (e) {
+                            var open = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-open]');
+                            if (open && host.contains(open)) { e.preventDefault(); openFor(open); return; }
+                        });
+                        modal.addEventListener('click', function (e) {
+                            var closer = e.target && e.target.closest && e.target.closest('[data-gs-upg-close]');
+                            if (closer) { e.preventDefault(); close(); return; }
+                            var tier = e.target && e.target.closest && e.target.closest('[data-plan-tier]');
+                            if (tier) modal.querySelectorAll('[data-plan-tier]').forEach(function (t) { t.classList.toggle('is-active', t === tier); });
+                        });
+                        document.addEventListener('keydown', function (e) {
+                            if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+                        });
+                        if (confirm) confirm.addEventListener('click', function () {
+                            confirm.textContent = 'Redirecting to checkout…';
+                            setTimeout(function () { window.location.href = '/checkout/'; }, 400);
+                        });
+                    })();
+                    </script>
+                    <?php endif; ?>
                 </section>
 
                 <!-- ── Backups ─────────────────────────────────────────── -->
