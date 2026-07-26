@@ -277,14 +277,25 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 		 */
 		private static function anchor( string $type, int $from_uid, array $payload ) : string {
 			if ( class_exists( 'Gend_Chain_Validator' ) && method_exists( 'Gend_Chain_Validator', 'submit_tx' ) ) {
+				// The validator rejects unsigned txs ('gend_chain_no_user') even for
+				// 'chain.'-prefixed system types. System anchors (created/locked/void/
+				// residual) pass from_uid=0 — sign those with the hub treasury user.
+				$signer = $from_uid > 0 ? $from_uid : self::treasury_uid();
 				$id = Gend_Chain_Validator::submit_tx( array(
 					'type'         => $type,
 					'from_app_id'  => '',
-					'from_user_id' => $from_uid,
+					'from_user_id' => $signer,
 					'payload'      => $payload,
 					'ts'           => time(),
 				) );
-				return is_string( $id ) ? $id : (string) $id;
+				// submit_tx() can return a WP_Error (validator key unset / chain
+				// unavailable). A (string) cast on a WP_Error fatals — treat any
+				// non-string/error as "unanchored" ('') so a chain hiccup never
+				// fatals a money event (trade/bet/payout/settle).
+				if ( is_string( $id ) ) {
+					return $id;
+				}
+				return is_wp_error( $id ) ? '' : (string) $id;
 			}
 			return '';
 		}
@@ -485,9 +496,15 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 				return is_object( $void ) ? $void : new WP_Error( 'gs_market_autovoid', 'Same-operator market auto-voided.', array( 'status' => 409 ) );
 			}
 
-			// Compute b + subsidy = ceil(b·ln2) BEFORE insert so the row carries them.
+			// Compute b + subsidy = ceil(b·ln2 / share-scale) BEFORE insert so the row
+			// carries them. b·ln2 is in RAW micro-DGEN·share units (b in micro-shares);
+			// divide by the 1e6 share-scale so the subsidy is WHOLE DGEN, consistent with
+			// payout / max_payout (which are /1e6 — see max_payout()/pay path). ceil UP so
+			// escrow pre-funds >= the exact bounded-loss reserve (maker-favor).
 			$b            = self::market_b();
-			$subsidy_dgen = Gend_GS_BC_Math::bc_ceil( bcmul( $b, Gend_GS_BC_Math::LN2, Gend_GS_BC_Math::SCALE ) );
+			$subsidy_dgen = Gend_GS_BC_Math::bc_ceil(
+				bcdiv( bcmul( $b, Gend_GS_BC_Math::LN2, Gend_GS_BC_Math::SCALE ), '1000000', Gend_GS_BC_Math::SCALE )
+			);
 			$resolve_by   = self::resolve_by_for_task( $contract_task_id );
 
 			// INSERT the row NON-TRADEABLE (state='locked', subsidy_funded=0, escrow_dgen=0).
@@ -829,10 +846,16 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 			$q_yes_new = ( 'yes' === $outcome ) ? bcadd( $q_yes, (string) $delta_shares, 0 ) : $q_yes;
 			$q_no_new  = ( 'no' === $outcome ) ? bcadd( $q_no, (string) $delta_shares, 0 ) : $q_no;
 
+			// C() is in RAW micro-DGEN·share units; divide by the 1e6 share-scale so the
+			// quoted cost is WHOLE DGEN, consistent with payout/max_payout. ceil UP.
 			$cost = Gend_GS_BC_Math::bc_ceil(
-				bcsub(
-					Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
-					Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+				bcdiv(
+					bcsub(
+						Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
+						Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+						Gend_GS_BC_Math::SCALE
+					),
+					'1000000',
 					Gend_GS_BC_Math::SCALE
 				)
 			);
@@ -1014,9 +1037,16 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 
 				// delta_cost = C(q') - C(q). BUY: cost = ceil(delta_cost) (UP). SELL:
 				// refund = floor( -delta_cost ) (DOWN — escrow shrinks by <= exact, never more).
-				$delta_cost = bcsub(
-					Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
-					Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+				// C() is in RAW micro-DGEN·share units; divide by the 1e6 share-scale so
+				// cost/refund land in WHOLE DGEN, consistent with payout/max_payout (/1e6).
+				// BUY ceil UP / SELL-refund floor DOWN (below) keep escrow maker-favor.
+				$delta_cost = bcdiv(
+					bcsub(
+						Gend_GS_BC_Math::cost( $q_yes_new, $q_no_new, $b ),
+						Gend_GS_BC_Math::cost( $q_yes, $q_no, $b ),
+						Gend_GS_BC_Math::SCALE
+					),
+					'1000000',
 					Gend_GS_BC_Math::SCALE
 				);
 				$cost   = '0';
@@ -1714,8 +1744,23 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 			//    already inside the remaining escrow; a VOID's full subsidy is likewise the
 			//    remaining escrow. Do NOT run a live per-winner `escrow = escrow - payout`
 			//    (BIGINT UNSIGNED underflow, Pitfall 1) — this ONE re-read residual is the drain.
-			$fresh    = self::get_market( $market_id );
-			$residual = is_object( $fresh ) ? (string) $fresh->escrow_dgen : '0';
+			$fresh      = self::get_market( $market_id );
+			$escrow_now = is_object( $fresh ) ? (string) $fresh->escrow_dgen : '0';
+			// Residual = escrow MINUS everything already paid to winners/refunds — the rake +
+			// rounding leftover. Computed in ONE step from the summed per-position payout_dgen
+			// (NOT a per-winner live `escrow -= payout` — that risks BIGINT UNSIGNED underflow,
+			// Pitfall 1). CRITICAL: without subtracting Σpayout the winner payouts are
+			// DOUBLE-COUNTED (minted) — the treasury would receive the FULL escrow while the
+			// winners were ALSO paid. The escrow-invariant guarantees escrow >= Σpayout, so the
+			// result is >= 0 (clamped defensively).
+			$paid_sum = (string) $wpdb->get_var( $wpdb->prepare(
+				"SELECT COALESCE(SUM(payout_dgen),0) FROM {$positions} WHERE market_id=%d AND paid=1",
+				$market_id
+			) );
+			$residual = bcsub( $escrow_now, $paid_sum, 0 );
+			if ( bccomp( $residual, '0', 0 ) < 0 ) {
+				$residual = '0';
+			}
 
 			if ( bccomp( $residual, '0', 0 ) > 0 && false === strpos( $residual, '.' ) ) {
 				mycred_add(

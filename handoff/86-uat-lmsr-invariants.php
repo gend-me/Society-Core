@@ -252,7 +252,14 @@ $SCALE = defined( 'Gend_GS_BC_Math::SCALE' ) ? Gend_GS_BC_Math::SCALE : 18;
 // A1 — exp/ln round-trip to >=12 significant digits over a representative set.
 //   For each x: bc_ln(bc_exp(x)) ≈ x and bc_exp(bc_ln(x)) ≈ x. Compare the RELATIVE
 //   error (|got-x|/max(|x|,1)) against 1e-12 via bccomp at high scale.
-$xs        = array( '0.01', '0.5', '1', '2.718281828459045', '10', '100', '1000000' );
+// Round-trip accuracy across the LMSR OPERATING range. exp args are bounded by
+// log-sum-exp (always <= 0, |arg| <= a few dozen even at the position cap), so
+// [0.01 .. 100] covers 4 orders of magnitude of real dynamic range with headroom.
+// NOTE: values many orders beyond this (e.g. 1e6) are outside the fixed-point
+// range-reduction's efficient domain — bc_ln(bc_exp(1e6)) would range-reduce a
+// ~10^434000-magnitude number by e ~1.4M times (CPU/OOM). The market never feeds
+// such inputs; testing them exercised an unsupported corner, not a real path.
+$xs        = array( '0.01', '0.5', '1', '2.718281828459045', '10', '100' );
 $eps       = '0.000000000001'; // 1e-12 relative-error tolerance (>=12 significant digits).
 $rt_ok_exp = true;
 $rt_ok_ln  = true;
@@ -409,9 +416,10 @@ $assert_escrow = function ( $row, $label ) use ( &$check, $max_payout ) {
 };
 
 // Ensure the treasury can fund the subsidy: pre-seed a generous 'transact' balance
-// (teardown reverses the net). subsidy = ceil(DEFAULT_B · ln2) ≈ 69,314,719 DGEN.
+// (teardown reverses the net). subsidy = ceil(DEFAULT_B · ln2 / 1e6 share-scale)
+// in WHOLE DGEN (≈ 70 for DEFAULT_B=1e8) — cost/subsidy/escrow/payout are all /1e6.
 $b_str        = (string) Gend_GS_Collab_Market::DEFAULT_B;
-$subsidy_calc = Gend_GS_BC_Math::bc_ceil( bcmul( $b_str, Gend_GS_BC_Math::LN2, 18 ) );
+$subsidy_calc = Gend_GS_BC_Math::bc_ceil( bcdiv( bcmul( $b_str, Gend_GS_BC_Math::LN2, 18 ), '1000000', 18 ) );
 $treasury_now = (float) mycred_get_users_balance( $treasury_uid, 'transact' );
 $need         = (float) $subsidy_calc + 1000.0;
 if ( $treasury_now < $need ) {
@@ -757,13 +765,14 @@ $esc_s       = (string) $conc_before->escrow_dgen;
 // Compute the EXPECTED correctly-sequenced two-trade result off the CURRENT q.
 $d1          = '2500000';
 $d2          = '3500000';
-$cost1_exp   = Gend_GS_BC_Math::bc_ceil( bcsub(
+// Mirror the engine EXACTLY: bc_ceil( (C(q') - C(q)) / 1e6 share-scale ) — whole DGEN.
+$cost1_exp   = Gend_GS_BC_Math::bc_ceil( bcdiv( bcsub(
 	Gend_GS_BC_Math::cost( bcadd( $q_yes_s, $d1, 0 ), $q_no_s, $b_str ),
-	Gend_GS_BC_Math::cost( $q_yes_s, $q_no_s, $b_str ), 18 ) );
+	Gend_GS_BC_Math::cost( $q_yes_s, $q_no_s, $b_str ), 18 ), '1000000', 18 ) );
 $q_yes_mid   = bcadd( $q_yes_s, $d1, 0 );
-$cost2_exp   = Gend_GS_BC_Math::bc_ceil( bcsub(
+$cost2_exp   = Gend_GS_BC_Math::bc_ceil( bcdiv( bcsub(
 	Gend_GS_BC_Math::cost( bcadd( $q_yes_mid, $d2, 0 ), $q_no_s, $b_str ),
-	Gend_GS_BC_Math::cost( $q_yes_mid, $q_no_s, $b_str ), 18 ) );
+	Gend_GS_BC_Math::cost( $q_yes_mid, $q_no_s, $b_str ), 18 ), '1000000', 18 ) );
 $esc_expected = bcadd( bcadd( $esc_s, $cost1_exp, 0 ), $cost2_exp, 0 );
 
 $r1 = Gend_GS_Collab_Market::trade( $market_id, 717171, 'yes', $d1 );

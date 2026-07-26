@@ -104,6 +104,18 @@ class Gend_GS_Collab_REST {
 			),
 		) );
 
+		// GET /collab/matches — the acting group's matches + counterparty business +
+		// intro-thread conversation link + current contract state (matched /
+		// proposal_sent / proposal_received / contracted / resolved). Read-only.
+		register_rest_route( self::NS, '/collab/matches', array(
+			'methods'             => WP_REST_Server::READABLE,
+			'callback'            => array( __CLASS__, 'route_matches' ),
+			'permission_callback' => array( __CLASS__, 'can_act_for_group' ),
+			'args'                => array(
+				'group_id' => array( 'required' => true, 'sanitize_callback' => 'absint' ),
+			),
+		) );
+
 		// ---------------------------------------------------------------
 		// Phase 84 (COLLAB-01) — contract escalation. Three HUB-ONLY routes.
 		// Tier A / PUBLIC (NOT GS_COLLAB_MARKET_PUBLIC-gated) but money-careful:
@@ -290,6 +302,112 @@ class Gend_GS_Collab_REST {
 		}
 		return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )
 			|| ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $uid, $gid ) );
+	}
+
+	/**
+	 * GET /collab/matches — list the acting group's matches with the counterparty
+	 * business, the intro-thread conversation link, and the current contract state
+	 * (matched / proposal_sent / proposal_received / contracted / resolved). Read-only.
+	 *
+	 * @param WP_REST_Request $req Request.
+	 * @return WP_REST_Response|WP_Error
+	 */
+	public static function route_matches( WP_REST_Request $req ) {
+		if ( ! class_exists( 'Gend_GS_Collab_Schema' ) ) {
+			return new WP_Error( 'gs_collab_no_schema', 'collab schema unavailable', array( 'status' => 500 ) );
+		}
+		global $wpdb;
+		$gid       = (int) $req->get_param( 'group_id' );
+		$matches_t = Gend_GS_Collab_Schema::matches_table();
+		$props_t   = Gend_GS_Collab_Schema::proposals_table();
+		$out_t     = method_exists( 'Gend_GS_Collab_Schema', 'contract_outcomes_table' ) ? Gend_GS_Collab_Schema::contract_outcomes_table() : '';
+
+		$rows = $wpdb->get_results( $wpdb->prepare(
+			"SELECT id, group_a, group_b, status, intro_thread_id, contract_task_id, created_at
+			 FROM {$matches_t} WHERE group_a = %d OR group_b = %d ORDER BY created_at DESC, id DESC LIMIT 100",
+			$gid,
+			$gid
+		) );
+
+		$cats = class_exists( 'Gend_GS_Collab_Taxonomy' ) ? Gend_GS_Collab_Taxonomy::CATEGORIES : array();
+		$inds = class_exists( 'Gend_GS_Collab_Taxonomy' ) ? Gend_GS_Collab_Taxonomy::INDUSTRIES : array();
+		$has_groupmeta = function_exists( 'groups_get_groupmeta' );
+
+		$out = array();
+		foreach ( (array) $rows as $r ) {
+			$match_id    = (int) $r->id;
+			$counter_gid = ( (int) $r->group_a === $gid ) ? (int) $r->group_b : (int) $r->group_a;
+			$grp         = function_exists( 'groups_get_group' ) ? groups_get_group( $counter_gid ) : null;
+
+			$name = ( $grp && function_exists( 'bp_get_group_name' ) ) ? bp_get_group_name( $grp ) : ( 'Business #' . $counter_gid );
+			$avatar = function_exists( 'bp_core_fetch_avatar' )
+				? bp_core_fetch_avatar( array( 'item_id' => $counter_gid, 'object' => 'group', 'type' => 'full', 'html' => false ) )
+				: '';
+			$permalink = ( $grp && function_exists( 'bp_get_group_permalink' ) ) ? bp_get_group_permalink( $grp ) : '';
+			$cat = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gs_collab_category', true ) : '';
+			$ind = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gs_collab_industry', true ) : '';
+			$loc = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gs_collab_location', true ) : '';
+
+			// Contract state.
+			$phase    = 'matched';
+			$proposal = null;
+			$outcome  = '';
+			if ( (int) $r->contract_task_id > 0 ) {
+				$phase = 'contracted';
+				if ( $out_t ) {
+					$oc = $wpdb->get_var( $wpdb->prepare( "SELECT outcome FROM {$out_t} WHERE contract_task_id = %d LIMIT 1", (int) $r->contract_task_id ) );
+					if ( $oc ) {
+						$phase   = 'resolved';
+						$outcome = (string) $oc;
+					}
+				}
+			} else {
+				$p = $wpdb->get_row( $wpdb->prepare(
+					"SELECT proposer_group, payer_group, payee_group, escrow_model, credits FROM {$props_t} WHERE match_id = %d AND prop_status = 'pending' LIMIT 1",
+					$match_id
+				) );
+				if ( is_object( $p ) ) {
+					$phase    = ( (int) $p->proposer_group === $gid ) ? 'proposal_sent' : 'proposal_received';
+					$proposal = array(
+						'proposer_group' => (int) $p->proposer_group,
+						'payer_group'    => (int) $p->payer_group,
+						'payee_group'    => (int) $p->payee_group,
+						'escrow_model'   => (string) $p->escrow_model,
+						'credits'        => (int) $p->credits,
+					);
+				}
+			}
+
+			// Conversation link — the BP private message thread view for the current user.
+			$msg = '';
+			$tid = (int) $r->intro_thread_id;
+			if ( $tid > 0 && function_exists( 'bp_loggedin_user_domain' ) && function_exists( 'bp_get_messages_slug' ) ) {
+				$msg = trailingslashit( bp_loggedin_user_domain() . bp_get_messages_slug() . '/view/' . $tid );
+			}
+
+			$out[] = array(
+				'match_id'     => $match_id,
+				'counterparty' => array(
+					'group_id'  => $counter_gid,
+					'name'      => $name,
+					'avatar'    => $avatar,
+					'permalink' => $permalink,
+					'tags'      => array(
+						'category' => isset( $cats[ $cat ] ) ? $cats[ $cat ] : $cat,
+						'industry' => isset( $inds[ $ind ] ) ? $inds[ $ind ] : $ind,
+						'location' => $loc,
+					),
+				),
+				'status'       => (string) $r->status,
+				'phase'        => $phase,
+				'outcome'      => $outcome,
+				'proposal'     => $proposal,
+				'message_link' => $msg,
+				'matched_at'   => (int) $r->created_at,
+			);
+		}
+
+		return rest_ensure_response( array( 'matches' => $out, 'group_id' => $gid ) );
 	}
 
 	/**

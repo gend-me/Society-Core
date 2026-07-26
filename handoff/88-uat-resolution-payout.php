@@ -400,9 +400,9 @@ $seed_bettor = function ( $label, $fund_whole ) use ( &$created_uids, &$bettor_p
 	return $uid;
 };
 
-// Ensure the treasury can fund a market subsidy (ceil(b·ln2) ≈ 69.3M DGEN); teardown reverses.
+// Ensure the treasury can fund a market subsidy (ceil(b·ln2 / 1e6) ≈ 70 WHOLE DGEN); teardown reverses.
 $b_str        = (string) Gend_GS_Collab_Market::DEFAULT_B;
-$subsidy_calc = Gend_GS_BC_Math::bc_ceil( bcmul( $b_str, Gend_GS_BC_Math::LN2, 18 ) );
+$subsidy_calc = Gend_GS_BC_Math::bc_ceil( bcdiv( bcmul( $b_str, Gend_GS_BC_Math::LN2, 18 ), '1000000', 18 ) );
 $ensure_treasury = function () use ( $treasury_uid, $subsidy_calc ) {
 	$now  = (float) mycred_get_users_balance( $treasury_uid, 'transact' );
 	$need = (float) $subsidy_calc + 1000.0;

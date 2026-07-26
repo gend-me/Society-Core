@@ -216,6 +216,17 @@ if ( ! class_exists( 'Gend_GS_BC_Math' ) ) {
 			$x = (string) $x;
 			$s = $scale + self::GUARD;
 
+			// Underflow fast-path (defense-in-depth): for x sufficiently negative,
+			// e^x < 10^-s and rounds to 0 at this scale. Without this, k = round(x/ln2)
+			// is a huge NEGATIVE integer and the bcpow('2',|k|) step below would build
+			// an astronomically large divisor — unbounded CPU/memory (a hang). e^x < 10^-s
+			// <=> x < -(s)*ln(10); use -(s+1)*ln10 for a safe margin. ln(10) ≈ 2.302585.
+			// The LMSR money path never reaches this (log-sum-exp bounds |arg|), so this
+			// only guards misuse; it is mathematically exact (e^-large = 0 at scale s).
+			if ( bccomp( $x, bcmul( (string) ( $s + 1 ), '-2.302585092994045901', $s ), $s ) < 0 ) {
+				return self::bc_scale( '0', $scale );
+			}
+
 			// 1. Range reduce: k = round(x / ln2), r = x - k*ln2.
 			$k = self::bc_round_int( bcdiv( $x, self::LN2, $s ) );
 			$r = bcsub( $x, bcmul( $k, self::LN2, $s ), $s );

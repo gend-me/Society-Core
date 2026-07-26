@@ -1381,6 +1381,35 @@ function gs_chat_tabs_footer() {
 			function escAttr(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/"/g, '&quot;'); }
 			function escHtml(s) { return String(s == null ? '' : s).replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;'); }
 
+			// ── "Dashboard builds itself" staggered reveal ──────────────
+			// Marks each section with .gs-reveal then reveals it (adds .is-in)
+			// as it scrolls into view, with a per-batch stagger — so the popup
+			// assembles top-to-bottom and keeps building as you scroll. Falls
+			// back to an instant show when IO / reduced-motion apply.
+			function gsBuildReveal(scope, selector, scrollRoot) {
+				if (!scope) return;
+				var items = scope.querySelectorAll(selector);
+				if (!items.length) return;
+				Array.prototype.forEach.call(items, function (el) { el.classList.add('gs-reveal'); el.classList.remove('is-in'); });
+				var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+				if (reduce || !('IntersectionObserver' in window)) {
+					Array.prototype.forEach.call(items, function (el) { el.classList.add('is-in'); });
+					return;
+				}
+				var io = new IntersectionObserver(function (entries) {
+					// Stagger whatever became visible together this tick.
+					var shown = 0;
+					entries.forEach(function (e) {
+						if (!e.isIntersecting) return;
+						var el = e.target;
+						el.style.transitionDelay = (shown++ * 70) + 'ms';
+						el.classList.add('is-in');
+						io.unobserve(el);
+					});
+				}, { root: scrollRoot || null, threshold: 0.06 });
+				Array.prototype.forEach.call(items, function (el) { io.observe(el); });
+			}
+
 			function injectPopup() {
 				if (popupEl && document.body.contains(popupEl)) return popupEl;
 				var tpl = document.getElementById('gs-agent-popup-template');
@@ -1445,6 +1474,8 @@ function gs_chat_tabs_footer() {
 				loadWebApps(root, '');
 				// Render the (empty) sequence list — sequences are built in the nested popup.
 				renderSeqList(root);
+				// Staggered "self-building" reveal of the form cards (+ on scroll).
+				gsBuildReveal(root, '.gs-agent-card, .gs-agent-actions', root.querySelector('.gs-agent-popup__dialog'));
 			}
 
 			function fieldValue(root, key) {
@@ -2415,6 +2446,8 @@ function gs_chat_tabs_footer() {
 				}
 				renderSeq(seqRoot);
 				seqRoot.classList.add('is-open');
+				// Staggered "self-building" reveal of the fields + step cards (+ on scroll).
+				gsBuildReveal(seqRoot, '.gs-agent-field, .gs-agent-step-row', seqRoot.querySelector('.gs-seq-popup__body'));
 			}
 
 			// Save (create or update) the open nested popup's sequence into the model.

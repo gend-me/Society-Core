@@ -222,7 +222,14 @@ class Gend_GS_Collab_Deck {
 		$all_params = array_merge( $join_params, $params, array( self::RANK_WINDOW ) );
 
 		$rows = $wpdb->get_results( $wpdb->prepare( $sql, $all_params ), ARRAY_A );
-		if ( ! is_array( $rows ) || empty( $rows ) ) {
+		if ( ! is_array( $rows ) ) {
+			$rows = array();
+		}
+		// Do NOT early-return on an empty NATIVE result when the hub federated arm is
+		// active — opted-in federated businesses (merged below) may still supply cards
+		// even when the viewer has no local complementary BP groups. Only short-circuit
+		// when there is genuinely nothing to add (container / native-only path).
+		if ( empty( $rows ) && ! $with_federated ) {
 			return array( 'cards' => array(), 'has_more' => false );
 		}
 

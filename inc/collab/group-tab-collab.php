@@ -97,6 +97,13 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 				'groupId' => (int) $group_id,
 			) );
 
+			// Matches-management controller (list matches + conversation + contract
+			// propose/accept/manage). Depends on gs-collab-swipe so window.gsCollabData
+			// (localized above) is available. file_exists-guarded ver like the deck.
+			$m_js_path = GS_DIR . 'assets/collab-matches.js';
+			$m_js_ver  = file_exists( $m_js_path ) ? GS_VERSION . '.' . filemtime( $m_js_path ) : GS_VERSION;
+			wp_enqueue_script( 'gs-collab-matches', GS_URL . 'assets/collab-matches.js', array( 'gs-collab-swipe' ), $m_js_ver, true );
+
 			// Server-side pre-population (best-effort). The REST route
 			// (Plan 82-02) is the source of truth for validation + the
 			// opt-in gate; these values just avoid an empty-form flash
@@ -164,20 +171,33 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 					</div>
 				</form>
 
-				<!-- Deck mount. Plan-82-04 JS renders cards into #gs-collab-deck,
-				     wires the buttons, and toggles the empty-state (SWIPE-06). -->
-				<div class="gs-collab-deck-wrap">
-					<div id="gs-collab-deck" data-group-id="<?php echo esc_attr( $group_id ); ?>"></div>
+				<!-- View toggle: Discover (swipe deck) | Matches (manage matches + contracts). -->
+				<div class="gs-collab-viewnav" role="tablist">
+					<button type="button" class="gs-collab-viewbtn is-active" data-gs-view="deck" role="tab" aria-selected="true"><?php echo esc_html__( 'Discover', 'gend-society' ); ?></button>
+					<button type="button" class="gs-collab-viewbtn" data-gs-view="matches" role="tab" aria-selected="false"><?php echo esc_html__( 'Matches', 'gend-society' ); ?> <span class="gs-collab-match-count" data-gs-collab-match-count hidden></span></button>
+				</div>
 
-					<div class="gs-collab-empty" hidden>
-						<p style="color:#cbd5f5; text-align:center; margin:24px 0;"><?php echo esc_html__( 'No more businesses to review right now. Check back soon.', 'gend-society' ); ?></p>
-					</div>
+				<!-- DECK view. Plan-82-04 JS renders cards into #gs-collab-deck. -->
+				<div class="gs-collab-view" data-gs-view-panel="deck">
+					<div class="gs-collab-deck-wrap">
+						<div id="gs-collab-deck" data-group-id="<?php echo esc_attr( $group_id ); ?>"></div>
 
-					<div class="gs-collab-controls" style="display:flex; justify-content:center; gap:18px; margin-top:16px;">
-						<button type="button" data-gs-collab-pass class="gs-collab-btn gs-collab-pass" aria-label="<?php echo esc_attr__( 'Pass', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(255,120,120,0.5); background:rgba(255,90,90,0.14); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Pass', 'gend-society' ); ?></button>
-						<button type="button" data-gs-collab-like class="gs-collab-btn gs-collab-like" aria-label="<?php echo esc_attr__( 'Interested', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(120,255,170,0.5); background:rgba(90,220,150,0.16); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Interested', 'gend-society' ); ?></button>
-						<button type="button" data-gs-collab-undo class="gs-collab-btn gs-collab-undo" disabled aria-label="<?php echo esc_attr__( 'Undo last swipe', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(160,170,255,0.45); background:rgba(120,130,255,0.14); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Undo', 'gend-society' ); ?></button>
+						<div class="gs-collab-empty" hidden>
+							<p style="color:#fff; text-align:center; margin:6px 0 8px; font-weight:600;"><?php echo esc_html__( 'No businesses to review yet.', 'gend-society' ); ?></p>
+							<p style="color:#cbd5f5; text-align:center; margin:0; font-size:0.88rem; line-height:1.5;"><?php echo esc_html__( 'A business appears here once it sets its collaboration tags and opens to collaboration (the switch above). As more businesses join, they’ll show up in your deck — check back soon.', 'gend-society' ); ?></p>
+						</div>
+
+						<div class="gs-collab-controls" style="display:flex; justify-content:center; gap:18px; margin-top:16px;">
+							<button type="button" data-gs-collab-pass class="gs-collab-btn gs-collab-pass" aria-label="<?php echo esc_attr__( 'Pass', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(255,120,120,0.5); background:rgba(255,90,90,0.14); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Pass', 'gend-society' ); ?></button>
+							<button type="button" data-gs-collab-like class="gs-collab-btn gs-collab-like" aria-label="<?php echo esc_attr__( 'Interested', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(120,255,170,0.5); background:rgba(90,220,150,0.16); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Interested', 'gend-society' ); ?></button>
+							<button type="button" data-gs-collab-undo class="gs-collab-btn gs-collab-undo" disabled aria-label="<?php echo esc_attr__( 'Undo last swipe', 'gend-society' ); ?>" style="padding:10px 22px; border-radius:10px; border:1px solid rgba(160,170,255,0.45); background:rgba(120,130,255,0.14); color:#fff; font-weight:600; cursor:pointer;"><?php echo esc_html__( 'Undo', 'gend-society' ); ?></button>
+						</div>
 					</div>
+				</div>
+
+				<!-- MATCHES view. collab-matches.js fills #gs-collab-matches from GET /collab/matches. -->
+				<div class="gs-collab-view" data-gs-view-panel="matches" hidden>
+					<div id="gs-collab-matches" data-group-id="<?php echo esc_attr( $group_id ); ?>"></div>
 				</div>
 
 			</div>

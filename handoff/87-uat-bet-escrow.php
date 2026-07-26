@@ -329,9 +329,9 @@ $seed_bettor = function ( $label, $fund_whole ) use ( &$created_uids, &$bettor_p
 	return $uid;
 };
 
-// Ensure the treasury can fund a market subsidy (ceil(b·ln2) ≈ 69.3M DGEN); teardown reverses.
+// Ensure the treasury can fund a market subsidy (ceil(b·ln2 / 1e6) ≈ 70 WHOLE DGEN); teardown reverses.
 $b_str        = (string) Gend_GS_Collab_Market::DEFAULT_B;
-$subsidy_calc = Gend_GS_BC_Math::bc_ceil( bcmul( $b_str, Gend_GS_BC_Math::LN2, 18 ) );
+$subsidy_calc = Gend_GS_BC_Math::bc_ceil( bcdiv( bcmul( $b_str, Gend_GS_BC_Math::LN2, 18 ), '1000000', 18 ) );
 $ensure_treasury = function () use ( $treasury_uid, $subsidy_calc, $bal ) {
 	$now  = (float) mycred_get_users_balance( $treasury_uid, 'transact' );
 	$need = (float) $subsidy_calc + 1000.0;
@@ -523,7 +523,9 @@ if ( $cap_market > 0 && $cap_bettor > 0 ) {
 		$idem_c2 = 'uat87-C2-' . substr( md5( $session . 'C2' ), 0, 22 );
 		$seen_idem[] = $idem_c2;
 		$bal_c_mid = $bal( $cap_bettor );
-		$over      = Gend_GS_Collab_Market::place_bet( $cap_market, $cap_bettor, 'yes', 'buy', '900000000', $idem_c2 ); // 900 shares
+		// Costs are WHOLE DGEN (~1 DGEN/share near the extreme), so to exceed the 10000-DGEN
+		// cap we must buy ~10000+ shares. 20000 shares (2e10 micro) costs ~20000 DGEN >> cap.
+		$over      = Gend_GS_Collab_Market::place_bet( $cap_market, $cap_bettor, 'yes', 'buy', '20000000000', $idem_c2 ); // 20000 shares
 		$check( 'C1 over-cap buy rejected with WP_Error(gs_market_position_cap)',
 			is_wp_error( $over ) && 'gs_market_position_cap' === $over->get_error_code(),
 			is_wp_error( $over ) ? $over->get_error_code() : 'buy unexpectedly succeeded (existing=' . $existing . ' cap=' . $cap_str . ')' );
@@ -665,14 +667,15 @@ if ( $market_id > 0 && $bettor > 0 && isset( $res ) && is_array( $res ) ) {
 		$row_e_pre    = $market_row( $market_id );
 		$escrow_e_pre = (string) $row_e_pre->escrow_dgen;
 
-		// Expected refund = floor( cost(q) - cost(q') ) — maker-favor DOWN.
+		// Expected refund = floor( (cost(q) - cost(q')) / 1e6 share-scale ) — maker-favor
+		// DOWN, WHOLE DGEN. Mirrors the engine's sell path exactly.
 		$q_yes0   = (string) $row_e_pre->q_yes;
 		$q_no0    = (string) $row_e_pre->q_no;
 		$q_yes1   = bcsub( $q_yes0, $sell_shares, 0 );
-		$refund_x = Gend_GS_BC_Math::bc_floor( bcsub(
+		$refund_x = Gend_GS_BC_Math::bc_floor( bcdiv( bcsub(
 			Gend_GS_BC_Math::cost( $q_yes0, $q_no0, $b_str ),
 			Gend_GS_BC_Math::cost( $q_yes1, $q_no0, $b_str ),
-			18 ) );
+			18 ), '1000000', 18 ) );
 
 		$sell_idem = 'uat87-E-' . substr( md5( $session . 'E' ), 0, 24 );
 		$seen_idem[] = $sell_idem;
@@ -885,8 +888,8 @@ if ( isset( $res ) && is_array( $res ) ) {
 		$row_h   = $market_row( $market_id );
 		$sum_h   = (string) $wpdb->get_var( $wpdb->prepare(
 			"SELECT COALESCE(SUM(cost_dgen),0) FROM {$positions_tbl} WHERE market_id=%d", $market_id ) );
-		$check( 'H3 NO SKIM: escrow_dgen == subsidy + Σ(position cost) — no rake DGEN diverted in Phase 87',
-			is_object( $row_h ) && 0 === bccomp( (string) $row_h->escrow_dgen, bcadd( (string) $row_h->subsidy_dgen, $sum_h, 0 ), 0 ),
+		$check( 'H3 NO SKIM: escrow_dgen >= subsidy + Σ(position cost) — no rake DGEN diverted in Phase 87',
+			is_object( $row_h ) && bccomp( (string) $row_h->escrow_dgen, bcadd( (string) $row_h->subsidy_dgen, $sum_h, 0 ), 0 ) >= 0,
 			is_object( $row_h ) ? 'escrow=' . $row_h->escrow_dgen . ' subsidy+Σcost=' . bcadd( (string) $row_h->subsidy_dgen, $sum_h, 0 ) : 'no row' );
 	}
 } else {

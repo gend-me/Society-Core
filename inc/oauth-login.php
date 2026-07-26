@@ -403,6 +403,12 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
         // site-wide auth filter so the manage_network check has a chance to run.
         // NARROW scope: BOTH strpos checks must match — MUST NOT allow-list other /admin/* subtrees.
         if ( strpos( $route, '/gdc-app-manager/v1/admin/' ) !== false && strpos( $route, '/hosting/domains/reconcile-all' ) !== false ) return null;
+        // Launch Triggers (email-manager chatflows → AI Sequences) — the
+        // [gend_launch] link's click-through route is meant to be pasted
+        // anywhere and clicked by logged-out visitors. The handler only
+        // fires a fire-and-forget webhook POST + redirects; nothing in it
+        // needs an authenticated caller.
+        if ( strpos( $route, '/em/v1/launch/' ) !== false ) return null;
     }
     return $result;
 }, 99 );

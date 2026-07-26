@@ -334,3 +334,305 @@
 		transition: none !important;
 	}
 }
+
+/* ================================================================== */
+/* Youzify / theme override hardening (v12.0 Phase 82 live-fix).        */
+/* Youzify_Styling emits body-scoped `!important` rules on BuddyPress   */
+/* forms + buttons that repaint our glass panel white + our buttons red */
+/* (inline styles can't beat an external !important). We win with an    */
+/* ID-scoped (#buddypress) selector + !important on the load-bearing    */
+/* visual props only. See memory project_youzify_scheme_color_override. */
+/* ================================================================== */
+#buddypress .gs-collab-panel,
+body .gs-collab-panel {
+	color: #e8eefc !important;
+	background: transparent !important;
+}
+
+/* The tag-editor card — force the dark glass, not Youzify white. */
+#buddypress .gs-collab-panel .gs-collab-tag-form,
+body .gs-collab-panel .gs-collab-tag-form {
+	background-color: rgba( 18, 26, 48, 0.92 ) !important;
+	border: 1px solid rgba( 120, 150, 220, 0.28 ) !important;
+	border-radius: 14px !important;
+	color: #e8eefc !important;
+	box-shadow: none !important;
+}
+
+/* Labels + helper copy stay light on the dark panel. */
+#buddypress .gs-collab-panel label,
+#buddypress .gs-collab-panel label span,
+#buddypress .gs-collab-panel .gs-collab-header p,
+#buddypress .gs-collab-panel .gs-collab-tag-status,
+body .gs-collab-panel label,
+body .gs-collab-panel label span {
+	color: #cbd5f5 !important;
+}
+#buddypress .gs-collab-panel .gs-collab-header h3,
+#buddypress .gs-collab-panel .gs-collab-optin span,
+#buddypress .gs-collab-panel .gs-collab-name {
+	color: #ffffff !important;
+}
+
+/* Form controls: dark field + light text — beat Youzify's white inputs. */
+#buddypress .gs-collab-panel select,
+#buddypress .gs-collab-panel input[ type="text" ],
+body .gs-collab-panel select,
+body .gs-collab-panel input[ type="text" ] {
+	background-color: rgba( 12, 18, 36, 0.85 ) !important;
+	border: 1px solid rgba( 120, 150, 220, 0.5 ) !important;
+	color: #f2f6ff !important;
+	border-radius: 8px !important;
+	padding: 8px 10px !important;
+	height: auto !important;
+	min-height: 0 !important;
+	line-height: normal !important;
+	box-shadow: none !important;
+	max-width: 100%;
+}
+/* Open dropdown list is OS-painted on white — keep options readable. */
+#buddypress .gs-collab-panel select option {
+	color: #0c1224 !important;
+	background: #ffffff !important;
+}
+#buddypress .gs-collab-panel input[ type="text" ]::placeholder {
+	color: rgba( 203, 213, 245, 0.55 ) !important;
+}
+
+/* Buttons: our intended tinted glass, NOT the theme's red submit style. */
+#buddypress .gs-collab-panel .gs-collab-save,
+body .gs-collab-panel .gs-collab-save {
+	background: rgba( 78, 170, 255, 0.22 ) !important;
+	border: 1px solid rgba( 78, 170, 255, 0.5 ) !important;
+	color: #ffffff !important;
+	box-shadow: none !important;
+	text-shadow: none !important;
+	border-radius: 8px !important;
+	text-transform: none !important;
+	font-weight: 600 !important;
+	width: auto !important;
+}
+#buddypress .gs-collab-panel .gs-collab-pass {
+	background: rgba( 255, 90, 90, 0.16 ) !important;
+	border: 1px solid rgba( 255, 120, 120, 0.5 ) !important;
+	color: #ffffff !important;
+}
+#buddypress .gs-collab-panel .gs-collab-like {
+	background: rgba( 90, 220, 150, 0.18 ) !important;
+	border: 1px solid rgba( 120, 255, 170, 0.5 ) !important;
+	color: #ffffff !important;
+}
+#buddypress .gs-collab-panel .gs-collab-undo {
+	background: rgba( 120, 130, 255, 0.16 ) !important;
+	border: 1px solid rgba( 160, 170, 255, 0.45 ) !important;
+	color: #ffffff !important;
+}
+#buddypress .gs-collab-panel .gs-collab-btn {
+	text-transform: none !important;
+	font-weight: 600 !important;
+	box-shadow: none !important;
+}
+
+/* Deck cards + empty-state (JS-rendered later) — keep glass, not white. */
+#buddypress .gs-collab-panel .gs-collab-card,
+body .gs-collab-panel .gs-collab-card {
+	background-color: rgba( 18, 26, 48, 0.78 ) !important;
+	border: 1px solid rgba( 120, 150, 220, 0.28 ) !important;
+	color: #e8eefc !important;
+}
+#buddypress .gs-collab-panel .gs-collab-empty,
+body .gs-collab-panel .gs-collab-empty {
+	background-color: rgba( 18, 26, 48, 0.35 ) !important;
+	border: 1px dashed rgba( 120, 150, 220, 0.28 ) !important;
+}
+#buddypress .gs-collab-panel .gs-collab-empty[ hidden ] {
+	display: none !important;
+}
+
+/* ================================================================== */
+/* Matches management view (v12.0 — Deck/Matches toggle + match cards + */
+/* contract controls). Interactive elements are #buddypress-scoped with */
+/* !important to beat Youzify's form/button/link overrides.             */
+/* ================================================================== */
+#buddypress .gs-collab-panel .gs-collab-viewnav,
+body .gs-collab-panel .gs-collab-viewnav {
+	display: flex !important;
+	gap: 8px !important;
+	margin: 0 0 16px !important;
+}
+#buddypress .gs-collab-panel .gs-collab-viewbtn,
+body .gs-collab-panel .gs-collab-viewbtn {
+	background: rgba( 12, 18, 36, 0.6 ) !important;
+	border: 1px solid rgba( 120, 150, 220, 0.28 ) !important;
+	color: #cbd5f5 !important;
+	padding: 7px 18px !important;
+	border-radius: 999px !important;
+	font-weight: 600 !important;
+	font-size: 0.85rem !important;
+	cursor: pointer !important;
+	text-transform: none !important;
+	box-shadow: none !important;
+	width: auto !important;
+	transition: background 0.15s ease, color 0.15s ease;
+}
+#buddypress .gs-collab-panel .gs-collab-viewbtn.is-active,
+body .gs-collab-panel .gs-collab-viewbtn.is-active {
+	background: rgba( 78, 170, 255, 0.22 ) !important;
+	border-color: rgba( 78, 170, 255, 0.55 ) !important;
+	color: #fff !important;
+}
+#buddypress .gs-collab-panel .gs-collab-match-count {
+	opacity: 0.85;
+	font-weight: 700;
+}
+#buddypress .gs-collab-panel .gs-collab-view[ hidden ] {
+	display: none !important;
+}
+
+/* Match cards */
+#buddypress .gs-collab-panel #gs-collab-matches,
+body .gs-collab-panel #gs-collab-matches {
+	display: flex;
+	flex-direction: column;
+	gap: 12px;
+}
+#buddypress .gs-collab-panel .gs-collab-mnote,
+#buddypress .gs-collab-panel .gs-collab-mempty {
+	color: #cbd5f5 !important;
+	text-align: center;
+	padding: 26px 20px;
+	background-color: rgba( 18, 26, 48, 0.35 ) !important;
+	border: 1px dashed rgba( 120, 150, 220, 0.28 ) !important;
+	border-radius: 16px;
+}
+#buddypress .gs-collab-panel .gs-collab-mcard,
+body .gs-collab-panel .gs-collab-mcard {
+	background-color: rgba( 18, 26, 48, 0.72 ) !important;
+	border: 1px solid rgba( 120, 150, 220, 0.28 ) !important;
+	border-radius: 16px !important;
+	padding: 14px 16px !important;
+	-webkit-backdrop-filter: blur( 14px ) saturate( 150% );
+	backdrop-filter: blur( 14px ) saturate( 150% );
+}
+#buddypress .gs-collab-panel .gs-collab-mhead {
+	display: flex;
+	align-items: center;
+	gap: 12px;
+}
+#buddypress .gs-collab-panel .gs-collab-mavatar {
+	width: 52px !important;
+	height: 52px !important;
+	border-radius: 12px !important;
+	object-fit: cover;
+	flex: 0 0 auto;
+	border: 1px solid rgba( 120, 150, 220, 0.3 ) !important;
+	font-size: 1.4rem;
+}
+#buddypress .gs-collab-panel a.gs-collab-mname,
+#buddypress .gs-collab-panel span.gs-collab-mname,
+body .gs-collab-panel .gs-collab-mname {
+	color: #fff !important;
+	font-weight: 700 !important;
+	font-size: 1.02rem !important;
+	text-decoration: none !important;
+	display: block;
+	margin-bottom: 5px;
+}
+#buddypress .gs-collab-panel a.gs-collab-mname:hover {
+	color: #9fd0ff !important;
+	text-decoration: underline !important;
+}
+#buddypress .gs-collab-panel .gs-collab-mactions {
+	display: flex;
+	flex-wrap: wrap;
+	align-items: center;
+	gap: 8px;
+	margin-top: 12px;
+}
+#buddypress .gs-collab-panel .gs-collab-mstate {
+	color: #cbd5f5 !important;
+	font-size: 0.85rem;
+	margin-right: auto;
+}
+#buddypress .gs-collab-panel .gs-collab-mstate-live { color: #67ffb0 !important; font-weight: 600; }
+#buddypress .gs-collab-panel .gs-collab-mstate-done { color: #9fb6e6 !important; font-weight: 600; }
+
+/* Buttons + message link (beat Youzify red/blue link styles) */
+#buddypress .gs-collab-panel .gs-collab-mbtn,
+body .gs-collab-panel .gs-collab-mbtn {
+	display: inline-block !important;
+	background: rgba( 120, 130, 255, 0.16 ) !important;
+	border: 1px solid rgba( 160, 170, 255, 0.4 ) !important;
+	color: #fff !important;
+	padding: 7px 14px !important;
+	border-radius: 8px !important;
+	font-weight: 600 !important;
+	font-size: 0.82rem !important;
+	cursor: pointer !important;
+	text-decoration: none !important;
+	text-transform: none !important;
+	box-shadow: none !important;
+	width: auto !important;
+	line-height: normal !important;
+}
+#buddypress .gs-collab-panel a.gs-collab-mbtn-msg {
+	background: rgba( 78, 170, 255, 0.18 ) !important;
+	border-color: rgba( 78, 170, 255, 0.45 ) !important;
+}
+#buddypress .gs-collab-panel .gs-collab-mbtn-go {
+	background: rgba( 90, 220, 150, 0.18 ) !important;
+	border-color: rgba( 120, 255, 170, 0.5 ) !important;
+}
+#buddypress .gs-collab-panel .gs-collab-mbtn-warn {
+	background: rgba( 255, 90, 90, 0.14 ) !important;
+	border-color: rgba( 255, 120, 120, 0.5 ) !important;
+}
+
+/* Inline propose form */
+#buddypress .gs-collab-panel .gs-collab-mform {
+	margin-top: 12px;
+	padding-top: 12px;
+	border-top: 1px solid rgba( 120, 150, 220, 0.2 );
+}
+#buddypress .gs-collab-panel .gs-collab-mform[ hidden ] { display: none !important; }
+#buddypress .gs-collab-panel .gs-collab-mform-row {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 14px;
+}
+#buddypress .gs-collab-panel .gs-collab-mform label,
+body .gs-collab-panel .gs-collab-mform label {
+	display: flex !important;
+	flex-direction: column;
+	gap: 4px;
+	color: #cbd5f5 !important;
+	font-size: 0.8rem;
+}
+#buddypress .gs-collab-panel .gs-collab-mform input,
+#buddypress .gs-collab-panel .gs-collab-mform select,
+body .gs-collab-panel .gs-collab-mform input,
+body .gs-collab-panel .gs-collab-mform select {
+	background-color: rgba( 12, 18, 36, 0.85 ) !important;
+	border: 1px solid rgba( 120, 150, 220, 0.5 ) !important;
+	color: #f2f6ff !important;
+	border-radius: 8px !important;
+	padding: 7px 10px !important;
+	min-width: 150px !important;
+	height: auto !important;
+	box-shadow: none !important;
+}
+#buddypress .gs-collab-panel .gs-collab-mform-note {
+	color: #9fb6e6 !important;
+	font-size: 0.78rem;
+	margin: 10px 0 0;
+}
+#buddypress .gs-collab-panel .gs-collab-mform-actions {
+	display: flex;
+	gap: 8px;
+	margin-top: 12px;
+}
+#buddypress .gs-collab-panel .gs-collab-mstatus {
+	font-size: 0.8rem;
+	margin-top: 8px;
+	min-height: 1em;
+}

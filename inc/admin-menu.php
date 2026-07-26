@@ -66,7 +66,7 @@ function gs_register_admin_menu()
         4
     );
     add_submenu_page('gs-app', __('Theme Editor', 'gend-society'), __('Theme Editor', 'gend-society'), 'edit_theme_options', 'site-editor.php', '');
-    add_submenu_page('gs-app', __('Media', 'gend-society'), __('Media', 'gend-society'), 'upload_files', 'upload.php', '');
+    add_submenu_page('gs-app', __('Digital Media', 'gend-society'), __('Digital Media', 'gend-society'), 'upload_files', 'upload.php', '');
 
     // Note: Blog Manager and Email Manager register their own submenus under gs-app.
 
@@ -83,7 +83,7 @@ function gs_register_admin_menu()
         'none',
         5
     );
-    add_submenu_page('gs-content', __('Pages', 'gend-society'), __('Pages', 'gend-society'), 'edit_pages', 'edit.php?post_type=page', '');
+    add_submenu_page('gs-content', __('Info Pages', 'gend-society'), __('Info Pages', 'gend-society'), 'edit_pages', 'edit.php?post_type=page', '');
 
     // ── STORE (conditional) ───────────────────────────────────────────────────
     $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/advanced-affiliate-system.php') || gs_plugin_active('projects/project-service-orders.php');
@@ -241,8 +241,8 @@ function gs_move_plugin_submenus_to_content()
         remove_submenu_page('gs-app', 'email-manager');
         add_submenu_page(
             'gs-content',
-            __('Conversations', 'gend-society'),
-            __('Conversations', 'gend-society'),
+            __('Talk Flows', 'gend-society'),
+            __('Talk Flows', 'gend-society'),
             'manage_options',
             'email-manager',
             'em_render_email_manager_page'

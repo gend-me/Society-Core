@@ -68,6 +68,23 @@ class Gend_GS_Collab_Resolver {
 	 * gend-society.php after the collab requires.
 	 */
 	public static function init() : void {
+		// is_hub() delegates to Gend_CP_OAuth_Resource::is_main_node(), which is NOT
+		// reliably resolvable at plugin-load time (no HTTP host under wp-cli; fragile
+		// cross-plugin load order on web). Evaluating it here made the early-return
+		// fire and the terminal-signal hooks NEVER bind (the sweep still worked only
+		// because it is called directly). Defer the hub-gated wiring to 'init' (pri 5,
+		// same cadence as class-collab-schema::maybe_install), by which point node
+		// identity is settled. The paid/terminated signals + cron all fire AFTER
+		// 'init', so nothing is missed. Fixes the recorder on real web requests too.
+		add_action( 'init', array( __CLASS__, 'boot' ), 5 );
+	}
+
+	/**
+	 * Hub-gated hook + cron wiring, deferred from init() to the 'init' action so
+	 * is_hub() is evaluated once node identity is settled. Idempotent: add_action
+	 * dedupes identical static callbacks; wp_next_scheduled guards the cron.
+	 */
+	public static function boot() : void {
 		if ( ! self::is_hub() ) {
 			return;
 		}
@@ -240,12 +257,19 @@ class Gend_GS_Collab_Resolver {
 				array(
 					'type'         => self::ANCHOR_TYPE,
 					'from_app_id'  => '',
-					'from_user_id' => 0,
+					// The validator rejects unsigned txs ('gend_chain_no_user') even for
+					// 'chain.'-prefixed system types — sign with the hub system user
+					// (mirrors c-and-p class-task-contract::anchor() + chain-commission-anchor).
+					'from_user_id' => self::system_user_id(),
 					'payload'      => $details,
 					'ts'           => time(),
 				)
 			);
-			if ( ! empty( $chain_tx_id ) ) {
+			// Anchor is best-effort: submit_tx() can return a WP_Error (validator
+			// key unset / chain unavailable) — a WP_Error is NOT empty, so guard it
+			// explicitly or the (string) cast below fatals and BLOCKS the outcome
+			// record (the money-safety spine). Unanchored just leaves chain_tx_id null.
+			if ( ! empty( $chain_tx_id ) && ! is_wp_error( $chain_tx_id ) ) {
 				$wpdb->query(
 					$wpdb->prepare(
 						"UPDATE {$outcomes} SET chain_tx_id = %s WHERE contract_task_id = %d",
@@ -439,5 +463,25 @@ class Gend_GS_Collab_Resolver {
 		return ! class_exists( 'Gend_CP_OAuth_Resource' )
 			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
 			|| Gend_CP_OAuth_Resource::is_main_node();
+	}
+
+	/**
+	 * The user id that signs a SYSTEM chain anchor (the recorder has no natural
+	 * actor). Mirrors the proven resolution in contracts-and-payments
+	 * (chain-commission-anchor::system_user_id + task-contract::escrow_user_id):
+	 * pinned gend_chain_system_user_id -> hub fee user -> first administrator -> 1.
+	 * Always returns a valid signer so the validator does not reject the anchor.
+	 */
+	private static function system_user_id() : int {
+		$u = (int) get_site_option( 'gend_chain_system_user_id', 0 );
+		if ( $u > 0 ) {
+			return $u;
+		}
+		$u = (int) get_option( 'gend_cp_hub_fee_user_id', 0 );
+		if ( $u > 0 ) {
+			return $u;
+		}
+		$admins = get_users( array( 'role' => 'administrator', 'number' => 1, 'fields' => 'ID', 'orderby' => 'ID', 'order' => 'ASC' ) );
+		return ! empty( $admins ) ? (int) $admins[0] : 1;
 	}
 }

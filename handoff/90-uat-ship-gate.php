@@ -248,8 +248,12 @@ if ( $have_routes ) {
 	$leak_route = false;
 	foreach ( $route_keys as $rk ) {
 		$rk = (string) $rk;
-		if ( false !== stripos( $rk, 'leaderboard' ) || false !== stripos( $rk, '/rankings' )
-			|| ( false !== strpos( $rk, '/gs/v1/' ) && false !== strpos( $rk, '/positions/' ) ) ) {
+		// Scope to OUR namespace — a shared hub has unrelated plugin routes (e.g. WooCommerce
+		// /wc-analytics/leaderboards) that must NOT trip the collab counsel gate. A real collab
+		// P/L leak would live under /gs/v1/.
+		if ( false !== strpos( $rk, '/gs/v1/' )
+			&& ( false !== stripos( $rk, 'leaderboard' ) || false !== stripos( $rk, 'ranking' )
+				|| false !== strpos( $rk, '/positions/' ) ) ) {
 			$leak_route = true;
 		}
 	}
@@ -314,8 +318,12 @@ if ( $have_routes ) {
 	$backend_route = false;
 	foreach ( $route_keys as $rk ) {
 		$rk = (string) $rk;
-		if ( false !== stripos( $rk, '/resolve' ) || false !== stripos( $rk, '/settle' )
-			|| false !== stripos( $rk, '/payout' ) || false !== stripos( $rk, '/pay_market' ) ) {
+		// Scope to OUR namespace — unrelated hub plugins expose routes like
+		// /bm/v1/playlists/resolve-url that must NOT trip the collab gate. A real collab
+		// settlement endpoint would live under /gs/v1/.
+		if ( false !== strpos( $rk, '/gs/v1/' )
+			&& ( false !== stripos( $rk, '/resolve' ) || false !== stripos( $rk, '/settle' )
+				|| false !== stripos( $rk, '/payout' ) || false !== stripos( $rk, '/pay_market' ) ) ) {
 			$backend_route = true;
 		}
 	}

@@ -399,8 +399,11 @@ $assert(
 // otherwise fall back to a raw recipient-row count for the thread id.
 if ( $post_tid > 0 && ! empty( $expected_union ) ) {
 	$thread_recips = array();
-	if ( class_exists( 'BP_Messages_Thread' ) && method_exists( 'BP_Messages_Thread', 'get_recipients' ) ) {
-		$raw = BP_Messages_Thread::get_recipients( $post_tid );
+	if ( class_exists( 'BP_Messages_Thread' ) ) {
+		// get_recipients() is a NON-static instance method on this BP build (static
+			// call fatals). Instantiate + read ->recipients (array keyed by user_id).
+			$thread_obj = new BP_Messages_Thread( $post_tid );
+			$raw        = ! empty( $thread_obj->recipients ) ? $thread_obj->recipients : array();
 		foreach ( (array) $raw as $r ) {
 			if ( is_object( $r ) && isset( $r->user_id ) ) {
 				$thread_recips[] = (int) $r->user_id;

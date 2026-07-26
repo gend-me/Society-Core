@@ -179,10 +179,37 @@
     display: none !important;
 }
 
+/* Only `position: relative` is actually needed here — it's the anchor
+   point for .gs-tabbed-view-container's absolute overlay. Forcing this
+   element into `display: flex; flex-direction: column` on top of that
+   (as this rule used to) fights Gutenberg's own layout: this container
+   already sizes and internally scrolls its real editor canvas correctly
+   on its own, and the overlay's tab-bar + content stacking is handled by
+   .gs-tabbed-view-container's own flex column (further down in this
+   file) — it doesn't need this ancestor to be flex too. Forcing it
+   anyway let the real canvas grow unconstrained instead of scrolling
+   within its own region, which is what produced the extra, nested
+   vertical scrollbar on the product edit screen. */
 .interface-interface-skeleton__content {
     position: relative;
-    display: flex;
-    flex-direction: column;
+}
+
+/* WooCommerce's own bundled product-editor stylesheet
+   (plugins/woocommerce/assets/client/admin/product-editor/style.css)
+   unconditionally sets `overflow: auto` on this element:
+       .interface-interface-skeleton__body{...;overflow:auto;...}
+   That's fine for WooCommerce's own full block-based product editor
+   (where __body is meant to be the one scrolling region), but this
+   install edits products via the classic layout, where the main canvas
+   (__content) and the document-settings sidebar (__sidebar) ALREADY
+   scroll independently on their own — WooCommerce's rule then makes
+   their shared ancestor ALSO scroll on top of that, producing the
+   nested/duplicate vertical scrollbar on the product edit screen.
+   Restore the non-scrolling flex-row behavior this classic layout
+   actually needs; !important to beat WooCommerce's own rule (loaded
+   after this stylesheet, so specificity alone wouldn't be enough). */
+.interface-interface-skeleton__body {
+    overflow: hidden !important;
 }
 
 /* Loading State for Tabbed View */

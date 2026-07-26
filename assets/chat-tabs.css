@@ -1150,6 +1150,53 @@
 }
 
 /* ============================================================
+ * Futuristic "self-building dashboard" treatment for the agent
+ * + sequence popups: a scale-in dialog with an animated accent
+ * edge + light-sweep, per-section staggered reveal-on-scroll
+ * (.gs-reveal, toggled by gsBuildReveal in messages-tabs.php),
+ * and readable dark <select> dropdown options. Reduced-motion
+ * users get instant, animation-free panels.
+ * ============================================================ */
+@keyframes gs-pop-backdrop-in { from { opacity: 0; } to { opacity: 1; } }
+@keyframes gs-pop-dialog-in { 0% { opacity: 0; transform: translateY(24px) scale(.95); } 60% { opacity: 1; } 100% { opacity: 1; transform: none; } }
+@keyframes gs-pop-borderglow { 0%, 100% { opacity: .5; } 50% { opacity: 1; } }
+@keyframes gs-pop-sweep { 0% { transform: translateX(-130%); } 100% { transform: translateX(130%); } }
+
+.gs-agent-popup__backdrop,
+.gs-seq-popup__backdrop { animation: gs-pop-backdrop-in .35s ease both; }
+
+.gs-agent-popup.is-open .gs-agent-popup__dialog,
+.gs-seq-popup.is-open .gs-seq-popup__dialog { animation: gs-pop-dialog-in .5s cubic-bezier(.2,.85,.25,1) both; }
+
+/* Animated gradient top edge + one-time light sweep on open. */
+.gs-agent-popup__dialog,
+.gs-seq-popup__dialog { position: relative; }
+.gs-agent-popup__dialog::before,
+.gs-seq-popup__dialog::before { content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px; z-index: 2; background: linear-gradient(90deg, transparent, #b608c9, #6ec1e4, transparent); animation: gs-pop-borderglow 3s ease-in-out infinite; pointer-events: none; }
+.gs-agent-popup__dialog::after,
+.gs-seq-popup__dialog::after { content: ""; position: absolute; top: 0; left: 0; width: 42%; height: 100%; z-index: 1; background: linear-gradient(105deg, transparent, rgba(255,255,255,0.05), transparent); pointer-events: none; opacity: 0; }
+.gs-agent-popup.is-open .gs-agent-popup__dialog::after,
+.gs-seq-popup.is-open .gs-seq-popup__dialog::after { animation: gs-pop-sweep 1.1s ease .15s 1; }
+
+/* Per-section staggered reveal (instant if .gs-reveal never added). */
+.gs-reveal { opacity: 0; transform: translateY(18px); filter: blur(6px); transition: opacity .55s cubic-bezier(.2,.85,.25,1), transform .55s cubic-bezier(.2,.85,.25,1), filter .55s ease; will-change: opacity, transform; }
+.gs-reveal.is-in { opacity: 1; transform: none; filter: blur(0); }
+
+/* Readable dark dropdown lists inside both popups (was light-on-light). */
+.gs-agent-popup select option,
+.gs-seq-popup select option { background: #181222; color: #f3f0fa; }
+.gs-agent-popup select option:checked,
+.gs-seq-popup select option:checked { background: #b608c9; color: #fff; }
+
+@media (prefers-reduced-motion: reduce) {
+    .gs-agent-popup__backdrop, .gs-seq-popup__backdrop,
+    .gs-agent-popup.is-open .gs-agent-popup__dialog, .gs-seq-popup.is-open .gs-seq-popup__dialog,
+    .gs-agent-popup__dialog::before, .gs-seq-popup__dialog::before,
+    .gs-agent-popup.is-open .gs-agent-popup__dialog::after, .gs-seq-popup.is-open .gs-seq-popup__dialog::after { animation: none !important; }
+    .gs-reveal { transition: none !important; opacity: 1 !important; transform: none !important; filter: none !important; }
+}
+
+/* ============================================================
  * Plan 44-01 — Projects tab: Group column, project filter, and
  * the per-row "Attach to project" control. Own .gs-thread- /
  * .gs-chat-project- prefixes; tokens reuse the .gs-chat-tab pill

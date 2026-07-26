@@ -530,7 +530,7 @@ function gs_build_frontend_nav()
   ];
 
   if (current_user_can('upload_files')) {
-    $app_children[] = ['label' => __('Media', 'gend-society'), 'url' => admin_url('upload.php')];
+    $app_children[] = ['label' => __('Digital Media', 'gend-society'), 'url' => admin_url('upload.php')];
   }
 
   if (current_user_can('manage_options')) {
@@ -547,13 +547,13 @@ function gs_build_frontend_nav()
 
   // Build the Content menu
   $content_children = [
-    ['label' => __('Pages', 'gend-society'), 'url' => admin_url('edit.php?post_type=page')],
+    ['label' => __('Info Pages', 'gend-society'), 'url' => admin_url('edit.php?post_type=page')],
   ];
   if (gs_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
-    $content_children[] = ['label' => __('Blog Manager', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
+    $content_children[] = ['label' => __('Content Campaigns', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
   }
   if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
-    $content_children[] = ['label' => __('Conversations', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
+    $content_children[] = ['label' => __('Talk Flows', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
   }
 
   $items[] = [
@@ -571,14 +571,14 @@ function gs_build_frontend_nav()
 
     // Add Online Store submenus if active
     if (gs_plugin_active('online-store/online-store.php') && current_user_can('manage_woocommerce')) {
-      $store_children[] = ['label' => __('Store Settings', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-settings')];
+      $store_children[] = ['label' => __('Store Management', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-settings')];
     }
 
     if (gs_plugin_active('sales-team/advanced-affiliate-system.php') && current_user_can('manage_options')) {
       $store_children[] = ['label' => __('Sales Team', 'gend-society'), 'url' => admin_url('admin.php?page=st_sales_team')];
     }
     if (gs_plugin_active('projects/project-service-orders.php') && current_user_can('manage_options')) {
-      $store_children[] = ['label' => __('Projects', 'gend-society'), 'url' => admin_url('admin.php?page=psoo-projects')];
+      $store_children[] = ['label' => __('Project Services', 'gend-society'), 'url' => admin_url('admin.php?page=psoo-projects')];
     }
 
     $items[] = [
@@ -946,6 +946,22 @@ function gs_enqueue_mini_cart_styles() {
     line-height: 1;
 }
 
+/* Off-canvas chrome (front sidebar + mini-cart drawer) is parked off-screen
+   to the RIGHT via translateX, which otherwise extends the document width and
+   creates a page-wide horizontal scrollbar on every page. Clip horizontal
+   overflow at the root so the parked panels never add scroll. `clip` (not
+   `hidden`) keeps normal vertical scrolling and does NOT break position:sticky.
+   The panels are only off-screen when closed; when open they translate to 0
+   (on-screen), so nothing visible is ever clipped. */
+/* Clip the off-screen fixed chrome (front sidebar + mini-cart) so it never
+   creates a horizontal scrollbar. hidden on the html element (the viewport
+   scroller) reliably clips fixed-position elements. On body use clip NOT
+   hidden: hidden would force body overflow-y to auto, making it a SECOND
+   vertical scroll container (double scrollbars). clip leaves overflow-y
+   visible, so there is still exactly one vertical scrollbar (the viewport). */
+html { overflow-x: hidden !important; }
+body { overflow-x: clip !important; }
+
 /* GS Mini-Cart Overlay */
 .gs-mini-cart-overlay {
     position: fixed;
@@ -955,6 +971,7 @@ function gs_enqueue_mini_cart_styles() {
     opacity: 0;
     pointer-events: none;
     transition: opacity .25s ease;
+    overflow: hidden; /* contain the off-screen drawer within the viewport */
 }
 .gs-mini-cart-overlay.is-open {
     opacity: 1;
