@@ -206,9 +206,34 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 'template_file'     => 'groups/single/plugins',
             ) );
         }
+        /**
+         * Phase 100-05: routes through the Group Page resolution system
+         * (gdc_gs_render_endpoint()) so davinci-ai's content becomes
+         * editable via Group Pages, same as the 6 original projects-owned
+         * endpoints. Falls back to render_legacy_content() directly if the
+         * projects plugin is somehow inactive (graceful degrade, matches
+         * every other endpoint's convention).
+         */
         public function display( $group_id = null ) {
-            if ( ! function_exists( 'gs_group_tabs_user_has_access' ) || ! gs_group_tabs_user_has_access() ) return;
             $group_id = $group_id ?: bp_get_current_group_id();
+            if ( function_exists( 'gdc_gs_render_endpoint' ) ) {
+                echo gdc_gs_render_endpoint( $group_id, 'davinci-ai' ); // phpcs:ignore WordPress.Security.EscapeOutput -- pre-rendered, resolved block content
+            } else {
+                self::render_legacy_content( $group_id );
+            }
+        }
+
+        /**
+         * The original display() body, extracted verbatim (pure move, not
+         * a duplicate) so both the self-registered Group Page callback
+         * below AND display()'s own fallback share ONE implementation.
+         * MUST NEVER re-invoke display() (directly or via self::/static::)
+         * -- doing so would recreate the display-calls-resolver-calls-
+         * callback-calls-display infinite-recursion cycle Plan 97-02 fixed
+         * for business-plan.
+         */
+        public static function render_legacy_content( $group_id ) {
+            if ( ! function_exists( 'gs_group_tabs_user_has_access' ) || ! gs_group_tabs_user_has_access() ) return;
             gs_group_render_davinci_ai_suite( (int) $group_id );
         }
     }
@@ -229,6 +254,40 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
     }
 
 endif; // BP_Group_Extension
+
+add_filter( 'gdc_gs_endpoint_content_callbacks', function ( $callbacks ) {
+    $callbacks['davinci-ai'] = array( 'GS_Group_Tab_Davinci_AI', 'render_legacy_content' );
+    return $callbacks;
+} );
+
+add_filter( 'gdc_gs_endpoints', function ( $endpoints ) {
+    $endpoints['davinci-ai'] = __( 'Davinci AI', 'gend-society' );
+    return $endpoints;
+} );
+
+/**
+ * Phase 100-05: gdc_gs_bootstrap_defaults() (projects plugin, init@20)
+ * already loops gdc_gs_endpoints() generically and will create an EMPTY
+ * default gdc_group_page for 'davinci-ai' the moment the filter above is
+ * active -- this fills that empty page with the real endpoint-panel block
+ * so the tab is never blank post-deploy. Idempotent: only writes when the
+ * resolved default page's content is still empty, never clobbers real
+ * content an admin has since edited. Mirrors
+ * gdc_gs_seed_hosting_and_members_hub_defaults() in
+ * projects/includes/group-members-screen.php exactly.
+ */
+add_action( 'init', 'gdc_gs_davinci_ai_seed_default_page', 30 );
+function gdc_gs_davinci_ai_seed_default_page() {
+    if ( ! function_exists( 'gdc_gs_get_site_default_page_id' ) ) return;
+    $post_id = gdc_gs_get_site_default_page_id( 'davinci-ai' );
+    if ( ! $post_id ) return; // Bootstrap hasn't created it yet -- self-heals next load.
+    $post = get_post( $post_id );
+    if ( ! $post || trim( (string) $post->post_content ) !== '' ) return; // Already seeded/has real content -- never clobber.
+    wp_update_post( array(
+        'ID'           => $post_id,
+        'post_content' => '<!-- wp:gdc-blocks/endpoint-panel {"slug":"davinci-ai"} /-->',
+    ) );
+}
 
 /* ──────────────────────────── renderer ──────────────────────────── */
 
