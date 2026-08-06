@@ -122,9 +122,27 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 'template_file'     => 'groups/single/plugins',
             ) );
         }
+        /**
+         * Phase 100-04: routes through the Group Page resolution system
+         * so feature-suite's content becomes editable via Group Pages,
+         * same as the 6 original projects-owned endpoints.
+         */
         public function display( $group_id = null ) {
-            if ( ! gs_group_tabs_user_has_access() ) return;
             $group_id = $group_id ?: bp_get_current_group_id();
+            if ( function_exists( 'gdc_gs_render_endpoint' ) ) {
+                echo gdc_gs_render_endpoint( $group_id, 'feature-suite' ); // phpcs:ignore WordPress.Security.EscapeOutput -- pre-rendered, resolved block content
+            } else {
+                self::render_legacy_content( $group_id );
+            }
+        }
+
+        /**
+         * The original display() body, extracted verbatim. MUST NEVER
+         * re-invoke display() — see Plan 97-02's business-plan recursion
+         * fix for why.
+         */
+        public static function render_legacy_content( $group_id ) {
+            if ( ! gs_group_tabs_user_has_access() ) return;
             // No gs_group_tab_open() wrapper — gs_render_group_feature_suite()
             // ships its own scoped chrome (plan badge hero + filter bar) so
             // the wrapper's small title strip would only duplicate it.
@@ -169,9 +187,30 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 'template_file'     => 'groups/single/plugins',
             ) );
         }
+        /**
+         * Phase 100-04: routes through the Group Page resolution system.
+         * The site-default gdc_group_page post for 'hosting' already
+         * exists with real content (seeded Phase 97-05) -- this plan only
+         * changes WHICH plugin's content-callback that post's
+         * endpoint-panel block dispatches to (see the self-registered
+         * filter below), completing the ownership transfer Plan 100-03
+         * started by retiring projects' competing registration.
+         */
         public function display( $group_id = null ) {
-            if ( ! gs_group_tabs_user_has_access() ) return;
             $group_id = $group_id ?: bp_get_current_group_id();
+            if ( function_exists( 'gdc_gs_render_endpoint' ) ) {
+                echo gdc_gs_render_endpoint( $group_id, 'hosting' ); // phpcs:ignore WordPress.Security.EscapeOutput -- pre-rendered, resolved block content
+            } else {
+                self::render_legacy_content( $group_id );
+            }
+        }
+
+        /**
+         * The original display() body, extracted verbatim. MUST NEVER
+         * re-invoke display().
+         */
+        public static function render_legacy_content( $group_id ) {
+            if ( ! gs_group_tabs_user_has_access() ) return;
             // No gs_group_tab_open() wrapper — the new suite header below
             // is the only chrome we need. (Same fix that landed on the
             // Compute Gas tab — the wrapper rendered a duplicate title.)
@@ -275,7 +314,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 'template_file'     => 'groups/single/plugins',
             ) );
         }
-        public function display( $group_id = null ) {
+        public static function render_legacy_content( $group_id ) {
             if ( ! gs_group_tabs_user_has_access() ) return;
             $group_id = $group_id ?: bp_get_current_group_id();
             // No gs_group_tab_open() wrapper here — the new design's two
@@ -2118,9 +2157,62 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             // No gs_group_tab_close() — paired with the skipped
             // gs_group_tab_open() above.
         }
+
+        /**
+         * Phase 100-04: routes through the Group Page resolution system.
+         */
+        public function display( $group_id = null ) {
+            $group_id = $group_id ?: bp_get_current_group_id();
+            if ( function_exists( 'gdc_gs_render_endpoint' ) ) {
+                echo gdc_gs_render_endpoint( $group_id, 'compute-gas' ); // phpcs:ignore WordPress.Security.EscapeOutput -- pre-rendered, resolved block content
+            } else {
+                self::render_legacy_content( $group_id );
+            }
+        }
     }
 
 endif; // class_exists( 'BP_Group_Extension' )
+
+add_filter( 'gdc_gs_endpoint_content_callbacks', function ( $callbacks ) {
+    $callbacks['feature-suite'] = array( 'GS_Group_Tab_Feature_Suite', 'render_legacy_content' );
+    $callbacks['hosting']       = array( 'GS_Group_Tab_Hosting', 'render_legacy_content' );
+    $callbacks['compute-gas']   = array( 'GS_Group_Tab_Compute_Gas', 'render_legacy_content' );
+    return $callbacks;
+} );
+
+add_filter( 'gdc_gs_endpoints', function ( $endpoints ) {
+    $endpoints['feature-suite'] = __( 'Feature Suite', 'gend-society' );
+    $endpoints['compute-gas']   = __( 'Compute Gas', 'gend-society' );
+    // 'hosting' deliberately NOT added here -- already a projects-owned key.
+    return $endpoints;
+} );
+
+/**
+ * Phase 100-04: gdc_gs_bootstrap_defaults() (projects plugin, init@20)
+ * already loops gdc_gs_endpoints() generically and will create EMPTY
+ * default gdc_group_page posts for 'feature-suite'/'compute-gas' the
+ * moment the filters above are active -- this fills them with the real
+ * endpoint-panel block so neither tab is blank post-deploy. Idempotent.
+ * Mirrors gdc_gs_seed_hosting_and_members_hub_defaults() in
+ * projects/includes/group-members-screen.php exactly. 'hosting' is
+ * deliberately excluded -- its default page already has real content
+ * from Phase 97-05; only its content-callback's owning plugin changed.
+ */
+add_action( 'init', 'gdc_gs_feature_suite_and_compute_gas_seed_defaults', 30 );
+function gdc_gs_feature_suite_and_compute_gas_seed_defaults() {
+    if ( ! function_exists( 'gdc_gs_get_site_default_page_id' ) ) return;
+    $seeds = array(
+        'feature-suite' => '<!-- wp:gdc-blocks/endpoint-panel {"slug":"feature-suite"} /-->',
+        'compute-gas'   => '<!-- wp:gdc-blocks/endpoint-panel {"slug":"compute-gas"} /-->',
+    );
+    foreach ( $seeds as $slug => $block_markup ) {
+        $post_id = gdc_gs_get_site_default_page_id( $slug );
+        if ( ! $post_id ) continue;
+        $post = get_post( $post_id );
+        if ( ! $post || trim( (string) $post->post_content ) !== '' ) continue;
+        wp_update_post( array( 'ID' => $post_id, 'post_content' => $block_markup ) );
+    }
+}
 
 /**
  * Register all four tabs at bp_init so BuddyPress sees them during
