@@ -262,6 +262,18 @@ if ( file_exists( GS_DIR . 'inc/collab/class-collab-portfolio-rest.php' ) ) {
 if ( file_exists( GS_DIR . 'inc/collab/member-markets.php' ) ) {
 	require_once GS_DIR . 'inc/collab/member-markets.php'; // self-registers its dark-guarded bp_setup_nav tab.
 }
+// GenD Match (v12.0 Phase 102) -- member-profile "Match" tab, the new primary
+// entry point (relocated from the group-tab-only surface). Calls
+// GS_Group_Tab_Collab::render_panel() (defined in group-tab-collab.php, loaded
+// via the bp_include closure above) to reuse 100% of the existing deck/matches
+// markup + asset enqueue -- needs that class loaded first at RUNTIME
+// (bp_setup_nav fires after bp_include, so ordering is safe), guarded
+// defensively with class_exists() inside the file itself. file_exists-guarded
+// per the hub PVC .no-plugin-sync quirk (kubectl cp BEFORE this entrypoint
+// edit, or every request fatals + WP auto-deactivates the plugin).
+if ( file_exists( GS_DIR . 'inc/collab/member-tab-collab.php' ) ) {
+	require_once GS_DIR . 'inc/collab/member-tab-collab.php';
+}
 
 // GenD Match (v12.0 Phase 89-02, FED-01) — cross-app federation of the swipe/match pool.
 //   - class-collab-sync-crypto.php (89-01): Gend_GS_Collab_Sync_Crypto — the standalone

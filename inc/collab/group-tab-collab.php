@@ -21,6 +21,16 @@
  * NO role SQL is hand-rolled here — the gate + the gs/v1 REST
  * permission_callback (Plan 82-02) own authorization.
  *
+ * Phase 102-01 note: the asset-enqueue + markup body that used to live inline
+ * inside display() has been extracted to a reusable public static method,
+ * render_panel( $group_id ), which takes an ALREADY-resolved,
+ * ALREADY-authorized group id and does no gating of its own. display() is now
+ * just the group-tab-specific access gate + $group_id resolution, ending in
+ * self::render_panel( $group_id ) — this is why display() is short. The new
+ * member-profile "Match" tab (inc/collab/member-tab-collab.php) calls
+ * render_panel() directly with its own resolved+authorized group id, reusing
+ * 100% of this markup without going through display()'s group-tab-only gate.
+ *
  * Consumed by Plan 82-04's collab-swipe.js — the stable DOM contract is:
  *   #gs-collab-deck[data-group-id]          the card-stack mount
  *   #gs-collab-tag-form                       the inline tag/opt-in editor
@@ -65,8 +75,9 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 		}
 
 		/**
-		 * Render the Match tab: access gate → assets → inline tag editor +
-		 * opt-in → deck mount + on-screen buttons + empty-state.
+		 * Render the Match tab: access gate → resolve $group_id → delegate
+		 * to render_panel() for the actual assets + markup (Phase 102-01
+		 * extract-method refactor — see the file docblock).
 		 *
 		 * @param int|null $group_id Current group id (BP passes it).
 		 */
@@ -79,6 +90,23 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 			}
 
 			$group_id = $group_id ? (int) $group_id : (int) bp_get_current_group_id();
+			self::render_panel( $group_id );
+		}
+
+		/**
+		 * Reusable render body — asset enqueue + full panel markup — for an
+		 * ALREADY-resolved, ALREADY-authorized $group_id. Callers own
+		 * access-gating and $group_id resolution; this method does neither
+		 * (it does not call gs_group_tabs_user_has_access() and does not call
+		 * bp_get_current_group_id()), so it is safe to call from any context
+		 * that has already authorized the caller for this specific group,
+		 * including a member-profile page with no ambient group context
+		 * (Phase 102-01, inc/collab/member-tab-collab.php).
+		 *
+		 * @param int $group_id Already-resolved, already-authorized group id.
+		 */
+		public static function render_panel( $group_id ) {
+			$group_id = (int) $group_id;
 
 			// Enqueue the deck assets with the GS_VERSION.'.'.filemtime()
 			// idiom (defeats the stale-asset pitfall). filemtime() is
