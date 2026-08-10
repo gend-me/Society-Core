@@ -90,6 +90,17 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 			}
 
 			$group_id = $group_id ? (int) $group_id : (int) bp_get_current_group_id();
+
+			// Phase 102-02 -- Match relocated to the member profile. This
+			// URL/tab stays fully functional (no broken mid-flight
+			// negotiations) but is now hard-hidden from the group nav (see
+			// the bp_group_extension_nav_show_for_user filter below) -- this
+			// notice is the only visible sign for anyone who lands here via
+			// a bookmark or the still-live URL.
+			echo '<div class="gs-collab-moved-notice" style="margin-bottom:16px; padding:12px 16px; border-radius:8px; background:rgba(78,170,255,0.12); border:1px solid rgba(78,170,255,0.35); color:#fff; font-size:0.88rem;">'
+				. esc_html__( 'GenD Match has moved to your profile — find it under the Match tab on your own profile page. This group view remains available during the transition.', 'gend-society' )
+				. '</div>';
+
 			self::render_panel( $group_id );
 		}
 
@@ -265,5 +276,13 @@ add_filter( 'bp_group_extension_nav_show_for_user', function ( $show, $slug, $gr
 	if ( 'collab' !== $slug ) {
 		return $show;
 	}
-	return function_exists( 'gs_group_tabs_user_has_access' ) ? gs_group_tabs_user_has_access() : $show;
+	// Phase 102 -- Match relocated to the member profile (member-tab-collab.php,
+	// Plan 102-01). The group-tab BP_Group_Extension registration stays in place
+	// as a safety net (direct-URL reachability for any mid-flight contract/
+	// proposal state -- 102-RESEARCH.md Open Question 1) but is now ALWAYS
+	// hidden from the group nav, regardless of any admin's prior Group Styling
+	// override -- confirmed via a live pre-check (Plan 102-02) that no group had
+	// an active override at retirement time. No group can re-surface it going
+	// forward (removed from gdc_gs_full_nav_manageable_slugs() below).
+	return false;
 }, 99, 3 );
