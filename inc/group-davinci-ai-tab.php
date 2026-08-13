@@ -334,7 +334,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
     ?>
     <style>
         [data-gs-dv-scope] {
-            --dv-blue:#6ec1e4; --dv-magenta:#b608c9; --dv-green:#00ff88; --dv-gold:#ffcc00;
+            --dv-blue:var(--gdc-group-accent,#6ec1e4); --dv-magenta:#b608c9; --dv-green:#00ff88; --dv-gold:#ffcc00;
             --dv-glass-bg:rgba(15,18,24,0.45); --dv-glass-border:rgba(255,255,255,0.08);
             --dv-ease:cubic-bezier(0.16,1,0.3,1);
             font-family:'Inter',system-ui,sans-serif; color:#fff; max-width:1250px; margin:0 auto; padding:20px; box-sizing:border-box;
