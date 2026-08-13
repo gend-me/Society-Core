@@ -116,7 +116,7 @@ function gs_render_group_feature_suite($group_id) {
            theme CSS can't bleed in. Class names use gs-fs-* prefix to
            avoid collisions with existing dashboard surfaces. */
         [data-gs-fs-scope] {
-            --fs-blue:    #6ec1e4;
+            --fs-blue:    var(--gdc-group-accent,#6ec1e4);
             --fs-magenta: #b608c9;
             --fs-green:   #00ff88;
             --fs-amber:   #ffb446;
