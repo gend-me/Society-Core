@@ -537,7 +537,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                    serif headings) can't bleed in. Class names use the
                    gs-cg-* namespace to avoid theme/plugin collisions. */
                 [data-gs-cg-scope] {
-                    --cg-blue:    #6ec1e4;
+                    --cg-blue:    var(--gdc-group-accent,#6ec1e4);
                     --cg-magenta: #b608c9;
                     --cg-green:   #00ff88;
                     --cg-obsidian:#0b0e14;
@@ -2620,7 +2620,7 @@ function gs_group_render_hosting_suite( $group_id ) {
            gs-host-* to avoid collisions with the wp-admin renderer.
         ───────────────────────────────────────────────────────────── */
         [data-gs-host-scope] {
-            --brand-blue:    #6ec1e4;
+            --brand-blue:    var(--gdc-group-accent,#6ec1e4);
             --brand-magenta: #b608c9;
             --brand-green:   #00ff88;
             --brand-red:     #cc0000;
