@@ -237,9 +237,9 @@ function gs_media_storage_panel_inline_js() {
 			var x = (window.screen.width - w) / 2;
 			var y = (window.screen.height - h) / 2;
 			var popup = window.open(
-				memberUrl + '?ui=embed&group=hosting',
+				memberUrl + '?ui=embed&plan_only=1&group=hosting',
 				'gs_mship_upgrade',
-				'width=' + w + ',height=' + h + ',left=' + x + ',top=' + y
+				'width=' + w + ',height=' + h + ',left=' + x + ',top=' + y + ',toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes'
 			);
 			if (!popup) { return; }
 			var watchdog = setInterval(function () {

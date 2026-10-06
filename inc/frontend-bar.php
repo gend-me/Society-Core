@@ -363,6 +363,38 @@ function gs_render_frontend_bar()
     }
   }
 
+  // ── "Edit Agent" quick-switch — viewing an Agent Member's own BP profile,
+  // as a site admin or super admin. A Group Admin/Project Consultant already
+  // gets "Switch to this Agent" on the group roster card itself (see
+  // projects/includes/group-members-screen.php); this surfaces the SAME
+  // underlying action (psoo/v1/agents/switch-to — its permission check
+  // already passes any manage_options/super-admin caller regardless of group
+  // role) for an admin who browsed directly to the agent's profile page.
+  $edit_agent_slug     = '';
+  $edit_agent_group_id = 0;
+  if ( function_exists( 'bp_is_user' ) && bp_is_user()
+       && ( is_super_admin( $user->ID ) || current_user_can( 'manage_options' ) )
+       && function_exists( 'gs_user_is_agent' ) ) {
+    $edit_agent_displayed_id = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
+    if ( $edit_agent_displayed_id && gs_user_is_agent( $edit_agent_displayed_id ) ) {
+      $edit_agent_slug = (string) get_user_meta( $edit_agent_displayed_id, '_aipa_agent_slug', true );
+      // Resolve the group this agent belongs to — prefer the bookkeeping meta
+      // (newer agents), fall back to actual BP group membership (older agents
+      // created via the desktop-sync path never got that meta stamped — same
+      // reasoning as psoo_rest_agents_switch_to()'s group-scope fix).
+      $edit_agent_group_id = (int) get_user_meta( $edit_agent_displayed_id, '_aipa_agent_container_group_id', true );
+      if ( ! $edit_agent_group_id && function_exists( 'groups_get_user_groups' ) ) {
+        $edit_agent_ug = groups_get_user_groups( $edit_agent_displayed_id );
+        if ( ! empty( $edit_agent_ug['groups'][0] ) ) {
+          $edit_agent_group_id = (int) $edit_agent_ug['groups'][0];
+        }
+      }
+      if ( $edit_agent_slug === '' || $edit_agent_group_id <= 0 ) {
+        $edit_agent_slug = ''; // could not resolve a target — hide the button
+      }
+    }
+  }
+
   // Build the nav items.
   // - If the admin-mirror nav has items → render those (existing behaviour).
   // - Otherwise (no accessible WP-admin menus) and social plugin active →
@@ -393,6 +425,20 @@ function gs_render_frontend_bar()
     </a>
 
     <div class="gs-sidebar-divider gs-delay-2" data-gs-animate></div>
+
+    <!-- Edit Agent (admin/super-admin, viewing an Agent Member's profile) -->
+    <?php if ($edit_agent_slug !== ''): ?>
+      <div class="gs-sidebar-actions gs-delay-3" data-gs-animate>
+        <button type="button" class="gs-sidebar-action-btn" id="gs-edit-agent-btn"
+          data-agent-slug="<?php echo esc_attr($edit_agent_slug); ?>"
+          data-agent-group-id="<?php echo esc_attr($edit_agent_group_id); ?>"
+          aria-label="<?php esc_attr_e('Switch to this Agent', 'gend-society'); ?>">
+          <span class="gs-sidebar-icon dashicons dashicons-admin-users"></span>
+          <span class="gs-sidebar-label"><?php esc_html_e('Edit Agent', 'gend-society'); ?></span>
+        </button>
+      </div>
+      <div class="gs-sidebar-divider gs-delay-4" data-gs-animate></div>
+    <?php endif; ?>
 
     <!-- Edit Action -->
     <?php if ($edit_url): ?>
@@ -431,6 +477,59 @@ function gs_render_frontend_bar()
       <?php endforeach; ?>
     </nav>
   </div>
+
+  <?php if ($edit_agent_slug !== ''): ?>
+  <script>
+    (function () {
+      // Wire the "Edit Agent" sidebar button to the SAME switch-to-agent REST
+      // route the group roster card uses (projects plugin, psoo/v1 — the
+      // permission check there already passes any manage_options/super-admin
+      // caller regardless of group role, which is exactly this button's
+      // audience). On success the server has swapped the auth cookie, so a
+      // FULL navigation (not a repaint) is required for the new identity to
+      // take effect app-wide.
+      function gsBindEditAgent() {
+        var btn = document.getElementById('gs-edit-agent-btn');
+        if (!btn || btn.__gsBound) return;
+        btn.__gsBound = true;
+        btn.addEventListener('click', function (e) {
+          e.preventDefault();
+          var slug = btn.getAttribute('data-agent-slug') || '';
+          var groupId = btn.getAttribute('data-agent-group-id') || '0';
+          if (!slug || !groupId) return;
+          var orig = btn.innerHTML;
+          btn.setAttribute('disabled', 'disabled');
+          fetch('<?php echo esc_url_raw( rest_url( 'psoo/v1/agents/switch-to' ) ); ?>', {
+            method: 'POST',
+            credentials: 'same-origin',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-WP-Nonce': <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>
+            },
+            body: JSON.stringify({ group_id: parseInt(groupId, 10), slug: slug, return_url: window.location.href })
+          })
+            .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+            .then(function (result) {
+              if (!result.ok || !result.data || result.data.ok === false) {
+                throw new Error((result.data && result.data.message) || 'switch_failed');
+              }
+              window.location.href = result.data.redirect_url || window.location.href;
+            })
+            .catch(function (err) {
+              btn.removeAttribute('disabled');
+              btn.innerHTML = orig;
+              window.alert((err && err.message) || <?php echo wp_json_encode( __( 'Could not switch to this agent.', 'gend-society' ) ); ?>);
+            });
+        });
+      }
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', gsBindEditAgent);
+      } else {
+        gsBindEditAgent();
+      }
+    })();
+  </script>
+  <?php endif; ?>
 
   <!-- Bottom-left floating dock: profile + cart, both glassmorphic. -->
   <div class="gs-float-dock" role="group" aria-label="<?php esc_attr_e('Quick actions', 'gend-society'); ?>">
@@ -524,40 +623,29 @@ function gs_build_frontend_nav()
   // dashboard membership card's User Access tab. Your Profile is still
   // reachable via the admin bar avatar dropdown.
 
-  // Build the App menu children dynamically
-  $app_children = [
-    ['label' => __('Theme Editor', 'gend-society'), 'url' => admin_url('site-editor.php')],
-  ];
-
-  if (current_user_can('upload_files')) {
-    $app_children[] = ['label' => __('Digital Media', 'gend-society'), 'url' => admin_url('upload.php')];
+  // The old standalone "App" nav item (gs-app) is gone — it only ever held
+  // Digital Media, which is removed outright. "Write" is renamed to "App"
+  // and takes over the label below. Theme Editor moved to the top of its
+  // children; Permalinks moved into the Dashboard's Settings tab (see
+  // gs_render_permalink_settings_form() in inc/pages/dashboard.php).
+  // Info Pages used to be its own link (edit.php?post_type=page), then a
+  // separate "Info Pages" submenu item pointing at the Content Campaigns
+  // "pages" tab. That submenu item is removed — Info Pages is reachable as
+  // a tab from within Content Campaigns itself, so it doesn't need its own
+  // sidebar entry.
+  $content_children = [];
+  if (current_user_can('edit_theme_options')) {
+    $content_children[] = ['label' => __('Theme Editor', 'gend-society'), 'url' => admin_url('site-editor.php')];
   }
-
-  if (current_user_can('manage_options')) {
-    $app_children[] = ['label' => __('Permalinks', 'gend-society'), 'url' => admin_url('options-permalink.php')];
-  }
-
-  $items[] = [
-    'label' => __('App', 'gend-society'),
-    'url' => admin_url('admin.php?page=gs-app'),
-    'icon' => 'dashicons-admin-appearance',
-    'cap' => 'edit_theme_options',
-    'children' => $app_children,
-  ];
-
-  // Build the Content menu
-  $content_children = [
-    ['label' => __('Info Pages', 'gend-society'), 'url' => admin_url('edit.php?post_type=page')],
-  ];
   if (gs_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
     $content_children[] = ['label' => __('Content Campaigns', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
   }
   if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
-    $content_children[] = ['label' => __('Talk Flows', 'gend-society'), 'url' => admin_url('admin.php?page=email-manager')];
+    $content_children[] = ['label' => __('Talk Flows', 'gend-society'), 'url' => admin_url('admin.php?page=talk-flows')];
   }
 
   $items[] = [
-    'label' => __('Write', 'gend-society'),
+    'label' => __('App', 'gend-society'),
     'url' => admin_url('admin.php?page=gs-content'),
     'icon' => 'dashicons-edit',
     'cap' => 'manage_options',
@@ -635,10 +723,12 @@ function gs_build_frontend_nav()
 
   // Pre-process items: if the parent slug isn't strictly known, we might need a mapping.
   // We'll rely on the top-level slugs defined in admin-menu.php where possible.
+  // 'App' used to map to the now-removed gs-app menu; it's the renamed
+  // "Write" item now, so it maps to gs-content (users whose Feature Access
+  // grid already allows gs-content keep seeing this item, unchanged).
   $slug_map = [
     'Dashboard' => 'index.php',
-    'App' => 'gs-app',
-    'Write' => 'gs-content',
+    'App' => 'gs-content',
     'Store' => 'gs-store',
     'Social' => 'gs-social',
     'Features' => 'gs-features'

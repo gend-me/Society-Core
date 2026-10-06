@@ -53,6 +53,28 @@ function gs_invite_default_template() {
 }
 
 /**
+ * Default SHARE email template — used when the panel renders in share mode
+ * (sharing a specific activity post / piece of content instead of inviting
+ * new members). {invite_link} carries the shared-post URL + the sender's
+ * affiliate tracking param.
+ */
+function gs_invite_share_template( $title = '' ) {
+    $what = $title !== '' ? $title : __( 'a post', 'gend-society' );
+    return array(
+        /* translators: %s: shared post title */
+        'subject' => sprintf( __( '{sender_name} shared %s with you on gend.me', 'gend-society' ), $what ),
+        'body'    => __(
+            '<p>Hi {name},</p>'
+            . '<p><strong>{sender_name}</strong> thought you\'d want to see this on <a href="https://gend.me">gend.me</a>:</p>'
+            . '<p><a href="{invite_link}" style="display:inline-block;background:#b608c9;color:#fff;padding:12px 22px;border-radius:8px;font-weight:700;text-decoration:none;">View the post</a></p>'
+            . '<p>Or paste this link into your browser:<br><a href="{invite_link}">{invite_link}</a></p>'
+            . '<p>See you there!<br>&mdash; The gend.me team</p>',
+            'gend-society'
+        ),
+    );
+}
+
+/**
  * Get the sender's saved template, falling back to the default.
  *
  * @param int $user_id
@@ -186,15 +208,20 @@ function gs_invite_enqueue_editor_assets() {
  * Render the Invite panel HTML. Called from the connections-tabs close hook
  * inside member-profile-pages.php.
  */
-function gs_invite_render_panel() {
+function gs_invite_render_panel( $share = array() ) {
     if ( ! is_user_logged_in() ) {
         echo '<p class="psoo-pm-empty">' . esc_html__( 'Please log in to invite members.', 'gend-society' ) . '</p>';
         return;
     }
     $user_id      = get_current_user_id();
     $sender       = wp_get_current_user();
-    $template     = gs_invite_get_template( $user_id );
-    $invite_url   = gs_invite_get_affiliate_url( $user_id );
+    // Share mode — same panel, but every tab's messaging is about sharing a
+    // specific post/content: {invite_link} becomes the shared URL (with the
+    // sender's tracking param appended by gs_invite_get_affiliate_url).
+    $is_share     = is_array( $share ) && ! empty( $share['url'] );
+    $share_title  = $is_share ? (string) ( $share['title'] ?? '' ) : '';
+    $template     = $is_share ? gs_invite_share_template( $share_title ) : gs_invite_get_template( $user_id );
+    $invite_url   = gs_invite_get_affiliate_url( $user_id, $is_share ? (string) $share['url'] : '' );
     $rest_root    = esc_url_raw( rest_url( 'gs/v1/invite' ) );
     $rest_nonce   = wp_create_nonce( 'wp_rest' );
     // Per-render unique ID so the inline IIFE can find its own wrap by id —
@@ -206,6 +233,31 @@ function gs_invite_render_panel() {
     // wp_editor needs a stable, unique ID we can hand to JS so it can call
     // tinyMCE.get( ID ) to pull the body content before AJAX submit.
     $editor_id = 'gs_invite_body_' . str_replace( '-', '_', wp_generate_uuid4() );
+
+    // ── Social tab data — the member's connected social accounts ─────────
+    // Youzify stores each network link as user meta keyed by the network id
+    // (read via youzify_get_user_meta), with the network catalog (name +
+    // icon) in the youzify_social_networks option. "Connecting" an account =
+    // filling it in on the Youzify profile social-networks settings screen.
+    $social_networks = array();
+    if ( function_exists( 'youzify_option' ) ) {
+        $nets = youzify_option( 'youzify_social_networks' );
+        if ( is_array( $nets ) ) {
+            foreach ( $nets as $net_key => $net ) {
+                $net_url = function_exists( 'youzify_get_user_meta' )
+                    ? youzify_get_user_meta( $net_key, $user_id )
+                    : get_user_meta( $user_id, $net_key, true );
+                $social_networks[ $net_key ] = array(
+                    'name' => isset( $net['name'] ) ? (string) $net['name'] : ucfirst( $net_key ),
+                    'icon' => isset( $net['icon'] ) ? (string) $net['icon'] : '',
+                    'url'  => $net_url ? esc_url_raw( $net_url ) : '',
+                );
+            }
+        }
+    }
+    $social_settings_url = function_exists( 'youzify_get_profile_settings_url' )
+        ? youzify_get_profile_settings_url( 'social-networks' )
+        : '';
     ?>
     <div id="<?php echo esc_attr( $wrap_id ); ?>" class="gs-invite-wrap" data-gs-invite
          data-rest-root="<?php echo esc_attr( $rest_root ); ?>"
@@ -216,41 +268,70 @@ function gs_invite_render_panel() {
          data-editor-id="<?php echo esc_attr( $editor_id ); ?>">
 
         <div class="gs-invite-hero">
-            <h2><?php esc_html_e( 'Grow Your Network', 'gend-society' ); ?></h2>
-            <p><?php esc_html_e( 'Invite people who aren\'t on gend.me yet. Every link carries your affiliate tracking automatically — when invitees join and purchase, the commission flows back to you.', 'gend-society' ); ?></p>
+            <?php if ( $is_share ) : ?>
+                <h2><?php echo $share_title !== '' ? esc_html( sprintf( __( 'Share: %s', 'gend-society' ), $share_title ) ) : esc_html__( 'Share This Post', 'gend-society' ); ?></h2>
+                <p><?php esc_html_e( 'Send this post to anyone — by email or from your connected social accounts. The link carries your tracking automatically, so anyone who joins gend.me through it is attributed to you.', 'gend-society' ); ?></p>
+            <?php else : ?>
+                <h2><?php esc_html_e( 'Grow Your Network', 'gend-society' ); ?></h2>
+                <p><?php esc_html_e( 'Invite people who aren\'t on gend.me yet. Every link carries your affiliate tracking automatically — when invitees join and purchase, the commission flows back to you.', 'gend-society' ); ?></p>
+            <?php endif; ?>
             <div class="gs-invite-link-pill">
-                <span class="gs-invite-link-label"><?php esc_html_e( 'Your invite link', 'gend-society' ); ?></span>
+                <span class="gs-invite-link-label"><?php echo $is_share ? esc_html__( 'Share link', 'gend-society' ) : esc_html__( 'Your invite link', 'gend-society' ); ?></span>
                 <code><?php echo esc_html( $invite_url ); ?></code>
+                <button type="button" class="gs-invite-btn gs-invite-btn--ghost gs-invite-copy-btn" data-gs-copy-link><?php esc_html_e( 'Copy', 'gend-society' ); ?></button>
             </div>
         </div>
 
+        <!-- ── Main invite tabs: Email / Social / Invitations ─────────── -->
+        <div class="gs-invite-tabs" role="tablist" data-gs-invite-tabs>
+            <button type="button" class="gs-invite-tab is-active" data-gs-tab="email" role="tab" aria-selected="true"><?php esc_html_e( 'Email', 'gend-society' ); ?></button>
+            <button type="button" class="gs-invite-tab" data-gs-tab="social" role="tab" aria-selected="false"><?php esc_html_e( 'Social', 'gend-society' ); ?></button>
+            <?php if ( ! $is_share ) : ?>
+            <button type="button" class="gs-invite-tab" data-gs-tab="invitations" role="tab" aria-selected="false"><?php esc_html_e( 'Invitations', 'gend-society' ); ?></button>
+            <?php endif; ?>
+        </div>
+
+        <div class="gs-invite-tabpanel is-active" data-gs-tab-panel="email" role="tabpanel">
         <div class="gs-invite-grid">
             <section class="gs-invite-card">
                 <h3><?php esc_html_e( 'Recipients', 'gend-society' ); ?></h3>
 
-                <div class="gs-invite-row">
-                    <div>
-                        <label><?php esc_html_e( 'Email', 'gend-society' ); ?></label>
-                        <input type="email" data-gs-email placeholder="name@example.com" autocomplete="off" />
+                <!-- Email sub-tabs: Individual Invite / Bulk Invite -->
+                <div class="gs-invite-subtabs" role="tablist" data-gs-invite-subtabs>
+                    <button type="button" class="gs-invite-subtab is-active" data-gs-subtab="individual" role="tab" aria-selected="true"><?php esc_html_e( 'Individual Invite', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-invite-subtab" data-gs-subtab="bulk" role="tab" aria-selected="false"><?php esc_html_e( 'Bulk Invite', 'gend-society' ); ?></button>
+                </div>
+
+                <div class="gs-invite-subpanel is-active" data-gs-subtab-panel="individual">
+                    <div class="gs-invite-row">
+                        <div>
+                            <label><?php esc_html_e( 'Email', 'gend-society' ); ?></label>
+                            <input type="email" data-gs-email placeholder="name@example.com" autocomplete="off" />
+                        </div>
+                        <div>
+                            <label><?php esc_html_e( 'Name', 'gend-society' ); ?></label>
+                            <input type="text" data-gs-name placeholder="<?php esc_attr_e( 'Add an optional name', 'gend-society' ); ?>" autocomplete="off" />
+                        </div>
                     </div>
-                    <div>
-                        <label><?php esc_html_e( 'Name', 'gend-society' ); ?></label>
-                        <input type="text" data-gs-name placeholder="<?php esc_attr_e( 'Add an optional name', 'gend-society' ); ?>" autocomplete="off" />
+                    <div class="gs-invite-actions">
+                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-add-email><?php esc_html_e( 'Add Email', 'gend-society' ); ?></button>
                     </div>
                 </div>
 
-                <div class="gs-invite-actions">
-                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-add-email><?php esc_html_e( 'Add Email', 'gend-society' ); ?></button>
-                    <label class="gs-invite-csv">
-                        <input type="file" accept=".csv" data-gs-csv hidden />
-                        <span class="gs-invite-btn gs-invite-btn--ghost"><?php esc_html_e( 'Upload CSV', 'gend-society' ); ?></span>
-                    </label>
-                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-oauth="google"><?php esc_html_e( 'Google Contacts', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-oauth="microsoft"><?php esc_html_e( 'Outlook Contacts', 'gend-society' ); ?></button>
-                    <label class="gs-invite-csv">
-                        <input type="file" accept=".vcf,text/vcard" data-gs-vcf hidden />
-                        <span class="gs-invite-btn gs-invite-btn--ghost" title="<?php esc_attr_e( 'Apple has no public Contacts API. Export Contacts.app via File → Export → Export vCard, then upload the .vcf here.', 'gend-society' ); ?>"><?php esc_html_e( 'Apple Contacts (.vcf)', 'gend-society' ); ?></span>
-                    </label>
+                <div class="gs-invite-subpanel" data-gs-subtab-panel="bulk">
+                    <p class="gs-invite-help" style="margin:0 0 10px !important;"><?php esc_html_e( 'Import many people at once — upload a CSV, or pull straight from your contacts.', 'gend-society' ); ?></p>
+                    <div class="gs-invite-actions">
+                        <label class="gs-invite-csv">
+                            <input type="file" accept=".csv" data-gs-csv hidden />
+                            <span class="gs-invite-btn gs-invite-btn--ghost"><?php esc_html_e( 'Upload CSV', 'gend-society' ); ?></span>
+                        </label>
+                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-oauth="google"><?php esc_html_e( 'Google Contacts', 'gend-society' ); ?></button>
+                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-oauth="microsoft"><?php esc_html_e( 'Outlook Contacts', 'gend-society' ); ?></button>
+                        <label class="gs-invite-csv">
+                            <input type="file" accept=".vcf,text/vcard" data-gs-vcf hidden />
+                            <span class="gs-invite-btn gs-invite-btn--ghost" title="<?php esc_attr_e( 'Apple has no public Contacts API. Export Contacts.app via File → Export → Export vCard, then upload the .vcf here.', 'gend-society' ); ?>"><?php esc_html_e( 'Apple Contacts (.vcf)', 'gend-society' ); ?></span>
+                        </label>
+                    </div>
                 </div>
 
                 <div class="gs-invite-list" data-gs-list>
@@ -302,10 +383,12 @@ function gs_invite_render_panel() {
                 );
                 ?>
 
+                <?php if ( ! $is_share ) : ?>
                 <div class="gs-invite-tpl-actions">
                     <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-tpl-save><?php esc_html_e( 'Save Template', 'gend-society' ); ?></button>
                     <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-tpl-reset><?php esc_html_e( 'Reset to Default', 'gend-society' ); ?></button>
                 </div>
+                <?php endif; ?>
 
                 <div class="gs-invite-test">
                     <label><?php esc_html_e( 'Send a test email', 'gend-society' ); ?></label>
@@ -317,9 +400,65 @@ function gs_invite_render_panel() {
                 </div>
             </section>
         </div>
+        </div><!-- /tabpanel:email -->
 
+        <!-- ── Social panel — DM your invite link from your own accounts ── -->
+        <div class="gs-invite-tabpanel" data-gs-tab-panel="social" role="tabpanel">
+            <section class="gs-invite-card gs-invite-social">
+                <h3><?php echo $is_share ? esc_html__( 'Share From Your Social Accounts', 'gend-society' ) : esc_html__( 'Invite Through Your Social Accounts', 'gend-society' ); ?></h3>
+                <p class="gs-invite-help" style="margin:0 0 14px !important;">
+                    <?php echo $is_share
+                        ? esc_html__( 'Send this post as a private DM from any social account connected to your profile. Your tracking link is baked into every message, so sign-ups it brings in are attributed to you.', 'gend-society' )
+                        : esc_html__( 'Send a private DM from any social account connected to your profile. Your custom tracking link is baked into every message — invites and sign-ups are attributed to you automatically, per network.', 'gend-society' ); ?>
+                </p>
 
+                <label><?php esc_html_e( 'Your DM message', 'gend-society' ); ?></label>
+                <textarea data-gs-social-msg rows="4"><?php
+                    if ( $is_share ) {
+                        /* translators: default social share DM; %1$s post title, %2$s link placeholder. */
+                        echo esc_textarea( sprintf(
+                            __( 'Check this out on gend.me — %1$s: %2$s', 'gend-society' ),
+                            ( $share_title !== '' ? $share_title : __( 'a post worth seeing', 'gend-society' ) ),
+                            '{invite_link}'
+                        ) );
+                    } else {
+                        /* translators: default social DM text; {invite_link} is replaced per network. */
+                        echo esc_textarea( sprintf( __( "Hey! I'm building on gend.me — a community for digital business builders. Come join me: %s", 'gend-society' ), '{invite_link}' ) );
+                    }
+                ?></textarea>
+                <p class="gs-invite-help"><?php esc_html_e( 'Keep {invite_link} in the message — it becomes your personal tracking URL for each network when you send.', 'gend-society' ); ?></p>
 
+                <div class="gs-invite-social-list" data-gs-social-list>
+                    <?php foreach ( $social_networks as $net_key => $net ) : ?>
+                    <div class="gs-invite-social-row <?php echo $net['url'] ? 'is-connected' : 'is-unconnected'; ?>" data-gs-network="<?php echo esc_attr( $net_key ); ?>">
+                        <span class="gs-invite-social-icon" aria-hidden="true"><i class="<?php echo esc_attr( $net['icon'] ); ?>"></i></span>
+                        <span class="gs-invite-social-meta">
+                            <strong><?php echo esc_html( $net['name'] ); ?></strong>
+                            <?php if ( $net['url'] ) : ?>
+                                <span class="gs-invite-social-status is-on"><?php esc_html_e( 'Connected', 'gend-society' ); ?></span>
+                            <?php else : ?>
+                                <span class="gs-invite-social-status"><?php esc_html_e( 'Not connected', 'gend-society' ); ?></span>
+                            <?php endif; ?>
+                        </span>
+                        <?php if ( $net['url'] ) : ?>
+                            <button type="button" class="gs-invite-btn gs-invite-btn--primary gs-invite-dm-btn" data-gs-dm="<?php echo esc_attr( $net_key ); ?>"><?php esc_html_e( 'Send DM', 'gend-society' ); ?></button>
+                        <?php elseif ( $social_settings_url ) : ?>
+                            <a class="gs-invite-btn gs-invite-btn--ghost" href="<?php echo esc_url( $social_settings_url ); ?>"><?php esc_html_e( 'Connect', 'gend-society' ); ?></a>
+                        <?php endif; ?>
+                    </div>
+                    <?php endforeach; ?>
+                    <?php if ( empty( $social_networks ) ) : ?>
+                        <p class="gs-invite-empty"><?php esc_html_e( 'No social networks are configured on this site yet.', 'gend-society' ); ?></p>
+                    <?php endif; ?>
+                </div>
+
+                <div class="gs-invite-status" data-gs-social-status aria-live="polite" style="margin-top:12px;"></div>
+            </section>
+        </div><!-- /tabpanel:social -->
+
+        <!-- ── Invitations panel — the complete tracking list ───────────── -->
+        <?php if ( ! $is_share ) : ?>
+        <div class="gs-invite-tabpanel" data-gs-tab-panel="invitations" role="tabpanel">
         <section class="gs-invite-sent" data-gs-sent>
             <div class="gs-invite-sent-head">
                 <h3><?php esc_html_e( 'Sent Invitations', 'gend-society' ); ?></h3>
@@ -329,6 +468,8 @@ function gs_invite_render_panel() {
                 <p class="gs-invite-empty"><?php esc_html_e( 'Loading…', 'gend-society' ); ?></p>
             </div>
         </section>
+        </div><!-- /tabpanel:invitations -->
+        <?php endif; ?>
 
         <div class="gs-invite-reminder" data-gs-reminder hidden>
             <div class="gs-invite-reminder__backdrop" data-rm-close></div>
@@ -458,6 +599,94 @@ function gs_invite_render_panel() {
     .gs-invite-reminder__body input[readonly] { color: #94a3b8; }
     .gs-invite-reminder__footer { display: flex; justify-content: flex-end; align-items: center; gap: 10px; padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.08); }
     .gs-invite-reminder__footer .gs-invite-status { margin-right: auto; }
+
+    /* ── Main tabs (Email / Social / Invitations) — enclosed pills, all
+       visible, wrapping instead of clipping. Matches the Connections
+       mobile pill-tray language. ─────────────────────────────────────── */
+    .gs-invite-tabs {
+        display: flex; flex-wrap: wrap; gap: 8px;
+        padding: 10px; margin: 0 0 20px;
+        background: rgba(0,0,0,0.45);
+        border: 1px solid rgba(255,255,255,0.1);
+        border-radius: 16px;
+        backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+    }
+    .gs-invite-tab {
+        flex: 1 1 0; min-width: 100px;
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 11px 14px;
+        border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
+        background: rgba(255,255,255,0.035);
+        color: #94a3b8;
+        font-size: 0.7rem; font-weight: 800; letter-spacing: 0.8px;
+        text-transform: uppercase; cursor: pointer; white-space: nowrap;
+        transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .gs-invite-tab:active { transform: scale(0.97); }
+    .gs-invite-tab.is-active {
+        background: rgba(182,8,201,0.14);
+        border-color: rgba(182,8,201,0.5);
+        color: #fff;
+        box-shadow: 0 0 16px rgba(182,8,201,0.22), inset 0 0 12px rgba(182,8,201,0.08);
+    }
+    .gs-invite-tabpanel { display: none; }
+    .gs-invite-tabpanel.is-active { display: block; }
+
+    /* Email sub-tabs (Individual Invite / Bulk Invite) — smaller pills */
+    .gs-invite-subtabs { display: flex; flex-wrap: wrap; gap: 8px; margin: 0 0 16px; }
+    .gs-invite-subtab {
+        flex: 1 1 0; min-width: 120px;
+        display: inline-flex; align-items: center; justify-content: center;
+        padding: 9px 12px;
+        border: 1px solid rgba(255,255,255,0.12); border-radius: 999px;
+        background: rgba(255,255,255,0.035);
+        color: #94a3b8;
+        font-size: 0.66rem; font-weight: 800; letter-spacing: 0.7px;
+        text-transform: uppercase; cursor: pointer; white-space: nowrap;
+        transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    }
+    .gs-invite-subtab.is-active {
+        background: rgba(137,194,224,0.12);
+        border-color: rgba(137,194,224,0.5);
+        color: #fff;
+        box-shadow: 0 0 14px rgba(137,194,224,0.2);
+    }
+    .gs-invite-subpanel { display: none; }
+    .gs-invite-subpanel.is-active { display: block; }
+
+    /* Copy button inside the invite-link pill */
+    .gs-invite-copy-btn { flex: 0 0 auto; padding: 6px 12px !important; }
+
+    /* Social network rows */
+    .gs-invite-social-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
+    .gs-invite-social-row {
+        display: flex; align-items: center; gap: 14px;
+        padding: 12px 16px;
+        background: rgba(11,14,20,0.45);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+        transition: border-color 0.2s ease, transform 0.2s ease;
+    }
+    .gs-invite-social-row:hover { border-color: rgba(182,8,201,0.32); transform: translateY(-1px); }
+    .gs-invite-social-row.is-unconnected { opacity: 0.65; }
+    .gs-invite-social-icon {
+        flex: 0 0 auto; width: 38px; height: 38px;
+        display: inline-flex; align-items: center; justify-content: center;
+        border-radius: 10px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.1);
+        color: #89C2E0; font-size: 1rem;
+    }
+    .gs-invite-social-meta { flex: 1 1 auto; display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+    .gs-invite-social-meta strong { color: #e2e8f0; font-size: 0.9rem; }
+    .gs-invite-social-status { color: #64748b; font-size: 0.7rem; letter-spacing: 0.08em; text-transform: uppercase; }
+    .gs-invite-social-status.is-on { color: #34d399; }
+    .gs-invite-dm-btn { flex: 0 0 auto; }
+    @media (max-width: 600px) {
+        .gs-invite-social-row { flex-wrap: wrap; }
+        .gs-invite-social-meta { flex: 1 1 auto; }
+        .gs-invite-dm-btn, .gs-invite-social-row .gs-invite-btn--ghost { flex: 1 1 100%; justify-content: center; }
+    }
     </style>
 
     <style id="gs-invite-polish">
@@ -693,10 +922,11 @@ function gs_invite_render_panel() {
     /* Per-section staggered build-in. Numeric prefix in the variable lets
        us cascade across the whole panel in one rule set. */
     .gs-invite-wrap > .gs-invite-hero      { --i: 1; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
-    .gs-invite-wrap > .gs-invite-grid      { opacity: 1; }
-    .gs-invite-wrap > .gs-invite-grid > .gs-invite-card:nth-child(1) { --i: 3; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
-    .gs-invite-wrap > .gs-invite-grid > .gs-invite-card:nth-child(2) { --i: 5; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
-    .gs-invite-wrap > .gs-invite-sent      { --i: 7; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
+    .gs-invite-wrap > .gs-invite-tabs      { --i: 2; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
+    .gs-invite-wrap .gs-invite-grid        { opacity: 1; }
+    .gs-invite-wrap .gs-invite-grid > .gs-invite-card:nth-child(1) { --i: 3; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
+    .gs-invite-wrap .gs-invite-grid > .gs-invite-card:nth-child(2) { --i: 5; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
+    .gs-invite-wrap .gs-invite-sent        { --i: 7; opacity: 0; animation: gs-i-rise 0.7s cubic-bezier(0.16,1,0.3,1) both; animation-delay: calc(var(--i) * 80ms + 80ms); }
     /* Send Invites button is now inside the Recipients card; cascade it to
        fade in last among that card's children. */
     .gs-invite-card .gs-invite-send-inline { opacity: 0; animation: gs-i-rise 0.55s cubic-bezier(0.16,1,0.3,1) both; animation-delay: 600ms; }
@@ -1369,6 +1599,155 @@ function gs_invite_render_panel() {
         }
     })();
     </script>
+
+    <!-- ── Tabs (Email / Social / Invitations) + sub-tabs + Social DMs ──
+         Kept as its own IIFE so the main invite controller above stays
+         untouched — this script only shows/hides panels, copies the
+         invite link, and drives the per-network DM composer. -->
+    <script>
+    (function () {
+        var WRAP_ID = <?php echo wp_json_encode( $wrap_id ); ?>;
+        function init () {
+            var wrap = document.getElementById( WRAP_ID );
+            if ( ! wrap ) return;
+
+            var inviteLink = wrap.getAttribute('data-invite-link') || '';
+
+            // ── Main tab switcher ────────────────────────────────────
+            var tabs   = wrap.querySelectorAll('.gs-invite-tab');
+            var panels = wrap.querySelectorAll('.gs-invite-tabpanel');
+            tabs.forEach(function ( tab ) {
+                tab.addEventListener('click', function () {
+                    var target = tab.getAttribute('data-gs-tab');
+                    tabs.forEach(function ( t ) {
+                        t.classList.toggle('is-active', t === tab);
+                        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+                    });
+                    panels.forEach(function ( p ) {
+                        p.classList.toggle('is-active', p.getAttribute('data-gs-tab-panel') === target);
+                    });
+                    // Mobile: land at the top of the freshly opened panel.
+                    if ( window.matchMedia && window.matchMedia('(max-width: 720px)').matches ) {
+                        var y = wrap.getBoundingClientRect().top + window.pageYOffset - 12;
+                        window.scrollTo({ top: Math.max(0, y), behavior: 'smooth' });
+                    }
+                });
+            });
+
+            // ── Email sub-tabs (Individual / Bulk) ───────────────────
+            var subtabs   = wrap.querySelectorAll('.gs-invite-subtab');
+            var subpanels = wrap.querySelectorAll('.gs-invite-subpanel');
+            subtabs.forEach(function ( tab ) {
+                tab.addEventListener('click', function () {
+                    var target = tab.getAttribute('data-gs-subtab');
+                    subtabs.forEach(function ( t ) {
+                        t.classList.toggle('is-active', t === tab);
+                        t.setAttribute('aria-selected', t === tab ? 'true' : 'false');
+                    });
+                    subpanels.forEach(function ( p ) {
+                        p.classList.toggle('is-active', p.getAttribute('data-gs-subtab-panel') === target);
+                    });
+                });
+            });
+
+            // ── Copy invite link ─────────────────────────────────────
+            var copyBtn = wrap.querySelector('[data-gs-copy-link]');
+            if ( copyBtn ) {
+                copyBtn.addEventListener('click', function () {
+                    copyText( inviteLink ).then(function () {
+                        var old = copyBtn.textContent;
+                        copyBtn.textContent = 'Copied!';
+                        setTimeout(function(){ copyBtn.textContent = old; }, 1600);
+                    });
+                });
+            }
+
+            function copyText ( text ) {
+                if ( navigator.clipboard && navigator.clipboard.writeText ) {
+                    return navigator.clipboard.writeText( text ).catch(function(){ return legacyCopy( text ); });
+                }
+                return Promise.resolve( legacyCopy( text ) );
+            }
+            function legacyCopy ( text ) {
+                var ta = document.createElement('textarea');
+                ta.value = text;
+                ta.style.position = 'fixed'; ta.style.left = '-9999px';
+                document.body.appendChild( ta );
+                ta.select();
+                try { document.execCommand('copy'); } catch ( e ) {}
+                document.body.removeChild( ta );
+            }
+
+            // ── Social DM composer ───────────────────────────────────
+            // Per-network tracking URL: the affiliate link + a src marker so
+            // clicks/sign-ups can be attributed to the exact network the DM
+            // went out on. The message template keeps {invite_link} as the
+            // placeholder; it is rendered per network at send time.
+            var msgBox   = wrap.querySelector('[data-gs-social-msg]');
+            var socStat  = wrap.querySelector('[data-gs-social-status]');
+            function socialStatus ( msg, type ) {
+                if ( ! socStat ) return;
+                socStat.textContent = msg || '';
+                socStat.classList.remove('is-error','is-success');
+                if ( type ) socStat.classList.add('is-' + type);
+            }
+            function trackedLinkFor ( network ) {
+                return inviteLink + ( inviteLink.indexOf('?') === -1 ? '?' : '&' ) + 'src=social-' + encodeURIComponent( network );
+            }
+            function renderedMessage ( network ) {
+                var tpl = msgBox ? msgBox.value : '';
+                var link = trackedLinkFor( network );
+                if ( tpl.indexOf('{invite_link}') !== -1 ) {
+                    return tpl.split('{invite_link}').join( link );
+                }
+                // Placeholder removed by the user — append the link so every
+                // DM still carries the tracking URL.
+                return ( tpl ? tpl.trim() + ' ' : '' ) + link;
+            }
+            // Where each network can take a prefilled DM. Networks without a
+            // prefill API get the message copied to the clipboard + their DM
+            // surface opened, ready to paste.
+            function dmTarget ( network, msg, link ) {
+                var n = String( network ).toLowerCase();
+                if ( n.indexOf('whatsapp') !== -1 ) return { url: 'https://wa.me/?text=' + encodeURIComponent( msg ), prefilled: true };
+                if ( n.indexOf('telegram') !== -1 ) return { url: 'https://t.me/share/url?url=' + encodeURIComponent( link ) + '&text=' + encodeURIComponent( msg.split( link ).join('').trim() ), prefilled: true };
+                if ( n.indexOf('twitter') !== -1 || n === 'x' ) return { url: 'https://twitter.com/messages/compose?text=' + encodeURIComponent( msg ), prefilled: true };
+                if ( n.indexOf('facebook') !== -1 || n.indexOf('messenger') !== -1 ) return { url: 'https://www.facebook.com/messages/t/', prefilled: false };
+                if ( n.indexOf('instagram') !== -1 ) return { url: 'https://www.instagram.com/direct/new/', prefilled: false };
+                if ( n.indexOf('linkedin') !== -1 ) return { url: 'https://www.linkedin.com/messaging/', prefilled: false };
+                return { url: '', prefilled: false };
+            }
+            wrap.addEventListener('click', function ( e ) {
+                var btn = e.target.closest('[data-gs-dm]');
+                if ( ! btn ) return;
+                var network = btn.getAttribute('data-gs-dm');
+                var link    = trackedLinkFor( network );
+                var msg     = renderedMessage( network );
+                var target  = dmTarget( network, msg, link );
+                // Always copy the full message first — every network then has
+                // it ready to paste even if its composer ignores prefills.
+                copyText( msg ).then(function () {
+                    if ( target.url ) {
+                        window.open( target.url, '_blank', 'noopener' );
+                        socialStatus(
+                            target.prefilled
+                                ? 'DM composer opened with your tracked message.'
+                                : 'Message (with your tracking link) copied — paste it into the DM that just opened.',
+                            'success'
+                        );
+                    } else {
+                        socialStatus( 'Message with your tracking link copied — paste it into a private DM on ' + network + '.', 'success' );
+                    }
+                });
+            });
+        }
+        if ( document.readyState === 'loading' ) {
+            document.addEventListener('DOMContentLoaded', init);
+        } else {
+            init();
+        }
+    })();
+    </script>
     <?php
 }
 
@@ -1646,5 +2025,37 @@ function gs_invite_rest_open( WP_REST_Request $req ) {
     header( 'Content-Type: image/gif' );
     header( 'Content-Length: ' . strlen( $gif ) );
     echo $gif;
+    exit;
+}
+
+/**
+ * Chat-widget fragment — the SAME Invite panel the Connections → Invite
+ * profile sub-tab renders, served bare over admin-ajax so the gend.me chat
+ * widget's "＋ Invite new" popup can graft it (markup + inline styles +
+ * inline IIFE script; the script bootstraps itself by the wrap's unique id,
+ * and the email-body editor degrades to a plain textarea when the host page
+ * has no TinyMCE — both by design, see gs_invite_render_panel()).
+ */
+add_action( 'wp_ajax_gs_invite_panel_fragment', 'gs_invite_ajax_panel_fragment' );
+function gs_invite_ajax_panel_fragment() {
+    if ( ! is_user_logged_in() ) {
+        status_header( 401 );
+        exit;
+    }
+    // Optional SHARE mode — ?share_url= (+ share_title=) renders the panel
+    // about sharing that piece of content instead of inviting new members.
+    // Same-host URLs only, so the tracking link can't be pointed off-site.
+    $share = array();
+    if ( ! empty( $_REQUEST['share_url'] ) ) {
+        $u = esc_url_raw( (string) wp_unslash( $_REQUEST['share_url'] ) );
+        if ( $u && wp_parse_url( $u, PHP_URL_HOST ) === wp_parse_url( home_url(), PHP_URL_HOST ) ) {
+            $share = array(
+                'url'   => $u,
+                'title' => sanitize_text_field( (string) wp_unslash( $_REQUEST['share_title'] ?? '' ) ),
+            );
+        }
+    }
+    header( 'Content-Type: text/html; charset=utf-8' );
+    gs_invite_render_panel( $share );
     exit;
 }

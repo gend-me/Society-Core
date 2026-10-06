@@ -3,6 +3,30 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
+/**
+ * The always-collapsed/hover-to-open rail (admin-style.css) implements its
+ * own show/hide logic independent of WordPress's native fold state — but
+ * WP still outputs `folded` on <body> whenever `get_user_setting('mfold')`
+ * is 'f', a persisted per-user preference from previously toggling the
+ * (now-hidden) native collapse button — nothing to do with the current
+ * page. That class isn't filterable: wp-admin/admin-header.php appends it
+ * to a separate string AFTER the `admin_body_class` filter already ran, so
+ * a filter can't strip it. `.folded #adminmenu .wp-menu-name` (WP core,
+ * wp-admin/css/admin-menu.css) sets `position:absolute; left:-999px` on
+ * that element — which is what actually contains both our custom icon AND
+ * label — silently yanking real custom icons off-screen for any user
+ * whose sidebar happened to be folded before this redesign shipped, no
+ * matter what our own CSS says. There are 20+ other `.folded`-scoped core
+ * rules in the same boat (submenu positioning, arrows, etc.), so instead
+ * of chasing each one, just clear the underlying preference so `folded`
+ * never gets added to <body> in the first place.
+ */
+add_action('admin_init', function () {
+    if (function_exists('get_user_setting') && function_exists('set_user_setting') && 'f' === get_user_setting('mfold')) {
+        set_user_setting('mfold', 'o');
+    }
+});
+
 add_action('admin_enqueue_scripts', 'gs_enqueue_admin_assets');
 function gs_enqueue_admin_assets()
 {

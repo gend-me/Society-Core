@@ -571,44 +571,118 @@ body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
     .header-anchor-wrap--oauth .gs-profile-dropdown { width: calc(100vw - 28px); }
 }
 
-/* ------ LEFT SIDEBAR --------------------------------------- */
-#adminmenuback,
+/* ------ LEFT SIDEBAR — glass rail, collapsed by default, opens on hover --
+   #adminmenumain is the one fixed-position box that actually animates;
+   everything inside (adminmenuback/adminmenuwrap/adminmenu) just fills
+   100% of whatever width it currently has. That keeps the whole thing a
+   pure overlay — #wpcontent's margin never changes, so body content never
+   reflows/shifts when the rail opens. ------------------------------- */
+:root {
+    --gs-rail-collapsed: 64px;
+    --gs-rail-expanded: 248px;
+    --gs-rail-ease: cubic-bezier(.16, 1, .3, 1);
+}
+
+/* Decorative WP backdrop layer — #adminmenu itself is the glass surface now. */
+#adminmenuback {
+    display: none !important;
+}
+
+#adminmenumain {
+    position: fixed !important;
+    top: var(--gs-header-h) !important;
+    left: 0 !important;
+    bottom: 0 !important;
+    width: var(--gs-rail-collapsed) !important;
+    z-index: 99998 !important;
+    transition: width .42s var(--gs-rail-ease);
+}
+
+#adminmenumain:hover,
+#adminmenumain:focus-within {
+    width: var(--gs-rail-expanded) !important;
+}
+
 #adminmenuwrap {
+    position: static !important;
+    float: none !important;
+    width: 100% !important;
+    height: 100% !important;
+    z-index: auto !important;
     background: transparent !important;
 }
 
 #adminmenu {
-    background: rgba(11, 14, 20, 0.95) !important;
-    border-right: 1px solid var(--gs-border) !important;
-    padding-top: var(--gs-header-h) !important;
+    background: linear-gradient(180deg, rgba(20, 24, 34, .78), rgba(9, 12, 18, .92)) !important;
+    backdrop-filter: blur(28px) saturate(160%);
+    -webkit-backdrop-filter: blur(28px) saturate(160%);
+    border-right: 1px solid rgba(255, 255, 255, .08) !important;
+    /* top-left, top-right, bottom-right, bottom-left. Top-right stays
+       square so the rail's top edge flows straight into the fixed header
+       above it instead of leaving a beveled notch where they meet. */
+    border-radius: 0 0 18px 0;
+    width: 100% !important;
+    height: 100%;
+    margin: 0 !important;
+    padding: 14px 0 !important;
+    overflow-x: hidden;
+    overflow-y: auto;
+    box-shadow: 4px 0 30px rgba(0, 0, 0, .3);
+    transition: box-shadow .42s ease, border-color .42s ease;
 }
+
+#adminmenumain:hover #adminmenu,
+#adminmenumain:focus-within #adminmenu {
+    border-right-color: rgba(182, 8, 201, .3) !important;
+    box-shadow: 16px 0 60px rgba(0, 0, 0, .55), 0 0 50px rgba(182, 8, 201, .1);
+}
+
+#adminmenu::-webkit-scrollbar { width: 6px; }
+#adminmenu::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .12); border-radius: 3px; }
+#adminmenu::-webkit-scrollbar-track { background: transparent; }
 
 #adminmenu li a,
 #adminmenu li a.menu-top {
+    display: flex !important;
+    align-items: center;
     color: var(--gs-text) !important;
     font-size: .82rem !important;
     font-weight: 600 !important;
     border-radius: 10px !important;
-    margin: 1px 8px !important;
-    padding: 9px 10px !important;
-    transition: all .18s ease !important;
+    margin: 2px 8px !important;
+    padding: 10px 11px !important;
+    transition: background .22s ease, border-color .22s ease, color .22s ease, transform .22s ease !important;
     background: transparent !important;
     border: 1px solid transparent !important;
+    white-space: nowrap;
+    overflow: hidden;
 }
 
 #adminmenu li.wp-has-current-submenu a.wp-has-current-submenu,
 #adminmenu li.current a.menu-top {
-    background: rgba(182, 8, 201, 0.14) !important;
-    border-color: rgba(182, 8, 201, 0.4) !important;
-    box-shadow: 0 0 12px rgba(182, 8, 201, 0.15) !important;
+    background: rgba(182, 8, 201, 0.16) !important;
+    border-color: rgba(182, 8, 201, 0.45) !important;
+    box-shadow: 0 0 16px rgba(182, 8, 201, 0.2) !important;
     color: #fff !important;
 }
 
 #adminmenu li a:hover {
-    background: rgba(255, 255, 255, 0.07) !important;
+    background: rgba(255, 255, 255, 0.08) !important;
     border-color: var(--gs-border) !important;
     color: #fff !important;
-    transform: translateX(2px);
+    transform: translateX(3px);
+}
+
+/* WP's native pointer/callout nub for the current item — drawn as a CSS
+   border-triangle ::after pseudo-element (wp-admin/css/admin-menu.css),
+   not the .wp-menu-arrow div (which core already hides itself and this
+   rule used to redundantly target — the real visible triangle was never
+   actually covered by that selector). Cleaner without it on a rail. */
+#adminmenu a.wp-has-current-submenu:after,
+#adminmenu li.current > a.current:after,
+#adminmenu li.wp-has-submenu.wp-not-current-submenu:hover:after,
+#adminmenu li.wp-has-submenu.wp-not-current-submenu:focus-within:after {
+    display: none !important;
 }
 
 /* Add a visual breaker below the Features menu item */
@@ -618,31 +692,118 @@ body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
     padding-bottom: 8px !important;
 }
 
-/* Hide the default dashicons column (we use our own) */
+/* Hide the default (empty) dashicons column outright. It used to only be
+   conditionally hidden (kept for third-party menus without a custom icon),
+   but that depended on JS reliably tagging it — if that ever didn't run in
+   time, the empty native box sat in the layout ahead of our real icon and
+   pushed/clipped it past the 64px collapsed width, i.e. exactly "no icon
+   showing". Unconditional hide removes that failure mode entirely. */
 #adminmenu .wp-menu-image {
     display: none !important;
 }
 
-/* Show our custom icon span */
+/* Icon + label row. The icon never moves; the label clips to nothing while
+   collapsed and fades/slides in once the rail opens. Explicit position:
+   static/left:auto belt-and-suspenders against WP core's
+   `.folded #adminmenu .wp-menu-name { position:absolute; left:-999px }` —
+   inc/admin-style.php clears the underlying user preference so `folded`
+   shouldn't land on <body> at all, but that's a cookie that can lag a
+   request; this makes sure the icon+label never go off-screen regardless. */
+#adminmenu .wp-menu-name {
+    display: flex !important;
+    align-items: center;
+    /* Centers the icon when it's the only visible thing (collapsed, label
+       clipped to 0). Switched to flex-start below once the rail opens, so
+       icon+label sit left-aligned like a normal list item instead of
+       staying centered as a pair. */
+    justify-content: center;
+    width: 100%;
+    position: static !important;
+    left: auto !important;
+    /* WP core: #adminmenu div.wp-menu-name { padding: 8px 8px 8px 36px }
+       — that 36px left-padding cleared space for WP's old, separately-
+       positioned icon column. Never overridden before, and `div.wp-menu-
+       name` outranks a plain `.wp-menu-name` selector on specificity, so
+       it silently won every time — shoving our icon 36px right, almost
+       entirely off the edge of the 64px collapsed rail. Confirmed via a
+       real rendered page: computed padding was exactly 8px 8px 8px 36px
+       and the icon's actual x-position matched it to the pixel. */
+    padding: 0 !important;
+}
+
+#adminmenumain:hover #adminmenu .wp-menu-name,
+#adminmenumain:focus-within #adminmenu .wp-menu-name {
+    justify-content: flex-start;
+}
+
 .gs-menu-icon {
     display: inline-flex;
     align-items: center;
     justify-content: center;
+    flex: 0 0 22px;
     width: 22px;
     height: 22px;
-    margin-right: 8px;
+    /* No margin here on purpose — with an icon-to-label gap living on the
+       icon's own box (e.g. margin-right), that gap is still reserved space
+       even while the label is clipped to 0 width, which visually shoves
+       the icon off-center in the collapsed rail. The gap lives on the
+       label's margin-left instead (below), animated in only once the rail
+       opens, so the icon has zero surrounding margin while collapsed and
+       centers cleanly via justify-content above. */
+    margin: 0;
     font-size: 16px;
-    vertical-align: middle;
 }
 
-/* Submenu */
+.gs-menu-label {
+    display: inline-block;
+    margin-left: 0;
+    opacity: 0;
+    max-width: 0;
+    overflow: hidden;
+    white-space: nowrap;
+    transition: opacity .16s ease, max-width .38s var(--gs-rail-ease), margin-left .38s var(--gs-rail-ease);
+}
+
+#adminmenumain:hover .gs-menu-label,
+#adminmenumain:focus-within .gs-menu-label {
+    margin-left: 12px;
+    opacity: 1;
+    max-width: 200px;
+    transition: opacity .32s ease .12s, max-width .38s var(--gs-rail-ease), margin-left .38s var(--gs-rail-ease);
+}
+
+/* A submenu only opens while the mouse (or keyboard focus) is over its own
+   specific item — not just because the rail itself is open. WP normally
+   keeps the *current page's* section pinned open unconditionally
+   (.wp-has-current-submenu); left alone, that meant hovering ANYWHERE on
+   the rail revealed that one section (whichever happened to be current)
+   regardless of what was actually under the cursor. Defaulting every
+   submenu to closed and only opening the one under the pointer/focus fixes
+   that — each icon now shows its own children, nothing more. */
 #adminmenu .wp-submenu {
+    display: none !important;
+    position: relative !important;
+    top: auto !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
     background: rgba(5, 8, 14, 0.85) !important;
     border: 1px solid var(--gs-border) !important;
     border-radius: var(--gs-radius) !important;
-    margin: 0 8px !important;
+    margin: 2px 8px 6px !important;
     padding: 6px !important;
-    animation: gsFadeIn .15s ease;
+}
+
+#adminmenu li.menu-top:hover > .wp-submenu,
+#adminmenu li.menu-top:focus-within > .wp-submenu {
+    display: block !important;
+    animation: gsFadeIn .18s ease;
+}
+
+/* WP's manual collapse toggle is retired — the rail is always
+   collapsed-by-default now and opens purely on hover/keyboard focus. */
+#collapse-menu {
+    display: none !important;
 }
 
 /* =========================================================================
@@ -831,6 +992,15 @@ body.logged-in .header-anchor-wrap .dash-link { display: flex !important; }
 }
 
 /* ------ MAIN CONTENT AREA ---------------------------------- */
+/* Always reserve just the collapsed rail's width — the rail is a fixed
+   overlay (see #adminmenumain above) so its hover-expansion floats over
+   content instead of pushing it. Beats both WP's default 160px and its
+   .folded 36px so content width never jumps regardless of fold state. */
+#wpcontent,
+#wpfooter {
+    margin-left: var(--gs-rail-collapsed) !important;
+}
+
 #wpcontent,
 #wpbody-content {
     background: var(--gs-bg) !important;
@@ -856,6 +1026,15 @@ body.block-editor-page .interface-interface-skeleton {
 
 body.block-editor-page .interface-interface-skeleton__sidebar {
     top: var(--gs-header-h) !important;
+}
+
+/* Desktop: the skeleton above is already moved down by the header, so moving the
+   sidebar down again left a black band over the sidebar tabs and pushed the bottom
+   of the sidebar off-screen. The extra offset is only wanted for the mobile overlay. */
+@media (min-width: 782px) {
+    body.block-editor-page .interface-interface-skeleton__sidebar {
+        top: 0 !important;
+    }
 }
 
 /* Site editor: .edit-site is position:fixed — offset from the viewport.

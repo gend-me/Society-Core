@@ -504,6 +504,188 @@ function gdc_visitors_to_friends_subnav() {
 // (see gs_member_groups_tabs_open() in member-profile-pages.php) instead
 // of as a BP subnav entry — keeps the tab strip self-contained.
 
+// ─── Profile photo edit: click-to-change + push to connected Web Apps ─────────
+//
+// Resolve every BP group this user belongs to (any role) that has a linked Web
+// App container — same "connected Web App" concept used elsewhere (groups
+// with a resolvable gdc_resolve_install_for_group() container), NOT scoped to
+// admin-only groups: a Group Admin's own Web Apps AND an Agent's bound
+// container group both need to show up here as push targets.
+
+function gdc_profile_connected_webapps( $user_id ) {
+    $targets = [];
+    if ( ! function_exists( 'groups_get_groups' ) ) {
+        return $targets;
+    }
+    $result = groups_get_groups( [
+        'user_id'     => $user_id,
+        'show_hidden' => true,
+        'per_page'    => 50,
+    ] );
+    if ( empty( $result['groups'] ) ) {
+        return $targets;
+    }
+    // Never list the site the popup is actually open on — this file runs on
+    // BOTH the hub AND every connected container (same plugin, deployed
+    // everywhere), so "am I the current site" is just "does the resolved
+    // Web App's host match home_url()'s host", checked wherever this renders.
+    $self_host = strtolower( (string) parse_url( home_url( '/' ), PHP_URL_HOST ) );
+    foreach ( $result['groups'] as $grp ) {
+        $app_url = function_exists( 'psoo_get_group_app_url' ) ? psoo_get_group_app_url( $grp->id ) : '';
+        if ( ! $app_url ) {
+            continue; // no linked Web App on this group — nothing to push to
+        }
+        $target_host = strtolower( (string) parse_url( $app_url, PHP_URL_HOST ) );
+        if ( $target_host !== '' && $target_host === $self_host ) {
+            continue; // this IS the site being edited right now — not a push target
+        }
+        $targets[] = [
+            'group_id' => (int) $grp->id,
+            'name'     => (string) $grp->name,
+        ];
+    }
+    return $targets;
+}
+
+add_action( 'rest_api_init', 'gdc_profile_avatar_register_routes' );
+function gdc_profile_avatar_register_routes() {
+    register_rest_route( 'gs/v1', '/profile/avatar', [
+        'methods'             => WP_REST_Server::CREATABLE,
+        'callback'            => 'gdc_rest_profile_avatar_update',
+        'permission_callback' => function () {
+            return is_user_logged_in() ? true : new WP_Error( 'gdc_auth', __( 'Authentication required.', 'gend-society' ), [ 'status' => 401 ] );
+        },
+    ] );
+}
+
+/**
+ * REST: change the CURRENT user's own profile photo (own-profile-only — the
+ * item_id is ALWAYS get_current_user_id(), never a request param, so there is
+ * no cross-user edit surface) and optionally push the same image to selected
+ * connected Web Apps via the existing hub->container signed-request rail.
+ *
+ * Body: { image_base64 (data-URI or raw base64), mime, targets?: [group_id,...] }
+ *
+ * @param WP_REST_Request $request Request instance.
+ * @return WP_REST_Response|WP_Error
+ */
+function gdc_rest_profile_avatar_update( WP_REST_Request $request ) {
+    $user_id = get_current_user_id();
+
+    $raw = (string) $request->get_param( 'image_base64' );
+    if ( $raw === '' ) {
+        return new WP_Error( 'gdc_avatar_bad', __( 'image_base64 is required.', 'gend-society' ), [ 'status' => 400 ] );
+    }
+    // Strip a data-URI prefix ("data:image/png;base64,...") if present.
+    if ( strpos( $raw, 'base64,' ) !== false ) {
+        $raw = substr( $raw, strpos( $raw, 'base64,' ) + 7 );
+    }
+    $bytes = base64_decode( $raw, true );
+    if ( $bytes === false || strlen( $bytes ) === 0 ) {
+        return new WP_Error( 'gdc_avatar_bad', __( 'Could not decode image data.', 'gend-society' ), [ 'status' => 400 ] );
+    }
+    if ( strlen( $bytes ) > 5 * MB_IN_BYTES ) {
+        return new WP_Error( 'gdc_avatar_too_large', __( 'Image must be under 5MB.', 'gend-society' ), [ 'status' => 400 ] );
+    }
+
+    if ( ! function_exists( 'bp_core_avatar_handle_crop' ) ) {
+        return new WP_Error( 'gdc_avatar_unavailable', __( 'Avatar handling is not available on this site.', 'gend-society' ), [ 'status' => 501 ] );
+    }
+
+    // BP_Attachment_Avatar::crop() does NOT read from an arbitrary
+    // 'original_file' path despite the docblock — it reconstructs an expected
+    // path as {bp_core_avatar_upload_path()}/avatars/{item_id}/{basename(...)}
+    // and bails with file_exists() false if the file isn't already sitting
+    // there (confirmed against the live BP source). So the staged file must
+    // be written directly into that exact folder, not a generic WP temp path.
+    $avatar_dir = trailingslashit( bp_core_avatar_upload_path() ) . 'avatars/' . $user_id;
+    if ( ! file_exists( $avatar_dir ) && ! wp_mkdir_p( $avatar_dir ) ) {
+        return new WP_Error( 'gdc_avatar_write_failed', __( 'Could not prepare the avatar folder.', 'gend-society' ), [ 'status' => 500 ] );
+    }
+    $ext  = 'jpg';
+    $info = @getimagesizefromstring( $bytes );
+    if ( $info && isset( $info['mime'] ) && $info['mime'] === 'image/png' ) {
+        $ext = 'png';
+    }
+    $staged = trailingslashit( $avatar_dir ) . 'orig-' . time() . '-' . wp_generate_password( 6, false ) . '.' . $ext;
+    if ( file_put_contents( $staged, $bytes ) === false ) {
+        return new WP_Error( 'gdc_avatar_write_failed', __( 'Could not stage the uploaded image.', 'gend-society' ), [ 'status' => 500 ] );
+    }
+
+    $dims = @getimagesize( $staged );
+    if ( ! $dims || empty( $dims[0] ) || empty( $dims[1] ) ) {
+        @unlink( $staged );
+        return new WP_Error( 'gdc_avatar_bad_image', __( 'That file is not a readable image.', 'gend-society' ), [ 'status' => 400 ] );
+    }
+
+    // Centered square crop — there is no interactive cropper in this popup, so
+    // this is the best default (avoids a stretched/off-center result).
+    $side   = min( (int) $dims[0], (int) $dims[1] );
+    $crop_x = (int) ( ( (int) $dims[0] - $side ) / 2 );
+    $crop_y = (int) ( ( (int) $dims[1] - $side ) / 2 );
+
+    // crop() unlinks the staged original itself on success; the failure path
+    // below cleans it up on a bail.
+    $cropped = bp_core_avatar_handle_crop( [
+        'object'        => 'user',
+        'item_id'       => $user_id,
+        'original_file' => $staged,
+        'crop_w'        => $side,
+        'crop_h'        => $side,
+        'crop_x'        => $crop_x,
+        'crop_y'        => $crop_y,
+    ] );
+
+    if ( ! $cropped ) {
+        // crop() only unlinks the staged file on its OWN success path — clean
+        // up ourselves on an early bail so nothing orphans in the avatars dir.
+        @unlink( $staged );
+        return new WP_Error( 'gdc_avatar_crop_failed', __( 'Could not process that image.', 'gend-society' ), [ 'status' => 500 ] );
+    }
+
+    $avatar_url = add_query_arg( 'v', time(), bp_core_fetch_avatar( [ 'item_id' => $user_id, 'type' => 'full', 'html' => false ] ) );
+
+    // ── Optional: push the same image to selected connected Web Apps ──────────
+    $requested_targets = (array) $request->get_param( 'targets' );
+    $allowed_targets    = wp_list_pluck( gdc_profile_connected_webapps( $user_id ), 'group_id' );
+    $push_results       = [];
+
+    if ( ! empty( $requested_targets ) && function_exists( 'gdc_resolve_install_for_group' ) && function_exists( 'gdc_agent_remote_post' ) ) {
+        $user = get_userdata( $user_id );
+        foreach ( $requested_targets as $gid ) {
+            $gid = (int) $gid;
+            // Only push to groups this user actually belongs to with a linked
+            // Web App — never trust a group_id the client happens to send.
+            if ( ! in_array( $gid, $allowed_targets, true ) ) {
+                $push_results[] = [ 'group_id' => $gid, 'ok' => false, 'error' => 'not a connected Web App for this account' ];
+                continue;
+            }
+            $c = gdc_resolve_install_for_group( $gid );
+            if ( is_wp_error( $c ) ) {
+                $push_results[] = [ 'group_id' => $gid, 'ok' => false, 'error' => $c->get_error_message() ];
+                continue;
+            }
+            $res = gdc_agent_remote_post( $c['base_url'], 'wp-json/gs/v1/agent/avatar', [
+                'install_id'   => $c['install_id'],
+                'email'        => $user ? $user->user_email : '',
+                'login_hint'   => $user ? $user->user_login : '',
+                'image_base64' => base64_encode( $bytes ),
+            ] );
+            if ( is_wp_error( $res ) ) {
+                $push_results[] = [ 'group_id' => $gid, 'ok' => false, 'error' => $res->get_error_message() ];
+            } else {
+                $push_results[] = [ 'group_id' => $gid, 'ok' => true ];
+            }
+        }
+    }
+
+    return new WP_REST_Response( [
+        'ok'          => true,
+        'avatar_url'  => $avatar_url,
+        'push_results'=> $push_results,
+    ], 200 );
+}
+
 // ─── Render header ────────────────────────────────────────────────────────────
 // Hook into youzify_profile_before_header (fires before the <header> element)
 // so our section renders first. The original header + navbar are hidden via CSS.
@@ -524,12 +706,18 @@ function gdc_render_profile_header() {
     ] );
     $display_name = bp_get_displayed_user_fullname();
 
+    // AI Agent accounts (role=ai_agent / _aipa_is_agent meta) have no BP member
+    // type of their own, so this always fell through to the 'MEMBER' default —
+    // check gs_user_is_agent() FIRST so an agent's own profile reads AGENT.
+    $is_agent_user   = function_exists( 'gs_user_is_agent' ) && gs_user_is_agent( $user_id );
     $member_type     = function_exists( 'bp_get_member_type' ) ? bp_get_member_type( $user_id ) : false;
     $member_type_obj = ( $member_type && function_exists( 'bp_get_member_type_object' ) )
                         ? bp_get_member_type_object( $member_type ) : null;
-    $auth_label      = $member_type_obj
-                        ? strtoupper( $member_type_obj->labels['singular_name'] )
-                        : 'MEMBER';
+    $auth_label      = $is_agent_user
+                        ? 'AGENT'
+                        : ( $member_type_obj
+                            ? strtoupper( $member_type_obj->labels['singular_name'] )
+                            : 'MEMBER' );
 
     // ── Live balance data ─────────────────────────────────────────────────────
     $has_mycred = function_exists( 'mycred_get_users_balance' );
@@ -548,35 +736,38 @@ function gdc_render_profile_header() {
         ? (float) mycred_get_users_balance( $user_id, 'mycred_default' )
         : 0.0;
 
+    // Card order: DGEN Balance, Task Credits, Store Credits, AI Builder
+    // Tokens (stagger follows position so the entrance animation stays
+    // left-to-right).
     $balances = apply_filters( 'gdc_profile_header_balances', [
-        [
-            'label'   => 'Task Credits',
-            'value'   => number_format( $task_credits ),
-            'color'   => 'var(--gph-magenta)',
-            'stagger' => 2,
-            'topup'   => 'tasks',
-        ],
-        [
-            'label'   => 'AI Builder Tokens',
-            'value'   => number_format( $ai_tokens, 1 ),
-            'color'   => 'var(--gph-blue)',
-            'stagger' => 3,
-            'topup'   => 'ai',
-        ],
         [
             'label'   => '🇨🇦 DGEN Balance',
             'value'   => number_format( $dgen_balance ),
             'color'   => 'var(--gph-green)',
-            'stagger' => 4,
+            'stagger' => 2,
             'topup'   => 'dgen',
+        ],
+        [
+            'label'   => 'Task Credits',
+            'value'   => number_format( $task_credits ),
+            'color'   => 'var(--gph-magenta)',
+            'stagger' => 3,
+            'topup'   => 'tasks',
         ],
         [
             'label'       => '🇨🇦 Store Credits',
             'value'       => '$' . number_format( $store_credits, 2 ),
             'color'       => 'var(--gph-red)',
-            'stagger'     => 5,
+            'stagger'     => 4,
             'topup'       => 'store',
             'topup_label' => 'Spend',
+        ],
+        [
+            'label'   => 'AI Builder Tokens',
+            'value'   => number_format( $ai_tokens, 1 ),
+            'color'   => 'var(--gph-blue)',
+            'stagger' => 5,
+            'topup'   => 'ai',
         ],
     ], $user_id );
 
@@ -708,32 +899,25 @@ function gdc_render_profile_header() {
     // Portfolio (Files/media) tab removed above — just re-index.
     $nav_items = array_values( $nav_items );
 
-    // ── Re-add Messages & Settings — Youzify hides these via youzify_profile_hidden_tabs()
-    // but our custom header needs them. Pull them back from the raw BP nav.
-    $slugs_already = array_column( array_map( 'get_object_vars', $nav_items ), 'slug' );
-    if ( isset( buddypress()->members ) && is_object( buddypress()->members->nav ) ) {
-        $raw_nav = buddypress()->members->nav->get_primary();
-        foreach ( [ 'messages', 'settings' ] as $restore_slug ) {
-            if ( in_array( $restore_slug, $slugs_already, true ) ) {
-                continue; // already present
-            }
-            foreach ( $raw_nav as $raw_item ) {
-                if ( $raw_item['slug'] !== $restore_slug ) {
-                    continue;
-                }
-                // Respect show_for_displayed_user — only show on own profile if not set
-                if ( empty( $raw_item['show_for_displayed_user'] ) && ! bp_is_my_profile() ) {
-                    break;
-                }
-                // Cast to object to match the rest of $nav_items
-                $nav_items[] = (object) [
-                    'name' => $raw_item['name'],
-                    'slug' => $raw_item['slug'],
-                    'link' => $raw_item['link'],
-                ];
-                break;
-            }
+    // ── Messages + Settings are GONE from the nav ─────────────────────────
+    // (they used to be re-added here from the raw BP nav). Messages is
+    // dropped outright; Settings moved onto the profile photo hover as a
+    // gear icon (top-left) that opens the settings screen in a POPUP —
+    // see the avatar markup below. Defensively strip both in case another
+    // layer injected them into the Youzify primary nav.
+    foreach ( $nav_items as $index => $item ) {
+        if ( in_array( $item->slug, [ 'messages', 'settings' ], true ) ) {
+            unset( $nav_items[ $index ] );
         }
+    }
+    $nav_items = array_values( $nav_items );
+    // The gear popup target (own profile only) — chrome-stripped for the
+    // iframe via the existing ?gdc_tab_only=1 mechanism.
+    $gdc_settings_popup_url = '';
+    if ( $is_own_profile && function_exists( 'bp_get_settings_slug' ) ) {
+        $gdc_settings_popup_url = add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . bp_get_settings_slug() ) );
+    }
+    if ( false ) { // retired restore loop kept out of the execution path
     }
 
     // ── Insert "Invest" right after Connections (friends) ──────────────────────
@@ -759,6 +943,21 @@ function gdc_render_profile_header() {
         }
         array_splice( $nav_items, $insert_at, 0, [ $invest_obj ] );
     }
+
+    // ── Canonical nav order (desktop AND phone base order): Overview,
+    // App Projects (groups), Calendar, Connections (friends), Contracts
+    // (invest), Wallet. Anything unlisted keeps its relative order after.
+    $gdc_nav_order = [ 'overview' => 1, 'groups' => 2, 'member-calendar' => 3, 'friends' => 4, 'invest' => 5, 'member-wallet' => 6 ];
+    $gdc_nav_pos   = 0;
+    foreach ( $nav_items as $it ) {
+        // Stable sort: remember each item's source index as the tiebreaker.
+        $it->_src = $gdc_nav_pos++;
+    }
+    usort( $nav_items, function ( $a, $b ) use ( $gdc_nav_order ) {
+        $oa = $gdc_nav_order[ $a->slug ] ?? 99;
+        $ob = $gdc_nav_order[ $b->slug ] ?? 99;
+        return ( $oa - $ob ) ?: ( $a->_src - $b->_src );
+    } );
 
     $current_component = bp_current_component();
 
@@ -794,9 +993,65 @@ function gdc_render_profile_header() {
             <div class="gdc-identity-wrap gdc-stagger-1">
                 <div class="gdc-kbx" style="--kbx-color: var(--gph-magenta)">
                     <div class="gdc-identity-inner">
+                        <?php if ( $is_own_profile ) : ?>
+                        <button type="button" id="gdc-avatar-edit-btn" class="gdc-avatar-btn" title="<?php esc_attr_e( 'Change profile photo', 'gend-society' ); ?>">
+                            <img src="<?php echo esc_url( $avatar_url ); ?>"
+                                 alt="<?php echo esc_attr( $display_name ); ?>"
+                                 class="gdc-avatar" id="gdc-avatar-img">
+                            <span class="gdc-avatar-edit-overlay" aria-hidden="true">
+                                <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
+                            </span>
+                            <?php if ( ! empty( $gdc_settings_popup_url ) ) : ?>
+                            <span id="gdc-avatar-settings-btn" class="gdc-avatar-settings-overlay" role="button" tabindex="0"
+                                  title="<?php esc_attr_e( 'Profile settings', 'gend-society' ); ?>"
+                                  data-settings-url="<?php echo esc_attr( $gdc_settings_popup_url ); ?>">
+                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
+                            </span>
+                            <?php endif; ?>
+                        </button>
+                        <?php if ( ! empty( $gdc_settings_popup_url ) ) : ?>
+                        <script>
+                        (function () {
+                            var gear = document.getElementById('gdc-avatar-settings-btn');
+                            if (!gear || gear.dataset.gdcBound === '1') return;
+                            gear.dataset.gdcBound = '1';
+                            function openSettings(ev) {
+                                // Do NOT bubble to the avatar button (which opens
+                                // the change-photo popup).
+                                ev.preventDefault();
+                                ev.stopPropagation();
+                                var existing = document.getElementById('gdc-profile-settings-overlay');
+                                if (existing) { existing.remove(); }
+                                var overlay = document.createElement('div');
+                                overlay.id = 'gdc-profile-settings-overlay';
+                                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,8,23,.85);backdrop-filter:blur(6px);';
+                                overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
+                                var dialog = document.createElement('div');
+                                dialog.style.cssText = 'position:relative;width:min(1100px,100%);height:min(90vh,900px);background:#0a1019;border-radius:20px;overflow:hidden;box-shadow:0 60px 160px rgba(0,0,0,.6),0 0 0 1px rgba(148,163,184,.2);display:flex;flex-direction:column;';
+                                var closeBtn = document.createElement('button');
+                                closeBtn.type = 'button';
+                                closeBtn.textContent = '×';
+                                closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(15,23,42,.85);color:#f1f5f9;border:1px solid rgba(148,163,184,.3);width:34px;height:34px;border-radius:999px;cursor:pointer;font-size:20px;line-height:1;z-index:2;';
+                                closeBtn.addEventListener('click', function () { overlay.remove(); });
+                                dialog.appendChild(closeBtn);
+                                var iframe = document.createElement('iframe');
+                                iframe.src = gear.getAttribute('data-settings-url') || '';
+                                iframe.setAttribute('title', 'Profile settings');
+                                iframe.style.cssText = 'border:0;width:100%;flex:1;background:#0a1019;';
+                                dialog.appendChild(iframe);
+                                overlay.appendChild(dialog);
+                                document.body.appendChild(overlay);
+                            }
+                            gear.addEventListener('click', openSettings);
+                            gear.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { openSettings(e); } });
+                        })();
+                        </script>
+                        <?php endif; ?>
+                        <?php else : ?>
                         <img src="<?php echo esc_url( $avatar_url ); ?>"
                              alt="<?php echo esc_attr( $display_name ); ?>"
                              class="gdc-avatar">
+                        <?php endif; ?>
                         <h1 class="gdc-identity-name"><?php echo esc_html( $display_name ); ?></h1>
                         <p class="gdc-identity-auth">AUTHORIZATION: <?php echo esc_html( $auth_label ); ?></p>
                         <?php
@@ -817,6 +1072,279 @@ function gdc_render_profile_header() {
                 </div>
             </div>
 
+            <?php if ( $is_own_profile ) :
+                $gdc_avatar_targets = gdc_profile_connected_webapps( $user_id );
+            ?>
+            <!-- ── Change profile photo popup (own profile only) ────────── -->
+            <div id="gdc-avatar-modal" class="gdc-avatar-modal" hidden aria-hidden="true">
+                <div class="gdc-avatar-modal-inner">
+                    <button type="button" class="gdc-avatar-modal-close" id="gdc-avatar-modal-close" aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                    <h3><?php esc_html_e( 'Change Profile Photo', 'gend-society' ); ?></h3>
+                    <div class="gdc-avatar-modal-preview">
+                        <canvas id="gdc-avatar-crop-canvas" class="gdc-avatar-crop-canvas" width="240" height="240"></canvas>
+                    </div>
+                    <label class="gdc-avatar-modal-pick">
+                        <?php esc_html_e( 'Choose an image…', 'gend-society' ); ?>
+                        <input type="file" id="gdc-avatar-file-input" accept="image/png,image/jpeg,image/webp">
+                    </label>
+                    <div class="gdc-avatar-modal-slider-row" id="gdc-avatar-zoom-row" hidden>
+                        <label for="gdc-avatar-zoom"><?php esc_html_e( 'Zoom', 'gend-society' ); ?></label>
+                        <input type="range" id="gdc-avatar-zoom" min="1" max="3" step="0.01" value="1">
+                    </div>
+                    <div class="gdc-avatar-modal-slider-row" id="gdc-avatar-quality-row" hidden>
+                        <label for="gdc-avatar-quality"><?php esc_html_e( 'Image quality', 'gend-society' ); ?></label>
+                        <input type="range" id="gdc-avatar-quality" min="0.5" max="1" step="0.05" value="0.9">
+                        <span id="gdc-avatar-quality-val" class="gdc-avatar-quality-val">90%</span>
+                    </div>
+                    <p class="gdc-avatar-modal-hint" id="gdc-avatar-drag-hint" hidden><?php esc_html_e( 'Drag to reposition.', 'gend-society' ); ?></p>
+                    <?php if ( ! empty( $gdc_avatar_targets ) ) : ?>
+                    <div class="gdc-avatar-modal-targets">
+                        <p class="gdc-avatar-modal-targets-label"><?php esc_html_e( 'Also update on connected Web Apps:', 'gend-society' ); ?></p>
+                        <?php foreach ( $gdc_avatar_targets as $t ) : ?>
+                        <label class="gdc-avatar-target-row">
+                            <input type="checkbox" class="gdc-avatar-target-cb" value="<?php echo esc_attr( $t['group_id'] ); ?>">
+                            <span><?php echo esc_html( $t['name'] ); ?></span>
+                        </label>
+                        <?php endforeach; ?>
+                    </div>
+                    <?php endif; ?>
+                    <div class="gdc-avatar-modal-error" id="gdc-avatar-modal-error" hidden></div>
+                    <div class="gdc-avatar-modal-actions">
+                        <button type="button" class="gdc-action-btn" id="gdc-avatar-modal-cancel"><?php esc_html_e( 'Cancel', 'gend-society' ); ?></button>
+                        <button type="button" class="gdc-action-btn gdc-action-btn--connect" id="gdc-avatar-modal-save" disabled><?php esc_html_e( 'Save', 'gend-society' ); ?></button>
+                    </div>
+                </div>
+            </div>
+            <script>
+            (function () {
+                var modal   = document.getElementById('gdc-avatar-modal');
+                var openBtn = document.getElementById('gdc-avatar-edit-btn');
+                if (!modal || !openBtn) { return; }
+                // .gdc-profile-hub has perspective, and .gdc-kbx has
+                // will-change:transform — both establish a containing block
+                // for position:fixed descendants, which traps this modal
+                // inside the header box instead of the viewport. Re-parent to
+                // <body> (same fix already used elsewhere in this file for
+                // the wallet/top-up popups) so position:fixed is relative to
+                // the real viewport.
+                if (modal.parentNode !== document.body) {
+                    document.body.appendChild(modal);
+                }
+                var closeBtn   = document.getElementById('gdc-avatar-modal-close');
+                var cancelBtn  = document.getElementById('gdc-avatar-modal-cancel');
+                var saveBtn    = document.getElementById('gdc-avatar-modal-save');
+                var fileInput  = document.getElementById('gdc-avatar-file-input');
+                var canvas     = document.getElementById('gdc-avatar-crop-canvas');
+                var ctx        = canvas ? canvas.getContext('2d') : null;
+                var zoomRow    = document.getElementById('gdc-avatar-zoom-row');
+                var zoomInput  = document.getElementById('gdc-avatar-zoom');
+                var qualityRow = document.getElementById('gdc-avatar-quality-row');
+                var qualityInput = document.getElementById('gdc-avatar-quality');
+                var qualityVal = document.getElementById('gdc-avatar-quality-val');
+                var dragHint   = document.getElementById('gdc-avatar-drag-hint');
+                var errorBox   = document.getElementById('gdc-avatar-modal-error');
+                var headerImg  = document.getElementById('gdc-avatar-img');
+                var nonce      = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
+                var restUrl    = <?php echo wp_json_encode( esc_url_raw( rest_url( 'gs/v1/profile/avatar' ) ) ); ?>;
+
+                // ── Crop/zoom/pan state (canvas-based, no external library) ──
+                var V = canvas ? canvas.width : 280;   // on-screen viewport (square)
+                var OUT = 600;                          // export resolution (square)
+                var img = null;                         // loaded HTMLImageElement
+                var baseScale = 1;                       // scale that makes the image just COVER the viewport at zoom=1
+                var zoom = 1;
+                var offsetX = 0, offsetY = 0;            // top-left of the drawn image, in viewport px
+                var dragging = false, dragStartX = 0, dragStartY = 0, dragOrigX = 0, dragOrigY = 0;
+
+                function clampOffsets() {
+                    var dw = img.naturalWidth * baseScale * zoom;
+                    var dh = img.naturalHeight * baseScale * zoom;
+                    var minX = V - dw, maxX = 0;
+                    var minY = V - dh, maxY = 0;
+                    offsetX = Math.min(maxX, Math.max(minX, offsetX));
+                    offsetY = Math.min(maxY, Math.max(minY, offsetY));
+                }
+
+                function draw() {
+                    if (!ctx || !img) { return; }
+                    var dw = img.naturalWidth * baseScale * zoom;
+                    var dh = img.naturalHeight * baseScale * zoom;
+                    ctx.clearRect(0, 0, V, V);
+                    ctx.drawImage(img, offsetX, offsetY, dw, dh);
+                }
+
+                function loadImage(dataUrl) {
+                    var image = new Image();
+                    image.onload = function () {
+                        img = image;
+                        baseScale = Math.max(V / img.naturalWidth, V / img.naturalHeight);
+                        zoom = 1;
+                        zoomInput.value = '1';
+                        offsetX = (V - img.naturalWidth * baseScale) / 2;
+                        offsetY = (V - img.naturalHeight * baseScale) / 2;
+                        clampOffsets();
+                        draw();
+                        zoomRow.hidden = false;
+                        qualityRow.hidden = false;
+                        dragHint.hidden = false;
+                        saveBtn.disabled = false;
+                    };
+                    image.onerror = function () {
+                        showError(<?php echo wp_json_encode( __( 'That file is not a readable image.', 'gend-society' ) ); ?>);
+                    };
+                    image.src = dataUrl;
+                }
+
+                function openModal() { modal.hidden = false; modal.setAttribute('aria-hidden', 'false'); }
+                function closeModal() { modal.hidden = true; modal.setAttribute('aria-hidden', 'true'); }
+                function showError(msg) { errorBox.textContent = msg; errorBox.hidden = false; }
+                function clearError() { errorBox.hidden = true; errorBox.textContent = ''; }
+
+                openBtn.addEventListener('click', function (e) { e.preventDefault(); clearError(); openModal(); });
+                closeBtn.addEventListener('click', closeModal);
+                cancelBtn.addEventListener('click', closeModal);
+                modal.addEventListener('click', function (e) { if (e.target === modal) { closeModal(); } });
+                document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && !modal.hidden) { closeModal(); } });
+
+                fileInput.addEventListener('change', function () {
+                    var file = fileInput.files && fileInput.files[0];
+                    clearError();
+                    if (!file) { return; }
+                    if (file.size > 5 * 1024 * 1024) {
+                        showError(<?php echo wp_json_encode( __( 'Image must be under 5MB.', 'gend-society' ) ); ?>);
+                        return;
+                    }
+                    var reader = new FileReader();
+                    reader.onload = function (ev) { loadImage(ev.target.result); };
+                    reader.readAsDataURL(file);
+                });
+
+                zoomInput.addEventListener('input', function () {
+                    if (!img) { return; }
+                    // Re-center on zoom change (no focal-point tracking) — simple,
+                    // predictable behavior without needing pinch/scroll math.
+                    zoom = parseFloat(zoomInput.value) || 1;
+                    var dw = img.naturalWidth * baseScale * zoom;
+                    var dh = img.naturalHeight * baseScale * zoom;
+                    offsetX = (V - dw) / 2;
+                    offsetY = (V - dh) / 2;
+                    clampOffsets();
+                    draw();
+                });
+
+                qualityInput.addEventListener('input', function () {
+                    qualityVal.textContent = Math.round(parseFloat(qualityInput.value) * 100) + '%';
+                });
+
+                function dragStart(x, y) {
+                    if (!img) { return; }
+                    dragging = true;
+                    dragStartX = x; dragStartY = y;
+                    dragOrigX = offsetX; dragOrigY = offsetY;
+                }
+                function dragMove(x, y) {
+                    if (!dragging || !img) { return; }
+                    offsetX = dragOrigX + (x - dragStartX);
+                    offsetY = dragOrigY + (y - dragStartY);
+                    clampOffsets();
+                    draw();
+                }
+                function dragEnd() { dragging = false; }
+
+                if (canvas) {
+                    canvas.addEventListener('mousedown', function (e) { dragStart(e.clientX, e.clientY); });
+                    window.addEventListener('mousemove', function (e) { dragMove(e.clientX, e.clientY); });
+                    window.addEventListener('mouseup', dragEnd);
+                    canvas.addEventListener('touchstart', function (e) {
+                        var t = e.touches[0]; if (t) { dragStart(t.clientX, t.clientY); }
+                    }, { passive: true });
+                    canvas.addEventListener('touchmove', function (e) {
+                        var t = e.touches[0]; if (t) { dragMove(t.clientX, t.clientY); e.preventDefault(); }
+                    }, { passive: false });
+                    canvas.addEventListener('touchend', dragEnd);
+                }
+
+                saveBtn.addEventListener('click', function () {
+                    if (!img) { return; }
+                    clearError();
+                    saveBtn.disabled = true;
+                    var orig = saveBtn.textContent;
+                    saveBtn.textContent = <?php echo wp_json_encode( __( 'Saving…', 'gend-society' ) ); ?>;
+
+                    // Render the SAME crop viewport onto a higher-resolution
+                    // export canvas at the chosen JPEG quality (this is the
+                    // reposition/zoom/compression the popup exposes — the
+                    // server then only does a defensive centered-square crop
+                    // on whatever square image it receives).
+                    var exportScale = OUT / V;
+                    var outCanvas = document.createElement('canvas');
+                    outCanvas.width = OUT; outCanvas.height = OUT;
+                    var outCtx = outCanvas.getContext('2d');
+                    var dw = img.naturalWidth * baseScale * zoom * exportScale;
+                    var dh = img.naturalHeight * baseScale * zoom * exportScale;
+                    outCtx.drawImage(img, offsetX * exportScale, offsetY * exportScale, dw, dh);
+
+                    var quality = parseFloat(qualityInput.value) || 0.9;
+                    var dataUrl = outCanvas.toDataURL('image/jpeg', quality);
+
+                    var targets = Array.prototype.slice.call(document.querySelectorAll('.gdc-avatar-target-cb:checked')).map(function (cb) { return cb.value; });
+                    fetch(restUrl, {
+                        method: 'POST',
+                        credentials: 'same-origin',
+                        headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': nonce },
+                        body: JSON.stringify({ image_base64: dataUrl, targets: targets })
+                    })
+                        .then(function (res) { return res.json().then(function (data) { return { ok: res.ok, data: data }; }); })
+                        .then(function (result) {
+                            if (!result.ok || !result.data || result.data.ok === false) {
+                                throw new Error((result.data && result.data.message) || 'save_failed');
+                            }
+                            if (headerImg) { headerImg.src = result.data.avatar_url; }
+                            closeModal();
+                        })
+                        .catch(function (err) {
+                            showError(err && err.message ? err.message : <?php echo wp_json_encode( __( 'Could not save your photo. Please try again.', 'gend-society' ) ); ?>);
+                        })
+                        .finally(function () {
+                            saveBtn.disabled = false;
+                            saveBtn.textContent = orig;
+                        });
+                });
+            })();
+            </script>
+            <style>
+            .gdc-avatar-btn { position: relative; display: block; border: none; background: none; padding: 0; cursor: pointer; }
+            .gdc-avatar-edit-overlay { position: absolute; right: 4px; bottom: 4px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.65); border: 1px solid rgba(255,255,255,.35); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s ease; }
+            .gdc-avatar-btn:hover .gdc-avatar-edit-overlay { opacity: 1; }
+            /* Settings gear — top-LEFT of the avatar on hover; opens the
+               settings POPUP (the Settings nav tab is gone). */
+            .gdc-avatar-settings-overlay { position: absolute; left: 4px; top: 4px; width: 30px; height: 30px; border-radius: 50%; background: rgba(0,0,0,.65); border: 1px solid rgba(255,255,255,.35); color: #fff; display: flex; align-items: center; justify-content: center; opacity: 0; transition: opacity .15s ease, transform .15s ease; cursor: pointer; }
+            .gdc-avatar-btn:hover .gdc-avatar-settings-overlay,
+            .gdc-avatar-settings-overlay:focus { opacity: 1; }
+            .gdc-avatar-settings-overlay:hover { transform: rotate(30deg); background: rgba(182,8,201,.6); }
+            .gdc-avatar-modal { position: fixed; inset: 0; z-index: 99999; background: rgba(0,0,0,.7); display: flex; align-items: center; justify-content: center; }
+            .gdc-avatar-modal[hidden] { display: none; }
+            .gdc-avatar-modal-inner { position: relative; width: 100%; max-width: 420px; background: #0b0e14; border: 1px solid rgba(255,255,255,.12); border-radius: 20px; padding: 28px; color: #fff; font-family: 'Inter', system-ui, sans-serif; }
+            .gdc-avatar-modal-inner h3 { margin: 0 0 16px; }
+            .gdc-avatar-modal-close { position: absolute; top: 14px; right: 14px; background: none; border: none; color: #fff; font-size: 22px; cursor: pointer; line-height: 1; }
+            .gdc-avatar-modal-preview { width: 240px; height: 240px; margin: 0 auto 16px; border-radius: 50%; overflow: hidden; border: 1px solid rgba(255,255,255,.2); background: #000; }
+            .gdc-avatar-crop-canvas { width: 240px; height: 240px; display: block; cursor: grab; touch-action: none; }
+            .gdc-avatar-crop-canvas:active { cursor: grabbing; }
+            .gdc-avatar-modal-pick { display: block; text-align: center; margin-bottom: 14px; padding: 10px; border: 1px dashed rgba(255,255,255,.3); border-radius: 12px; cursor: pointer; font-size: 13px; }
+            .gdc-avatar-modal-pick input { display: none; }
+            .gdc-avatar-modal-slider-row { display: flex; align-items: center; gap: 10px; margin-bottom: 12px; font-size: 12px; color: rgba(255,255,255,.75); }
+            .gdc-avatar-modal-slider-row label { flex: 0 0 auto; min-width: 76px; }
+            .gdc-avatar-modal-slider-row input[type="range"] { flex: 1; }
+            .gdc-avatar-quality-val { flex: 0 0 auto; min-width: 34px; text-align: right; }
+            .gdc-avatar-modal-hint { text-align: center; font-size: 11px; color: rgba(255,255,255,.5); margin: -6px 0 14px; }
+            .gdc-avatar-modal-targets { margin-bottom: 16px; max-height: 160px; overflow-y: auto; }
+            .gdc-avatar-modal-targets-label { font-size: 12px; color: rgba(255,255,255,.6); margin: 0 0 8px; }
+            .gdc-avatar-target-row { display: flex; align-items: center; gap: 8px; padding: 6px 0; font-size: 13px; cursor: pointer; }
+            .gdc-avatar-modal-error { color: #fca5a5; font-size: 12px; margin-bottom: 12px; }
+            .gdc-avatar-modal-actions { display: flex; gap: 10px; justify-content: flex-end; }
+            </style>
+            <?php endif; ?>
+
             <!-- ── 2. Metrics Port ────────────────────────────────────── -->
             <div class="gdc-metrics-port">
 
@@ -834,9 +1362,10 @@ function gdc_render_profile_header() {
                                class="gdc-admin-group-name"><?php echo esc_html( $admin_group->name ); ?></a>
                             <span class="gdc-admin-group-role">Group Admin</span>
                         </div>
-                        <a href="<?php echo esc_url( $admin_group_app ); ?>"
-                           class="gdc-action-btn gdc-view-site-btn"
-                           target="_blank" rel="noopener">View Site</a>
+                        <?php // Button order: Hub → Details → View Site. ?>
+                        <a href="<?php echo esc_url( $admin_group_url ); ?>"
+                           class="gdc-action-btn gdc-hub-btn"
+                           style="background:rgba(110,193,228,.16);color:#9ddcff;border:1px solid rgba(110,193,228,.4);">Hub</a>
                         <?php
                         // Details button — surfaced when the viewer is the
                         // group's creator (membership owner). Opens the
@@ -926,6 +1455,10 @@ function gdc_render_profile_header() {
                             <?php
                         }
                         ?>
+                        <a href="<?php echo esc_url( $admin_group_app ); ?>"
+                           class="gdc-action-btn gdc-view-site-btn"
+                           style="margin-left:8px;"
+                           target="_blank" rel="noopener">View Site</a>
                     </div>
                 </div>
                 <?php endif; ?>
@@ -982,7 +1515,7 @@ function gdc_render_profile_header() {
                     $is_active = ( $current_component === $item->slug );
                 ?>
                 <a href="<?php echo esc_url( $item->link ); ?>"
-                   class="gdc-nav-item<?php echo $is_active ? ' gdc-nav-item--active' : ''; ?>"
+                   class="gdc-nav-item gdc-nav-item--<?php echo sanitize_html_class( $item->slug ); ?><?php echo $is_active ? ' gdc-nav-item--active' : ''; ?>"
                    style="--gdc-nav-i: <?php echo (int) $i; ?>">
                     <span class="gdc-nav-icon" aria-hidden="true"><?php echo gdc_get_profile_nav_icon( $item->slug ); ?></span>
                     <span class="gdc-nav-text"><?php echo wp_kses( $item->name, [ 'span' => [ 'class' => true ] ] ); ?></span>
@@ -1581,6 +2114,373 @@ function gdc_render_profile_header() {
         }
     }());
     </script>
+    <!-- ── Mobile subnav → land on the content, not the header ──────────
+         The Connections subnav tabs (Friendships / Requests / Visitors)
+         are `no-ajax` full page loads, so selecting one reloads the page
+         at the very top — the visitor then has to scroll past the whole
+         header again. On phones we flag the click in sessionStorage and,
+         on the destination page, jump straight to the top of the content
+         (the subnav pills), so the selected tab and its list are what you
+         land on. Two passes (60ms + 500ms) absorb late layout shifts. -->
+    <script id="gdc-subnav-scroll">
+    (function () {
+        if (window.__gdcSubnavScrollBound) return;
+        window.__gdcSubnavScrollBound = true;
+
+        var mq  = window.matchMedia && window.matchMedia('(max-width: 720px)');
+        var KEY = 'gdcSubnavScroll';
+
+        document.addEventListener('click', function (e) {
+            if (!mq || !mq.matches) return;
+            var a = e.target.closest('#subnav.item-list-tabs a');
+            if (!a) return;
+            try { sessionStorage.setItem(KEY, '1'); } catch (err) { /* private mode */ }
+        }, true);
+
+        function land() {
+            var target = document.getElementById('subnav') ||
+                         document.getElementById('buddypress');
+            if (!target) return;
+            var y = target.getBoundingClientRect().top + window.pageYOffset - 12;
+            window.scrollTo(0, Math.max(0, y));
+        }
+        function maybeLand() {
+            var flagged = null;
+            try {
+                flagged = sessionStorage.getItem(KEY);
+                sessionStorage.removeItem(KEY);
+            } catch (err) { /* private mode */ }
+            if (!flagged || !mq || !mq.matches) return;
+            setTimeout(land, 60);
+            setTimeout(land, 500);
+        }
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', maybeLand);
+        } else {
+            maybeLand();
+        }
+    }());
+    </script>
+    <!-- ── Mobile SPA navigation (PJAX) ─────────────────────────────────
+         On phones, tapping a profile menu chip (or a content sub-tab that
+         is a real link) fetches the destination page in the background and
+         swaps ONLY the content column (main.youzify-page-main-content),
+         leaving the header untouched — no full reload, no header entrance
+         replay — then smooth-scrolls to the top of the new content.
+         New stylesheets/styles/scripts the destination page needs are
+         diffed in (by URL for external, content-hash for inline) and the
+         destination page's own scripts run in document order. Any failure
+         at any step falls back to a normal full navigation. -->
+    <script id="gdc-nav-pjax">
+    (function () {
+        if (window.__gdcNavPjax) return;
+        window.__gdcNavPjax = true;
+
+        var mq = window.matchMedia && window.matchMedia('(max-width: 720px)');
+        var CONTENT_SEL = 'main.youzify-page-main-content, .youzify-page-main-content';
+        var busy = false;
+        var didPjax = false;
+
+        // ── In-memory page cache: bouncing between menu items is instant.
+        // Entries refresh in the background after a cache-hit swap.
+        var CACHE_TTL = 5 * 60 * 1000;
+        var CACHE_MAX = 8;
+        var cache = {};
+        var cacheKeys = [];
+        function cachePut(href, text) {
+            if (!cache[href]) {
+                cacheKeys.push(href);
+                if (cacheKeys.length > CACHE_MAX) { delete cache[cacheKeys.shift()]; }
+            }
+            cache[href] = { text: text, ts: Date.now() };
+        }
+
+        function hashStr(str) {
+            var h = 0, i;
+            for (i = 0; i < str.length; i++) { h = ((h << 5) - h + str.charCodeAt(i)) | 0; }
+            return 'h' + h;
+        }
+
+        // ── Loading feedback: slim top progress bar + a centred pill so a
+        // tap visibly does something the instant it lands.
+        var progBar = null, progPill = null;
+        function progress(on) {
+            if (!progBar) {
+                progBar = document.createElement('div');
+                progBar.id = 'gdc-pjax-progress';
+                document.body.appendChild(progBar);
+                progPill = document.createElement('div');
+                progPill.id = 'gdc-pjax-spinner';
+                progPill.innerHTML = '<span class="dot" aria-hidden="true"></span><span>Loading</span>';
+                document.body.appendChild(progPill);
+            }
+            progBar.classList.toggle('is-on', !!on);
+            progPill.classList.toggle('is-on', !!on);
+        }
+
+        function linkFrom(e) {
+            var a = e.target.closest && e.target.closest('a.gdc-nav-item, #subnav.item-list-tabs a, a.gs-tab-link');
+            if (!a || !a.href) return null;
+            if (a.target && a.target !== '_self') return null;
+            if (e.metaKey || e.ctrlKey || e.shiftKey || e.altKey || e.button !== 0) return null;
+            var url;
+            try { url = new URL(a.href, location.href); } catch (err) { return null; }
+            if (url.origin !== location.origin) return null;
+            if (url.pathname.indexOf('/members/') !== 0) return null;
+            return url;
+        }
+
+        function markActive(url) {
+            document.querySelectorAll('.gdc-nav-item').forEach(function (it) {
+                var on = false;
+                try {
+                    var p = new URL(it.href, location.href).pathname;
+                    on = p.length > 1 && url.pathname.indexOf(p) === 0;
+                } catch (err) { /* leave off */ }
+                it.classList.toggle('gdc-nav-item--active', on);
+            });
+        }
+
+        // Execute an ordered list of scripts. External src entries block the
+        // chain until loaded (preserves lib → init order); inline entries
+        // with a target node are recreated IN PLACE inside the swapped
+        // content (so they re-bind fresh DOM on every visit), others append
+        // to <head>.
+        function runScripts(list, done) {
+            var i = 0;
+            (function next() {
+                if (i >= list.length) { done(); return; }
+                var item = list[i++];
+                var s = document.createElement('script');
+                if (item.src) {
+                    s.src = item.src;
+                    s.onload = next;
+                    s.onerror = next;
+                    document.head.appendChild(s);
+                    return;
+                }
+                s.textContent = item.text;
+                if (item.node && item.node.parentNode) {
+                    item.node.parentNode.replaceChild(s, item.node);
+                } else {
+                    document.head.appendChild(s);
+                }
+                next();
+            })();
+        }
+
+        function doSwap(html, url, push) {
+            var content = document.querySelector(CONTENT_SEL);
+            if (!content) { location.assign(url.href); return; }
+            var doc = new DOMParser().parseFromString(html, 'text/html');
+            var fresh = doc.querySelector(CONTENT_SEL);
+            if (!fresh) { location.assign(url.href); return; }
+
+            var seenSrc = {};
+            document.querySelectorAll('script[src]').forEach(function (s) { seenSrc[s.src] = 1; });
+            var haveCss = {};
+            document.querySelectorAll('link[rel="stylesheet"][href]').forEach(function (l) { haveCss[l.href] = 1; });
+            var haveStyle = {};
+            document.querySelectorAll('style').forEach(function (st) { haveStyle[hashStr(st.textContent || '')] = 1; });
+
+            // 1. Stylesheets + style blocks the destination page adds.
+            doc.querySelectorAll('link[rel="stylesheet"][href]').forEach(function (l) {
+                if (haveCss[l.href]) return;
+                var n = document.createElement('link');
+                n.rel = 'stylesheet';
+                n.href = l.href;
+                document.head.appendChild(n);
+            });
+            doc.querySelectorAll('style').forEach(function (st) {
+                var k = hashStr(st.textContent || '');
+                if (haveStyle[k]) return;
+                haveStyle[k] = 1;
+                var n = document.createElement('style');
+                n.textContent = st.textContent;
+                document.head.appendChild(n);
+            });
+
+            // 2. Swap the content column (embedded <script> clones stay inert
+            //    until step 3 recreates them).
+            var imported = document.importNode(fresh, true);
+            content.parentNode.replaceChild(imported, content);
+            var importedScripts = imported.querySelectorAll('script');
+
+            // 3. Build the ordered script list from the fetched page:
+            //    external src — once per session (dedupe); inline — EVERY
+            //    visit (they bind the freshly swapped DOM; house scripts are
+            //    guarded so re-runs are safe). Content-internal inline
+            //    scripts execute in place inside the new content.
+            var list = [];
+            var contentIdx = 0;
+            doc.querySelectorAll('script').forEach(function (s) {
+                var inContent = fresh.contains(s);
+                var target = null;
+                if (inContent) { target = importedScripts[contentIdx] || null; contentIdx++; }
+                if (s.src) {
+                    if (seenSrc[s.src]) return;
+                    seenSrc[s.src] = 1;
+                    list.push({ src: s.src });
+                    return;
+                }
+                var text = s.textContent || '';
+                if (!text) return;
+                list.push({ text: text, node: target });
+            });
+
+            document.title = doc.title || document.title;
+            markActive(url);
+            didPjax = true;
+            if (push) { history.pushState({ gdcPjax: 1 }, '', url.href); }
+
+            runScripts(list, function () {
+                busy = false;
+                progress(false);
+                // Re-arm stateful widgets that only bind on document.ready
+                // (e.g. the wallet point-type popups). Each init is idempotent.
+                try {
+                    if (window.GendWallet && typeof window.GendWallet.init === 'function') {
+                        window.GendWallet.init();
+                    }
+                } catch (err) { /* widget absent — fine */ }
+                // Land at the top of the new content — never back at the top
+                // of the profile header. Re-assert once after late scripts.
+                function landAt() {
+                    return imported.getBoundingClientRect().top + window.pageYOffset - 10;
+                }
+                window.scrollTo({ top: Math.max(0, landAt()), behavior: 'smooth' });
+                window.setTimeout(function () {
+                    var y = Math.max(0, landAt());
+                    if (Math.abs(window.pageYOffset - y) > 80) {
+                        window.scrollTo(0, y);
+                    }
+                }, 950);
+            });
+        }
+
+        function fetchPage(url, timeoutMs) {
+            var ctrl = ('AbortController' in window) ? new AbortController() : null;
+            var timer = ctrl ? window.setTimeout(function () { ctrl.abort(); }, timeoutMs) : null;
+            return fetch(url.href, {
+                credentials: 'same-origin',
+                headers: { 'X-Requested-With': 'gdc-pjax' },
+                signal: ctrl ? ctrl.signal : undefined
+            }).then(function (r) {
+                if (timer) { window.clearTimeout(timer); }
+                if (!r.ok) { throw new Error('http ' + r.status); }
+                return r.text();
+            }, function (e) {
+                if (timer) { window.clearTimeout(timer); }
+                throw e;
+            });
+        }
+
+        function navigate(url, push) {
+            if (busy) return;
+            busy = true;
+            var content = document.querySelector(CONTENT_SEL);
+            if (!content || !window.DOMParser || !window.fetch) { location.assign(url.href); return; }
+
+            // Immediate feedback: chip highlights + progress UI + content dims
+            // before any network work.
+            markActive(url);
+            progress(true);
+            content.style.transition = 'opacity 0.22s ease';
+            content.style.opacity = '0.35';
+
+            var hit = cache[url.href];
+            if (hit && (Date.now() - hit.ts) < CACHE_TTL) {
+                // Instant swap from cache. No background revalidate — these
+                // pages cost the server 8-10s each to render, so within the
+                // TTL the cached copy is the copy.
+                try { doSwap(hit.text, url, push); } catch (err) { location.assign(url.href); }
+                return;
+            }
+
+            fetchPage(url, 35000)
+                .then(function (html) {
+                    cachePut(url.href, html);
+                    doSwap(html, url, push);
+                })
+                .catch(function () { location.assign(url.href); });
+        }
+
+        document.addEventListener('click', function (e) {
+            if (!mq || !mq.matches) return;
+            var url = linkFrom(e);
+            if (!url) return;
+            e.preventDefault();
+            e.stopPropagation();
+            // Clear the full-reload scroll flag — PJAX handles the landing.
+            try { sessionStorage.removeItem('gdcSubnavScroll'); } catch (err) {}
+            navigate(url, true);
+        }, true);
+
+        // History traversal after a PJAX swap: a clean reload is the only
+        // state we can guarantee, so take it.
+        window.addEventListener('popstate', function () {
+            if (didPjax) { location.reload(); }
+        });
+    }());
+    </script>
+    <!-- ── Popup vs floating-chrome guard (phones) ──────────────────────
+         While any large fixed overlay (membership Details modal, PM task
+         modals, ready overlay, …) is visible, tag <body> with
+         gdc-popup-open — CSS hides the floating Society menu / dock /
+         chat so they can never sit on top of a popup's close button.
+         Detection is geometric (fixed, visible, covers most of the
+         viewport), so new popups are covered automatically. -->
+    <script id="gdc-popup-chrome">
+    (function () {
+        if (window.__gdcPopupChrome) return;
+        window.__gdcPopupChrome = true;
+
+        var mq = window.matchMedia && window.matchMedia('(max-width: 720px)');
+        var timer = null;
+
+        function overlayOpen() {
+            var candidates = document.querySelectorAll(
+                '[class*="modal"], [class*="overlay"], [class*="popup"], [class*="drawer"], dialog[open]'
+            );
+            for (var i = 0; i < candidates.length; i++) {
+                var el = candidates[i];
+                // Skip the chrome itself and our own PJAX-hidden bits.
+                if (el.closest('.gs-float-dock, .gs-front-sidebar, .em-chat-widget')) continue;
+                var cs = getComputedStyle(el);
+                if (cs.position !== 'fixed') continue;
+                if (cs.display === 'none' || cs.visibility === 'hidden' || parseFloat(cs.opacity) === 0) continue;
+                var r = el.getBoundingClientRect();
+                if (r.width >= window.innerWidth * 0.7 && r.height >= window.innerHeight * 0.5) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        function sync() {
+            if (!mq || !mq.matches) {
+                document.body.classList.remove('gdc-popup-open');
+                return;
+            }
+            var open = overlayOpen();
+            document.body.classList.toggle('gdc-popup-open', open);
+            // While open, poll so the chrome returns as soon as the popup
+            // closes by any means (Escape, backdrop, its own JS).
+            if (open && !timer) {
+                timer = window.setInterval(function () {
+                    if (!overlayOpen()) {
+                        document.body.classList.remove('gdc-popup-open');
+                        window.clearInterval(timer);
+                        timer = null;
+                    }
+                }, 600);
+            }
+        }
+
+        document.addEventListener('click', function () { window.setTimeout(sync, 150); }, true);
+        document.addEventListener('keyup', function (e) { if (e.key === 'Escape') window.setTimeout(sync, 150); });
+    }());
+    </script>
     <script id="gdc-kbx-tilt">
     (function () {
         if (window.__gdcKbxTilt) return;        // bind once per page
@@ -1722,6 +2622,91 @@ function gdc_profile_header_css() {
 .youzify.youzify-profile .youzify-open-nav {
     display: none !important;
 }
+/* Youzify also injects a phone-only "Menu" dropdown (.youzify-mobile-nav)
+   above the content on member pages — a third navigation surface that
+   duplicates our chip grid + pill trays. bp-user scoping keeps it alive on
+   group pages, where we have not replaced it. */
+body.bp-user .youzify-mobile-nav,
+body.bp-user .youzify-inline-mobile-nav {
+    display: none !important;
+}
+
+/* ── Popups must beat the floating Society chrome ─────────────────────
+   The floating menu / dock / chat sit at z-index ~1000002. Popups that
+   shipped with lower z-indexes ended up underneath them, putting the
+   floating buttons on top of popup close controls. Raise the known-low
+   overlays, and (below) a body.gdc-popup-open class set by JS hides the
+   floating chrome entirely while any large fixed overlay is visible on
+   a phone. */
+.gdc-ready-overlay,
+.psoo-seq-modal {
+    z-index: 1000000005 !important;
+}
+@media (max-width: 720px) {
+    body.gdc-popup-open .gs-float-menu,
+    body.gdc-popup-open .gs-float-dock,
+    body.gdc-popup-open .gs-front-sidebar,
+    body.gdc-popup-open .em-chat-widget,
+    body.gdc-popup-open .gs-mini-cart-overlay {
+        display: none !important;
+    }
+}
+
+/* ── SPA navigation loading feedback ──────────────────────────────────
+   Slim indeterminate bar across the very top plus a centred glass pill,
+   both shown the instant a profile menu tap is intercepted, so the tap
+   always visibly does something while the next screen loads. */
+#gdc-pjax-progress {
+    position: fixed;
+    top: 0; left: 0; right: 0;
+    height: 3px;
+    z-index: 2000000000;
+    background: linear-gradient(90deg, transparent, #b608c9, #89C2E0, transparent);
+    background-size: 50% 100%;
+    background-repeat: no-repeat;
+    animation: gdcPjaxSlide 1s linear infinite;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.15s ease;
+}
+#gdc-pjax-progress.is-on { opacity: 1; }
+@keyframes gdcPjaxSlide {
+    from { background-position: -60% 0; }
+    to   { background-position: 160% 0; }
+}
+#gdc-pjax-spinner {
+    position: fixed;
+    top: 42%; left: 50%;
+    transform: translate(-50%, -50%);
+    z-index: 2000000000;
+    display: none;
+    align-items: center;
+    gap: 10px;
+    padding: 12px 22px;
+    border-radius: 999px;
+    background: rgba(11,14,20,0.88);
+    border: 1px solid rgba(182,8,201,0.45);
+    color: #fff;
+    font-family: "Inter", sans-serif;
+    font-size: 0.68rem;
+    font-weight: 800;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    box-shadow: 0 0 28px rgba(182,8,201,0.3);
+    pointer-events: none;
+}
+#gdc-pjax-spinner.is-on { display: flex; }
+#gdc-pjax-spinner .dot {
+    width: 15px; height: 15px;
+    border-radius: 50%;
+    border: 2px solid rgba(255,255,255,0.22);
+    border-top-color: #b608c9;
+    animation: gdcPjaxSpin 0.7s linear infinite;
+    flex: 0 0 auto;
+}
+@keyframes gdcPjaxSpin { to { transform: rotate(360deg); } }
 
 /* ── Design tokens scoped to our header ──────────────────────────────── */
 .gdc-profile-uplink {
@@ -2384,9 +3369,10 @@ function gdc_profile_header_css() {
     .gdc-identity-inner     { padding: 28px 16px; }
     .gdc-avatar             { width: 110px; height: 110px; }
     .gdc-identity-name      { font-size: 1.3rem; }
-    .gdc-balance-grid       { grid-template-columns: 1fr 1fr; gap: 12px; }
-    .gdc-node-content       { padding: 20px 14px; }
-    .gdc-node-value         { font-size: 1.3rem; }
+    /* Balance cards (Task Credits / AI Builder Tokens / DGEN Balance /
+       Store Credits) are hidden on phones -- the header stays identity-only
+       on small screens; balances remain reachable on desktop. */
+    .gdc-balance-grid       { display: none !important; }
 
     /* Nav wrapper — sits as a dashboard tray below the cards */
     .gdc-profile-nav {
@@ -2472,8 +3458,11 @@ function gdc_profile_header_css() {
         max-width: 100%;
     }
 
-    /* Count badge becomes a corner bubble */
-    .gdc-nav-item .count {
+    /* Count badge becomes a corner bubble. BP emits class "no-count" instead
+       of "count" when the number is 0 (the Messages tab does this) -- style
+       both so the Messages bubble matches App Projects / Connections. */
+    .gdc-nav-item .count,
+    .gdc-nav-item .no-count {
         position: absolute;
         top: 6px;
         right: 6px;
@@ -2488,10 +3477,23 @@ function gdc_profile_header_css() {
         z-index: 2;
         box-shadow: 0 0 8px rgba(182,8,201,0.4);
     }
-    .gdc-nav-item--active .count {
+    .gdc-nav-item--active .count,
+    .gdc-nav-item--active .no-count {
         background: var(--gph-magenta);
         color: #fff;
     }
+
+    /* Phone menu order — matches the canonical PHP sort: Overview,
+       App Projects, Calendar, Connections, Contracts, Wallet. Grid
+       auto-placement honors the order property; anything unlisted lands
+       after (default order 99). */
+    .gdc-nav-item                  { order: 99; }
+    .gdc-nav-item--overview        { order: 1; }
+    .gdc-nav-item--groups          { order: 2; }
+    .gdc-nav-item--member-calendar { order: 3; }
+    .gdc-nav-item--friends         { order: 4; }
+    .gdc-nav-item--invest          { order: 5; }
+    .gdc-nav-item--member-wallet   { order: 6; }
 }
 
 /* Very narrow phones — drop to 3 columns to keep labels readable */
@@ -2505,8 +3507,11 @@ function gdc_profile_header_css() {
     }
 }
 
-/* Count badge inside nav items (e.g. "Groups 5") */
-.gdc-nav-item .count {
+/* Count badge inside nav items (e.g. "Groups 5"). Also match BP class
+   "no-count" (emitted when the number is 0, e.g. Messages with no unread)
+   so every nav number gets the same pill treatment. */
+.gdc-nav-item .count,
+.gdc-nav-item .no-count {
     display: inline-flex;
     align-items: center;
     justify-content: center;
@@ -2522,7 +3527,8 @@ function gdc_profile_header_css() {
     vertical-align: middle;
     line-height: 1.6;
 }
-.gdc-nav-item--active .count {
+.gdc-nav-item--active .count,
+.gdc-nav-item--active .no-count {
     background: rgba(182,8,201,0.15);
     border-color: rgba(182,8,201,0.35);
     color: var(--gph-magenta);
@@ -2850,6 +3856,176 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 @media (max-width: 720px) {
     .gdc-subnav-icon { width: 26px; height: 26px; border-radius: 8px; }
     .gdc-subnav-icon svg { width: 14px; height: 14px; }
+}
+
+/* ── Mobile: Connections content tabs → enclosed pill buttons ─────────────
+   On phones the Connections subnav (Friendships / Requests / Visitors) and
+   the Visitors screen subnav (Recent / Analytics / History) become a glass
+   tray of fully-enclosed pill buttons that WRAP, so every tab stays visible
+   — no horizontal squeeze or cut-off. The Order By filter drops onto its
+   own full-width row under the pills. The #subnav id in these selectors
+   outranks every Youzify item-list-tabs rule regardless of order. */
+@media (max-width: 720px) {
+    body.friends div.item-list-tabs#subnav,
+    body.messages div.item-list-tabs#subnav,
+    body.groups div.item-list-tabs#subnav,
+    body.visitors div.item-list-tabs#subnav {
+        /* Youzify hides #subnav entirely at phone widths (its mobile Menu
+           dropdown replaced it, which we removed) — force it visible so the
+           pill tray below is the mobile navigation. */
+        display: block !important;
+        background: transparent !important;
+        border: 0 !important;
+        box-shadow: none !important;
+        padding: 0 !important;
+        margin: 0 0 16px !important;
+        height: auto !important;
+        overflow: visible !important;
+    }
+    body.friends div.item-list-tabs#subnav ul,
+    body.messages div.item-list-tabs#subnav ul,
+    body.groups div.item-list-tabs#subnav ul,
+    body.visitors div.item-list-tabs#subnav ul {
+        display: flex !important;
+        flex-wrap: wrap !important;
+        gap: 8px !important;
+        align-items: stretch !important;
+        margin: 0 !important;
+        padding: 10px !important;
+        background: rgba(0,0,0,0.45) !important;
+        border: 1px solid rgba(255,255,255,0.1) !important;
+        border-radius: 16px !important;
+        backdrop-filter: blur(14px);
+        -webkit-backdrop-filter: blur(14px);
+        height: auto !important;
+        overflow: visible !important;
+    }
+    body.friends div.item-list-tabs#subnav ul li,
+    body.messages div.item-list-tabs#subnav ul li,
+    body.groups div.item-list-tabs#subnav ul li,
+    body.visitors div.item-list-tabs#subnav ul li {
+        float: none !important;
+        display: block !important;
+        flex: 1 1 auto;
+        margin: 0 !important;
+        padding: 0 !important;
+        border: 0 !important;
+        background: transparent !important;
+        max-width: 100%;
+    }
+    body.friends div.item-list-tabs#subnav ul li a,
+    body.messages div.item-list-tabs#subnav ul li a,
+    body.groups div.item-list-tabs#subnav ul li a,
+    body.visitors div.item-list-tabs#subnav ul li a {
+        display: flex !important;
+        width: 100% !important;
+        align-items: center !important;
+        justify-content: center !important;
+        gap: 8px !important;
+        padding: 11px 14px !important;
+        border-radius: 999px !important;
+        background: rgba(255,255,255,0.035) !important;
+        border: 1px solid rgba(255,255,255,0.12) !important;
+        color: #94a3b8 !important;
+        font-size: 0.68rem !important;
+        font-weight: 800 !important;
+        letter-spacing: 0.6px !important;
+        text-transform: uppercase !important;
+        line-height: 1.1 !important;
+        text-decoration: none !important;
+        white-space: nowrap !important;
+        transition: background 0.25s ease, border-color 0.25s ease, color 0.25s ease, box-shadow 0.25s ease;
+    }
+    body.friends div.item-list-tabs#subnav ul li a i,
+    body.messages div.item-list-tabs#subnav ul li a i,
+    body.groups div.item-list-tabs#subnav ul li a i,
+    body.visitors div.item-list-tabs#subnav ul li a i {
+        font-size: 0.8rem !important;
+        line-height: 1 !important;
+    }
+    body.friends div.item-list-tabs#subnav ul li a:active,
+    body.messages div.item-list-tabs#subnav ul li a:active,
+    body.groups div.item-list-tabs#subnav ul li a:active,
+    body.visitors div.item-list-tabs#subnav ul li a:active {
+        transform: scale(0.97);
+    }
+    body.friends div.item-list-tabs#subnav ul li.current a,
+    body.messages div.item-list-tabs#subnav ul li.current a,
+    body.friends div.item-list-tabs#subnav ul li.selected a,
+    body.messages div.item-list-tabs#subnav ul li.selected a,
+    body.groups div.item-list-tabs#subnav ul li.current a,
+    body.groups div.item-list-tabs#subnav ul li.selected a,
+    body.visitors div.item-list-tabs#subnav ul li.current a,
+    body.visitors div.item-list-tabs#subnav ul li.selected a {
+        background: rgba(182,8,201,0.14) !important;
+        border-color: rgba(182,8,201,0.5) !important;
+        color: #fff !important;
+        box-shadow:
+            0 0 16px rgba(182,8,201,0.22),
+            inset 0 0 12px rgba(182,8,201,0.08) !important;
+    }
+    /* Count bubbles inside the pills keep the header-chip look */
+    body.friends div.item-list-tabs#subnav ul li a span.count,
+    body.messages div.item-list-tabs#subnav ul li a span.count,
+    body.friends div.item-list-tabs#subnav ul li a span.no-count,
+    body.messages div.item-list-tabs#subnav ul li a span.no-count,
+    body.groups div.item-list-tabs#subnav ul li a span.count,
+    body.groups div.item-list-tabs#subnav ul li a span.no-count,
+    body.visitors div.item-list-tabs#subnav ul li a span.count,
+    body.visitors div.item-list-tabs#subnav ul li a span.no-count {
+        background: rgba(182,8,201,0.85) !important;
+        border: 1px solid rgba(182,8,201,0.6) !important;
+        border-radius: 20px !important;
+        color: #fff !important;
+        padding: 1px 6px !important;
+        font-size: 0.58rem !important;
+        line-height: 1.45 !important;
+    }
+    /* Order By filter — its own full-width row under the pills */
+    body.friends div.item-list-tabs#subnav ul li.filter,
+    body.messages div.item-list-tabs#subnav ul li.filter,
+    body.groups div.item-list-tabs#subnav ul li.filter,
+    body.visitors div.item-list-tabs#subnav ul li.filter {
+        flex: 1 1 100% !important;
+        display: flex !important;
+        align-items: center !important;
+        gap: 8px !important;
+        margin-top: 2px !important;
+    }
+    body.friends div.item-list-tabs#subnav ul li.filter label,
+    body.messages div.item-list-tabs#subnav ul li.filter label,
+    body.groups div.item-list-tabs#subnav ul li.filter label,
+    body.visitors div.item-list-tabs#subnav ul li.filter label {
+        color: #64748b !important;
+        font-size: 0.66rem !important;
+        font-weight: 700 !important;
+        text-transform: uppercase !important;
+        letter-spacing: 0.5px !important;
+        margin: 0 !important;
+        white-space: nowrap;
+    }
+    body.friends div.item-list-tabs#subnav ul li.filter select,
+    body.messages div.item-list-tabs#subnav ul li.filter select,
+    body.groups div.item-list-tabs#subnav ul li.filter select,
+    body.visitors div.item-list-tabs#subnav ul li.filter select {
+        flex: 1 1 auto !important;
+        width: auto !important;
+        max-width: 100% !important;
+    }
+
+    /* Connections page: menus are centered, content-sized buttons — not
+       full-width bars. Later in the sheet than the shared pill rules, so
+       these win for body.friends. */
+    body.friends div.item-list-tabs#subnav ul { justify-content: center !important; }
+    body.friends div.item-list-tabs#subnav ul li:not(.filter) {
+        flex: 0 1 auto !important;
+        width: auto !important;
+        min-width: 0 !important;
+    }
+    body.friends div.item-list-tabs#subnav ul li:not(.filter) a {
+        width: auto !important;
+        padding: 10px 18px !important;
+    }
 }
 
 /* ── Pagination ──────────────────────────────────────────────────────── */

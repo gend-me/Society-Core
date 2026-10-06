@@ -314,7 +314,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 'template_file'     => 'groups/single/plugins',
             ) );
         }
-        public static function render_legacy_content( $group_id ) {
+        public static function render_legacy_content( $group_id, $forced_tab = '' ) {
             if ( ! gs_group_tabs_user_has_access() ) return;
             $group_id = $group_id ?: bp_get_current_group_id();
             // No gs_group_tab_open() wrapper here — the new design's two
@@ -324,11 +324,43 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             $ajax_url = admin_url( 'admin-ajax.php' );
             $nonce    = wp_create_nonce( 'gs_membership_action' );
             $uid      = 'gs-cg-' . (int) $group_id;
-            // v12.1 — Deep-link support: /compute-gas/storage/ or /gas-stations/
-            // lands on the matching tab. Anything else lands on Power.
+            // Deep-link support: /compute-gas/gas-stations/ lands on the
+            // matching tab. Legacy power/storage links land on Consumed Gas.
             $cg_active_tab = function_exists( 'bp_action_variable' ) ? (string) bp_action_variable( 0 ) : '';
-            if ( ! in_array( $cg_active_tab, array( 'power', 'storage', 'gas-stations' ), true ) ) {
-                $cg_active_tab = 'power';
+            if ( in_array( $cg_active_tab, array( 'power', 'storage' ), true ) ) {
+                $cg_active_tab = 'consumed-gas';
+            }
+            if ( ! in_array( $cg_active_tab, array( 'consumed-gas', 'gas-stations' ), true ) ) {
+                $cg_active_tab = 'consumed-gas';
+            }
+            // $forced_tab lets a caller embed just ONE panel with no tab
+            // switcher at all (operator directive) -- used by the Earnings
+            // -> Gas Stations sub-tab, which is already inside a
+            // "Gas Stations"-labeled context and shouldn't also offer a
+            // "Consumed Gas" choice or a nav bar to switch away from it.
+            $gs_cg_hide_nav = false;
+            if ( in_array( $forced_tab, array( 'consumed-gas', 'gas-stations' ), true ) ) {
+                $cg_active_tab  = $forced_tab;
+                $gs_cg_hide_nav = true;
+            }
+            $gs_gas_earnings = array();
+            global $wpdb;
+            $gs_gas_ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
+            $gs_gas_rows = $wpdb->get_results(
+                "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
+                 FROM {$gs_gas_ledger}
+                 WHERE station_id <> ''
+                 GROUP BY station_id
+                 ORDER BY owner_amount DESC",
+                ARRAY_A
+            );
+            foreach ( (array) $gs_gas_rows as $gs_gas_row ) {
+                $gs_gas_earnings[] = array(
+                    'station_id'   => (string) ( $gs_gas_row['station_id'] ?? '' ),
+                    'units'        => (float) ( $gs_gas_row['units'] ?? 0 ),
+                    'owner_amount' => (float) ( $gs_gas_row['owner_amount'] ?? 0 ),
+                    'last_earned'  => (string) ( $gs_gas_row['last_earned'] ?? '' ),
+                );
             }
             // Pre-compute per-device earning + savings for the Gas Stations tab.
             // Source: Gend_Chain_Node_Scoring (per-device ledger). Falls through
@@ -354,13 +386,13 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             }
             ?>
             <style>
-                /* v12.1 — 2-tab top nav for Compute Gas (Power / Storage). */
+                /* Compute Gas has two sections: usage and Gas Stations. */
                 .gs-cg-tabsuite {
                     max-width: 1250px; margin: 0 auto; padding: 0 20px;
                     box-sizing: border-box; font-family: Inter, system-ui, sans-serif;
                 }
                 .gs-cg-toptabs {
-                    display: flex; flex-wrap: wrap; gap: 8px;
+                    display: flex; flex-wrap: wrap; justify-content: center; gap: 8px;
                     padding: 8px;
                     background: linear-gradient(180deg, rgba(15,23,42,.65), rgba(15,23,42,.42));
                     border: 1px solid rgba(125, 211, 252, .18);
@@ -399,18 +431,13 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 .gs-cg-toptab-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
             </style>
             <div class="gs-cg-tabsuite" data-gs-cg-tabsuite>
+                <?php if ( ! $gs_cg_hide_nav ) : ?>
                 <nav class="gs-cg-toptabs" role="tablist" aria-label="<?php esc_attr_e( 'Compute Gas sections', 'gend-society' ); ?>">
-                    <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'power' ? ' is-active' : ''; ?>" data-cg-tab="power" role="tab" aria-selected="<?php echo $cg_active_tab === 'power' ? 'true' : 'false'; ?>">
+                    <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'consumed-gas' ? ' is-active' : ''; ?>" data-cg-tab="consumed-gas" role="tab" aria-selected="<?php echo $cg_active_tab === 'consumed-gas' ? 'true' : 'false'; ?>">
                         <span class="gs-cg-toptab-icon" aria-hidden="true">
                             <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
                         </span>
-                        <span><?php esc_html_e( 'Power', 'gend-society' ); ?></span>
-                    </button>
-                    <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'storage' ? ' is-active' : ''; ?>" data-cg-tab="storage" role="tab" aria-selected="<?php echo $cg_active_tab === 'storage' ? 'true' : 'false'; ?>">
-                        <span class="gs-cg-toptab-icon" aria-hidden="true">
-                            <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><ellipse cx="12" cy="6" rx="9" ry="3"/><path d="M3 6v12c0 1.7 4 3 9 3s9-1.3 9-3V6"/><path d="M3 12c0 1.7 4 3 9 3s9-1.3 9-3"/></svg>
-                        </span>
-                        <span><?php esc_html_e( 'Storage', 'gend-society' ); ?></span>
+                        <span><?php esc_html_e( 'Consumed Gas', 'gend-society' ); ?></span>
                     </button>
                     <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'gas-stations' ? ' is-active' : ''; ?>" data-cg-tab="gas-stations" role="tab" aria-selected="<?php echo $cg_active_tab === 'gas-stations' ? 'true' : 'false'; ?>">
                         <span class="gs-cg-toptab-icon" aria-hidden="true">
@@ -419,8 +446,9 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         <span><?php esc_html_e( 'Gas Stations', 'gend-society' ); ?></span>
                     </button>
                 </nav>
+                <?php endif; ?>
 
-                <div class="gs-cg-tabpanel<?php echo $cg_active_tab === 'power' ? ' is-active' : ''; ?>" data-cg-panel="power">
+                <div class="gs-cg-tabpanel<?php echo $cg_active_tab === 'consumed-gas' ? ' is-active' : ''; ?>" data-cg-panel="power" data-cg-panel-key="consumed-gas">
                     <?php
                     // v12.1 — Compute widget moved from Containers (Storage tab)
                     // to the TOP of Power. This is where compute belongs — the
@@ -1562,6 +1590,44 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         </div>
                     </section>
 
+                    <style>
+                        [data-cg-panel="gas-stations"] .gs-cg-connected-card {
+                            margin-top: 22px; padding: 24px 28px; color: #f8fafc;
+                            background: linear-gradient(160deg, rgba(15,23,42,.78), rgba(15,23,42,.58));
+                            border: 1px solid rgba(125,211,252,.22); border-radius: 18px;
+                        }
+                        [data-cg-panel="gas-stations"] .gs-cg-connected-card h3 { margin: 0 0 7px; color: #f8fafc; }
+                        [data-cg-panel="gas-stations"] .gs-cg-connected-card p { color: rgba(226,232,240,.72); }
+                        [data-cg-panel="gas-stations"] .gs-cg-device-table { width: 100%; border-collapse: collapse; margin-top: 16px; }
+                        [data-cg-panel="gas-stations"] .gs-cg-device-table th,
+                        [data-cg-panel="gas-stations"] .gs-cg-device-table td { padding: 11px 10px; text-align: left; border-bottom: 1px solid rgba(125,211,252,.13); color: #e2e8f0; }
+                        [data-cg-panel="gas-stations"] .gs-cg-device-table th { color: #7dd3fc; font-size: .72rem; text-transform: uppercase; letter-spacing: .08em; }
+                        [data-cg-panel="gas-stations"] .gs-cg-device-table code { color: #c4b5fd; }
+                        [data-cg-panel="gas-stations"] .gs-cg-device-editor { margin-top: 16px; padding: 16px; border: 1px solid rgba(34,211,238,.32); border-radius: 12px; background: rgba(2,6,23,.42); }
+                        [data-cg-panel="gas-stations"] .gs-cg-device-editor[hidden] { display: none; }
+                        @media (max-width: 760px) {
+                            [data-cg-panel="gas-stations"] .gs-cg-device-table { display: block; overflow-x: auto; white-space: nowrap; }
+                        }
+                    </style>
+                    <section class="gs-cg-connected-card">
+                        <h3><?php esc_html_e( 'Connected devices', 'gend-society' ); ?></h3>
+                        <p><?php esc_html_e( 'View each connected server, desktop, or mobile device and edit its Gas Station participation.', 'gend-society' ); ?></p>
+                        <div data-gs-cg-devices><p><?php esc_html_e( 'Loading connected devices…', 'gend-society' ); ?></p></div>
+                        <div class="gs-cg-device-editor" data-gs-cg-device-editor hidden>
+                            <h4 data-gs-cg-device-title><?php esc_html_e( 'Run as a node', 'gend-society' ); ?></h4>
+                            <p><?php esc_html_e( 'Node participation currently applies to this WordPress install; the selected device identifies which connected device you are editing.', 'gend-society' ); ?></p>
+                            <button type="button" class="gs-cg-cta" data-gs-cg-node-action="start"><?php esc_html_e( 'Start node', 'gend-society' ); ?></button>
+                            <button type="button" class="gs-cg-cta gs-cg-cta--ghost" data-gs-cg-node-action="stop"><?php esc_html_e( 'Stop node', 'gend-society' ); ?></button>
+                            <span data-gs-cg-node-status></span>
+                        </div>
+                    </section>
+
+                    <section class="gs-cg-connected-card">
+                        <h3><?php esc_html_e( 'Earned GAS fees', 'gend-society' ); ?></h3>
+                        <p><?php esc_html_e( 'Gas Station Owner commissions earned by connected devices.', 'gend-society' ); ?></p>
+                        <div data-gs-cg-earnings></div>
+                    </section>
+
                     <?php
                     $gs_devices = array(
                         'server' => array(
@@ -2117,6 +2183,91 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         var panel = document.querySelector('[data-cg-panel="gas-stations"]');
                         if (!panel || panel.dataset.gasSubInited === '1') return;
                         panel.dataset.gasSubInited = '1';
+                        var devicesEl = panel.querySelector('[data-gs-cg-devices]');
+                        var earningsEl = panel.querySelector('[data-gs-cg-earnings]');
+                        var editor = panel.querySelector('[data-gs-cg-device-editor]');
+                        var editorTitle = panel.querySelector('[data-gs-cg-device-title]');
+                        var nodeStatus = panel.querySelector('[data-gs-cg-node-status]');
+                        var selectedDevice = '';
+                        var earnings = <?php echo wp_json_encode( $gs_gas_earnings ); ?>;
+                        var restRoot = <?php echo wp_json_encode( esc_url_raw( rest_url( 'gend-cp/v1' ) ) ); ?>;
+                        var restNonce = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
+                        function esc(value) {
+                            return String(value == null ? '' : value).replace(/[&<>"']/g, function (c) {
+                                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c];
+                            });
+                        }
+                        function renderEarnings(devices) {
+                            if (!earningsEl) return;
+                            var names = {};
+                            devices.forEach(function (d) {
+                                var id = d.id != null ? d.id : d.device_id;
+                                names[String(id)] = d.label || d.name || id;
+                            });
+                            if (!earnings.length) {
+                                earningsEl.innerHTML = '<p>No GAS fees have been recorded for connected devices yet.</p>';
+                                return;
+                            }
+                            earningsEl.innerHTML = '<table class="gs-cg-device-table"><thead><tr><th>Device</th><th>GAS units</th><th>Owner commission</th><th>Last earned</th></tr></thead><tbody>' +
+                                earnings.map(function (row) {
+                                    return '<tr><td><strong>' + esc(names[row.station_id] || row.station_id) + '</strong><br><code>' + esc(row.station_id) + '</code></td><td>' +
+                                        esc(Number(row.units || 0).toLocaleString()) + '</td><td><strong>' + esc(Number(row.owner_amount || 0).toFixed(8)) +
+                                        ' GAS</strong></td><td>' + esc(row.last_earned || '—') + '</td></tr>';
+                                }).join('') + '</tbody></table>';
+                        }
+                        function loadDevices() {
+                            if (!devicesEl) return;
+                            fetch(<?php echo wp_json_encode( esc_url_raw( rest_url( 'psoo/v1/devices' ) ) ); ?>, {
+                                credentials: 'same-origin',
+                                headers: { 'X-WP-Nonce': <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?> }
+                            }).then(function (response) {
+                                if (!response.ok) throw new Error('request_failed');
+                                return response.json();
+                            }).then(function (payload) {
+                                var devices = Array.isArray(payload) ? payload : (Array.isArray(payload.devices) ? payload.devices : []);
+                                renderEarnings(devices);
+                                if (!devices.length) {
+                                    devicesEl.innerHTML = '<p>No connected devices were found. Start a desktop or mobile app to register it.</p>';
+                                    return;
+                                }
+                                devicesEl.innerHTML = '<table class="gs-cg-device-table"><thead><tr><th>Device</th><th>Type</th><th>Status</th><th>Last seen</th><th></th></tr></thead><tbody>' +
+                                    devices.map(function (d, i) {
+                                        var id = d.id != null ? d.id : d.device_id;
+                                        var label = d.label || d.name || d.device_id || d.id || ('Device ' + (i + 1));
+                                        var status = d.online === false || d.status === 'offline' ? 'Offline' : 'Connected';
+                                        return '<tr><td><strong>' + esc(label) + '</strong><br><code>' + esc(id) + '</code></td><td>' +
+                                            esc(String(d.type || d.platform || 'device')) + '</td><td>' + esc(status) + '</td><td>' +
+                                            esc(d.last_seen || d.last_seen_at || d.updated_at || '—') + '</td><td><button type="button" class="gs-cg-cta gs-cg-edit-device" data-id="' +
+                                            esc(id) + '" data-label="' + esc(label) + '">Edit</button></td></tr>';
+                                    }).join('') + '</tbody></table>';
+                            }).catch(function () {
+                                devicesEl.innerHTML = '<p>Connected devices could not be loaded. Check the device service connection.</p>';
+                                renderEarnings([]);
+                            });
+                        }
+                        loadDevices();
+                        panel.addEventListener('click', function (e) {
+                            var edit = e.target && e.target.closest && e.target.closest('.gs-cg-edit-device');
+                            if (edit) {
+                                selectedDevice = edit.getAttribute('data-id') || '';
+                                if (editorTitle) editorTitle.textContent = 'Run as a node — ' + (edit.getAttribute('data-label') || selectedDevice);
+                                if (editor) editor.hidden = false;
+                                return;
+                            }
+                            var action = e.target && e.target.closest && e.target.closest('[data-gs-cg-node-action]');
+                            if (!action || !selectedDevice) return;
+                            action.disabled = true;
+                            fetch(restRoot + '/node/' + action.getAttribute('data-gs-cg-node-action'), {
+                                method: 'POST',
+                                credentials: 'same-origin',
+                                headers: { 'X-WP-Nonce': restNonce }
+                            }).then(function (response) {
+                                if (!response.ok) throw new Error('node_request_failed');
+                                if (nodeStatus) nodeStatus.textContent = ' Updated.';
+                            }).catch(function () {
+                                if (nodeStatus) nodeStatus.textContent = ' Could not update node participation.';
+                            }).finally(function () { action.disabled = false; });
+                        });
                         panel.addEventListener('click', function (e) {
                             var btn = e.target && e.target.closest && e.target.closest('.gs-cg-gas-subtab');
                             if (!btn) return;
@@ -2148,7 +2299,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         b.setAttribute('aria-selected', on ? 'true' : 'false');
                     });
                     suite.querySelectorAll('.gs-cg-tabpanel').forEach(function (p) {
-                        p.classList.toggle('is-active', p.getAttribute('data-cg-panel') === key);
+                        p.classList.toggle('is-active', (p.getAttribute('data-cg-panel-key') || p.getAttribute('data-cg-panel')) === key);
                     });
                 });
             })();
@@ -2567,11 +2718,31 @@ function gs_group_render_hosting_suite( $group_id ) {
 
     // Pre-fetch initial values so the panels render with real numbers on
     // first paint instead of waiting on a JS round-trip.
+    //
+    // gs_hosting_collect_tables()/gs_hosting_collect_media() take no site
+    // parameter — they were written for dashboard-hosting.php's wp-admin
+    // widget, where they're correctly called on the vendor's OWN site.
+    // Reused verbatim here with no switch_to_blog(), they were reading
+    // whatever site THIS process is already on — the gend.me hub itself
+    // when rendering a group's Hosting tab — showing the hub's own tables/
+    // uploads on every group's Containers panel instead of that group's
+    // connected app. Scope to the group's linked site the same way every
+    // other per-connected-app feature in this codebase does (see e.g.
+    // group-media-screen.php's groups_get_groupmeta( ..., 'gdc_site_id', ... )
+    // + switch_to_blog() pattern).
+    $hosting_site_id = (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true );
+    $hosting_site_ok = $hosting_site_id > 0 && (bool) get_blog_details( $hosting_site_id );
+    if ( $hosting_site_ok ) {
+        switch_to_blog( $hosting_site_id );
+    }
     $tables_data = function_exists( 'gs_hosting_collect_tables' ) ? gs_hosting_collect_tables() : array();
     $media_data  = function_exists( 'gs_hosting_collect_media' )  ? gs_hosting_collect_media()  : array();
     $resources   = function_exists( 'gs_hosting_collect_container_resources' )
         ? gs_hosting_collect_container_resources( $media_data, $tables_data )
         : array();
+    if ( $hosting_site_ok ) {
+        restore_current_blog();
+    }
 
     // Domains / backups from the remote membership payload (best-effort).
     $domains_list = array();
@@ -3637,7 +3808,7 @@ function gs_group_render_hosting_suite( $group_id ) {
                 case 'cache-object':     fire('gs_hosting_cache_object',     null, btn); break;
                 case 'template-reset':   fire('gs_hosting_template_reset',   null, btn); break;
                 case 'logs-refresh':     refreshLogs(btn); break;
-                case 'media-rescan':     fire('gs_hosting_media_rescan',     null, btn); break;
+                case 'media-rescan':     fire('gs_hosting_media_rescan',     { group_id: <?php echo (int) $group_id; ?> }, btn); break;
                 case 'backup-now':       fire('gs_membership_backup_now',    null, btn, 'backups'); break;
                 case 'backup-restore':
                     if (!confirm('<?php echo esc_js( __( 'Restore this snapshot? The container will be overwritten with its contents.', 'gend-society' ) ); ?>')) return;

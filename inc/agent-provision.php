@@ -77,6 +77,18 @@ function gs_agent_register_routes() {
         'callback'            => 'gs_agent_run',
         'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
     ));
+
+    register_rest_route('gs/v1', '/agent/credentials', array(
+        'methods'             => 'POST',
+        'callback'            => 'gs_agent_credentials',
+        'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
+    ));
+
+    register_rest_route('gs/v1', '/agent/avatar', array(
+        'methods'             => 'POST',
+        'callback'            => 'gs_agent_avatar_update',
+        'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
+    ));
 }
 
 /**
@@ -271,6 +283,202 @@ function gs_agent_deactivate(\WP_REST_Request $request) {
         'ok'              => true,
         'state'           => 'deactivated',
         'container_user_id' => (int) $user->ID,
+    ));
+}
+
+/**
+ * POST /gs/v1/agent/avatar
+ *
+ * Signed-by-hub request → set the profile photo for the LOCAL user matching
+ * the hub identity (agent OR regular member — resolved by email first, then
+ * login_hint) to the pushed image, via the same core BuddyPress avatar-crop
+ * path the hub itself uses. Despite living under the /agent/ prefix (reusing
+ * the already-allow-listed route group — see the rest_authentication_errors
+ * filter at the bottom of this file), this route is generic: any hub user
+ * pushing a new profile photo to a connected Web App lands here, not just
+ * agent accounts.
+ */
+function gs_agent_avatar_update(\WP_REST_Request $request) {
+
+    $payload = gs_agent_verify_signed_request($request);
+    if (is_wp_error($payload)) {
+        return $payload;
+    }
+
+    $email      = sanitize_email((string) ($payload['email'] ?? ''));
+    $login_hint = sanitize_user((string) ($payload['login_hint'] ?? ''), true);
+    $raw        = (string) ($payload['image_base64'] ?? '');
+
+    if ($raw === '') {
+        return new \WP_Error('gs_avatar_bad', __('image_base64 required', 'gend-society'), array('status' => 400));
+    }
+
+    $user = false;
+    if ($email !== '') {
+        $user = get_user_by('email', $email);
+    }
+    if (!$user && $login_hint !== '') {
+        $user = get_user_by('login', $login_hint);
+    }
+    if (!$user) {
+        // Not an error — this member simply has no account on this container
+        // yet (e.g. invited but never logged in). Idempotent no-op.
+        return rest_ensure_response(array('ok' => true, 'state' => 'no_local_user'));
+    }
+
+    if (!function_exists('bp_core_avatar_handle_crop')) {
+        return new \WP_Error('gs_avatar_unavailable', __('Avatar handling is not available on this site.', 'gend-society'), array('status' => 501));
+    }
+
+    $bytes = base64_decode($raw, true);
+    if ($bytes === false || strlen($bytes) === 0) {
+        return new \WP_Error('gs_avatar_bad', __('Could not decode image data.', 'gend-society'), array('status' => 400));
+    }
+    if (strlen($bytes) > 5 * MB_IN_BYTES) {
+        return new \WP_Error('gs_avatar_too_large', __('Image must be under 5MB.', 'gend-society'), array('status' => 400));
+    }
+
+    // BP_Attachment_Avatar::crop() does NOT read from an arbitrary
+    // 'original_file' path despite the docblock — it reconstructs an expected
+    // path as {bp_core_avatar_upload_path()}/avatars/{item_id}/{basename(...)}
+    // and bails with file_exists() false if the file isn't already sitting
+    // there (confirmed against the live BP source). So the staged file must
+    // be written directly into that exact folder, not a generic WP temp path.
+    $avatar_dir = trailingslashit(bp_core_avatar_upload_path()) . 'avatars/' . $user->ID;
+    if (!file_exists($avatar_dir) && !wp_mkdir_p($avatar_dir)) {
+        return new \WP_Error('gs_avatar_write_failed', __('Could not prepare the avatar folder.', 'gend-society'), array('status' => 500));
+    }
+    $ext  = 'jpg';
+    $info = @getimagesizefromstring($bytes);
+    if ($info && isset($info['mime']) && $info['mime'] === 'image/png') {
+        $ext = 'png';
+    }
+    $staged = trailingslashit($avatar_dir) . 'orig-' . time() . '-' . wp_generate_password(6, false) . '.' . $ext;
+    if (file_put_contents($staged, $bytes) === false) {
+        return new \WP_Error('gs_avatar_write_failed', __('Could not stage the uploaded image.', 'gend-society'), array('status' => 500));
+    }
+
+    $dims = @getimagesize($staged);
+    if (!$dims || empty($dims[0]) || empty($dims[1])) {
+        @unlink($staged);
+        return new \WP_Error('gs_avatar_bad_image', __('That file is not a readable image.', 'gend-society'), array('status' => 400));
+    }
+
+    $side   = min((int) $dims[0], (int) $dims[1]);
+    $crop_x = (int) (((int) $dims[0] - $side) / 2);
+    $crop_y = (int) (((int) $dims[1] - $side) / 2);
+
+    // bp_attachments_current_user_can('edit_avatar') requires
+    // bp_loggedin_user_id() === item_id — there is no logged-in session on a
+    // signed server-to-server call, so run AS the resolved user (mirrors the
+    // same pattern gs_agent_run() already uses for this exact reason).
+    if (function_exists('wp_set_current_user')) {
+        wp_set_current_user($user->ID);
+    }
+
+    $cropped = bp_core_avatar_handle_crop(array(
+        'object'        => 'user',
+        'item_id'       => $user->ID,
+        'original_file' => $staged,
+        'crop_w'        => $side,
+        'crop_h'        => $side,
+        'crop_x'        => $crop_x,
+        'crop_y'        => $crop_y,
+    ));
+
+    if (!$cropped) {
+        @unlink($staged);
+        return new \WP_Error('gs_avatar_crop_failed', __('Could not process that image.', 'gend-society'), array('status' => 500));
+    }
+
+    return rest_ensure_response(array(
+        'ok'              => true,
+        'container_user_id' => (int) $user->ID,
+    ));
+}
+
+/**
+ * POST /gs/v1/agent/credentials
+ *
+ * Signed-by-hub request → mint a fresh WP Application Password for the
+ * agent's container user and return it directly in the response. Nothing is
+ * persisted here beyond what WP core's own Application Passwords table
+ * already holds (this route mints and forwards, once, per call) — the hub
+ * broker (psoo_rest_agents_credentials) that calls this is itself NOT
+ * best-effort, so a failure here must surface, never be swallowed.
+ *
+ * ROTATE, don't accumulate: any prior 'gend-desktop-agent'-named application
+ * password for this user is deleted before minting a new one, so a Desktop
+ * app always gets a live credential and old ones don't pile up in the user's
+ * Application Passwords list.
+ */
+function gs_agent_credentials(\WP_REST_Request $request) {
+
+    $payload = gs_agent_verify_signed_request($request);
+    if (is_wp_error($payload)) {
+        return $payload;
+    }
+
+    $slug = sanitize_title((string) ($payload['slug'] ?? ''));
+    if ($slug === '') {
+        return new \WP_Error('gs_agent_bad_slug', __('slug required', 'gend-society'), array('status' => 400));
+    }
+
+    // Resolve the user by email first; fall back to login (the
+    // vendor-app-manager fix_user_query rewrite can make get_user_by('email')
+    // return false for users lacking wp_{site_id}_capabilities meta).
+    $domain = function_exists('em_inbox_default_domain') ? (string) em_inbox_default_domain() : (string) get_option('em_inbox_default_domain', '');
+    $user   = false;
+    if ($domain !== '') {
+        $user = get_user_by('email', 'agent-' . $slug . '@' . $domain);
+    }
+    if (!$user) {
+        $user = get_user_by('login', 'agent-' . $slug);
+    }
+
+    if (!$user) {
+        return new \WP_Error('gs_agent_no_user', __('Agent user not found', 'gend-society'), array('status' => 404));
+    }
+
+    if (get_user_meta($user->ID, '_aipa_agent_disabled', true)) {
+        return new \WP_Error('gs_agent_disabled', __('Agent is deactivated and has no credentials.', 'gend-society'), array('status' => 403));
+    }
+
+    if (!function_exists('wp_is_application_passwords_available') || !wp_is_application_passwords_available()) {
+        return new \WP_Error('gs_agent_app_passwords_unavailable', __('Application Passwords are not available on this site (requires HTTPS).', 'gend-society'), array('status' => 501));
+    }
+
+    $app_name = 'gend-desktop-agent';
+
+    // Rotate: delete any prior credential of the same name before minting.
+    if (class_exists('WP_Application_Passwords')) {
+        $existing = \WP_Application_Passwords::get_user_application_passwords($user->ID);
+        if (is_array($existing)) {
+            foreach ($existing as $rec) {
+                if (isset($rec['name'], $rec['uuid']) && $rec['name'] === $app_name) {
+                    \WP_Application_Passwords::delete_application_password($user->ID, $rec['uuid']);
+                }
+            }
+        }
+    }
+
+    // wp_create_application_password() is not a real function on this core
+    // version (WP 6.7.9) — WP_Application_Passwords only exposes the static
+    // create_new_application_password() method, confirmed via
+    // get_class_methods(). The plain-function call was an undefined-function
+    // fatal (500) on every call, live-verified 2026-09-30.
+    $created = \WP_Application_Passwords::create_new_application_password($user->ID, array('name' => $app_name));
+    if (is_wp_error($created)) {
+        return $created;
+    }
+    list($new_password, $item) = $created;
+
+    return rest_ensure_response(array(
+        'ok'                 => true,
+        'username'           => $user->user_login,
+        'app_password'       => $new_password,
+        'site_url'           => home_url('/'),
+        'container_user_id'  => (int) $user->ID,
     ));
 }
 

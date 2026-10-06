@@ -79,6 +79,14 @@ function gs_agent_chat_maybe_reply( $message ) {
 		return;
 	}
 
+	// A reply to an Agent-Messages chatflow (email-manager's em_cf_msgflow_*) is an ANSWER, consumed by that flow,
+	// which sends the next question / the thank-you itself -- an auto-reply here would talk over it. Flagged by
+	// gs_agent_chat_note_chatflow_reply() below, before the flow clears its state on the final answer.
+	$thread_for_flow = (int) ( isset( $message->thread_id ) ? $message->thread_id : 0 );
+	if ( $thread_for_flow && ! empty( $GLOBALS['gs_agent_chat_chatflow_threads'][ $thread_for_flow ] ) ) {
+		return;
+	}
+
 	// CHAT-03 gate: do nothing when social messaging is unavailable.
 	if ( ! function_exists( 'bp_is_active' ) || ! bp_is_active( 'messages' ) ) {
 		return;
@@ -139,6 +147,25 @@ function gs_agent_chat_maybe_reply( $message ) {
 	}
 }
 add_action( 'messages_message_sent', 'gs_agent_chat_maybe_reply', 30, 1 );
+
+/**
+ * Priority 5 (before email-manager's chatflow handler at 10, which deletes its state on the last answer): note
+ * when this message is a member's answer inside an active Agent-Messages chatflow, so the auto-reply above
+ * stays quiet for it. The flow's state is a network option keyed by thread id (em_cf_msgflow_<thread>).
+ *
+ * @param object $message BP_Messages_Message.
+ * @return void
+ */
+function gs_agent_chat_note_chatflow_reply( $message ) {
+	if ( ! is_object( $message ) || empty( $message->thread_id ) ) {
+		return;
+	}
+	$state = get_site_option( 'em_cf_msgflow_' . (int) $message->thread_id );
+	if ( is_array( $state ) && ! empty( $state['qs'] ) && (int) ( $state['user_id'] ?? 0 ) === (int) ( $message->sender_id ?? 0 ) ) {
+		$GLOBALS['gs_agent_chat_chatflow_threads'][ (int) $message->thread_id ] = true;
+	}
+}
+add_action( 'messages_message_sent', 'gs_agent_chat_note_chatflow_reply', 5, 1 );
 
 /**
  * Generate the agent's reply text via the hub LEO proxy.

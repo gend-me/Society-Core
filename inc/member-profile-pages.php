@@ -392,6 +392,10 @@ function gdc_overview_tabs_assets() {
     .gs-overview-tab { background:transparent; border:0; border-bottom:2px solid transparent; padding:12px 22px; color:#64748b; font-family:"Inter",sans-serif; font-size:0.78rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:color 0.18s, border-color 0.18s; margin-bottom:-1px; }
     .gs-overview-tab:hover { color:rgba(255,255,255,0.75); }
     .gs-overview-tab.is-active { color:#b608c9; border-bottom-color:#b608c9; }
+    /* Phones: center the Overview sub-tab strip */
+    @media (max-width:720px) {
+        .gs-overview-tabs { justify-content:center; }
+    }
     .gs-overview-panel { display:none; }
     .gs-overview-panel.is-active { display:block; }
     .gs-overview-media-frame { display:block; width:100%; min-height:80vh; height:80vh; border:0; background:transparent; border-radius:12px; overflow:hidden; }
@@ -2215,8 +2219,14 @@ function gs_invest_footer_assets() {
                 ents.forEach(function (en) { if (en.isIntersecting) { en.target.classList.add('gi-in'); io.unobserve(en.target); } });
             }, { threshold: 0.06 }) : null;
             function tag() {
-                screen.querySelectorAll(SEL).forEach(function (el) {
-                    if (el.classList.contains('gi-reveal')) return;
+                // Include elements that ship with gi-reveal hard-coded in the
+                // markup (e.g. .gci-topup-bar) — the old class-based skip left
+                // them unobserved, so they NEVER got .gi-in and sat invisible
+                // (the "blank space at the top" on the mobile Contracts tab).
+                // De-dupe via data-gi-obs instead.
+                screen.querySelectorAll(SEL + ', .gi-reveal').forEach(function (el) {
+                    if (el.dataset.giObs) return;
+                    el.dataset.giObs = '1';
                     el.classList.add('gi-reveal');
                     if (io) io.observe(el); else el.classList.add('gi-in');
                 });
@@ -2398,6 +2408,67 @@ function gs_wallet_body_class( $classes ) {
 add_action( 'bp_before_member_groups_content', 'gs_member_groups_tabs_open', 1 );
 add_action( 'bp_after_member_groups_content',  'gs_member_groups_tabs_close', 99 );
 
+/**
+ * Render one page of a member's BP activity as glass cards. Used by the
+ * App Projects → Activity panel (initial server render) and by the
+ * gs_profile_activity_page admin-ajax handler (Load More). Returns the
+ * number of items rendered.
+ */
+function gs_render_profile_activity_items( $user_id, $page = 1, $per_page = 20 ) {
+    if ( ! function_exists( 'bp_has_activities' ) ) {
+        return 0;
+    }
+    $count = 0;
+    if ( bp_has_activities( array(
+        'user_id'     => (int) $user_id,
+        'per_page'    => (int) $per_page,
+        'page'        => (int) $page,
+        'show_hidden' => get_current_user_id() === (int) $user_id,
+    ) ) ) {
+        while ( bp_activities() ) {
+            bp_the_activity();
+            $count++;
+            ?>
+            <div class="gs-act-item">
+                <div class="gs-act-avatar">
+                    <a href="<?php bp_activity_user_link(); ?>"><?php bp_activity_avatar( 'type=thumb&width=44&height=44' ); ?></a>
+                </div>
+                <div class="gs-act-body">
+                    <div class="gs-act-action"><?php bp_activity_action(); ?></div>
+                    <?php if ( function_exists( 'bp_activity_has_content' ) && bp_activity_has_content() ) : ?>
+                        <div class="gs-act-content"><?php bp_activity_content_body(); ?></div>
+                    <?php endif; ?>
+                </div>
+            </div>
+            <?php
+        }
+    }
+    return $count;
+}
+
+/**
+ * Load More for the native profile activity feed. Public activity is
+ * viewable by anyone (nopriv included); hidden activity only for the
+ * member themselves (show_hidden gate inside the renderer).
+ */
+function gs_profile_activity_page_ajax() {
+    check_ajax_referer( 'gs_profile_activity', 'nonce' );
+    $user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+    $page    = isset( $_POST['page'] ) ? max( 1, absint( $_POST['page'] ) ) : 1;
+    if ( ! $user_id ) {
+        wp_send_json_error();
+    }
+    ob_start();
+    $count = gs_render_profile_activity_items( $user_id, $page, 20 );
+    wp_send_json_success( array(
+        'html'  => ob_get_clean(),
+        'count' => $count,
+        'more'  => $count >= 20,
+    ) );
+}
+add_action( 'wp_ajax_gs_profile_activity_page', 'gs_profile_activity_page_ajax' );
+add_action( 'wp_ajax_nopriv_gs_profile_activity_page', 'gs_profile_activity_page_ajax' );
+
 function gs_member_groups_tabs_open() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
         return;
@@ -2445,6 +2516,170 @@ function gs_member_groups_tabs_open() {
     .gs-member-groups-tab.is-active {
         color: #b608c9;
         border-bottom-color: #b608c9;
+    }
+    a.gs-member-groups-tab { text-decoration: none !important; }
+
+    /* ── Mobile: one unified pill menu, every tab visible ─────────────────
+       The desktop underline strip overflows a phone (clipped after the 2nd
+       tab). On ≤720px it becomes the same glass pill tray as the rest of
+       the profile — two enclosed buttons per row, wrapping so Memberships /
+       Groups / My Projects / Activity / Invitations are ALL visible. The
+       BP subnav row (Memberships / Invitations links) duplicates this tray,
+       so its nav items are hidden here; the Order By filter stays. */
+    @media (max-width: 720px) {
+        .gs-member-groups-tabs {
+            flex-wrap: wrap;
+            gap: 8px;
+            border-bottom: 0;
+            padding: 10px;
+            margin-bottom: 18px;
+            background: rgba(0,0,0,0.45);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+        .gs-member-groups-tab {
+            flex: 1 1 calc(50% - 4px);
+            min-width: calc(50% - 4px);
+            justify-content: center;
+            margin-bottom: 0;
+            padding: 11px 8px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.035);
+            color: #94a3b8;
+            font-size: 0.64rem;
+            letter-spacing: 0.7px;
+            white-space: nowrap;
+            transition: background 0.25s ease, border-color 0.25s ease,
+                        color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .gs-member-groups-tab:active { transform: scale(0.97); }
+        .gs-member-groups-tab.is-active {
+            background: rgba(182,8,201,0.14);
+            border-color: rgba(182,8,201,0.5);
+            border-bottom-color: rgba(182,8,201,0.5);
+            color: #fff;
+            box-shadow:
+                0 0 16px rgba(182,8,201,0.22),
+                inset 0 0 12px rgba(182,8,201,0.08);
+        }
+        /* The BP subnav bar duplicates this tray (its nav links moved into
+           the pills above), and with only the Order By filter left it read
+           as a stray dropdown — remove the entire bar on phones. */
+        body.groups.my-groups #subnav.item-list-tabs { display: none !important; }
+
+    }
+
+    /* ── My Projects: collapsible PM dashboard menu on phones ─────────────
+       The PM dashboard nav (nav.psoo-pm-tabs — Consult / Developers /
+       Proposals / Projects / My Tasks / …) stacks ~350px of buttons on a
+       phone. It collapses behind a single open/close toggle showing the
+       active section; opening reveals the full menu as a glass tray and
+       picking an item closes it again. Desktop keeps the full tab row. */
+    .gs-pm-menu-toggle { display: none; }
+    @media (max-width: 720px) {
+        .gs-member-groups-panel[data-gs-panel="projects"] .gs-pm-menu-toggle {
+            display: flex;
+            width: 100%;
+            align-items: center;
+            justify-content: space-between;
+            gap: 10px;
+            padding: 13px 16px;
+            margin: 0 0 12px;
+            background: rgba(0,0,0,0.45);
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 14px;
+            color: #fff;
+            font-family: "Inter", sans-serif;
+            font-size: 0.68rem;
+            font-weight: 800;
+            letter-spacing: 0.8px;
+            text-transform: uppercase;
+            cursor: pointer;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+        .gs-member-groups-panel[data-gs-panel="projects"] .gs-pm-menu-toggle .gs-pm-menu-caret {
+            transition: transform 0.25s ease;
+            font-size: 0.8rem;
+        }
+        .gs-member-groups-panel[data-gs-panel="projects"] .gs-pm-menu-toggle.is-open .gs-pm-menu-caret {
+            transform: rotate(180deg);
+        }
+        .gs-member-groups-panel[data-gs-panel="projects"] nav.psoo-pm-tabs {
+            display: none !important;
+        }
+        .gs-member-groups-panel[data-gs-panel="projects"] nav.psoo-pm-tabs.gs-pm-menu-open {
+            display: flex !important;
+            flex-direction: column !important;
+            gap: 8px !important;
+            padding: 10px !important;
+            margin: 0 0 14px !important;
+            background: rgba(0,0,0,0.45) !important;
+            border: 1px solid rgba(255,255,255,0.1) !important;
+            border-radius: 16px !important;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+        .gs-member-groups-panel[data-gs-panel="projects"] nav.psoo-pm-tabs.gs-pm-menu-open .psoo-pm-tab {
+            width: 100% !important;
+            justify-content: flex-start !important;
+            padding: 11px 14px !important;
+            border: 1px solid rgba(255,255,255,0.12) !important;
+            border-radius: 999px !important;
+            background: rgba(255,255,255,0.035) !important;
+            color: #94a3b8 !important;
+            font-size: 0.68rem !important;
+            font-weight: 800 !important;
+            letter-spacing: 0.7px !important;
+            text-transform: uppercase !important;
+        }
+        .gs-member-groups-panel[data-gs-panel="projects"] nav.psoo-pm-tabs.gs-pm-menu-open .psoo-pm-tab--active {
+            background: rgba(182,8,201,0.14) !important;
+            border-color: rgba(182,8,201,0.5) !important;
+            color: #fff !important;
+            box-shadow:
+                0 0 16px rgba(182,8,201,0.22),
+                inset 0 0 12px rgba(182,8,201,0.08) !important;
+        }
+    }
+
+    /* Memberships panel on stacked (single-column) widths — the component
+       collapses to one column at ≤960px and pins the Launch App image CTA
+       ABOVE the list via order:-1. Flip that: list first, launch button
+       below. A JS mover (gsFixMembershipOrder below) also reorders the DOM
+       itself so no cascade/breakpoint quirk can override this. */
+    @media (max-width: 960px) {
+        .gs-member-groups-panel[data-gs-panel="memberships"] .gdc-memberships-layout {
+            display: flex !important;
+            flex-direction: column !important;
+        }
+        .gs-member-groups-panel[data-gs-panel="memberships"] .gdc-memberships-main {
+            order: 1 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+        }
+        .gs-member-groups-panel[data-gs-panel="memberships"] .gdc-memberships-sidebar {
+            order: 2 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin-top: 16px !important;
+            position: static !important;
+        }
+        /* The component fades these in with a load-time entrance animation
+           that STARTS at opacity 0 — if the animation does not run (e.g.
+           content arrived via the PJAX swap), they stay invisible. On
+           stacked widths, guarantee visibility instead of the flourish. */
+        .gs-member-groups-panel[data-gs-panel="memberships"] .gdc-launch-cta,
+        .gs-member-groups-panel[data-gs-panel="memberships"] .gdc-memberships-banner,
+        .gs-member-groups-panel[data-gs-panel="memberships"] .gdc-mig-slim,
+        .gs-member-groups-panel[data-gs-panel="memberships"] .shop_table,
+        .gs-member-groups-panel[data-gs-panel="memberships"] .shop_table tbody tr {
+            opacity: 1 !important;
+            animation: none !important;
+        }
     }
 
     /* ── Futuristic icon chip on each tab ─────────────────────────────────
@@ -2551,23 +2786,112 @@ function gs_member_groups_tabs_open() {
         }
     }
 
-    /* Activity panel — iframe of /activity/?gdc_tab_only=1.
-       The chrome stripper (gdc_tab_only_strip_chrome in this file) hides
-       the surrounding profile header / nav so only the activity stream
-       renders. Sizing is large enough to feel inline without an obvious
-       scrollbar; "Load More" inside the iframe extends content as needed. */
-    .gs-activity-tab-frame {
-        display: block;
-        width: 100%;
-        min-height: 80vh;
-        height: 80vh;
-        border: 0;
-        background: transparent;
-        border-radius: 12px;
-        overflow: hidden;
+    /* Activity panel — native glass-card feed (the old iframe embed was
+       slow and leaked the backend header chrome). */
+    .gs-profile-activity__list { display: flex; flex-direction: column; gap: 12px; }
+    .gs-act-frame-shell { position: relative; }
+    .gs-act-frame {
+        width: 100%; border: 0; display: block; min-height: 680px;
+        border-radius: 14px; background: transparent;
+        opacity: 0; transition: opacity .4s ease;
     }
+    .gs-act-frame.is-ready { opacity: 1; }
+    .gs-act-frame-loading {
+        display: flex; align-items: center; gap: 10px; justify-content: center;
+        padding: 46px 0; color: #94a3b8; font-size: 0.9rem;
+    }
+    .gs-act-frame-loading[hidden] { display: none; }
+    .gs-act-frame-spinner {
+        width: 18px; height: 18px; border-radius: 50%;
+        border: 2px solid rgba(110,193,228,.25); border-top-color: #6ec1e4;
+        animation: gsActFrameSpin .8s linear infinite;
+    }
+    @keyframes gsActFrameSpin { to { transform: rotate(360deg); } }
+    .gs-act-item {
+        display: flex; gap: 12px;
+        padding: 14px 16px;
+        background: rgba(11,14,20,0.5);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 14px;
+    }
+    .gs-act-avatar img { width: 44px; height: 44px; border-radius: 12px; display: block; }
+    .gs-act-body { flex: 1 1 auto; min-width: 0; }
+    .gs-act-action { color: #cbd5e1; font-size: 0.86rem; line-height: 1.5; }
+    .gs-act-action a { color: #89C2E0 !important; font-weight: 600; text-decoration: none !important; }
+    .gs-act-action .time-since,
+    .gs-act-action .activity-time-since { display: block; color: #64748b; font-size: 0.72rem; margin-top: 2px; }
+    .gs-act-content {
+        margin-top: 8px; color: #e2e8f0;
+        font-size: 0.9rem; line-height: 1.55;
+        overflow-wrap: anywhere;
+    }
+    .gs-act-content img, .gs-act-content video, .gs-act-content iframe {
+        max-width: 100% !important; height: auto; border-radius: 10px;
+    }
+    .gs-act-empty { color: #94a3b8; padding: 18px; text-align: center; }
+    .gs-act-more {
+        display: block; width: 100%;
+        margin-top: 14px; padding: 12px;
+        border-radius: 999px;
+        background: rgba(255,255,255,0.04);
+        border: 1px solid rgba(255,255,255,0.14);
+        color: #e2e8f0;
+        font-size: 0.7rem; font-weight: 800; letter-spacing: 0.8px;
+        text-transform: uppercase; cursor: pointer;
+        transition: background 0.2s ease, border-color 0.2s ease;
+    }
+    .gs-act-more:hover { background: rgba(182,8,201,0.14); border-color: rgba(182,8,201,0.45); }
+    .gs-act-more[hidden] { display: none; }
+    .gs-act-more[disabled] { opacity: 0.5; cursor: wait; }
     .gs-member-groups-panel[data-gs-panel="activity"].is-active {
         padding: 0;
+    }
+
+    /* ── Pending hub invitations (top of the Hubs panel) ─────────────── */
+    .gs-hub-invites {
+        margin: 0 0 22px;
+        padding: 16px;
+        background: rgba(182,8,201,0.06);
+        border: 1px solid rgba(182,8,201,0.3);
+        border-radius: 16px;
+    }
+    .gs-hub-invites__head { display: flex; align-items: center; gap: 10px; margin: 0 0 12px; }
+    .gs-hub-invites__head h3 { margin: 0; color: #fff; font-size: 1rem; font-weight: 800; letter-spacing: 0.5px; }
+    .gs-hub-invites__pill {
+        background: rgba(182,8,201,0.16);
+        border: 1px solid rgba(182,8,201,0.4);
+        color: #e879ff;
+        font-size: 0.66rem; font-weight: 800; letter-spacing: 1px;
+        text-transform: uppercase;
+        padding: 4px 10px; border-radius: 999px;
+    }
+    .gs-hub-invite-card {
+        display: flex; align-items: center; gap: 12px;
+        padding: 12px 14px; margin-bottom: 10px;
+        background: rgba(11,14,20,0.5);
+        border: 1px solid rgba(255,255,255,0.08);
+        border-radius: 12px;
+    }
+    .gs-hub-invite-card:last-child { margin-bottom: 0; }
+    .gs-hub-invite-card__avatar img { width: 46px; height: 46px; border-radius: 12px; display: block; }
+    .gs-hub-invite-card__meta { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+    .gs-hub-invite-card__meta a { color: #fff !important; font-weight: 700; text-decoration: none !important; }
+    .gs-hub-invite-card__meta span { color: #94a3b8; font-size: 0.78rem; }
+    .gs-hub-invite-card__actions { display: flex; gap: 8px; flex: 0 0 auto; }
+    .gs-hub-invite-accept, .gs-hub-invite-reject {
+        padding: 9px 16px; border-radius: 999px;
+        font-size: 0.68rem; font-weight: 800; letter-spacing: 0.6px;
+        text-transform: uppercase; text-decoration: none !important;
+        transition: background 0.2s ease, box-shadow 0.2s ease;
+    }
+    .gs-hub-invite-accept { background: rgba(0,255,136,0.14); border: 1px solid rgba(0,255,136,0.45); color: #00ff88 !important; }
+    .gs-hub-invite-accept:hover { background: rgba(0,255,136,0.24); box-shadow: 0 0 14px rgba(0,255,136,0.25); }
+    .gs-hub-invite-reject { background: rgba(255,99,99,0.12); border: 1px solid rgba(255,99,99,0.4); color: #ff8a8a !important; }
+    .gs-hub-invite-reject:hover { background: rgba(255,99,99,0.22); box-shadow: 0 0 14px rgba(255,99,99,0.2); }
+    @media (max-width: 600px) {
+        .gs-hub-invite-card { flex-wrap: wrap; }
+        .gs-hub-invite-card__actions { flex: 1 1 100%; }
+        .gs-hub-invite-accept, .gs-hub-invite-reject { flex: 1; text-align: center; }
     }
 
     .gs-member-groups-panel { display: none; }
@@ -2690,32 +3014,39 @@ function gs_member_groups_tabs_open() {
 
     <div class="gs-member-groups-wrap">
 
+        <?php
+        // Sub-tab order: My Projects (default active on own profile),
+        // Memberships, Hubs (the BP groups list), Activity. Visitors on
+        // someone else's profile default to Hubs — the My Projects PM
+        // dashboard and Memberships are own-profile surfaces.
+        $gs_default_panel = ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile() ) ? 'projects' : 'groups';
+        ?>
         <div class="gs-member-groups-tabs" role="tablist">
+            <button type="button"
+                    class="gs-member-groups-tab<?php echo 'projects' === $gs_default_panel ? ' is-active' : ''; ?>"
+                    data-gs-panel="projects"
+                    role="tab"
+                    aria-selected="<?php echo 'projects' === $gs_default_panel ? 'true' : 'false'; ?>">
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('projects') : ''; ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'My Projects', 'gend-society' ); ?></span>
+            </button>
             <?php if ( $gs_show_memberships ) : ?>
             <button type="button"
-                    class="gs-member-groups-tab is-active"
+                    class="gs-member-groups-tab"
                     data-gs-panel="memberships"
                     role="tab"
-                    aria-selected="true">
+                    aria-selected="false">
                 <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('memberships') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Memberships', 'gend-society' ); ?></span>
             </button>
             <?php endif; ?>
             <button type="button"
-                    class="gs-member-groups-tab<?php echo $gs_show_memberships ? '' : ' is-active'; ?>"
+                    class="gs-member-groups-tab<?php echo 'groups' === $gs_default_panel ? ' is-active' : ''; ?>"
                     data-gs-panel="groups"
                     role="tab"
-                    aria-selected="<?php echo $gs_show_memberships ? 'false' : 'true'; ?>">
+                    aria-selected="<?php echo 'groups' === $gs_default_panel ? 'true' : 'false'; ?>">
                 <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('groups') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'Groups', 'gend-society' ); ?></span>
-            </button>
-            <button type="button"
-                    class="gs-member-groups-tab"
-                    data-gs-panel="projects"
-                    role="tab"
-                    aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('projects') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'My Projects', 'gend-society' ); ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Hubs', 'gend-society' ); ?></span>
             </button>
             <button type="button"
                     class="gs-member-groups-tab"
@@ -2728,7 +3059,7 @@ function gs_member_groups_tabs_open() {
         </div>
 
         <?php if ( $gs_show_memberships ) : ?>
-        <div class="gs-member-groups-panel is-active" data-gs-panel="memberships" role="tabpanel">
+        <div class="gs-member-groups-panel" data-gs-panel="memberships" role="tabpanel">
             <?php
             // The shared customer-surface CSS (membership cards, subgroup tags,
             // domain-stage tags) only auto-enqueues on is_account_page(). On
@@ -2741,7 +3072,44 @@ function gs_member_groups_tabs_open() {
         </div>
         <?php endif; ?>
 
-        <div class="gs-member-groups-panel<?php echo $gs_show_memberships ? '' : ' is-active'; ?>" data-gs-panel="groups" role="tabpanel">
+        <div class="gs-member-groups-panel<?php echo 'groups' === $gs_default_panel ? ' is-active' : ''; ?>" data-gs-panel="groups" role="tabpanel">
+        <?php
+        // ── Pending group invitations — native render (NO iframe), shown at
+        // the top of the Hubs panel above the joined-hub cards, only on the
+        // viewer's own profile and only when any invitations exist. Accept /
+        // Decline are the standard nonce-protected BP action links. This
+        // mini bp_has_groups loop completes before the page's main groups
+        // loop starts, so the template globals are handed over clean.
+        if ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile()
+             && function_exists( 'bp_has_groups' )
+             && bp_has_groups( array(
+                    'type'     => 'invites',
+                    'user_id'  => get_current_user_id(),
+                    'per_page' => 20,
+                ) ) ) :
+        ?>
+        <div class="gs-hub-invites">
+            <div class="gs-hub-invites__head">
+                <h3><?php esc_html_e( 'Invitations', 'gend-society' ); ?></h3>
+                <span class="gs-hub-invites__pill"><?php esc_html_e( 'Pending', 'gend-society' ); ?></span>
+            </div>
+            <?php while ( bp_groups() ) : bp_the_group(); ?>
+            <div class="gs-hub-invite-card">
+                <div class="gs-hub-invite-card__avatar">
+                    <a href="<?php bp_group_permalink(); ?>"><?php bp_group_avatar( 'type=thumb&width=52&height=52' ); ?></a>
+                </div>
+                <div class="gs-hub-invite-card__meta">
+                    <strong><a href="<?php bp_group_permalink(); ?>"><?php bp_group_name(); ?></a></strong>
+                    <span><?php esc_html_e( 'invited you to join this hub', 'gend-society' ); ?></span>
+                </div>
+                <div class="gs-hub-invite-card__actions">
+                    <a class="gs-hub-invite-accept" href="<?php bp_group_accept_invite_link(); ?>"><?php esc_html_e( 'Accept', 'gend-society' ); ?></a>
+                    <a class="gs-hub-invite-reject" href="<?php bp_group_reject_invite_link(); ?>"><?php esc_html_e( 'Decline', 'gend-society' ); ?></a>
+                </div>
+            </div>
+            <?php endwhile; ?>
+        </div>
+        <?php endif; ?>
     <?php
 }
 
@@ -2771,7 +3139,7 @@ function gs_member_groups_tabs_close() {
     ?>
         </div><!-- /panel:groups -->
 
-        <div class="gs-member-groups-panel" data-gs-panel="projects" role="tabpanel">
+        <div class="gs-member-groups-panel<?php echo ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile() ) ? ' is-active' : ''; ?>" data-gs-panel="projects" role="tabpanel">
             <?php
             if ( $group_id && shortcode_exists( 'psoo_pm_group_projects' ) ) {
                 // Render the full native PM dashboard (All Projects / My Tasks / Calendar / Reports / Settings)
@@ -2787,27 +3155,41 @@ function gs_member_groups_tabs_close() {
 
         <div class="gs-member-groups-panel" data-gs-panel="activity" role="tabpanel">
             <?php
-            // Embed the displayed user's existing /activity/ page in an iframe.
-            // Rendering the activity loop inline produced unstyled entries — BP
-            // and Youzify CSS targets the full #buddypress > .youzify > #activity-
-            // stream > ul.activity-list ancestor chain and the post-comment AJAX
-            // handlers expect that DOM context. The iframe inherits the same
-            // page chrome the dedicated /activity/ tab uses, so styling and JS
-            // (like, comment, load-more) all work without any divergence.
-            // gdc_tab_only=1 is a query flag our wp_footer hook reads to strip
-            // the page header/footer/sidebar so only the activity stream shows.
+            // Full Youzify activity feed — iframes the member's own
+            // /activity/ page with ?gdc_tab_only=1. The chrome stripper
+            // removes header/nav/sidebar and the same hook injects a glass
+            // restyle for the feed, so every Youzify feature stays live
+            // (wall post form, reactions, comments, edit-activity, GIFs,
+            // filters) with its own JS stack. src is assigned on first tab
+            // activation so the profile page doesn't pay the load until the
+            // member opens the tab; the frame then auto-sizes to its
+            // content (same origin) so the profile scrolls as one surface.
+            $gs_act_url = '';
             if ( $displayed_user_id > 0 ) {
-                $activity_slug = function_exists( 'bp_get_activity_slug' ) ? bp_get_activity_slug() : 'activity';
-                $activity_url  = bp_displayed_user_domain() . $activity_slug . '/';
-                $activity_url  = add_query_arg( 'gdc_tab_only', '1', $activity_url );
-                ?>
-                <iframe class="gs-activity-tab-frame"
-                        src="<?php echo esc_url( $activity_url ); ?>"
-                        title="<?php esc_attr_e( 'Activity', 'gend-society' ); ?>"
-                        loading="lazy"></iframe>
-                <?php
+                if ( function_exists( 'bp_members_get_user_url' ) ) {
+                    $gs_act_url = bp_members_get_user_url( $displayed_user_id );
+                } elseif ( function_exists( 'bp_core_get_user_domain' ) ) {
+                    $gs_act_url = bp_core_get_user_domain( $displayed_user_id );
+                }
+                if ( $gs_act_url ) {
+                    $gs_act_url = add_query_arg( 'gdc_tab_only', '1', trailingslashit( $gs_act_url ) . 'activity/' );
+                }
             }
+            if ( $gs_act_url ) :
             ?>
+            <div class="gs-profile-activity gs-profile-activity--youzify" data-gs-activity>
+                <div class="gs-act-frame-shell" data-gs-act-shell>
+                    <div class="gs-act-frame-loading" data-gs-act-loading>
+                        <span class="gs-act-frame-spinner" aria-hidden="true"></span>
+                        <?php esc_html_e( 'Loading activity…', 'gend-society' ); ?>
+                    </div>
+                    <iframe class="gs-act-frame" data-gs-act-frame
+                            data-src="<?php echo esc_url( $gs_act_url ); ?>"
+                            title="<?php esc_attr_e( 'Activity feed', 'gend-society' ); ?>"
+                            referrerpolicy="same-origin"></iframe>
+                </div>
+            </div>
+            <?php endif; ?>
         </div><!-- /panel:activity -->
 
     </div><!-- /.gs-member-groups-wrap -->
@@ -2826,6 +3208,9 @@ function gs_member_groups_tabs_close() {
         tabs.forEach( function ( tab ) {
             tab.addEventListener( 'click', function () {
                 var target = tab.getAttribute('data-gs-panel');
+                // Link-style items (e.g. Invitations) navigate — on phones the
+                // PJAX controller intercepts them; leave the panels alone.
+                if ( ! target ) return;
 
                 tabs.forEach( function ( t ) {
                     t.classList.remove('is-active');
@@ -2840,8 +3225,131 @@ function gs_member_groups_tabs_close() {
 
                 var panel = wrap.querySelector('[data-gs-panel="' + target + '"].gs-member-groups-panel');
                 if ( panel ) panel.classList.add('is-active');
+
+                // Mobile: land at the top of the content after switching.
+                if ( window.matchMedia && window.matchMedia('(max-width: 720px)').matches ) {
+                    var y = wrap.getBoundingClientRect().top + window.pageYOffset - 12;
+                    window.scrollTo( { top: Math.max( 0, y ), behavior: 'smooth' } );
+                }
             } );
         } );
+
+        // ── Memberships: physically move the Launch App sidebar BELOW the
+        // list in the DOM on stacked widths, and force it visible. CSS
+        // order/opacity rules exist too, but the DOM move is immune to any
+        // stylesheet cascade or breakpoint disagreement on real devices.
+        function gsFixMembershipOrder() {
+            if ( ! window.matchMedia || ! window.matchMedia('(max-width: 960px)').matches ) return;
+            var layout = wrap.querySelector('.gs-member-groups-panel[data-gs-panel="memberships"] .gdc-memberships-layout');
+            if ( ! layout ) return;
+            var side = layout.querySelector('.gdc-memberships-sidebar');
+            var main = layout.querySelector('.gdc-memberships-main');
+            if ( ! side || ! main ) return;
+            if ( side.nextElementSibling || side.previousElementSibling !== main ) {
+                layout.appendChild( side ); // last child = below the list
+            }
+            side.style.setProperty('opacity', '1', 'important');
+            side.style.setProperty('position', 'static', 'important');
+            var cta = side.querySelector('.gdc-launch-cta');
+            if ( cta ) {
+                cta.style.setProperty('opacity', '1', 'important');
+                cta.style.setProperty('animation', 'none', 'important');
+            }
+        }
+        gsFixMembershipOrder();
+        setTimeout( gsFixMembershipOrder, 400 );
+        setTimeout( gsFixMembershipOrder, 1500 );
+
+        // ── My Projects: collapse the PM dashboard nav behind an open/close
+        // toggle (phones only via CSS — the toggle is display:none on
+        // desktop and the nav stays a normal tab row there).
+        function gsPmMenuCollapse() {
+            var panel = wrap.querySelector('.gs-member-groups-panel[data-gs-panel="projects"]');
+            if ( ! panel ) return;
+            var nav = panel.querySelector('nav.psoo-pm-tabs');
+            if ( ! nav || nav.__gsCollapsed ) return;
+            nav.__gsCollapsed = true;
+
+            var toggle = document.createElement('button');
+            toggle.type = 'button';
+            toggle.className = 'gs-pm-menu-toggle';
+            toggle.setAttribute('aria-expanded', 'false');
+            toggle.innerHTML = '<span class="gs-pm-menu-label"></span><span class="gs-pm-menu-caret" aria-hidden="true">&#9662;</span>';
+            function paintLabel() {
+                var active = nav.querySelector('.psoo-pm-tab--active');
+                var name = active ? active.textContent.trim() : '';
+                toggle.querySelector('.gs-pm-menu-label').textContent =
+                    name ? 'Dashboard Menu · ' + name : 'Dashboard Menu';
+            }
+            paintLabel();
+            nav.parentNode.insertBefore( toggle, nav );
+
+            toggle.addEventListener('click', function () {
+                var open = nav.classList.toggle('gs-pm-menu-open');
+                toggle.classList.toggle('is-open', open);
+                toggle.setAttribute('aria-expanded', open ? 'true' : 'false');
+            });
+            nav.addEventListener('click', function ( e ) {
+                if ( ! e.target.closest('.psoo-pm-tab') ) return;
+                // Let the PM app switch tabs first, then close + relabel.
+                setTimeout(function () {
+                    paintLabel();
+                    nav.classList.remove('gs-pm-menu-open');
+                    toggle.classList.remove('is-open');
+                    toggle.setAttribute('aria-expanded', 'false');
+                }, 60);
+            });
+        }
+        gsPmMenuCollapse();
+        setTimeout( gsPmMenuCollapse, 600 );
+        setTimeout( gsPmMenuCollapse, 2000 );
+
+        // ── Activity feed: lazy-boot the full Youzify /activity/ iframe on
+        // first tab activation, then keep it sized to its content (same
+        // origin) so the profile page scrolls as one surface. If the
+        // document ever becomes unreadable, the CSS min-height + internal
+        // scroll keep the feed usable.
+        var act = wrap.querySelector('[data-gs-activity]');
+        if ( act ) {
+            var actFrame   = act.querySelector('[data-gs-act-frame]');
+            var actLoading = act.querySelector('[data-gs-act-loading]');
+            var actSizer   = null;
+            function gsActSize() {
+                if ( ! actFrame ) return;
+                try {
+                    var doc = actFrame.contentDocument;
+                    if ( ! doc || ! doc.body ) return;
+                    var h = Math.max(
+                        doc.body.scrollHeight,
+                        doc.documentElement ? doc.documentElement.scrollHeight : 0
+                    );
+                    if ( h > 200 ) actFrame.style.height = ( h + 40 ) + 'px';
+                } catch ( e ) { /* keep CSS fallback height */ }
+            }
+            function gsActBoot() {
+                if ( ! actFrame || actFrame.getAttribute('src') ) return;
+                actFrame.addEventListener('load', function () {
+                    if ( actLoading ) actLoading.hidden = true;
+                    actFrame.classList.add('is-ready');
+                    gsActSize();
+                    // Comments, Load More and lightboxes change the document
+                    // height at any time — keep polling while the tab lives.
+                    if ( ! actSizer ) actSizer = window.setInterval( gsActSize, 900 );
+                });
+                actFrame.src = actFrame.getAttribute('data-src');
+            }
+            var actTab = wrap.querySelector('.gs-member-groups-tab[data-gs-panel="activity"]');
+            if ( actTab ) actTab.addEventListener('click', gsActBoot);
+            var actPanel = wrap.querySelector('.gs-member-groups-panel[data-gs-panel="activity"]');
+            if ( actPanel && actPanel.classList.contains('is-active') ) gsActBoot();
+            // Prefetch during idle time after the profile settles, so the
+            // feed is already loaded (or loading) when the tab is clicked.
+            if ( 'requestIdleCallback' in window ) {
+                window.requestIdleCallback( gsActBoot, { timeout: 6000 } );
+            } else {
+                window.setTimeout( gsActBoot, 3000 );
+            }
+        }
 
         // ── Brute-force full-width — walk up from our wrap to <body> and
         // force every ancestor to width:100% / max-width:none via inline
@@ -2975,7 +3483,352 @@ function gdc_tab_only_strip_chrome() {
         }
         body.gdc-tab-only html { padding-top: 0 !important; margin-top: 0 !important; }
         body.gdc-tab-only #buddypress { padding: 12px 14px !important; }
+
+        /* ── Activity feed glass restyle (App Projects → Activity iframe) ──
+           Only activity-page markup matches these selectors, so other
+           gdc_tab_only surfaces (settings popup) are unaffected. The
+           `html body` prefix out-specifies Youzify_Styling's `body .x`
+           emissions without needing load-order luck. */
+        html body.gdc-tab-only ::-webkit-scrollbar { width: 8px; height: 8px; }
+        html body.gdc-tab-only ::-webkit-scrollbar-thumb { background: rgba(110,193,228,.35); border-radius: 999px; }
+        html body.gdc-tab-only ::-webkit-scrollbar-track { background: transparent; }
+
+        /* Wall post form */
+        html body.gdc-tab-only .youzify-wall-form {
+            background: rgba(12,16,44,.62) !important;
+            border: 1px solid rgba(110,193,228,.2) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 14px 40px rgba(0,0,0,.35) !important;
+            overflow: hidden;
+        }
+        html body.gdc-tab-only .youzify-wall-content,
+        html body.gdc-tab-only .youzify-wall-options,
+        html body.gdc-tab-only .youzify-wall-footer,
+        html body.gdc-tab-only .youzify-form-attachments,
+        html body.gdc-tab-only .youzify-form-tools {
+            background: transparent !important;
+            border-color: rgba(110,193,228,.14) !important;
+        }
+        html body.gdc-tab-only .youzify-wall-options a,
+        html body.gdc-tab-only .youzify-wall-options li,
+        html body.gdc-tab-only .youzify-form-tool { color: #94a3b8 !important; }
+        html body.gdc-tab-only .youzify-wall-textarea,
+        html body.gdc-tab-only .youzify-wall-form textarea {
+            background: rgba(8,12,32,.55) !important;
+            color: #e8f0ff !important;
+            border: 1px solid rgba(110,193,228,.18) !important;
+            border-radius: 12px !important;
+        }
+        html body.gdc-tab-only .youzify-wall-form ::placeholder { color: #64748b !important; }
+        html body.gdc-tab-only .youzify-wall-form input[type="submit"],
+        html body.gdc-tab-only .youzify-wall-form button[type="submit"] {
+            background: linear-gradient(135deg, #6ec1e4, #b608c9) !important;
+            color: #fff !important; border: 0 !important; border-radius: 999px !important;
+        }
+
+        /* Stream cards */
+        html body.gdc-tab-only #buddypress .activity-list > li {
+            background: rgba(12,16,44,.55) !important;
+            border: 1px solid rgba(110,193,228,.16) !important;
+            border-radius: 16px !important;
+            box-shadow: 0 10px 30px rgba(0,0,0,.3) !important;
+        }
+        html body.gdc-tab-only .activity-content,
+        html body.gdc-tab-only .activity-inner,
+        html body.gdc-tab-only .activity-inner p,
+        html body.gdc-tab-only .activity-header { color: #cbd5e1 !important; }
+        html body.gdc-tab-only .activity-header a,
+        html body.gdc-tab-only .acomment-meta a,
+        html body.gdc-tab-only .comment-author a { color: #6ec1e4 !important; font-weight: 700; }
+        html body.gdc-tab-only .activity-time-since,
+        html body.gdc-tab-only .time-since { color: #64748b !important; }
+
+        /* Action bar — like/reactions/comment/share */
+        html body.gdc-tab-only .activity-meta,
+        html body.gdc-tab-only .youzify-activity-statistics {
+            background: transparent !important;
+            border-color: rgba(110,193,228,.12) !important;
+            color: #94a3b8 !important;
+        }
+        html body.gdc-tab-only .activity-meta a,
+        html body.gdc-tab-only .activity-meta .button,
+        html body.gdc-tab-only .activity-meta button {
+            background: rgba(110,193,228,.08) !important;
+            color: #94a3b8 !important;
+            border: 1px solid rgba(110,193,228,.18) !important;
+            border-radius: 999px !important;
+            box-shadow: none !important;
+        }
+        html body.gdc-tab-only .activity-meta a:hover,
+        html body.gdc-tab-only .activity-meta button:hover {
+            color: #fff !important;
+            border-color: rgba(182,8,201,.5) !important;
+        }
+
+        /* Comments + reply forms */
+        html body.gdc-tab-only .activity-comments,
+        html body.gdc-tab-only .activity-comments ul,
+        html body.gdc-tab-only .activity-comments li {
+            background: transparent !important;
+            border-color: rgba(110,193,228,.1) !important;
+        }
+        html body.gdc-tab-only .activity-comments .acomment-content,
+        html body.gdc-tab-only .activity-comments .ac-reply-content { color: #cbd5e1 !important; }
+        html body.gdc-tab-only .ac-form,
+        html body.gdc-tab-only .ac-form .ac-input,
+        html body.gdc-tab-only .ac-form textarea {
+            background: rgba(8,12,32,.55) !important;
+            color: #e8f0ff !important;
+            border-color: rgba(110,193,228,.18) !important;
+            border-radius: 12px !important;
+        }
+
+        /* Filter bar + load more */
+        html body.gdc-tab-only #buddypress .item-list-tabs,
+        html body.gdc-tab-only .youzify-activity-filter-bar,
+        html body.gdc-tab-only #activity-filter-select,
+        html body.gdc-tab-only #activity-filter-select select {
+            background: rgba(12,16,44,.55) !important;
+            color: #cbd5e1 !important;
+            border-color: rgba(110,193,228,.18) !important;
+            border-radius: 12px !important;
+        }
+        html body.gdc-tab-only #buddypress .item-list-tabs a { color: #94a3b8 !important; background: transparent !important; }
+        html body.gdc-tab-only #buddypress .item-list-tabs .selected a,
+        html body.gdc-tab-only #buddypress .item-list-tabs a:hover { color: #fff !important; }
+        html body.gdc-tab-only .load-more,
+        html body.gdc-tab-only .load-more a {
+            background: rgba(110,193,228,.08) !important;
+            border-color: rgba(110,193,228,.3) !important;
+            border-radius: 999px !important;
+            color: #6ec1e4 !important;
+        }
+
+        /* Reactions hover bar (youzify-activity-reactions) */
+        html body.gdc-tab-only .yzpr-bar {
+            background: rgba(12,16,44,.92) !important;
+            border: 1px solid rgba(110,193,228,.25) !important;
+            border-radius: 999px !important;
+            box-shadow: 0 14px 40px rgba(0,0,0,.5), 0 0 16px rgba(182,8,201,.15) !important;
+        }
+        html body.gdc-tab-only .yzpr-bar-item { background: transparent !important; }
+        html body.gdc-tab-only .yzpr-bar-item img { filter: none !important; }
     </style>
+    <?php
+}
+
+// ─── ?gdc_tab_only=1 — server-side lightening ────────────────────────────────
+// The CSS stripper above only HIDES the page chrome; everything still
+// rendered and enqueued, which made the App Projects → Activity iframe load
+// the full profile stack (custom header + balances, profile-page embed,
+// frontend bar, mini-cart, BOTH chat widgets). Skip all of it at the source
+// — the iframe shows only the feed, so none of it can ever be seen.
+add_filter( 'show_admin_bar', function ( $show ) {
+    return empty( $_GET['gdc_tab_only'] ) ? $show : false;
+}, 60 );
+
+add_action( 'wp', 'gdc_tab_only_lighten', 1 );
+function gdc_tab_only_lighten() {
+    if ( empty( $_GET['gdc_tab_only'] ) ) return;
+    // Heavy per-request renders (each does its own queries).
+    remove_action( 'youzify_profile_before_header', 'gdc_render_profile_header', 1 );
+    remove_action( 'bp_before_member_home_content', 'gdc_inject_profile_page_embed', 1 );
+    remove_action( 'wp_footer', 'gdc_render_wallet_source', 5 );
+    remove_action( 'wp_footer', 'gs_render_frontend_bar', 5 );
+    remove_action( 'wp_footer', 'gs_inject_mini_cart', 20 );
+    remove_action( 'wp_footer', 'gs_invest_footer_assets', 50 );
+    // Chat widgets (LEO + email-manager) — dead weight inside an iframe;
+    // the parent page already has both.
+    remove_action( 'wp_footer', 'aipa_widget_render_footer', 99999 );
+    remove_action( 'wp_enqueue_scripts', 'aipa_widget_register_scripts', 5 );
+    remove_action( 'wp_enqueue_scripts', 'aipa_widget_load_assets', 10 );
+    remove_action( 'wp_enqueue_scripts', 'em_chat_widget_enqueue', 20 );
+    remove_action( 'wp_footer', 'em_chat_widget_mount', 50 );
+    if ( class_exists( 'GS_AI_Widget' ) ) {
+        remove_action( 'wp_footer', array( 'GS_AI_Widget', 'render_footer' ), 99999 );
+        remove_action( 'wp_enqueue_scripts', array( 'GS_AI_Widget', 'enqueue' ), 5 );
+    }
+}
+
+// Asset diet — same pattern as gdc_topup_embed_trim_assets but keeping the
+// BuddyPress/Youzify stack the feed runs on. Runs twice: normal enqueue
+// pass + right before footer prints (late block/render-time enqueues).
+add_action( 'wp_enqueue_scripts', 'gdc_tab_only_trim_assets', 9999 );
+add_action( 'wp_print_footer_scripts', 'gdc_tab_only_trim_assets', 1 );
+function gdc_tab_only_trim_assets() {
+    if ( empty( $_GET['gdc_tab_only'] ) ) return;
+    $kill = array( 'aipa-widget', 'leo-flow', 'leo-widget', 'gs-frontend-bar', 'gs-template-modal', 'gs-site-editor', 'gs-animation', 'em-chat', 'em-inbox', 'gdc-membership', 'membership-system', 'gdc-customer-shared', 'woocommerce', 'wc-', 'wc_', 'elementor', 'sourcebuster' );
+    $keep = array( 'youzify', 'yz-', 'yzpr', 'bp-', 'buddypress', 'jquery', 'wp-', 'dashicons', 'admin-bar' );
+    $hit  = function ( $h ) use ( $kill, $keep ) {
+        $h = (string) $h;
+        foreach ( $keep as $k ) { if ( strpos( $h, $k ) !== false ) return false; }
+        foreach ( $kill as $k ) { if ( strpos( $h, $k ) === 0 ) return true; }
+        return false;
+    };
+    global $wp_scripts, $wp_styles;
+    if ( $wp_scripts && ! empty( $wp_scripts->registered ) ) {
+        foreach ( array_keys( $wp_scripts->registered ) as $h ) { if ( $hit( $h ) ) wp_dequeue_script( $h ); }
+    }
+    if ( $wp_styles && ! empty( $wp_styles->registered ) ) {
+        foreach ( array_keys( $wp_styles->registered ) as $h ) { if ( $hit( $h ) ) wp_dequeue_style( $h ); }
+    }
+}
+
+// ─── Activity feed Share popup (gdc_tab_only iframe) ─────────────────────────
+// Replaces the Youzify "Share" button behaviour on the iframed activity feed
+// with the same share panel used by the chat widget's "＋ Invite new" popup —
+// rendered in SHARE mode, so every tab's messaging is about sharing that
+// activity post. The modal centers itself in the VISIBLE part of the
+// auto-sized iframe by reading the parent viewport (same origin), instead of
+// landing at the top of the feed.
+add_action( 'wp_footer', 'gdc_tab_only_share_modal', 20 );
+function gdc_tab_only_share_modal() {
+    if ( empty( $_GET['gdc_tab_only'] ) || ! is_user_logged_in() ) return;
+    if ( ! function_exists( 'bp_is_activity_component' ) || ! bp_is_activity_component() ) return;
+    ?>
+    <div class="gdc-act-share" data-gdc-share hidden>
+        <div class="gdc-act-share__backdrop" data-gdc-share-close></div>
+        <div class="gdc-act-share__modal" data-gdc-share-modal role="dialog" aria-modal="true" aria-label="<?php esc_attr_e( 'Share this post', 'gend-society' ); ?>">
+            <button type="button" class="gdc-act-share__x" data-gdc-share-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+            <div class="gdc-act-share__body" data-gdc-share-body></div>
+        </div>
+    </div>
+    <style id="gdc-act-share-css">
+        .gdc-act-share { position: fixed; inset: 0; z-index: 999999; }
+        .gdc-act-share[hidden] { display: none; }
+        .gdc-act-share__backdrop {
+            position: absolute; inset: 0;
+            background: rgba(2,8,23,.8);
+            backdrop-filter: blur(5px);
+            -webkit-backdrop-filter: blur(5px);
+        }
+        .gdc-act-share__modal {
+            position: absolute; left: 50%; top: 50%;
+            transform: translate(-50%, -50%);
+            width: min(1100px, 94vw);
+            max-height: 86vh;
+            overflow-y: auto;
+            background: #0a1019;
+            border: 1px solid rgba(110,193,228,.25);
+            border-radius: 20px;
+            box-shadow: 0 60px 160px rgba(0,0,0,.65), 0 0 30px rgba(182,8,201,.14);
+            padding: 22px;
+        }
+        .gdc-act-share__modal::-webkit-scrollbar { width: 8px; }
+        .gdc-act-share__modal::-webkit-scrollbar-thumb { background: rgba(110,193,228,.35); border-radius: 999px; }
+        .gdc-act-share__x {
+            position: sticky; top: 0; float: right; z-index: 3;
+            width: 34px; height: 34px; border-radius: 999px;
+            background: rgba(15,23,42,.9); color: #f1f5f9;
+            border: 1px solid rgba(148,163,184,.3);
+            font-size: 20px; line-height: 1; cursor: pointer;
+        }
+        .gdc-act-share__loading {
+            display: flex; align-items: center; gap: 10px; justify-content: center;
+            padding: 60px 0; color: #94a3b8;
+        }
+        .gdc-act-share__spin {
+            width: 18px; height: 18px; border-radius: 50%;
+            border: 2px solid rgba(110,193,228,.25); border-top-color: #6ec1e4;
+            animation: gdcActShareSpin .8s linear infinite;
+        }
+        @keyframes gdcActShareSpin { to { transform: rotate(360deg); } }
+    </style>
+    <script id="gdc-act-share-js">
+    (function () {
+        var root  = document.querySelector('[data-gdc-share]');
+        if ( ! root ) return;
+        var modal = root.querySelector('[data-gdc-share-modal]');
+        var body  = root.querySelector('[data-gdc-share-body]');
+        var ajax  = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+        var permBase = <?php echo wp_json_encode( home_url( '/activity/p/' ) ); ?>;
+        var loadedKey = '', centerTimer = null;
+
+        // Center in the VISIBLE slice of this document. Inside the profile's
+        // auto-sized iframe the iframe box IS the viewport, so plain
+        // fixed-centering lands mid-document; read the parent viewport
+        // (same origin) to find what the member can actually see.
+        function center() {
+            var topVis = 0, visH = window.innerHeight;
+            try {
+                if ( window.parent && window.parent !== window && window.frameElement ) {
+                    var r   = window.frameElement.getBoundingClientRect();
+                    var pvh = window.parent.innerHeight;
+                    var visTop    = Math.max( r.top, 0 );
+                    var visBottom = Math.min( r.top + r.height, pvh );
+                    if ( visBottom > visTop ) {
+                        topVis = visTop - r.top;      // doc-Y of visible top
+                        visH   = visBottom - visTop;  // visible height
+                    }
+                }
+            } catch ( e ) { /* cross-origin or sandbox — viewport fallback */ }
+            modal.style.top = ( topVis + visH / 2 ) + 'px';
+            modal.style.transform = 'translate(-50%, -50%)';
+            modal.style.maxHeight = Math.max( 340, visH - 48 ) + 'px';
+        }
+
+        function openShare( url, title ) {
+            root.hidden = false;
+            center();
+            if ( centerTimer ) clearInterval( centerTimer );
+            centerTimer = setInterval( center, 400 );
+            var key = url + '|' + title;
+            if ( loadedKey === key ) return;
+            loadedKey = key;
+            body.innerHTML = '<div class="gdc-act-share__loading"><span class="gdc-act-share__spin"></span><?php echo esc_js( __( 'Loading share options…', 'gend-society' ) ); ?></div>';
+            fetch( ajax + '?action=gs_invite_panel_fragment&share_url=' + encodeURIComponent( url ) + '&share_title=' + encodeURIComponent( title || '' ), { credentials: 'same-origin' } )
+                .then( function ( r ) { return r.text(); } )
+                .then( function ( html ) {
+                    body.innerHTML = html;
+                    // Re-execute the panel's inline bootstrap scripts — HTML
+                    // set via innerHTML never runs them.
+                    body.querySelectorAll('script').forEach( function ( s ) {
+                        var n = document.createElement('script');
+                        if ( s.src ) { n.src = s.src; } else { n.textContent = s.textContent; }
+                        s.parentNode.replaceChild( n, s );
+                    } );
+                    center();
+                } )
+                .catch( function () {
+                    loadedKey = '';
+                    body.innerHTML = '<p style="color:#94a3b8;text-align:center;padding:40px 0;"><?php echo esc_js( __( 'Could not load share options. Close and try again.', 'gend-society' ) ); ?></p>';
+                } );
+        }
+        function closeShare() {
+            root.hidden = true;
+            if ( centerTimer ) { clearInterval( centerTimer ); centerTimer = null; }
+        }
+        root.addEventListener('click', function ( e ) {
+            if ( e.target && e.target.closest && e.target.closest('[data-gdc-share-close]') ) closeShare();
+        });
+        document.addEventListener('keydown', function ( e ) {
+            if ( e.key === 'Escape' && ! root.hidden ) closeShare();
+        });
+
+        // Capture-phase interception beats Youzify's own .share-activity
+        // handler, so its top-of-feed share UI never opens.
+        document.addEventListener('click', function ( e ) {
+            var btn = e.target && e.target.closest && e.target.closest('.share-activity');
+            if ( ! btn ) return;
+            e.preventDefault();
+            e.stopPropagation();
+            var li = btn.closest('li');
+            var id = ( btn.id || '' ).replace( 'ashare-', '' );
+            if ( ! id && li ) id = ( li.id || '' ).replace( 'activity-', '' );
+            var url = id ? permBase + id + '/' : window.location.href.split('?')[0];
+            var title = '';
+            if ( li ) {
+                var hd = li.querySelector('.activity-header');
+                if ( hd ) {
+                    title = ( hd.textContent || '' ).replace( /\s+/g, ' ' ).trim();
+                    // Drop the trailing timestamp fragment if present.
+                    title = title.replace( /\s*·.*$/, '' ).slice( 0, 110 );
+                }
+            }
+            openShare( url, title );
+        }, true );
+    })();
+    </script>
     <?php
 }
 
@@ -3135,6 +3988,53 @@ function gs_member_friends_tabs_open() {
             animation: none !important;
             opacity: 1 !important;
             transform: none !important;
+        }
+    }
+
+    /* ── Mobile: content tabs → enclosed pill buttons, all visible ──────
+       The desktop underline strip (MY CONNECTIONS / REFERRAL SALES /
+       SALES TEAM / INVITE) does not fit a phone and was clipping. On
+       ≤720px it becomes a glass tray of fully-enclosed pill buttons,
+       two per row, wrapping so every tab is always visible. */
+    @media (max-width: 720px) {
+        .gs-member-friends-tabs {
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 8px;
+            border-bottom: 0;
+            padding: 10px;
+            margin-bottom: 18px;
+            background: rgba(0,0,0,0.45);
+            border: 1px solid rgba(255,255,255,0.1);
+            border-radius: 16px;
+            backdrop-filter: blur(14px);
+            -webkit-backdrop-filter: blur(14px);
+        }
+        .gs-member-friends-tab {
+            flex: 0 1 auto;
+            min-width: 0;
+            justify-content: center;
+            margin-bottom: 0;
+            padding: 11px 18px;
+            border: 1px solid rgba(255,255,255,0.12);
+            border-radius: 999px;
+            background: rgba(255,255,255,0.035);
+            color: #94a3b8;
+            font-size: 0.64rem;
+            letter-spacing: 0.7px;
+            white-space: nowrap;
+            transition: background 0.25s ease, border-color 0.25s ease,
+                        color 0.25s ease, box-shadow 0.25s ease;
+        }
+        .gs-member-friends-tab:active { transform: scale(0.97); }
+        .gs-member-friends-tab.is-active {
+            background: rgba(182,8,201,0.14);
+            border-color: rgba(182,8,201,0.5);
+            border-bottom-color: rgba(182,8,201,0.5);
+            color: #fff;
+            box-shadow:
+                0 0 16px rgba(182,8,201,0.22),
+                inset 0 0 12px rgba(182,8,201,0.08);
         }
     }
 
@@ -3349,6 +4249,14 @@ function gs_member_friends_tabs_close() {
 
                 var panel = wrap.querySelector('[data-gs-panel="' + target + '"].gs-member-friends-panel');
                 if ( panel ) panel.classList.add('is-active');
+
+                // Mobile: after switching, land at the top of the content —
+                // the tab tray with the fresh panel right below it — instead
+                // of leaving the viewport wherever the previous panel ended.
+                if ( window.matchMedia && window.matchMedia('(max-width: 720px)').matches ) {
+                    var y = wrap.getBoundingClientRect().top + window.pageYOffset - 12;
+                    window.scrollTo( { top: Math.max( 0, y ), behavior: 'smooth' } );
+                }
             } );
         } );
 

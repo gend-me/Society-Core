@@ -122,6 +122,14 @@ function gs_portfolio_panels_styles () {
 function gs_portfolio_render_schedule ( $own_profile ) {
     if ( $own_profile ) {
         if ( function_exists( 'aas_get_social_poster_modal_markup' ) ) {
+            // FullCalendar powers the Calendar tab and Chart.js the Analytics
+            // tab. The standalone AAS dashboard shortcode enqueues both, but
+            // this profile embed only pulls the modal MARKUP — without these
+            // the Calendar tab rendered nothing at all. Mirror the enqueues
+            // (same handles/versions, so no double-load when both surfaces
+            // are on a page).
+            wp_enqueue_script( 'fullcalendar', 'https://cdn.jsdelivr.net/npm/fullcalendar@6.1.10/index.global.min.js', array(), '6.1.10', true );
+            wp_enqueue_script( 'chartjs', 'https://cdn.jsdelivr.net/npm/chart.js', array(), '4.4.1', true );
             // The modal's actual root is <div id="aas-social-poster-modal"
             // class="aas-modal-overlay" style="display:none;">. Override the
             // inline display:none + the overlay's fixed positioning so its
@@ -154,6 +162,23 @@ function gs_portfolio_render_schedule ( $own_profile ) {
                 . '.gs-overview-panel #aas-social-poster-modal .aas-modal-header {'
                 . '  border-bottom: 0 !important; padding: 0 !important;'
                 . '}'
+                /* Calendar panel: the modal markup sizes the calendar to
+                   height:100% of a flex column we flattened to height:auto,
+                   which collapsed it to nothing. Give it a real height. */
+                . '.gs-overview-panel .aas-tab-panel[data-panel="calendar"] { height: auto !important; }'
+                . '.gs-overview-panel #aas-native-calendar { height: 72vh !important; min-height: 480px !important; }'
+                . '@media (max-width: 720px) {'
+                . '  .gs-overview-panel .aas-modal-tabs { flex-wrap: wrap; justify-content: center; padding: 0 10px !important; }'
+                . '  .gs-overview-panel #aas-native-calendar { height: 64vh !important; min-height: 420px !important; }'
+                . '  .gs-overview-panel #aas-native-calendar .fc-header-toolbar { flex-wrap: wrap; gap: 8px; justify-content: center; }'
+                . '  .gs-overview-panel #aas-native-calendar .fc-toolbar-title { font-size: 1rem; }'
+                /* Content tab: the side tool rail (link builder + search) and
+                   the composer render side-by-side and break on phones —
+                   stack them, tool rail first, both full width. */
+                . '  .gs-overview-panel .aas-tab-panel[data-panel="content"] { flex-direction: column !important; height: auto !important; }'
+                . '  .gs-overview-panel .aas-tab-panel[data-panel="content"] .aas-side-tool { width: 100% !important; flex: 0 0 auto !important; border-right: 0 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; box-sizing: border-box !important; }'
+                . '  .gs-overview-panel .aas-tab-panel[data-panel="content"] .aas-main-content { width: 100% !important; box-sizing: border-box !important; }'
+                . '}'
                 . '</style>';
             // The function emits markup that has style="display:none;" on
             // the overlay. Strip that single inline style so even browsers
@@ -174,15 +199,26 @@ function gs_portfolio_render_schedule ( $own_profile ) {
                     var modal = document.getElementById('aas-social-poster-modal');
                     if (!modal || modal.dataset.gsTabsTweaked) return;
                     var tabsBar = modal.querySelector('.aas-modal-tabs');
-                    var channelsBtn = modal.querySelector('.aas-modal-tabs [data-tab="channels"]');
-                    if (!tabsBar || !channelsBtn) return;
+                    if (!tabsBar) return;
+                    function byTab (k) { return modal.querySelector('.aas-modal-tabs [data-tab="' + k + '"]'); }
+                    var analytics = byTab('analytics');
+                    var content   = byTab('content');
+                    var calendar  = byTab('calendar');
+                    var channels  = byTab('channels');
+                    if (!analytics || !content || !calendar || !channels) return;
 
-                    channelsBtn.textContent = 'Accounts';
-                    tabsBar.insertBefore(channelsBtn, tabsBar.firstChild);
+                    // Order: Analytics · Content · Calendar · Accounts.
+                    // ("Find Content" → "Content", "Settings & Channels" → "Accounts")
+                    content.textContent  = 'Content';
+                    channels.textContent = 'Accounts';
+                    tabsBar.appendChild(analytics);
+                    tabsBar.appendChild(content);
+                    tabsBar.appendChild(calendar);
+                    tabsBar.appendChild(channels);
 
-                    // Activate Accounts tab on initial load. Click the button so
-                    // AAS's own handler swaps panels and updates is-active state.
-                    try { channelsBtn.click(); } catch (e) {}
+                    // Analytics is the landing tab. Click it so AAS's own
+                    // handler swaps panels and updates is-active state.
+                    try { analytics.click(); } catch (e) {}
                     modal.dataset.gsTabsTweaked = '1';
                 }
                 if (document.readyState === 'loading') {

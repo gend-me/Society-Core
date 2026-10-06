@@ -383,6 +383,13 @@
 		if ( t && ( t.tagName === 'INPUT' || t.tagName === 'SELECT' || t.tagName === 'TEXTAREA' || t.isContentEditable ) ) {
 			return;
 		}
+		// Ignore arrows while the deck is not visible — e.g. mounted inside the
+		// closed "Get Matched With Business Partners" modal on the group
+		// Payments page, or while the Matches view is toggled in. offsetParent
+		// is null whenever any ancestor is display:none.
+		if ( deckEl.offsetParent === null ) {
+			return;
+		}
 		if ( busy || ! queue.length || ! deckEl.querySelector( '.gs-collab-card' ) ) {
 			return;
 		}

@@ -87,9 +87,20 @@ function gs_render_feature_upgrade_page() {
 
     $required = isset( $_GET['required'] ) ? sanitize_key( (string) $_GET['required'] ) : '';
     $from     = isset( $_GET['from'] )     ? sanitize_key( (string) $_GET['from'] )     : '';
+    $tab      = isset( $_GET['tab'] )      ? sanitize_key( (string) $_GET['tab'] )      : '';
+    // sanitize_key() strips dots, so it can't be used on required_child
+    // (dotted area.child form, e.g. "store.sales_team") without corrupting
+    // it - matches the character set gdc_admin_menu_hierarchy() keys use.
+    $required_child = isset( $_GET['required_child'] )
+        ? preg_replace( '/[^a-z0-9._-]/', '', strtolower( (string) wp_unslash( $_GET['required_child'] ) ) )
+        : '';
     $features = function_exists( 'gs_features_get_cached' ) ? gs_features_get_cached() : null;
     $current_areas = is_array( $features ) && isset( $features['allowed_areas'] ) ? (array) $features['allowed_areas'] : array();
     $current_plan  = is_array( $features ) && ! empty( $features['plan_name'] ) ? (string) $features['plan_name'] : '';
+    $learn_more_pages = is_array( $features ) && isset( $features['learn_more_pages'] ) ? (array) $features['learn_more_pages'] : array();
+    $learn_more_url = function_exists( 'gs_features_resolve_learn_more_url' )
+        ? gs_features_resolve_learn_more_url( $required_child, $tab, $learn_more_pages )
+        : '';
 
     // Membership URL on gend.me — the popup target. ?ui=embed strips
     // the theme chrome so the popup looks like a focused modal.
@@ -116,6 +127,8 @@ function gs_render_feature_upgrade_page() {
             .gs-up-shell h1 { color: #fff; font-size: 1.8rem; font-weight: 800; margin: 0 0 8px; }
             .gs-up-shell p.lead { color: rgba(255,255,255,0.7); font-size: 1rem; margin: 0 0 24px; max-width: 720px; }
             .gs-up-current { display: inline-flex; align-items: center; gap: 8px; padding: 6px 14px; border-radius: 999px; background: rgba(255,180,0,0.12); border: 1px solid rgba(255,180,0,0.35); color: #ffd166; font-size: 0.8rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 16px; }
+            .gs-up-learn-more-embed { margin-bottom: 24px; border-radius: 14px; overflow: hidden; border: 1px solid rgba(255,255,255,0.08); }
+            .gs-up-learn-more-embed iframe { display: block; width: 100%; height: 480px; border: 0; background: #0b0e14; }
             .gs-up-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(260px, 1fr)); gap: 18px; margin-top: 18px; }
             .gs-up-card { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 16px; padding: 24px; display: flex; flex-direction: column; gap: 12px; transition: transform 0.18s, border-color 0.18s; }
             .gs-up-card.is-recommended { border-color: rgba(78,170,255,0.5); box-shadow: 0 0 30px -8px rgba(78,170,255,0.4); }
@@ -139,6 +152,12 @@ function gs_render_feature_upgrade_page() {
                 <span class="gs-up-current">⨯ <?php echo esc_html( sprintf( __( '%s requires an upgrade', 'gend-society' ), gs_feature_area_label( $required ) ) ); ?></span>
             <?php elseif ( $current_plan !== '' ) : ?>
                 <span class="gs-up-current">● <?php echo esc_html( sprintf( __( 'Current plan: %s', 'gend-society' ), $current_plan ) ); ?></span>
+            <?php endif; ?>
+
+            <?php if ( $learn_more_url !== '' ) : ?>
+                <div class="gs-up-learn-more-embed">
+                    <iframe src="<?php echo esc_url( add_query_arg( 'gdc_upgrade_embed', '1', $learn_more_url ) ); ?>" loading="lazy" title="<?php esc_attr_e( 'More about this upgrade', 'gend-society' ); ?>"></iframe>
+                </div>
             <?php endif; ?>
 
             <h1><?php esc_html_e( 'Choose your Dashboard Feature plan', 'gend-society' ); ?></h1>
@@ -208,7 +227,7 @@ function gs_render_feature_upgrade_page() {
                 var y = (window.screen.height - h) / 2;
                 var url = upgradeUrl + '&tier=' + encodeURIComponent(btn.dataset.tier || '');
                 var popup = window.open(url, 'gs_feature_upgrade',
-                    'width=' + w + ',height=' + h + ',left=' + x + ',top=' + y);
+                    'width=' + w + ',height=' + h + ',left=' + x + ',top=' + y + ',toolbar=no,location=no,status=no,menubar=no,scrollbars=yes,resizable=yes');
                 if (!popup) { alert('Popup blocked. Allow popups and try again.'); return; }
 
                 btn.disabled = true; var orig = btn.textContent; btn.textContent = 'Awaiting checkout…';

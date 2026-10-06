@@ -56,7 +56,7 @@
                     <p>
                         <?php esc_html_e('Manage transactional emails, campaigns, and subscriber lists.', 'gend-society'); ?>
                     </p>
-                    <a href="<?php echo esc_url(admin_url('admin.php?page=email-manager')); ?>"
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=talk-flows')); ?>"
                         class="gs-btn gs-btn-primary">
                         <?php esc_html_e('Open Email Manager', 'gend-society'); ?>
                     </a>
