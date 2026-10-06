@@ -3393,6 +3393,94 @@ function gs_rest_agent_admin_groups( $req = null ) {
 }
 
 /**
+ * GET gs/v1/agent-roster — the group's full agent roster for the chat
+ * widget's Agents → Chat directory (search, department filter, edit, chat).
+ * Unlike gs_rest_agent_list() (slug+name only, for the Reports-to dropdown),
+ * this returns everything the roster UI needs to render + filter + edit
+ * without a second request: user_id (to open/start a chat thread), avatar,
+ * role, department. Reads the SAME _aipa_agent_* meta keys
+ * psoo_upsert_group_agent() writes (projects plugin, group-members-screen.php)
+ * so the roster always reflects the latest edit.
+ *
+ * FATAL-SAFE: every external symbol is guarded; any missing dependency yields
+ * { ok:true, agents:[] } rather than an error. ID-only resolution throughout.
+ *
+ * @param WP_REST_Request $req group_id (required positive BP group id).
+ * @return WP_REST_Response
+ */
+function gs_rest_agent_roster( $req ) {
+	$gid    = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
+	$agents = array();
+
+	if ( $gid <= 0 ) {
+		return rest_ensure_response( array( 'ok' => true, 'agents' => $agents ) );
+	}
+
+	$member_ids = array();
+	if ( function_exists( 'groups_get_group_members' ) ) {
+		$res = groups_get_group_members( array(
+			'group_id'            => $gid,
+			'per_page'            => 0,
+			'exclude_admins_mods' => false,
+		) );
+		if ( is_array( $res ) && ! empty( $res['members'] ) && is_array( $res['members'] ) ) {
+			foreach ( $res['members'] as $m ) {
+				$mid = is_object( $m ) && isset( $m->ID ) ? (int) $m->ID
+					: ( is_object( $m ) && isset( $m->user_id ) ? (int) $m->user_id : 0 );
+				if ( $mid > 0 ) {
+					$member_ids[] = $mid;
+				}
+			}
+		}
+	}
+
+	foreach ( array_unique( $member_ids ) as $uid ) {
+		$uid = (int) $uid;
+		if ( $uid <= 0 ) {
+			continue;
+		}
+		$is_agent = false;
+		if ( function_exists( 'gs_user_is_agent' ) ) {
+			$is_agent = (bool) gs_user_is_agent( $uid );
+		} elseif ( function_exists( 'get_user_meta' ) ) {
+			$is_agent = (bool) get_user_meta( $uid, '_aipa_is_agent', true );
+		}
+		if ( ! $is_agent ) {
+			continue;
+		}
+
+		$slug = function_exists( 'get_user_meta' ) ? (string) get_user_meta( $uid, '_aipa_agent_slug', true ) : '';
+		if ( $slug === '' ) {
+			continue;
+		}
+
+		$name = $slug;
+		if ( function_exists( 'get_userdata' ) ) {
+			$u = get_userdata( $uid );
+			if ( $u && ! empty( $u->display_name ) ) {
+				$name = (string) $u->display_name;
+			}
+		}
+
+		$avatar = (string) get_user_meta( $uid, '_aipa_agent_avatar', true );
+		if ( $avatar === '' && function_exists( 'get_avatar_url' ) ) {
+			$avatar = (string) get_avatar_url( $uid, array( 'size' => 64 ) );
+		}
+
+		$agents[] = array(
+			'user_id'    => $uid,
+			'slug'       => $slug,
+			'name'       => $name,
+			'avatar'     => $avatar,
+			'role'       => (string) get_user_meta( $uid, '_aipa_agent_role', true ),
+			'department' => (string) get_user_meta( $uid, '_aipa_agent_department', true ),
+		);
+	}
+
+	return rest_ensure_response( array( 'ok' => true, 'agents' => $agents ) );
+}
+
+/**
  * GET gs/v1/agent-list — list the agents already in a group.
  *
  * Powers the "Reports to" dropdown in the Add-new-Agent popup so a new agent can
@@ -4617,6 +4705,23 @@ function gs_rest_register_agent_create_routes() {
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
+		)
+	);
+
+	// Chat widget Agents → Chat directory — the group's full agent roster
+	// (user_id + avatar + role + department), for search/filter/edit/chat.
+	register_rest_route(
+		'gs/v1',
+		'/agent-roster',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'gs_rest_agent_roster',
+			'permission_callback' => function () {
+				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
+			},
+			'args'                => array(
+				'group_id' => array( 'required' => true ),
+			),
 		)
 	);
 

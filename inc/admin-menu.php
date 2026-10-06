@@ -53,37 +53,42 @@ function gs_register_admin_menu()
         require GS_DIR . 'inc/pages/feature-access.php';
     });
 
-    // ── APP ───────────────────────────────────────────────────────────────────
-    add_menu_page(
-        __('App', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-admin-appearance"></span><span class="gs-menu-label">' . __('App', 'gend-society') . '</span>',
-        'edit_theme_options',
-        'gs-app',
-        function () {
-            require GS_DIR . 'inc/pages/app.php';
-        },
-        'none',
-        4
-    );
-    add_submenu_page('gs-app', __('Theme Editor', 'gend-society'), __('Theme Editor', 'gend-society'), 'edit_theme_options', 'site-editor.php', '');
-    add_submenu_page('gs-app', __('Digital Media', 'gend-society'), __('Digital Media', 'gend-society'), 'upload_files', 'upload.php', '');
-
-    // Note: Blog Manager and Email Manager register their own submenus under gs-app.
-
-    // ── WRITE (was "Content") ─────────────────────────────────────────────────
+    // ── APP (was "Write", was "Content") ──────────────────────────────────────
+    // The old standalone "App" menu (gs-app) is gone — it only ever held the
+    // Digital Media submenu, which is removed outright (not relocated). This
+    // menu is renamed from "Write" to "App" and takes over the label.
     // Slug stays gs-content for backwards-compat with existing deep links,
     // submenu registrations from sibling plugins, and the frontend bar's
-    // slug_map. Only the visible label changed.
+    // slug_map. Blog Manager and Email Manager still self-register under
+    // gs-app first (their own bm_register_menu/em equivalent runs before
+    // gs_move_plugin_submenus_to_content relocates them here) — that's
+    // harmless even though gs-app is no longer a registered top-level menu;
+    // the orphaned registration just gets moved over like before.
     add_menu_page(
-        __('Write', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-edit"></span><span class="gs-menu-label">' . __('Write', 'gend-society') . '</span>',
+        __('App', 'gend-society'),
+        '<span class="gs-menu-icon dashicons dashicons-edit"></span><span class="gs-menu-label">' . __('App', 'gend-society') . '</span>',
         'manage_options',
         'gs-content',
         '__return_null',
         'none',
         5
     );
-    add_submenu_page('gs-content', __('Info Pages', 'gend-society'), __('Info Pages', 'gend-society'), 'edit_pages', 'edit.php?post_type=page', '');
+    // Theme Editor — moved here from the old App menu, registered first so
+    // it's the top item in this submenu. This is also gs-content's very
+    // first add_submenu_page() call, which is what triggers WP's built-in
+    // "auto-add a link back to the parent" behavior (see add_submenu_page()
+    // in wp-admin/includes/plugin.php — fires whenever $submenu[$parent]
+    // isn't set yet and the new item's slug differs from the parent's).
+    // Stripping it immediately — same as the gs-social / gs-features pattern
+    // — keeps $submenu['gs-content'] populated so later registrations
+    // (Content Campaigns, Talk Flows via gs_move_plugin_submenus_to_content)
+    // never re-trigger it either.
+    add_submenu_page('gs-content', __('Theme Editor', 'gend-society'), __('Theme Editor', 'gend-society'), 'edit_theme_options', 'site-editor.php', '');
+    remove_submenu_page('gs-content', 'gs-content');
+    // Info Pages used to live here as its own submenu (edit.php?post_type=page).
+    // It's now the "Info Pages" tab on Content Campaigns (2nd position, after
+    // Analytics) — see blog-manager/inc/admin-page.php. Blog Manager registers
+    // Content Campaigns under gs-content itself (gs_move_plugin_submenus_to_content).
 
     // ── STORE (conditional) ───────────────────────────────────────────────────
     $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/advanced-affiliate-system.php') || gs_plugin_active('projects/project-service-orders.php');
@@ -155,11 +160,11 @@ function gs_register_admin_menu()
     add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'activate_plugins', 'plugins.php', '');
     add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'update_core', 'update-core.php', '');
 
-    // Add Permalinks to App Menu
-    add_submenu_page('gs-app', __('Permalinks', 'gend-society'), __('Permalinks', 'gend-society'), 'manage_options', 'options-permalink.php', '');
+    // Permalinks used to be a standalone App submenu (options-permalink.php);
+    // its settings now render at the bottom of the Dashboard's Settings tab
+    // — see gs_render_permalink_settings_form() in inc/pages/dashboard.php.
 
     // Prevent redundant submenus from being added inside the Dashboard rendering engine by removing them late in another hook
-    remove_submenu_page('gs-app', 'gs-app');
     remove_submenu_page('gs-features', 'gs-features');
     if (gs_plugin_active('online-store/online-store.php')) {
         remove_submenu_page('gs-store', 'gs-store');
@@ -172,7 +177,10 @@ function gs_register_admin_menu()
     remove_submenu_page('gs-social', 'youzify-extensions-settings');
     remove_submenu_page('gs-social', 'youzify-reports');
     remove_submenu_page('gs-rewards', 'gs-rewards');
-    remove_submenu_page('gs-content', 'gs-content');
+    // gs-content's duplicate is already stripped right after Theme Editor is
+    // registered above — has to happen before Content Campaigns / Talk Flows
+    // are added at admin_menu priority 1200, otherwise WP's auto-duplicate
+    // fires again on that later, still-unset-at-this-point-in-time check.
     remove_submenu_page('index.php', 'index.php');
     remove_submenu_page('index.php', 'update-core.php');
 }

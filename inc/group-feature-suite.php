@@ -40,7 +40,7 @@ defined('ABSPATH') || exit;
  * Top-level renderer for the Feature Suite group tab. Called from
  * GS_Group_Tab_Feature_Suite::display() in group-app-tabs.php.
  */
-function gs_render_group_feature_suite($group_id) {
+function gs_render_group_feature_suite($group_id, $show_hero = true) {
     $group_id = (int) $group_id;
     if (!$group_id) {
         echo '<p style="color:rgba(203,213,245,0.7);">' . esc_html__('No group context — feature suite cannot resolve a membership.', 'gend-society') . '</p>';
@@ -379,7 +379,14 @@ function gs_render_group_feature_suite($group_id) {
 
     <div data-gs-fs-scope id="<?php echo esc_attr($uid); ?>">
 
-        <?php /* ── Hero / plan badge ──────────────────────────────── */ ?>
+        <?php /* ── Hero / plan badge — suppressed when $show_hero is
+               false (operator directive: the Payments -> Features tab
+               embeds this catalog below its OWN plan-picker button/
+               popup, which already covers "no plan selected" /
+               "current plan" / upgrade, so this hero read as a
+               duplicate there; the standalone Feature Suite group tab
+               still gets it, unchanged). ── */ ?>
+        <?php if ( $show_hero ) : ?>
         <section class="gs-fs-hero">
             <div class="gs-fs-hero-head">
                 <?php if ($current_plan) : ?>
@@ -447,6 +454,7 @@ function gs_render_group_feature_suite($group_id) {
                 <span class="gs-fs-hero-cta is-max">✓ <?php esc_html_e('On the top tier', 'gend-society'); ?></span>
             <?php endif; ?>
         </section>
+        <?php endif; ?>
 
         <?php /* ── Filter bar ────────────────────────────────────── */ ?>
         <section class="gs-fs-filterbar">

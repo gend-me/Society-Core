@@ -1,26 +1,22 @@
 <?php
 /**
- * Connected web-app group menu → embedded (inline, NOT iframe) tab pages.
+ * Connected web-app group menu → direct links onto the linked gend.me group.
  *
  * The wp-admin header (admin-script.js) renders the connected gend.me
- * Business Group's menu across the centre of the bar. Each item links to
+ * Business Group's menu across the centre of the bar. gs_group_embed_menu_items()
+ * builds those links from the cached remote-membership payload (option
+ * gs_remote_membership_cache — same underlying data as the Dashboard's
+ * Business Group card / gs_render_membership_panel(), read directly here to
+ * avoid a live fetch on every admin page load — see that function's own
+ * docblock), pointed straight at that group's own tabs on gend.me —
+ * Business Plan, Organization, Marketing, Contracts, Payments — opened in a
+ * new tab, not embedded in wp-admin. Sites with no linked group get an
+ * empty menu (nothing to link to).
  *
- *     admin.php?page=gs-group-embed&tab=<slug>
- *
- * which this file renders as a real wp-admin page whose body IS the group
- * tab's content — rendered inline by reusing the always-loaded,
- * container-local renderers (the exact same ones gs_render_membership_panel()
- * already embeds):
- *
- *   feature-suite → gs_render_feature_cards_widget()
- *   hosting       → gs_render_hosting_tab()
- *   compute-gas   → self-contained explainer + gs_hosting_compute_gas AJAX
- *   organization  → inc/pages/feature-access.php
- *
- * No iframe, no BuddyPress/group_id dependency — the data is the install's
- * own, so it renders identically on the hub and on every customer install.
- * The connected group's name (from the cached remote-membership payload) is
- * shown as a subtitle so the surface reads as a continuation of the group.
+ * gs_group_embed_tabs() / gs_group_embed_render_page() below are the older
+ * in-wp-admin embed surface the header used to point at. Left in place as a
+ * still-reachable-by-URL deep link (admin.php?page=gs-group-embed&tab=<slug>)
+ * even though the header no longer links to it.
  *
  * @package GenD_Society
  */
@@ -62,22 +58,127 @@ function gs_group_embed_tabs() {
 }
 
 /**
+ * Tab registry for the connected group's own pages on gend.me. Each entry's
+ * `path` is the group's tab slug on gend.me itself
+ * (https://gend.me/groups/<group-slug>/<path>/) — not a wp-admin page.
+ *
+ * @return array<string,array{label:string,icon:string,cap:string,path:string}>
+ */
+function gs_group_hub_tabs() {
+	return array(
+		'business-plan' => array(
+			'label' => __( 'Business Plan', 'gend-society' ),
+			'icon'  => 'dashicons-media-document',
+			'cap'   => 'manage_options',
+			'path'  => 'business-plan',
+		),
+		'organization' => array(
+			'label' => __( 'Organization', 'gend-society' ),
+			'icon'  => 'dashicons-groups',
+			'cap'   => 'list_users',
+			'path'  => 'members-hub',
+		),
+		'marketing' => array(
+			'label' => __( 'Marketing', 'gend-society' ),
+			'icon'  => 'dashicons-megaphone',
+			'cap'   => 'manage_options',
+			'path'  => 'files',
+		),
+		'contracts' => array(
+			'label' => __( 'Contracts', 'gend-society' ),
+			'icon'  => 'dashicons-portfolio',
+			'cap'   => 'manage_options',
+			'path'  => 'projects',
+		),
+		'payments' => array(
+			'label' => __( 'Payments', 'gend-society' ),
+			'icon'  => 'dashicons-money-alt',
+			'cap'   => 'manage_options',
+			'path'  => 'payments',
+		),
+	);
+}
+
+/**
  * The connected web-app group menu, capability-filtered for the current
  * user. Consumed by admin-style.php's gsAdminData localize so the header
- * (admin-script.js) renders the centre nav.
+ * (admin-script.js) renders the centre nav. Links go straight to the linked
+ * group's own tabs on gend.me (target="_blank" in the header markup) —
+ * empty array (no menu at all) when this site has no group linked yet, same
+ * "No group linked" condition the Dashboard's Business Group card checks.
+ *
+ * Three-tier resolution, cheapest/most-direct first:
+ *
+ *  1. Direct blog-level reverse binding — the `gdc_bp_group_id` blogmeta
+ *     gend.me's own main site (and any WP Ultimo-networked subsite) is
+ *     bound to its showcased/customer BP group with, independent of any
+ *     purchased-plan membership record (the hub's own site has none — see
+ *     project_gendme_self_showcase_binding memory). A direct DB read, no
+ *     network call.
+ *  2. gs_membership_payload_from_local() — covers the normal case where
+ *     the current site DOES have a real WP Ultimo membership (this is what
+ *     gs_render_custom_dashboard_screen() / the Dashboard's own Business
+ *     Group card uses).
+ *  3. The cached remote-membership payload (standalone/paired customer
+ *     installs, which fetch it from gend.me's REST API rather than reading
+ *     local WP Ultimo data). Read the raw option directly via get_option()
+ *     rather than calling gs_remote_membership_get_cached() itself — that
+ *     helper can trigger a live (8s timeout) HTTP fetch when the cache has
+ *     expired, and this function runs on every single wp-admin page load
+ *     (the header is persistent), not just the Dashboard. A stale cache
+ *     here just means the header nav is a few minutes behind; a live fetch
+ *     on every page load would mean noticeably slower admin navigation
+ *     whenever the cache expires.
  *
  * @return array<int,array{label:string,icon:string,url:string,slug:string}>
  */
 function gs_group_embed_menu_items() {
+	$payload = null;
+
+	$gid = (int) get_blog_option( get_current_blog_id(), 'gdc_bp_group_id', 0 );
+	if ( $gid > 0 ) {
+		global $wpdb;
+		$tbl = $wpdb->base_prefix . 'bp_groups';
+		$row = $wpdb->get_row( $wpdb->prepare( "SELECT name, slug FROM {$tbl} WHERE id = %d", $gid ) );
+		if ( $row && ! empty( $row->slug ) ) {
+			$payload = array(
+				'hub_url' => trailingslashit( (string) network_home_url( '/' ) ),
+				'group'   => array(
+					'id'   => $gid,
+					'name' => (string) $row->name,
+					'slug' => (string) $row->slug,
+				),
+			);
+		}
+	}
+
+	if ( ! is_array( $payload ) ) {
+		$membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+		if ( $membership && function_exists( 'gs_membership_payload_from_local' ) ) {
+			$payload = gs_membership_payload_from_local( $membership );
+		}
+	}
+
+	if ( ! is_array( $payload ) ) {
+		$payload = get_option( 'gs_remote_membership_cache', null );
+	}
+
+	if ( ! is_array( $payload ) || empty( $payload['group']['id'] ) || empty( $payload['hub_url'] ) ) {
+		return array();
+	}
+
+	$group_slug = sanitize_title( $payload['group']['slug'] ?? $payload['group']['id'] );
+	$group_link = trailingslashit( trailingslashit( (string) $payload['hub_url'] ) . 'groups/' . $group_slug );
+
 	$items = array();
-	foreach ( gs_group_embed_tabs() as $slug => $t ) {
+	foreach ( gs_group_hub_tabs() as $slug => $t ) {
 		if ( ! current_user_can( $t['cap'] ) ) {
 			continue;
 		}
 		$items[] = array(
 			'label' => $t['label'],
 			'icon'  => $t['icon'],
-			'url'   => admin_url( 'admin.php?page=gs-group-embed&tab=' . $slug ),
+			'url'   => $group_link . $t['path'] . '/',
 			'slug'  => $slug,
 		);
 	}

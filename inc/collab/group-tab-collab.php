@@ -91,14 +91,18 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 
 			$group_id = $group_id ? (int) $group_id : (int) bp_get_current_group_id();
 
-			// Phase 102-02 -- Match relocated to the member profile. This
-			// URL/tab stays fully functional (no broken mid-flight
-			// negotiations) but is now hard-hidden from the group nav (see
-			// the bp_group_extension_nav_show_for_user filter below) -- this
-			// notice is the only visible sign for anyone who lands here via
-			// a bookmark or the still-live URL.
+			// 2026-08-16 -- Match now lives in the "Get Matched With Business
+			// Partners" popup on this group's Payments tab
+			// (inc/collab/group-payments-match-launcher.php). This URL/tab
+			// stays fully functional as a direct-URL safety net (mid-flight
+			// contract/proposal state) but remains hard-hidden from the group
+			// nav (see the bp_group_extension_nav_show_for_user filter below).
+			$gs_collab_payments_url = function_exists( 'bp_get_group_permalink' ) && function_exists( 'groups_get_current_group' ) && groups_get_current_group()
+				? trailingslashit( bp_get_group_permalink( groups_get_current_group() ) ) . 'payments/'
+				: '';
 			echo '<div class="gs-collab-moved-notice" style="margin-bottom:16px; padding:12px 16px; border-radius:8px; background:rgba(78,170,255,0.12); border:1px solid rgba(78,170,255,0.35); color:#fff; font-size:0.88rem;">'
-				. esc_html__( 'GenD Match has moved to your profile — find it under the Match tab on your own profile page. This group view remains available during the transition.', 'gend-society' )
+				. esc_html__( 'GenD Match has moved — find it via the "Get Matched With Business Partners" button at the top of this group\'s Payments page.', 'gend-society' )
+				. ( $gs_collab_payments_url ? ' <a href="' . esc_url( $gs_collab_payments_url ) . '" style="color:#9fd0ff;">' . esc_html__( 'Open Payments', 'gend-society' ) . '</a>' : '' )
 				. '</div>';
 
 			self::render_panel( $group_id );

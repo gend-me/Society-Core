@@ -57,7 +57,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * bp_setup_nav priority 100 so it runs after BP core/Youzify have registered
  * their primary nav items (lets us read the live `groups` position).
  */
-add_action( 'bp_setup_nav', 'gs_add_collab_profile_tab', 100 );
+// RETIRED (2026-08-16) -- Match moved again: from the member profile to a
+// per-group popup launcher on each group's Payments tab
+// (inc/collab/group-payments-match-launcher.php). The profile nav item is no
+// longer registered, which also retires the /members/{user}/collab/ URL and
+// its "Acting as" business picker -- the group context is now implicit (the
+// payments page's own group). The functions below are kept only because
+// gs_collab_profile_can_act_for_group() is reused by the launcher's gate.
+// add_action( 'bp_setup_nav', 'gs_add_collab_profile_tab', 100 );
 function gs_add_collab_profile_tab() {
 	if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
 		return;

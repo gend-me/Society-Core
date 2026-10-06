@@ -2,8 +2,19 @@
     exit;
 }
 
-// Ensure the current user has permission to manage users
-if (!current_user_can('list_users')) {
+// Ensure the current user has permission to manage users. list_users is the
+// right check for this file's original standalone wp-admin usage (real site
+// administrators), but it's also now included front-end, mid-render, on the
+// MAIN network site's BuddyPress group page (gs_group_render_user_access_below_members(),
+// group-app-tabs.php) for a customer who administers their OWN subsite -- a
+// role that never carries list_users on the main site. That caller already
+// gates on gs_group_tabs_user_has_access() (group admin/mod or network super
+// admin) before including this file, so accepting that as an alternate pass
+// condition here closes the gap without weakening the original wp-admin path:
+// confirmed live this was wp_die()-ing for every non-super-admin group owner,
+// truncating the rest of the page (including the footer scripts that apply
+// the full-width layout class) and surfacing as a 500 on the whole request.
+if (!current_user_can('list_users') && !(function_exists('gs_group_tabs_user_has_access') && gs_group_tabs_user_has_access())) {
     wp_die(__('You do not have sufficient permissions to access this page.', 'gend-society'));
 }
 
@@ -92,136 +103,124 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
         </div>
         <div class="gs-card-body">
             <style>
-                /* User Access table — readability pass. WP's default list
-                   table styles assume a white admin background; on the
-                   glass surface they read as low-contrast grey. Lift the
-                   colors, add row padding, and give each column its own
-                   typographic role so the eye can scan quickly. */
-                #gs-fa-users-table { background: transparent !important; border: 0 !important; box-shadow: none !important; }
-                #gs-fa-users-table thead th {
-                    background: transparent !important;
-                    color: #cbd5f5 !important;
-                    font-size: 0.72rem;
-                    font-weight: 700;
-                    text-transform: uppercase;
-                    letter-spacing: 0.08em;
-                    padding: 14px 16px;
-                    border-bottom: 1px solid rgba(255,255,255,0.14) !important;
+                /* User Access — membership-style user cards. A grid of
+                   glass cards (same palette as the dashboard's membership
+                   cards) reads far better than a cramped table row for
+                   long names/emails, and gives the avatar real presence. */
+                #gs-fa-users-table {
+                    display: grid;
+                    grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+                    gap: 14px;
                 }
-                #gs-fa-users-table tbody tr {
-                    background: transparent !important;
-                    transition: background 0.15s ease;
+                .gs-fa-usercard {
+                    display: flex;
+                    align-items: center;
+                    gap: 14px;
+                    padding: 16px;
+                    background: rgba(255,255,255,0.03);
+                    border: 1px solid rgba(255,255,255,0.08);
+                    border-radius: 14px;
+                    transition: background 0.2s ease, border-color 0.2s ease, transform 0.2s ease, box-shadow 0.2s ease;
                 }
-                #gs-fa-users-table tbody tr + tr td { border-top: 1px solid rgba(255,255,255,0.05); }
-                #gs-fa-users-table tbody tr:hover { background: rgba(78,170,255,0.06) !important; }
-                #gs-fa-users-table tbody td {
-                    padding: 14px 16px;
-                    vertical-align: middle;
-                    color: #e6edf7;
-                    font-size: 0.92rem;
-                    line-height: 1.45;
+                .gs-fa-usercard:hover {
+                    background: rgba(78,170,255,0.07);
+                    border-color: rgba(78,170,255,0.3);
+                    transform: translateY(-2px);
+                    box-shadow: 0 10px 24px rgba(0,0,0,0.3);
                 }
-                /* Avatar — slightly larger, soft ring, lifts the row */
-                #gs-fa-users-table .gs-fa-avatar {
-                    width: 38px; height: 38px;
+                .gs-fa-usercard__avatar {
+                    width: 52px; height: 52px;
                     border-radius: 50%;
                     object-fit: cover;
                     flex-shrink: 0;
-                    border: 2px solid rgba(255,255,255,0.10);
+                    border: 2px solid rgba(255,255,255,0.12);
                     box-shadow: 0 4px 12px rgba(0,0,0,0.35);
                     background: rgba(0,0,0,0.25);
                 }
-                /* Username button — looks like a real link, not <ins>-style underline */
-                #gs-fa-users-table .gs-fa-open-modal[data-user-id] {
-                    background: none; border: 0; padding: 0;
-                    color: #8ab4f8;
-                    font: inherit;
-                    font-weight: 600;
-                    cursor: pointer;
-                    text-decoration: none;
-                    transition: color 0.15s ease;
+                .gs-fa-usercard__body {
+                    flex: 1 1 auto;
+                    min-width: 0;
                 }
-                #gs-fa-users-table .gs-fa-open-modal[data-user-id]:hover { color: #fff; }
-                /* Display name — brighter primary */
-                #gs-fa-users-table td.column-name { color: #fff; font-weight: 500; }
-                /* Email — monospace + subtle accent so it scans as data */
-                #gs-fa-users-table td.column-email a {
+                /* Display name — brighter primary, legible at a glance */
+                .gs-fa-usercard__name {
+                    color: #fff;
+                    font-weight: 600;
+                    font-size: 1rem;
+                    line-height: 1.35;
+                    margin-bottom: 4px;
+                    overflow: hidden;
+                    text-overflow: ellipsis;
+                    white-space: nowrap;
+                }
+                /* Email — monospace + subtle accent so it scans as data, wraps instead of clipping */
+                .gs-fa-usercard__email a {
                     color: #a5b4fc;
                     text-decoration: none;
                     font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-                    font-size: 0.86rem;
+                    font-size: 0.84rem;
+                    line-height: 1.4;
                     word-break: break-all;
                 }
-                #gs-fa-users-table td.column-email a:hover { color: #c7d2fe; text-decoration: underline; }
+                .gs-fa-usercard__email a:hover { color: #c7d2fe; text-decoration: underline; }
+                .gs-fa-usercard__action { flex-shrink: 0; }
                 /* Action button — refresh the WP "button button-small" feel */
-                #gs-fa-users-table .gs-fa-open-modal.button {
+                .gs-fa-usercard__action .gs-fa-open-modal {
                     background: rgba(78,170,255,0.12) !important;
                     border: 1px solid rgba(78,170,255,0.35) !important;
                     color: #8ab4f8 !important;
                     border-radius: 8px;
                     padding: 6px 14px;
                     font-weight: 600;
+                    white-space: nowrap;
                     box-shadow: none !important;
                     text-shadow: none !important;
                     transition: all 0.15s ease;
                 }
-                #gs-fa-users-table .gs-fa-open-modal.button:hover {
+                .gs-fa-usercard__action .gs-fa-open-modal:hover {
                     background: rgba(78,170,255,0.22) !important;
                     color: #fff !important;
                     border-color: rgba(78,170,255,0.55) !important;
                 }
+                @media (max-width: 480px) {
+                    .gs-fa-usercard { flex-wrap: wrap; }
+                    .gs-fa-usercard__action { flex: 1 0 100%; }
+                    .gs-fa-usercard__action .gs-fa-open-modal { width: 100%; }
+                }
             </style>
-            <table class="wp-list-table widefat fixed striped users" id="gs-fa-users-table">
-                <thead>
-                    <tr>
-                        <th scope="col" class="manage-column column-username"><?php esc_html_e('Username', 'gend-society'); ?></th>
-                        <th scope="col" class="manage-column column-name"><?php esc_html_e('Name', 'gend-society'); ?></th>
-                        <th scope="col" class="manage-column column-email"><?php esc_html_e('Email', 'gend-society'); ?></th>
-                        <th scope="col" class="manage-column column-action"><?php esc_html_e('Action', 'gend-society'); ?></th>
-                    </tr>
-                </thead>
-                <tbody id="the-list">
-                    <?php foreach ($users as $user) :
-                        // Stash all searchable fields as lowercase data-search so JS filter is one string compare.
-                        $search_blob = strtolower($user->user_login . ' ' . $user->display_name . ' ' . $user->user_email);
-                        // Prefer the BuddyPress / Youzify avatar (handles uploaded
-                        // custom avatars under wp-content/uploads/avatars/{id}/);
-                        // falls back to Gravatar via get_avatar_url() when BP
-                        // isn't loaded or the user has no Youzify upload.
-                        if ( function_exists( 'bp_core_fetch_avatar' ) ) {
-                            $gs_fa_avatar_url = bp_core_fetch_avatar( array(
-                                'item_id' => $user->ID,
-                                'object'  => 'user',
-                                'type'    => 'thumb',
-                                'html'    => false,
-                            ) );
-                        } else {
-                            $gs_fa_avatar_url = get_avatar_url( $user->ID, array( 'size' => 64 ) );
-                        }
-                    ?>
-                        <tr id="user-<?php echo esc_attr($user->ID); ?>" data-search="<?php echo esc_attr($search_blob); ?>">
-                            <td class="username column-username" data-colname="<?php esc_attr_e('Username', 'gend-society'); ?>">
-                                <div style="display:flex; align-items:center; gap:10px;">
-                                    <img class="gs-fa-avatar" src="<?php echo esc_url( $gs_fa_avatar_url ); ?>" alt="" width="38" height="38" loading="lazy">
-                                    <button type="button" class="gs-fa-open-modal" data-user-id="<?php echo esc_attr($user->ID); ?>"><?php echo esc_html($user->user_login); ?></button>
-                                </div>
-                            </td>
-                            <td class="name column-name" data-colname="<?php esc_attr_e('Name', 'gend-society'); ?>">
-                                <?php echo esc_html($user->display_name); ?>
-                            </td>
-                            <td class="email column-email" data-colname="<?php esc_attr_e('Email', 'gend-society'); ?>">
-                                <a href="mailto:<?php echo esc_attr($user->user_email); ?>"><?php echo esc_html($user->user_email); ?></a>
-                            </td>
-                            <td class="action column-action" data-colname="<?php esc_attr_e('Action', 'gend-society'); ?>">
-                                <button type="button" class="button button-small gs-fa-open-modal" data-user-id="<?php echo esc_attr($user->ID); ?>"><?php esc_html_e('Manage Access', 'gend-society'); ?></button>
-                            </td>
-                        </tr>
-                    <?php endforeach; ?>
-                    <?php if (empty($users)) : ?>
-                        <tr><td colspan="4"><?php esc_html_e('No eligible users found.', 'gend-society'); ?></td></tr>
-                    <?php endif; ?>
-                </tbody>
-            </table>
+            <div id="gs-fa-users-table">
+                <?php foreach ($users as $user) :
+                    // Stash all searchable fields as lowercase data-search so JS filter is one string compare.
+                    $search_blob = strtolower($user->user_login . ' ' . $user->display_name . ' ' . $user->user_email);
+                    // Prefer the BuddyPress / Youzify avatar (handles uploaded
+                    // custom avatars under wp-content/uploads/avatars/{id}/);
+                    // falls back to Gravatar via get_avatar_url() when BP
+                    // isn't loaded or the user has no Youzify upload.
+                    if ( function_exists( 'bp_core_fetch_avatar' ) ) {
+                        $gs_fa_avatar_url = bp_core_fetch_avatar( array(
+                            'item_id' => $user->ID,
+                            'object'  => 'user',
+                            'type'    => 'thumb',
+                            'html'    => false,
+                        ) );
+                    } else {
+                        $gs_fa_avatar_url = get_avatar_url( $user->ID, array( 'size' => 64 ) );
+                    }
+                ?>
+                    <div class="gs-fa-usercard" id="user-<?php echo esc_attr($user->ID); ?>" data-search="<?php echo esc_attr($search_blob); ?>">
+                        <img class="gs-fa-usercard__avatar" src="<?php echo esc_url( $gs_fa_avatar_url ); ?>" alt="<?php echo esc_attr( $user->user_login ); ?>" width="52" height="52" loading="lazy">
+                        <div class="gs-fa-usercard__body">
+                            <div class="gs-fa-usercard__name"><?php echo esc_html($user->display_name); ?></div>
+                            <div class="gs-fa-usercard__email"><a href="mailto:<?php echo esc_attr($user->user_email); ?>"><?php echo esc_html($user->user_email); ?></a></div>
+                        </div>
+                        <div class="gs-fa-usercard__action">
+                            <button type="button" class="button button-small gs-fa-open-modal" data-user-id="<?php echo esc_attr($user->ID); ?>"><?php esc_html_e('Manage Access', 'gend-society'); ?></button>
+                        </div>
+                    </div>
+                <?php endforeach; ?>
+                <?php if (empty($users)) : ?>
+                    <p><?php esc_html_e('No eligible users found.', 'gend-society'); ?></p>
+                <?php endif; ?>
+            </div>
             <p id="gs-fa-empty" style="display:none; color:var(--gs-muted, #94a3b8); padding:12px 0; font-style:italic;">
                 <?php esc_html_e('No users match your search.', 'gend-society'); ?>
             </p>
@@ -333,7 +332,7 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
         // Search filter — show/hide rows by data-search blob
         $(document).on('input', '#gs-fa-search', function(){
             var q = ($(this).val() || '').toLowerCase().trim();
-            var $rows = $('#gs-fa-users-table tbody tr[data-search]');
+            var $rows = $('#gs-fa-users-table .gs-fa-usercard[data-search]');
             var visible = 0;
             $rows.each(function(){
                 var match = !q || ($(this).data('search') || '').indexOf(q) !== -1;

@@ -10,7 +10,7 @@
  * gend.me's /my-account/membership/{id}/ page:
  *
  *   ┌── Header: site title • status badge • Open App • 5-stage progress
- *   ┌── 4-card grid: Membership ▪ Business Group ▪ Feature Access ▪ App Hosting
+ *   ┌── 2-card grid: Membership ▪ Integration Hub (Feature Access now sits atop the Feature Suite tab)
  *   └── Tabs: Orders ▪ Domain ▪ Backups (lazy-loaded inline AJAX)
  *
  * Inline actions:
@@ -30,6 +30,36 @@
  */
 
 if ( ! defined( 'ABSPATH' ) ) exit;
+
+add_action( 'wp_ajax_gs_compute_gas_devices', function () {
+    check_ajax_referer( 'gs_membership_action' );
+    if ( ! current_user_can( 'manage_options' ) ) {
+        wp_send_json_error( array( 'message' => __( 'You are not authorized to view connected devices.', 'gend-society' ) ), 403 );
+    }
+    if ( ! function_exists( 'psoo_device_get_records' ) ) {
+        wp_send_json_error( array( 'message' => __( 'The connected-device service is unavailable.', 'gend-society' ) ), 503 );
+    }
+    $owner_ids = array( get_current_user_id() );
+    $site = function_exists( 'wu_get_site' ) ? wu_get_site( get_current_blog_id() ) : null;
+    $group_id = isset( $_POST['group_id'] ) ? absint( $_POST['group_id'] ) : 0;
+    if ( ! $group_id ) {
+        $group_id = $site && method_exists( $site, 'get_meta' ) ? (int) $site->get_meta( 'gdc_bp_group_id', 0 ) : 0;
+    }
+    if ( $group_id > 0 && function_exists( 'psoo_group_device_owner_uids' ) ) {
+        $owner_ids = psoo_group_device_owner_uids( $group_id );
+    }
+    $devices = array();
+    foreach ( $owner_ids as $owner_id ) {
+        foreach ( psoo_device_get_records( (int) $owner_id ) as $record ) {
+            if ( function_exists( 'psoo_device_online' ) ) {
+                $record['online'] = psoo_device_online( $record );
+            }
+            $record['owner'] = (int) $owner_id;
+            $devices[ (string) ( $record['device_id'] ?? wp_generate_uuid4() ) ] = $record;
+        }
+    }
+    wp_send_json_success( array( 'devices' => array_values( $devices ) ) );
+} );
 
 const GS_REMOTE_MEMBERSHIP_CACHE_OPTION         = 'gs_remote_membership_cache';
 const GS_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION = 'gs_remote_membership_cache_expires';
@@ -123,7 +153,11 @@ function gs_remote_membership_call( string $path, array $body = array(), string 
         $args['body']                    = wp_json_encode( $body );
         $resp = wp_remote_post( $endpoint, $args );
     } else {
-        $resp = wp_remote_get( $endpoint, $args );
+        // $body was previously silently dropped for GET calls - every
+        // existing caller passes an empty array, so this is a no-op for
+        // them and only takes effect for a caller that actually needs a
+        // query param (e.g. membership/plan-options?resource=server).
+        $resp = wp_remote_get( $body ? add_query_arg( $body, $endpoint ) : $endpoint, $args );
     }
     if ( is_wp_error( $resp ) ) return $resp;
 
@@ -186,6 +220,34 @@ add_action( 'wp_ajax_gs_membership_domain_remove', function () {
     $domain = isset( $_POST['domain'] ) ? strtolower( trim( wp_unslash( (string) $_POST['domain'] ) ) ) : '';
     if ( $domain === '' ) wp_send_json_error( array( 'message' => __( 'Domain required.', 'gend-society' ) ) );
     $r = gs_remote_membership_call( 'domains/remove', array( 'domain' => $domain ) );
+    if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+    gs_remote_membership_invalidate();
+    wp_send_json_success( $r );
+} );
+
+// ─── Native (no-iframe) change-plan picker: list options + resolve the
+// checkout URL for a switch. Both proxy to gend.me's install-token REST
+// routes (gdc-self-hosted-handshake.php). Dashboard-group plans by
+// default; an optional resource= (server/media/database/codebase/
+// backups) switches to that hosting-group resource-upgrade type's
+// plans instead - same hub endpoint, now hosting-aware (see
+// gdc_self_hosted_rest_plan_options() on the hub). Replaces the old
+// popup-window + embedded-iframe checkout, which blanked because a
+// cross-origin iframe can't carry gend.me's session cookie.
+add_action( 'wp_ajax_gs_membership_plan_options', function () {
+    gs_membership_ajax_authorize();
+    $resource = isset( $_POST['resource'] ) ? sanitize_key( wp_unslash( $_POST['resource'] ) ) : '';
+    $params   = $resource !== '' ? array( 'resource' => $resource ) : array();
+    $r = gs_remote_membership_call( 'membership/plan-options', $params, 'GET' );
+    if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+    wp_send_json_success( $r );
+} );
+
+add_action( 'wp_ajax_gs_membership_change_plan', function () {
+    gs_membership_ajax_authorize();
+    $plan_id = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
+    if ( ! $plan_id ) wp_send_json_error( array( 'message' => __( 'Please select a plan.', 'gend-society' ) ) );
+    $r = gs_remote_membership_call( 'membership/change-plan', array( 'plan_id' => $plan_id ), 'POST' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     gs_remote_membership_invalidate();
     wp_send_json_success( $r );
@@ -600,6 +662,42 @@ add_action( 'wp_ajax_gs_membership_domain_email_preset_list', function () {
     wp_send_json_success( $r );
 } );
 
+// Real WooCommerce "Media Storage" tier catalog (size + price) for the
+// gend-media-optimizer Media tab's Upgrade dropdown. Cached 1h (server-
+// side, via the same option-cache shape gs_remote_membership_get_cached
+// uses) since pricing/tiers change rarely — avoids a remote round trip
+// on every Media tab page load.
+add_action( 'wp_ajax_gs_get_media_storage_plans', function () {
+    gs_membership_ajax_authorize();
+
+    $cache_key     = 'gs_media_storage_plans_cache';
+    $cache_expires = 'gs_media_storage_plans_cache_expires';
+    $expires       = (int) get_option( $cache_expires, 0 );
+    if ( $expires > time() ) {
+        $cached = get_option( $cache_key, null );
+        if ( is_array( $cached ) ) {
+            wp_send_json_success( $cached );
+        }
+    }
+
+    $r = gs_remote_membership_call( 'media-storage-plans', array(), 'GET' );
+    if ( is_wp_error( $r ) ) {
+        $data   = $r->get_error_data();
+        $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 502;
+        // Fall back to a stale cache rather than a hard error, if we have one.
+        $stale = get_option( $cache_key, null );
+        if ( is_array( $stale ) ) {
+            wp_send_json_success( $stale );
+        }
+        wp_send_json_error( array_merge( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), (array) $data ), $status );
+    }
+
+    $ttl = isset( $r['cache_seconds'] ) ? max( 300, (int) $r['cache_seconds'] ) : HOUR_IN_SECONDS;
+    update_option( $cache_key, $r, false );
+    update_option( $cache_expires, time() + $ttl, false );
+    wp_send_json_success( $r );
+} );
+
 // Refresh-cache hook — used after the plan-upgrade popup closes so
 // the new plan appears immediately without waiting out the TTL.
 add_action( 'wp_ajax_gs_membership_refresh', function () {
@@ -672,10 +770,16 @@ function gs_render_membership_panel( $payload = null ) {
         .gs-mship-step.is-done .dot { background: #00b450; border-color: #00b450; box-shadow: 0 0 12px rgba(0,180,80,0.5); }
         .gs-mship-step .label { font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gs-muted); }
         .gs-mship-step.is-done .label { color: #4ee68a; }
-        .gs-mship-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-top: 24px; }
-        @media (max-width: 1100px) { .gs-mship-grid { grid-template-columns: repeat(2, 1fr); } }
-        @media (max-width: 600px)  { .gs-mship-grid { grid-template-columns: 1fr; } }
+        .gs-mship-grid { display: grid; grid-template-columns: 1fr; gap: 16px; margin-top: 24px; }
         .gs-mship-cell { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.06); border-radius: 14px; padding: 18px; }
+        .gs-mship-cell--group[style*="background-image"] { background-color: rgba(255,255,255,0.03); }
+        .gs-mship-group-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; margin-bottom: 12px; }
+        .gs-mship-group-head h3 { margin: 0; }
+        .gs-mship-cell--group h3 { display: inline-block; background: rgba(11,14,20,.72); color: #fff; padding: 5px 16px; border-radius: 999px; border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(6px); -webkit-backdrop-filter: blur(6px); box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+        .gs-mship-hub-visit-btn { padding: 6px 14px; font-size: 0.72rem; white-space: nowrap; flex-shrink: 0; box-shadow: 0 2px 10px rgba(0,0,0,.35); }
+        .gs-mship-plan-card--link { text-decoration: none; cursor: pointer; border-radius: 14px; transition: transform .15s ease, background .15s ease; }
+        .gs-mship-plan-card--link:hover { transform: translateY(-2px); background: rgba(255,255,255,.05); }
+        .gs-mship-plan-card--link:hover .gs-mship-plan-name { text-decoration: underline; }
         .gs-mship-cell h3 { margin: 0 0 12px; font-size: 0.7rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.1em; color: var(--gs-muted); text-align: center; }
         .gs-mship-row { display: flex; flex-direction: column; gap: 4px; margin-bottom: 12px; font-size: 0.85rem; }
         .gs-mship-row .label { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--gs-muted); font-weight: 600; }
@@ -687,14 +791,163 @@ function gs_render_membership_panel( $payload = null ) {
         .gs-mship-plan-img .dashicons { font-size: 48px; color: rgba(255,255,255,0.3); }
         .gs-mship-plan-name { color: #fff; font-weight: 700; font-size: 1rem; }
         .gs-mship-plan-price { color: #4eaaff; font-size: 0.9rem; font-weight: 600; }
-        .gs-mship-tabs { margin-top: 28px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 18px; }
-        .gs-mship-tabs-nav { display: flex; gap: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); margin-bottom: 16px; flex-wrap: wrap; }
-        .gs-mship-tab-btn { padding: 12px 18px; background: transparent; border: 0; border-bottom: 2px solid transparent; color: var(--gs-muted); font-size: 0.85rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.08em; cursor: pointer; display: inline-flex; align-items: center; gap: 8px; transition: color 0.18s ease; }
-        .gs-mship-tab-btn:hover { color: #fff; }
-        .gs-mship-tab-btn.is-active { color: #4eaaff; border-bottom-color: #4eaaff; }
-        .gs-mship-tab-icon { font-size: 16px; width: 16px; height: 16px; line-height: 16px; opacity: 0.85; transition: transform 0.2s ease, opacity 0.18s ease; }
-        .gs-mship-tab-btn:hover .gs-mship-tab-icon { transform: translateY(-1px); opacity: 1; }
-        .gs-mship-tab-btn.is-active .gs-mship-tab-icon { opacity: 1; }
+        /* Dashboard Plan card — horizontal layout on desktop (image left,
+           name/price stacked to the right), stays centered/stacked on
+           narrower screens where a row would feel cramped. */
+        .gs-mship-plan-card--dashboard .gs-mship-plan-text { display: flex; flex-direction: column; gap: 4px; }
+        @media (min-width: 821px) {
+            .gs-mship-plan-card--dashboard { flex-direction: row; text-align: left; justify-content: flex-start; }
+            .gs-mship-plan-card--dashboard .gs-mship-plan-img { flex-shrink: 0; }
+        }
+        /* Status / Dashboard Plan — 2 equal columns on desktop, stacked on
+           narrower screens (Membership title removed, so these sit right
+           at the top of the cell). */
+        .gs-mship-status-plan-row { display: grid; grid-template-columns: 1fr 1fr; gap: 24px; align-items: start; }
+        @media (max-width: 820px) { .gs-mship-status-plan-row { grid-template-columns: 1fr; } }
+        /* Gas Used — History / Connected Devices popups. Same dark-glass
+           dialog language as the Upgrade popup (gs_hosting_render_storage_resource_cards()
+           in dashboard-hosting.php) so this reads as the same design system. */
+        .gs-gas-modal { position: fixed; inset: 0; z-index: 999999; display: none; align-items: center; justify-content: center; padding: 24px; }
+        .gs-gas-modal.is-open { display: flex; }
+        .gs-gas-modal__overlay { position: absolute; inset: 0; background: rgba(2, 6, 23, .78); backdrop-filter: blur(18px) saturate(160%); -webkit-backdrop-filter: blur(18px) saturate(160%); }
+        .gs-gas-modal__dialog { position: relative; width: 100%; max-width: 720px; max-height: 84vh; background: linear-gradient(160deg, rgba(15,23,42,.97), rgba(15,23,42,.90)); border: 1px solid rgba(125, 211, 252, .28); border-radius: 20px; box-shadow: 0 40px 80px rgba(0,0,0,.6); display: flex; flex-direction: column; overflow: hidden; }
+        .gs-gas-modal__header { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 18px 22px; border-bottom: 1px solid rgba(255,255,255,0.08); flex-shrink: 0; }
+        .gs-gas-modal__header h3 { margin: 0; color: #f8fafc; font-size: 1.1rem; display: flex; align-items: center; gap: 10px; }
+        .gs-gas-modal__close { background: none; border: 0; color: #e6edf7; font-size: 22px; cursor: pointer; line-height: 1; padding: 0 4px; }
+        .gs-gas-modal__close:hover { color: #fff; }
+        .gs-gas-modal__body { padding: 20px 22px; overflow-y: auto; flex: 1 1 auto; min-height: 0; }
+        .gs-gas-history-filters { display: flex; gap: 8px; margin-bottom: 14px; }
+        .gs-gas-filter { background: rgba(255,255,255,0.05); border: 1px solid rgba(255,255,255,0.1); color: #cbd5f5; border-radius: 999px; padding: 6px 16px; font-size: 0.8rem; font-weight: 600; cursor: pointer; }
+        .gs-gas-filter.is-active { background: rgba(78,170,255,0.18); border-color: rgba(78,170,255,0.4); color: #4eaaff; }
+        .gs-gas-devices-stats { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 18px; }
+        .gs-gas-devices-stat { background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; }
+        .gs-gas-devices-stat .k { color: var(--gs-muted, #94a3b8); font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; }
+        .gs-gas-devices-stat .v { color: #fff; font-size: 1.15rem; font-weight: 700; margin-top: 4px; }
+        .gs-gas-devices-stat .hint { color: var(--gs-muted, #94a3b8); font-size: 0.72rem; margin-top: 2px; }
+        .gs-gas-device-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 12px 14px; background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 10px; margin-bottom: 8px; }
+        .gs-gas-device-name { color: #fff; font-weight: 700; font-size: 0.92rem; }
+        .gs-gas-device-meta { color: var(--gs-muted, #94a3b8); font-size: 0.78rem; margin-top: 2px; }
+        /* Blockchain Compute Gas — bespoke "crypto ledger" hero, matching
+           the real Compute Gas sub-tab's own gradient/glow visual language
+           (.gs-compute-gas__hero, dashboard-hosting.php) rather than the
+           plain shared analytics-hero used by Media/Codebase/Tables/Backups. */
+        .gs-bcg-hero { position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(78,170,255,0.16) 0%, rgba(168,85,247,0.14) 55%, rgba(11,14,20,0.5) 100%); border: 1px solid rgba(168,85,247,0.28); border-radius: 20px; padding: 28px 30px; }
+        .gs-bcg-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 88% 8%, rgba(168,85,247,.22), transparent 55%), radial-gradient(circle at 6% 95%, rgba(34,211,238,.16), transparent 50%); pointer-events: none; }
+        .gs-bcg-badge { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; background: rgba(168,85,247,.16); border: 1px solid rgba(168,85,247,.4); color: #d8b4fe; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+        .gs-bcg-badge .dashicons { font-size: 14px; width: 14px; height: 14px; }
+        .gs-bcg-head { position: relative; z-index: 1; display: flex; justify-content: space-between; align-items: flex-start; gap: 18px; flex-wrap: wrap; margin-bottom: 24px; }
+        .gs-bcg-title { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.35; padding-bottom: 2px; font-weight: 900; letter-spacing: -0.01em; background: linear-gradient(90deg, #fff, #d8b4fe); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .gs-bcg-sub { margin: 0; color: rgba(226,232,240,.65); font-size: 0.9rem; max-width: 460px; }
+        .gs-bcg-actions { display: flex; gap: 10px; flex-wrap: wrap; }
+        .gs-bcg-btn { display: inline-flex; align-items: center; gap: 7px; padding: 10px 18px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #e6edf7; font-size: 0.8rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+        .gs-bcg-btn .dashicons { font-size: 15px; width: 15px; height: 15px; }
+        .gs-bcg-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,.28); transform: translateY(-1px); color: #fff; }
+        .gs-bcg-btn--cta { background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14 !important; border: none; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 8px 22px rgba(34,211,238,.32); }
+        .gs-bcg-btn--cta:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(34,211,238,.4); }
+        .gs-bcg-stats { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 14px; }
+        .gs-bcg-stat { position: relative; background: rgba(11,14,20,.55); border: 1px solid rgba(255,255,255,.08); border-radius: 14px; padding: 16px 18px 14px 20px; overflow: hidden; }
+        .gs-bcg-stat::before { content: ''; position: absolute; left: 0; top: 0; bottom: 0; width: 3px; background: var(--gs-bcg-accent, #4eaaff); }
+        .gs-bcg-stat .icon { color: var(--gs-bcg-accent, #4eaaff); font-size: 18px; width: 18px; height: 18px; display: block; margin-bottom: 10px; }
+        .gs-bcg-stat .k { color: rgba(226,232,240,.55); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.07em; font-weight: 700; }
+        .gs-bcg-stat .v { color: #fff; font-size: 1.3rem; font-weight: 800; margin-top: 5px; line-height: 1.25; }
+        @media (max-width: 640px) { .gs-bcg-hero { padding: 22px 20px; } .gs-bcg-head { flex-direction: column; } }
+
+        /* Backups — same bespoke hero treatment as Blockchain Compute Gas
+           above (.gs-bcg-*), own accent (emerald/teal instead of purple/blue)
+           and own class prefix so the two sections stay independently
+           editable. */
+        .gs-bk-hero { position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(16,185,129,0.16) 0%, rgba(34,211,238,0.12) 55%, rgba(11,14,20,0.5) 100%); border: 1px solid rgba(16,185,129,0.28); border-radius: 20px; padding: 28px 30px; display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; flex-wrap: wrap; }
+        .gs-bk-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 88% 8%, rgba(16,185,129,.20), transparent 55%), radial-gradient(circle at 6% 95%, rgba(34,211,238,.16), transparent 50%); pointer-events: none; }
+        .gs-bk-main { position: relative; z-index: 1; flex: 1 1 280px; min-width: 220px; }
+        .gs-bk-badge { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; background: rgba(16,185,129,.16); border: 1px solid rgba(16,185,129,.4); color: #6ee7b7; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+        .gs-bk-badge.is-warn { background: rgba(245,158,11,.16); border-color: rgba(245,158,11,.4); color: #fcd34d; }
+        .gs-bk-badge.is-neutral { background: rgba(148,163,184,.14); border-color: rgba(148,163,184,.35); color: #cbd5e1; }
+        .gs-bk-badge .dashicons { font-size: 14px; width: 14px; height: 14px; }
+        .gs-bk-title { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.35; padding-bottom: 2px; font-weight: 900; letter-spacing: -0.01em; background: linear-gradient(90deg, #fff, #6ee7b7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+        .gs-bk-sub { margin: 0; color: rgba(226,232,240,.65); font-size: 0.9rem; max-width: 460px; }
+        .gs-bk-actions { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 210px; }
+        .gs-bk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 10px 18px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #e6edf7; font-size: 0.8rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+        .gs-bk-btn .dashicons { font-size: 15px; width: 15px; height: 15px; }
+        .gs-bk-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,.28); transform: translateY(-1px); color: #fff; }
+        .gs-bk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+        .gs-bk-btn:disabled:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); transform: none; color: #e6edf7; }
+        .gs-bk-btn--cta { background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14 !important; border: none; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 8px 22px rgba(34,211,238,.32); }
+        .gs-bk-btn--cta:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(34,211,238,.4); }
+        @media (max-width: 640px) { .gs-bk-hero { padding: 22px 20px; flex-direction: column; } .gs-bk-actions { width: 100%; } }
+        .gs-plan-picker { margin-top: 16px; }
+        .gs-plan-picker__status { color: var(--gs-muted); font-size: 0.85rem; padding: 8px 2px; }
+        .gs-plan-picker__grid { display: flex; flex-direction: column; gap: 10px; }
+        .gs-plan-picker__card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--gs-border, rgba(255,255,255,0.08)); cursor: pointer; text-align: left; width: 100%; color: #fff; font: inherit; transition: border-color .15s ease, background .15s ease; }
+        .gs-plan-picker__card:hover:not([disabled]) { border-color: rgba(182,8,201,0.6); background: rgba(182,8,201,0.08); }
+        .gs-plan-picker__card[disabled] { opacity: 0.5; cursor: wait; }
+        .gs-plan-picker__card.is-current { border-color: rgba(78,230,138,0.4); background: rgba(0,180,80,0.06); }
+        .gs-plan-picker__card-name { font-weight: 700; font-size: 0.95rem; }
+        .gs-plan-picker__card-price { color: #4eaaff; font-size: 0.85rem; font-weight: 600; }
+        .gs-plan-picker__card-badge { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #4ee68a; font-weight: 700; }
+        .gs-mship-tabs { margin-top: 28px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 22px; }
+        .gs-mship-tabs-nav { display: flex; justify-content: center; gap: 14px; border-bottom: 0; margin-bottom: 24px; flex-wrap: wrap; padding-bottom: 4px; }
+        /* Glassmorphic, "3D" tab buttons: translucent + blurred glass body,
+           an animated gradient-ring border (mask-composite cuts out the
+           interior so only the stroke shows) that fades/sweeps in on
+           hover, plus a lift + layered glow for a raised, tactile feel. */
+        .gs-mship-tab-btn {
+            position: relative;
+            padding: 14px 26px;
+            background: rgba(255,255,255,0.045);
+            backdrop-filter: blur(16px) saturate(140%);
+            -webkit-backdrop-filter: blur(16px) saturate(140%);
+            border: 1px solid rgba(255,255,255,0.10);
+            border-radius: 14px;
+            color: var(--gs-muted);
+            font-size: 0.82rem;
+            font-weight: 800;
+            text-transform: uppercase;
+            letter-spacing: 0.07em;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 9px;
+            overflow: hidden;
+            isolation: isolate;
+            transition: color 0.25s ease, transform 0.25s cubic-bezier(0.2,0.9,0.3,1), box-shadow 0.25s cubic-bezier(0.2,0.9,0.3,1), border-color 0.25s ease, background 0.25s ease;
+            box-shadow: 0 1px 0 rgba(255,255,255,0.06) inset, 0 6px 14px rgba(0,0,0,0.18);
+        }
+        .gs-mship-tab-btn::before {
+            content: '';
+            position: absolute;
+            inset: -1px;
+            border-radius: 14px;
+            padding: 1.5px;
+            background: linear-gradient(130deg, transparent 20%, rgba(78,170,255,0.6), rgba(182,8,201,0.6), transparent 80%);
+            background-size: 220% 220%;
+            background-position: 0% 50%;
+            -webkit-mask: linear-gradient(#000 0 0) content-box, linear-gradient(#000 0 0);
+            -webkit-mask-composite: xor;
+            mask-composite: exclude;
+            opacity: 0;
+            transition: opacity 0.3s ease, background-position 0.8s ease;
+            z-index: -1;
+            pointer-events: none;
+        }
+        .gs-mship-tab-btn:hover {
+            color: #fff;
+            transform: translateY(-3px);
+            border-color: rgba(255,255,255,0.22);
+            background: rgba(255,255,255,0.07);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.10) inset, 0 14px 30px -6px rgba(78,170,255,0.28), 0 4px 14px rgba(0,0,0,0.30);
+        }
+        .gs-mship-tab-btn:hover::before { opacity: 1; background-position: 100% 50%; }
+        .gs-mship-tab-btn:active { transform: translateY(-1px) scale(0.98); }
+        .gs-mship-tab-btn.is-active {
+            color: #fff;
+            background: linear-gradient(160deg, rgba(78,170,255,0.16), rgba(182,8,201,0.12));
+            border-color: rgba(78,170,255,0.45);
+            box-shadow: 0 1px 0 rgba(255,255,255,0.12) inset, 0 10px 26px -6px rgba(78,170,255,0.35), 0 2px 10px rgba(0,0,0,0.25);
+        }
+        .gs-mship-tab-btn.is-active::before { opacity: 0.85; }
+        .gs-mship-tab-icon { font-size: 17px; width: 17px; height: 17px; line-height: 17px; opacity: 0.85; transition: transform 0.25s cubic-bezier(0.2,0.9,0.3,1), opacity 0.2s ease; }
+        .gs-mship-tab-btn:hover .gs-mship-tab-icon { transform: translateY(-1px) scale(1.12) rotate(-4deg); opacity: 1; }
+        .gs-mship-tab-btn.is-active .gs-mship-tab-icon { opacity: 1; filter: drop-shadow(0 0 6px rgba(78,170,255,0.6)); }
         .gs-mship-tab-panel { display: none; }
         .gs-mship-tab-panel.is-active { display: block; }
 
@@ -852,262 +1105,787 @@ function gs_render_membership_panel( $payload = null ) {
         </div>
         <?php endif; ?>
 
-        <!-- ── 4-card grid: Membership / Group / Feature Access / Hosting ── -->
+        <!-- ── 2-card grid: Membership / Integration Hub. Feature Access moved to the top of the
+             Feature Suite tab (see below) so it sits with the feature cards it controls. ── -->
         <div class="gs-mship-grid">
 
-            <!-- Membership cell -->
+            <!-- Membership cell — now full width (see .gs-mship-grid above).
+                 Order: Integration Hub / Dashboard Plan (2-col row, was a
+                 separate row above), Activated / Next Renewal, Storage
+                 (moved here from Hosting → Storage), Backup plan, Gas Used
+                 / Server Costs. -->
             <div class="gs-mship-cell">
-                <h3><?php esc_html_e( 'Membership', 'gend-society' ); ?></h3>
-                <?php if ( $status_label !== '' ) : ?>
-                    <div class="gs-mship-row"><span class="label"><?php esc_html_e( 'Status', 'gend-society' ); ?></span><span class="pill"><?php echo esc_html( $status_label ); ?></span></div>
-                <?php endif; ?>
-                <?php if ( ! empty( $billing['label'] ) ) : ?>
-                    <div class="gs-mship-row"><span class="label"><?php esc_html_e( 'Billing', 'gend-society' ); ?></span><span class="value"><?php echo esc_html( $billing['label'] ); ?> <?php echo ! empty( $billing['unit'] ) ? esc_html( sprintf( __( 'every %s', 'gend-society' ), $billing['unit'] ) ) : ''; ?></span></div>
-                <?php endif; ?>
-                <?php if ( ! empty( $dates['created'] ) ) : ?>
-                    <div class="gs-mship-row"><span class="label"><?php esc_html_e( 'Created', 'gend-society' ); ?></span><span class="value"><?php echo esc_html( $dates['created'] ); ?></span></div>
-                <?php endif; ?>
+                <div class="gs-mship-status-plan-row">
+                    <div class="gs-mship-status-col">
+                        <?php
+                            $g_link = ( $group && ! empty( $group['id'] ) && $hub_url !== '' ) ? trailingslashit( $hub_url ) . 'groups/' . sanitize_title( $group['slug'] ?: $group['id'] ) . '/' : '';
+                        ?>
+                        <!-- Integration Hub (was "Business Group") — moved here from its own row above. -->
+                        <div class="gs-mship-cell gs-mship-cell--group"<?php echo ( $group && ! empty( $group['cover'] ) ) ? ' style="background-image:linear-gradient(180deg, rgba(11,14,20,.35), rgba(11,14,20,.92) 78%), url(' . esc_url( $group['cover'] ) . ');background-size:cover;background-position:center;"' : ''; ?>>
+                            <div class="gs-mship-group-head">
+                                <h3><?php esc_html_e( 'Integration Hub', 'gend-society' ); ?></h3>
+                                <?php if ( $g_link !== '' ) : ?>
+                                    <a class="gs-mship-action-btn gs-mship-hub-visit-btn" href="<?php echo esc_url( $g_link ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Visit Hub', 'gend-society' ); ?></a>
+                                <?php endif; ?>
+                            </div>
+                            <?php if ( $group && ! empty( $group['id'] ) ) : ?>
+                                <a class="gs-mship-plan-card gs-mship-plan-card--link" href="<?php echo esc_url( $g_link ); ?>" target="_blank" rel="noopener">
+                                    <div class="gs-mship-plan-img">
+                                        <?php if ( ! empty( $group['avatar'] ) ) : ?>
+                                            <img src="<?php echo esc_url( $group['avatar'] ); ?>" alt="" />
+                                        <?php else : ?>
+                                            <span class="dashicons dashicons-groups"></span>
+                                        <?php endif; ?>
+                                    </div>
+                                    <div class="gs-mship-plan-name"><?php echo esc_html( $group['name'] ?? '' ); ?></div>
+                                </a>
+                            <?php else : ?>
+                                <div class="gs-mship-empty"><?php esc_html_e( 'No group linked.', 'gend-society' ); ?></div>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                    <div class="gs-mship-plan-col">
+                        <?php if ( ! empty( $dates['expires'] ) || ! empty( $dates['renews'] ) ) : ?>
+                            <!-- Next Renewal — moved up here from its own full-width row below the grid. -->
+                            <div class="gs-mship-renewal" style="max-width: 420px; margin: 10px auto 0; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
+                                <span class="dashicons dashicons-calendar-alt" style="color: #4eaaff; font-size: 26px; width: 26px; height: 26px; flex-shrink: 0;"></span>
+                                <div style="min-width: 0;">
+                                    <div style="color: var(--gs-muted, #94a3b8); font-size: 0.72rem; font-weight: 700; letter-spacing: 0.08em; text-transform: uppercase;"><?php esc_html_e( 'Next Renewal / Expiration', 'gend-society' ); ?></div>
+                                    <div style="color: #fff; font-size: 1.05rem; font-weight: 700; margin-top: 2px;"><?php echo esc_html( ! empty( $dates['expires'] ) ? $dates['expires'] : $dates['renews'] ); ?></div>
+                                </div>
+                            </div>
+                        <?php endif; ?>
+                        <?php if ( $dash_plan && ! empty( $dash_plan['name'] ) ) : ?>
+                            <div class="gs-mship-plan-card gs-mship-plan-card--dashboard" style="max-width: 420px; margin: 10px auto 0;">
+                                <div class="gs-mship-plan-img">
+                                    <?php if ( ! empty( $dash_plan['image'] ) ) : ?>
+                                        <img src="<?php echo esc_url( $dash_plan['image'] ); ?>" alt="" />
+                                    <?php else : ?>
+                                        <span class="dashicons dashicons-admin-users"></span>
+                                    <?php endif; ?>
+                                </div>
+                                <div class="gs-mship-plan-text">
+                                    <div class="gs-mship-plan-name"><?php echo esc_html( $dash_plan['name'] ); ?></div>
+                                    <?php if ( ! empty( $dash_plan['amount_label'] ) ) : ?>
+                                        <div class="gs-mship-plan-price"><?php echo esc_html( $dash_plan['amount_label'] ); ?> <?php echo ! empty( $dash_plan['duration_unit'] ) ? esc_html( sprintf( __( 'every %s', 'gend-society' ), $dash_plan['duration_unit'] ) ) : ''; ?></div>
+                                    <?php endif; ?>
+                                </div>
+                            </div>
+                            <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="dashboard" style="display: block; width: 100%; max-width: 420px; margin: 12px auto 0;" aria-expanded="false" aria-controls="gs-plan-picker-membership-top">
+                                <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
+                            </button>
+                            <div class="gs-plan-picker" id="gs-plan-picker-membership-top" style="max-width: 420px; margin: 0 auto;" hidden></div>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <?php if ( ! empty( $dates['activated'] ) ) : ?>
                     <div class="gs-mship-row"><span class="label"><?php esc_html_e( 'Activated', 'gend-society' ); ?></span><span class="value"><?php echo esc_html( $dates['activated'] ); ?></span></div>
                 <?php endif; ?>
-                <?php if ( ! empty( $dates['expires'] ) || ! empty( $dates['renews'] ) ) : ?>
-                    <div class="gs-mship-row"><span class="label"><?php esc_html_e( 'Next Renewal / Expiration', 'gend-society' ); ?></span><span class="value"><?php echo esc_html( ! empty( $dates['expires'] ) ? $dates['expires'] : $dates['renews'] ); ?></span></div>
-                <?php endif; ?>
-            </div>
 
-            <!-- Business Group cell -->
-            <div class="gs-mship-cell">
-                <h3><?php esc_html_e( 'Business Group', 'gend-society' ); ?></h3>
-                <?php if ( $group && ! empty( $group['id'] ) ) :
-                    $g_link = $hub_url !== '' ? trailingslashit( $hub_url ) . 'groups/' . sanitize_title( $group['slug'] ?? $group['id'] ) . '/' : '';
-                ?>
-                    <div class="gs-mship-plan-card">
-                        <div class="gs-mship-plan-img">
-                            <?php if ( ! empty( $group['avatar'] ) ) : ?>
-                                <img src="<?php echo esc_url( $group['avatar'] ); ?>" alt="" />
+                <!-- ── Gas Used / Server Costs / Backup Plan — 3-column row.
+                     Moved above Storage. Gas Used now reads the real
+                     vendor-app-manager gdc_gas_ledger total for this site
+                     (gs_hosting_compute_gas_real_data() - same real query
+                     the Hosting → Compute Gas sub-tab's own breakdown uses),
+                     rather than the honest-placeholder it used to be before
+                     that ledger/billing system existed.
+                     Server Costs pulls the real vendor-app-manager 'server'
+                     plan-attach products: whichever real server-subgroup
+                     product is attached to this membership, else the
+                     cheapest available real server tier ("From $X") - same
+                     gs_hosting_server_price() source the Servers sub-tab's
+                     own Upgrade flow uses. Backup Plan is real WP Ultimo
+                     plan(s) under the 'backups' plan-attach type
+                     (gdc_register_backups_plan_product(),
+                     gdc_plan_attach_types()), sits last. ── -->
+                <!-- ── Blockchain Compute Gas — bespoke "crypto ledger" hero,
+                     NOT the shared gs_hosting_render_analytics_hero() other
+                     sub-tabs (Media/Codebase/Tables/Backups) use - this one
+                     gets its own richer treatment (gradient hero, glow accents,
+                     color-coded stat cards) matching the visual language
+                     already established for the real Compute Gas sub-tab's
+                     own hero (.gs-compute-gas__hero in dashboard-hosting.php)
+                     since this IS that same subject matter surfaced here on
+                     the membership card. Data is unchanged from before:
+                     gs_hosting_compute_gas_real_data() for consumption/
+                     balance/invoices, gs_hosting_gas_earned_summary() for
+                     real Gas Station device-owner earnings (station_user_id
+                     on gdc_gas_ledger, paid out in real DGEN via
+                     gdc_gas_credit_gcp_payee()), gs_hosting_server_price()
+                     for Server Costs. ── -->
+                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <?php
+                    $gs_gas_data   = function_exists( 'gs_hosting_compute_gas_real_data' ) ? gs_hosting_compute_gas_real_data() : array();
+                    $gs_gas_earned = function_exists( 'gs_hosting_gas_earned_summary' ) ? gs_hosting_gas_earned_summary( get_current_user_id() ) : array();
+
+                    $gs_gas_pending_payment = null;
+                    foreach ( (array) ( $gs_gas_data['payments'] ?? array() ) as $gs_gp ) {
+                        if ( ( $gs_gp['status'] ?? '' ) === 'pending' && ! empty( $gs_gp['pay_url'] ) ) {
+                            $gs_gas_pending_payment = $gs_gp;
+                            break;
+                        }
+                    }
+
+                    $gs_server_price_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+                    $gs_server_price = function_exists( 'gs_hosting_server_price' ) ? gs_hosting_server_price( $gs_server_price_membership ) : array( 'current' => null, 'starting' => null );
+                    $gs_server_count_label = '';
+                    if ( ! empty( $gs_server_price['current']['label'] ) ) {
+                        $gs_server_price_label = $gs_server_price['current']['label'] . ( ! empty( $gs_server_price['current']['unit'] ) ? ' / ' . $gs_server_price['current']['unit'] : '' );
+                        $gs_server_count       = (int) ( $gs_server_price['current']['count'] ?? 0 );
+                        if ( $gs_server_count > 0 ) {
+                            $gs_server_count_label = sprintf( _n( '%d server attached', '%d servers attached', $gs_server_count, 'gend-society' ), $gs_server_count );
+                        }
+                    } elseif ( ! empty( $gs_server_price['starting']['label'] ) ) {
+                        $gs_server_price_label = sprintf( __( 'From %s', 'gend-society' ), $gs_server_price['starting']['label'] );
+                        $gs_server_count_label = __( 'No servers attached', 'gend-society' );
+                    } else {
+                        $gs_server_price_label = __( 'Not available yet', 'gend-society' );
+                    }
+
+                    // Real this-month-vs-last-month GAS consumption trend, off
+                    // the same real gdc_gas_ledger table gs_gas_data totals
+                    // all-time - see gs_hosting_gas_month_over_month().
+                    $gs_bcg_mom = function_exists( 'gs_hosting_gas_month_over_month' ) ? gs_hosting_gas_month_over_month() : array( 'direction' => 'flat', 'change_label' => __( 'No usage yet', 'gend-society' ) );
+                    $gs_bcg_mom_dir = (string) ( $gs_bcg_mom['direction'] ?? 'flat' );
+                    $gs_bcg_mom_accent = array( 'up' => '#ef4444', 'down' => '#22c55e', 'new' => '#4eaaff', 'flat' => '#94a3b8' )[ $gs_bcg_mom_dir ] ?? '#94a3b8';
+                    $gs_bcg_mom_icon   = array( 'up' => 'dashicons-arrow-up-alt', 'down' => 'dashicons-arrow-down-alt', 'new' => 'dashicons-chart-line', 'flat' => 'dashicons-minus' )[ $gs_bcg_mom_dir ] ?? 'dashicons-minus';
+
+                    // Same capability gate + embed-url mechanism the Storage
+                    // cards' own Upgrade buttons use (gs_hosting_render_storage_resource_cards()
+                    // below already renders the shared upgrade modal + its
+                    // document-scoped click handler on this page, so this
+                    // button just needs the matching data-gs-upgrade-open
+                    // attributes - no new modal/JS required).
+                    $gs_server_can_upgrade = current_user_can( 'manage_options' )
+                        || is_super_admin()
+                        || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
+                    $gs_server_upgrade_attrs = ( $gs_server_can_upgrade && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
+                        ? gs_hosting_resource_upgrade_data_attrs( 'server' )
+                        : '';
+                    // Raw same-origin embed URL for the Gas Station "Add a
+                    // Device" modal's always-on inline Server-tab iframe
+                    // below (a separate, non-click-triggered widget, unlike
+                    // the data-gs-upgrade-open button above) - empty on a
+                    // cross-origin install, where that pane falls back to
+                    // its existing "not available" message rather than
+                    // trying to drive an always-on iframe through the
+                    // click-triggered proxy/picker flow.
+                    $gs_server_same_origin = function_exists( 'gs_oauth_is_hub_site' ) ? gs_oauth_is_hub_site() : true;
+                    $gs_server_embed_url = ( $gs_server_can_upgrade && $gs_server_same_origin && function_exists( 'gdc_plan_attach_resource_embed_url' ) )
+                        ? gdc_plan_attach_resource_embed_url( 'server' )
+                        : '';
+
+                    $gs_bcg_next_bill = $gs_gas_pending_payment
+                        ? __( 'Ready to pay', 'gend-society' )
+                        : ( ! empty( $dates['renews'] ) ? $dates['renews'] : __( 'Not scheduled', 'gend-society' ) );
+                    ?>
+                    <div class="gs-bcg-hero">
+                        <span class="gs-bcg-badge"><span class="dashicons dashicons-superhero-alt"></span><?php esc_html_e( 'Live Ledger', 'gend-society' ); ?></span>
+                        <div class="gs-bcg-head">
+                            <div>
+                                <h2 class="gs-bcg-title"><?php esc_html_e( 'Blockchain Compute Gas', 'gend-society' ); ?></h2>
+                                <p class="gs-bcg-sub"><?php esc_html_e( 'Compute gas consumed by this install.', 'gend-society' ); ?></p>
+                            </div>
+                            <div class="gs-bcg-actions">
+                                <button type="button" class="gs-bcg-btn" data-gs-gas-open="history"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'History', 'gend-society' ); ?></button>
+                                <button type="button" class="gs-bcg-btn" data-gs-gas-open="devices"><span class="dashicons dashicons-database-view"></span><?php esc_html_e( 'Connected Devices', 'gend-society' ); ?></button>
+                                <?php if ( $gs_server_upgrade_attrs !== '' ) : ?>
+                                    <button type="button"
+                                            class="gs-bcg-btn gs-bcg-btn--cta"
+                                            data-gs-upgrade-open
+                                            data-resource="server"
+                                            data-resource-label="<?php esc_attr_e( 'Server', 'gend-society' ); ?>"
+                                            <?php echo $gs_server_upgrade_attrs; ?>>
+                                        <span class="dashicons dashicons-networking"></span>
+                                        <?php esc_html_e( 'Add Server', 'gend-society' ); ?>
+                                    </button>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="gs-bcg-stats">
+                            <div class="gs-bcg-stat" style="--gs-bcg-accent:#22c55e;">
+                                <span class="dashicons dashicons-awards icon"></span>
+                                <div class="k"><?php esc_html_e( 'Earned', 'gend-society' ); ?></div>
+                                <div class="v"><?php echo esc_html( $gs_gas_earned['total_earned_dgen_label'] ?? '0.00 DGEN' ); ?></div>
+                            </div>
+                            <div class="gs-bcg-stat" style="--gs-bcg-accent:#a855f7;">
+                                <span class="dashicons dashicons-networking icon"></span>
+                                <div class="k"><?php esc_html_e( 'Server Costs', 'gend-society' ); ?></div>
+                                <div class="v" style="<?php echo strlen( $gs_server_price_label ) > 16 ? 'font-size:1.05rem;' : ''; ?>"><?php echo esc_html( $gs_server_price_label ); ?></div>
+                                <?php if ( $gs_server_count_label !== '' ) : ?>
+                                    <div style="color: rgba(226,232,240,.5); font-size: 0.7rem; margin-top: 4px;"><?php echo esc_html( $gs_server_count_label ); ?></div>
+                                <?php endif; ?>
+                            </div>
+                        </div>
+                        <div class="gs-bcg-stats" style="margin-top: 14px;">
+                            <div class="gs-bcg-stat" style="--gs-bcg-accent:#f59e0b;">
+                                <span class="dashicons dashicons-money-alt icon"></span>
+                                <div class="k"><?php esc_html_e( 'Owed Balance', 'gend-society' ); ?></div>
+                                <div class="v"><?php echo esc_html( $gs_gas_data['unbilled_gas_label'] ?? '0.000000 GAS' ); ?></div>
+                                <?php if ( $gs_gas_pending_payment ) : ?>
+                                    <a href="<?php echo esc_url( $gs_gas_pending_payment['pay_url'] ); ?>" class="gs-bcg-btn gs-bcg-btn--cta" style="margin-top: 10px; padding: 6px 14px; font-size: 0.72rem;">
+                                        <span class="dashicons dashicons-money-alt"></span>
+                                        <?php echo esc_html( sprintf( __( 'Pay %s', 'gend-society' ), $gs_gas_pending_payment['total_label'] ) ); ?>
+                                    </a>
+                                <?php endif; ?>
+                            </div>
+                            <div class="gs-bcg-stat" style="--gs-bcg-accent:#94a3b8;">
+                                <span class="dashicons dashicons-calendar-alt icon"></span>
+                                <div class="k"><?php esc_html_e( 'Next Bill', 'gend-society' ); ?></div>
+                                <div class="v" style="<?php echo strlen( $gs_bcg_next_bill ) > 14 ? 'font-size:1.05rem;' : ''; ?>"><?php echo esc_html( $gs_bcg_next_bill ); ?></div>
+                            </div>
+                            <div class="gs-bcg-stat" style="--gs-bcg-accent:<?php echo esc_attr( $gs_bcg_mom_accent ); ?>;">
+                                <span class="dashicons <?php echo esc_attr( $gs_bcg_mom_icon ); ?> icon"></span>
+                                <div class="k"><?php esc_html_e( 'Change', 'gend-society' ); ?></div>
+                                <div class="v"><?php echo esc_html( $gs_bcg_mom['change_label'] ?? __( 'No usage yet', 'gend-society' ) ); ?></div>
+                                <div style="color: rgba(226,232,240,.5); font-size: 0.7rem; margin-top: 4px;"><?php esc_html_e( 'vs last month', 'gend-society' ); ?></div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- ── Backups — full-width bespoke hero (2-column: badge/
+                     title/sub on the left, action buttons in their own
+                     column on the right), placed BEFORE Storage below since
+                     backup plans protect those containers. Usage stats live
+                     on the real Hosting-tab Backups sub-tab's own hero
+                     instead (gs_hosting_render_backups_section()) - this
+                     summary card only needs plan status + actions. Backup
+                     Plan pricing tiers are real WP Ultimo plan(s) under the
+                     'backups' plan-attach type
+                     (gdc_register_backups_plan_product(),
+                     gdc_plan_attach_types()). ── -->
+                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <?php
+                    // Backup Plan pricing tiers — real WP Ultimo plan(s) under the
+                    // 'backups' plan-attach type (gdc_register_backups_plan_product(),
+                    // gdc_plan_attach_types()). Folded into this hero's cta row
+                    // (Upgrade/Current Plan/Coming Soon) + a stats2 row (name+price)
+                    // instead of a separate floating card below it.
+                    $gs_backup_plans     = function_exists( 'gdc_plan_attach_get_plans' ) ? gdc_plan_attach_get_plans( 'backups' ) : array();
+
+                    // Which backups-subgroup product (if any) is already attached to
+                    // this membership - same get_all_products()/subgroup pattern
+                    // gs_hosting_server_price() uses for Server Costs above, so an
+                    // already-purchased tier reads as "Current Plan" rather than
+                    // just another Upgrade button.
+                    $gs_backup_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+                    $gs_backup_current_id = 0;
+                    if ( $gs_backup_membership && is_object( $gs_backup_membership ) && method_exists( $gs_backup_membership, 'get_all_products' ) ) {
+                        foreach ( (array) $gs_backup_membership->get_all_products() as $gs_bp_row ) {
+                            $gs_bp_prod = is_array( $gs_bp_row ) && isset( $gs_bp_row['product'] ) ? $gs_bp_row['product'] : null;
+                            if ( $gs_bp_prod && is_object( $gs_bp_prod ) && method_exists( $gs_bp_prod, 'get_subgroup' )
+                                && strtolower( (string) $gs_bp_prod->get_subgroup() ) === 'backups' && method_exists( $gs_bp_prod, 'get_id' ) ) {
+                                $gs_backup_current_id = (int) $gs_bp_prod->get_id();
+                                break;
+                            }
+                        }
+                    }
+
+                    $gs_bk_multi_plan     = count( $gs_backup_plans ) > 1;
+                    $gs_bk_has_plan       = $gs_backup_current_id > 0;
+                    $gs_bk_current_name   = '';
+                    foreach ( $gs_backup_plans as $gs_bp ) {
+                        if ( $gs_backup_current_id > 0 && (int) ( $gs_bp['id'] ?? 0 ) === $gs_backup_current_id ) {
+                            $gs_bk_current_name = (string) ( $gs_bp['name'] ?? '' );
+                            break;
+                        }
+                    }
+                    ?>
+                    <div class="gs-bk-hero">
+                        <div class="gs-bk-main">
+                            <?php if ( empty( $gs_backup_plans ) ) : ?>
+                                <span class="gs-bk-badge is-neutral"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Backup Plans Configured', 'gend-society' ); ?></span>
+                            <?php elseif ( $gs_bk_has_plan ) : ?>
+                                <span class="gs-bk-badge"><span class="dashicons dashicons-backup"></span><?php echo esc_html( sprintf( __( 'Active: %s', 'gend-society' ), $gs_bk_current_name ) ); ?></span>
                             <?php else : ?>
-                                <span class="dashicons dashicons-groups"></span>
+                                <span class="gs-bk-badge is-warn"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Active Plan', 'gend-society' ); ?></span>
                             <?php endif; ?>
+                            <h2 class="gs-bk-title"><?php esc_html_e( 'Backups', 'gend-society' ); ?></h2>
+                            <p class="gs-bk-sub"><?php esc_html_e( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' ); ?></p>
                         </div>
-                        <div class="gs-mship-plan-name"><?php echo esc_html( $group['name'] ?? '' ); ?></div>
+                        <div class="gs-bk-actions">
+                            <?php foreach ( $gs_backup_plans as $gs_bp ) :
+                                $gs_bp_is_current = $gs_backup_current_id > 0 && (int) ( $gs_bp['id'] ?? 0 ) === $gs_backup_current_id;
+                                $gs_bp_available  = ! empty( $gs_bp['available'] );
+                                $gs_bp_upgrade_attrs = ( ! $gs_bp_is_current && $gs_bp_available && function_exists( 'gs_hosting_plan_upgrade_data_attrs' ) )
+                                    ? gs_hosting_plan_upgrade_data_attrs( 'backups', $gs_bp['id'] ?? 0 )
+                                    : '';
+                                $gs_bp_label      = $gs_bk_multi_plan ? sprintf( __( 'Upgrade — %s', 'gend-society' ), $gs_bp['name'] ?? '' ) : __( 'Upgrade', 'gend-society' );
+                            ?>
+                                <?php if ( ! $gs_bp_is_current && $gs_bp_upgrade_attrs !== '' ) : ?>
+                                    <button type="button"
+                                            class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta"
+                                            data-gs-upgrade-open
+                                            data-resource="backups"
+                                            data-resource-label="<?php echo esc_attr( $gs_bp['name'] ?? __( 'Backups', 'gend-society' ) ); ?>"
+                                            <?php echo $gs_bp_upgrade_attrs; ?>>
+                                        <span class="dashicons dashicons-money-alt"></span>
+                                        <?php echo esc_html( $gs_bp_label ); ?>
+                                    </button>
+                                <?php elseif ( ! $gs_bp_is_current && ! empty( $gs_bp['name'] ) ) : ?>
+                                    <button type="button" class="gs-bk-btn" disabled>
+                                        <?php esc_html_e( 'Coming Soon', 'gend-society' ); ?>
+                                    </button>
+                                <?php endif; ?>
+                            <?php endforeach; ?>
+                            <button type="button" class="gs-bk-btn" data-gs-mship="backup-now"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
+                            <button type="button" class="gs-bk-btn" data-gs-hosting-goto="backups"><span class="dashicons dashicons-list-view"></span><?php esc_html_e( 'Manage Backups', 'gend-society' ); ?></button>
+                        </div>
                     </div>
-                    <?php if ( $g_link !== '' ) : ?>
-                        <div style="display: flex; flex-direction: column; gap: 6px; margin-top: 12px;">
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'proposals/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Proposals', 'gend-society' ); ?></a>
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'projects/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Projects', 'gend-society' ); ?></a>
-                            <a class="gs-mship-action-btn is-secondary" href="<?php echo esc_url( $g_link . 'payments/' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Payments', 'gend-society' ); ?></a>
-                        </div>
-                    <?php endif; ?>
-                <?php else : ?>
-                    <div class="gs-mship-empty"><?php esc_html_e( 'No group linked.', 'gend-society' ); ?></div>
+                </div>
+
+                <!-- ── Storage — real usage cards, moved here from Hosting →
+                     Storage. Same function the Hosting tab itself calls for
+                     the section_group=all (BuddyPress group) case, so this
+                     stays in sync automatically. ── -->
+                <?php if ( function_exists( 'gs_hosting_render_storage_resource_cards' ) ) : ?>
+                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                    <?php
+                    $gs_top_media_data  = function_exists( 'gs_hosting_collect_media' )  ? gs_hosting_collect_media()  : array();
+                    $gs_top_tables_data = function_exists( 'gs_hosting_collect_tables' ) ? gs_hosting_collect_tables() : array();
+                    gs_hosting_render_storage_resource_cards( $gs_top_media_data, $gs_top_tables_data, $billing, array(
+                        'media'    => 'media-library',
+                        'database' => 'tables',
+                        'codebase' => 'codebase',
+                    ) );
+                    ?>
+                </div>
                 <?php endif; ?>
-            </div>
-
-            <!-- Feature Access (Dashboard plan) cell -->
-            <div class="gs-mship-cell">
-                <h3><?php esc_html_e( 'Feature Access', 'gend-society' ); ?></h3>
-                <div class="gs-mship-plan-card">
-                    <div class="gs-mship-plan-img">
-                        <?php if ( $dash_plan && ! empty( $dash_plan['image'] ) ) : ?>
-                            <img src="<?php echo esc_url( $dash_plan['image'] ); ?>" alt="" />
-                        <?php else : ?>
-                            <span class="dashicons dashicons-admin-users"></span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="gs-mship-plan-name"><?php echo esc_html( $dash_plan['name'] ?? __( 'No dashboard plan', 'gend-society' ) ); ?></div>
-                    <?php if ( $dash_plan && ! empty( $dash_plan['amount_label'] ) ) : ?>
-                        <div class="gs-mship-plan-price"><?php echo esc_html( $dash_plan['amount_label'] ); ?> <?php echo ! empty( $dash_plan['duration_unit'] ) ? esc_html( sprintf( __( 'every %s', 'gend-society' ), $dash_plan['duration_unit'] ) ) : ''; ?></div>
-                    <?php endif; ?>
-                </div>
-                <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="dashboard" style="width: 100%; margin-top: 12px;">
-                    <?php esc_html_e( 'Change Plan', 'gend-society' ); ?>
-                </button>
-            </div>
-
-            <!-- App Hosting cell -->
-            <div class="gs-mship-cell">
-                <h3><?php esc_html_e( 'App Hosting', 'gend-society' ); ?></h3>
-                <div class="gs-mship-plan-card">
-                    <div class="gs-mship-plan-img">
-                        <?php if ( $host_plan && ! empty( $host_plan['image'] ) ) : ?>
-                            <img src="<?php echo esc_url( $host_plan['image'] ); ?>" alt="" />
-                        <?php else : ?>
-                            <span class="dashicons dashicons-cloud"></span>
-                        <?php endif; ?>
-                    </div>
-                    <div class="gs-mship-plan-name"><?php echo esc_html( $host_plan['name'] ?? __( 'No hosting plan', 'gend-society' ) ); ?></div>
-                    <?php if ( $host_plan && ! empty( $host_plan['amount_label'] ) ) : ?>
-                        <div class="gs-mship-plan-price"><?php echo esc_html( $host_plan['amount_label'] ); ?> <?php echo ! empty( $host_plan['duration_unit'] ) ? esc_html( sprintf( __( 'every %s', 'gend-society' ), $host_plan['duration_unit'] ) ) : ''; ?></div>
-                    <?php endif; ?>
-                </div>
-                <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="hosting" style="width: 100%; margin-top: 12px;">
-                    <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
-                </button>
             </div>
 
         </div>
 
-        <!-- ── Tabs: Settings / Feature Suite / User Access / Orders / Domain / Backups ── -->
+        <!-- ── Tabs: Hosting / Feature Suite / Project Contracts ──
+             Settings and User Access now live inside Hosting (Dashboard / User Access sub-tabs).
+             Compute Gas also now lives inside Hosting (Hosting → Compute Gas sub-tab). -->
         <?php
         $gs_can_manage     = current_user_can( 'manage_options' );
         $gs_can_list_users = current_user_can( 'list_users' );
-        $gs_default_tab    = $gs_can_manage ? 'settings' : 'orders';
+        // Hosting is the first (default) tab, so saving App Settings / an application password
+        // (redirect + flag) lands back on it; the User Access form (POST) returns to its
+        // sub-tab, and the Permalinks save redirects with gs_section=permalinks.
+        $gs_hosting_section = 'dashboard';
+        if ( isset( $_GET['gs_section'] ) && 'permalinks' === $_GET['gs_section'] ) {
+            $gs_hosting_section = 'permalinks';
+        }
+        // Feature Suite tab removed - Dashboards moved to Hosting -> Codebase,
+        // User Access moved to Project Contracts -> User Access (its own
+        // independent selector there, separate from pm-admin.js's own tabs).
+        $gs_project_contracts_section = 'workspace';
+        $gs_default_tab     = $gs_can_manage ? 'app' : 'project-contracts';
+        // ?gs_tab= deep link (e.g. a chatflow's "Open the sequence project" redirect lands on
+        // ?gs_tab=project-contracts&pm_project=<id>, and pm-admin.js opens that project). App/Hosting stay
+        // manager-only, exactly as their tab buttons are.
+        $gs_tab_req = isset( $_GET['gs_tab'] ) ? sanitize_key( wp_unslash( $_GET['gs_tab'] ) ) : '';
+        if ( 'project-contracts' === $gs_tab_req || ( $gs_can_manage && in_array( $gs_tab_req, array( 'app', 'hosting' ), true ) ) ) {
+            $gs_default_tab = $gs_tab_req;
+        }
+        if ( isset( $_POST['gs_feature_access_nonce'] ) ) {
+            // feature-access.php posts to itself (action=""); on reload, reopen
+            // Project Contracts on its User Access panel instead of losing place.
+            $gs_project_contracts_section = 'user-access';
+            $gs_default_tab               = 'project-contracts';
+        }
+        // Front-end membership popup's "Open Full Hosting Tools" button loads
+        // this page inside an iframe (?gdc_dash_embed=1, see
+        // gs_dashboard_allow_embed_framing() in pages/dashboard.php) and wants
+        // to land straight on the Hosting tab (Compute Gas/Servers/Storage/
+        // Tables) instead of App - App's own Dashboard sub-view otherwise just
+        // duplicates the popup's own hosting-grid summary cards.
+        if ( $gs_can_manage && ! empty( $_GET['gdc_dash_embed'] ) ) {
+            $gs_default_tab = 'hosting';
+        }
         ?>
         <div class="gs-mship-tabs">
             <div class="gs-mship-tabs-nav" role="tablist">
                 <?php if ( $gs_can_manage ) : ?>
-                    <button type="button" class="gs-mship-tab-btn is-active" data-tab="settings" role="tab"><span class="dashicons dashicons-admin-generic gs-mship-tab-icon"></span><?php esc_html_e( 'Settings', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-mship-tab-btn" data-tab="feature-suite" role="tab"><span class="dashicons dashicons-admin-plugins gs-mship-tab-icon"></span><?php esc_html_e( 'Feature Suite', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn<?php echo 'app' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="app" role="tab"><span class="dashicons dashicons-admin-home gs-mship-tab-icon"></span><?php esc_html_e( 'App', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Hosting', 'gend-society' ); ?></button>
                 <?php endif; ?>
-                <?php if ( $gs_can_list_users ) : ?>
-                    <button type="button" class="gs-mship-tab-btn" data-tab="user-access" role="tab"><span class="dashicons dashicons-admin-users gs-mship-tab-icon"></span><?php esc_html_e( 'User Access', 'gend-society' ); ?></button>
-                <?php endif; ?>
-                <?php if ( $gs_can_manage ) : ?>
-                    <button type="button" class="gs-mship-tab-btn" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Hosting', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-mship-tab-btn" data-tab="compute-gas" role="tab"><span class="dashicons dashicons-superhero gs-mship-tab-icon"></span><?php esc_html_e( 'Compute Gas', 'gend-society' ); ?></button>
-                <?php endif; ?>
-                <button type="button" class="gs-mship-tab-btn<?php echo $gs_default_tab === 'orders' ? ' is-active' : ''; ?>" data-tab="orders" role="tab"><span class="dashicons dashicons-cart gs-mship-tab-icon"></span><?php esc_html_e( 'Orders', 'gend-society' ); ?></button>
+                <button type="button" class="gs-mship-tab-btn<?php echo $gs_default_tab === 'project-contracts' ? ' is-active' : ''; ?>" data-tab="project-contracts" role="tab"><span class="dashicons dashicons-portfolio gs-mship-tab-icon"></span><?php esc_html_e( 'Projects', 'gend-society' ); ?></button>
                 <?php // Domain + Backups removed from the top tab strip — both
                       // now live inside Hosting (Hosting → Domains / Backups).
                 ?>
             </div>
 
-            <?php if ( $gs_can_manage ) : ?>
-            <!-- Settings tab (App Title, Tagline, App Icon, Site Logo, Save) -->
-            <div class="gs-mship-tab-panel is-active" data-panel="settings" role="tabpanel">
-                <?php
-                if ( function_exists( 'gs_render_app_settings_form' ) ) {
-                    gs_render_app_settings_form();
-                }
-                ?>
-            </div>
-
-            <!-- Feature Suite tab (plugin/feature cards) -->
-            <div class="gs-mship-tab-panel" data-panel="feature-suite" role="tabpanel">
-                <h3 style="margin: 0 0 8px 0; color: #fff; font-size: 1.1rem;"><?php esc_html_e( 'App Feature Access', 'gend-society' ); ?></h3>
-                <p style="color: var(--gs-muted); margin: 0 0 24px 0;"><?php esc_html_e( 'Manage which plugins and features are available on this site.', 'gend-society' ); ?></p>
-                <?php
-                if ( function_exists( 'gs_render_feature_cards_widget' ) ) {
-                    gs_render_feature_cards_widget();
-                }
-                ?>
-            </div>
-            <?php endif; ?>
-
-            <?php if ( $gs_can_list_users ) : ?>
-            <!-- User Access tab (per-user menu/feature gates from inc/pages/feature-access.php) -->
-            <div class="gs-mship-tab-panel" data-panel="user-access" role="tabpanel">
-                <?php
-                if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'inc/pages/feature-access.php' ) ) {
-                    require GS_DIR . 'inc/pages/feature-access.php';
-                }
-                ?>
-            </div>
-            <?php endif; ?>
+            <?php // Feature Suite tab removed - Plans is already covered by the
+                  // Membership card's own Dashboard Plan Membership card at the
+                  // top of the page, Dashboards moved to Hosting -> Codebase,
+                  // and User Access moved to Project Contracts -> User Access.
+            ?>
 
             <?php if ( $gs_can_manage ) : ?>
-            <!-- Hosting tab (Dashboard / Domains / Logs / Tables / Containers / Backups) -->
-            <div class="gs-mship-tab-panel" data-panel="hosting" role="tabpanel">
+            <!-- App tab (Dashboard [App Settings on top] / Domains / Permalinks / Logs) -->
+            <div class="gs-mship-tab-panel<?php echo 'app' === $gs_default_tab ? ' is-active' : ''; ?>" data-panel="app" role="tabpanel">
                 <?php
                 if ( function_exists( 'gs_render_hosting_tab' ) ) {
-                    gs_render_hosting_tab( $payload );
+                    gs_render_hosting_tab( $payload, array(
+                        'with_settings'    => true,
+                        'with_permalinks'  => true,
+                        'active_section'   => $gs_hosting_section,
+                        'section_group'    => 'app',
+                    ) );
                 }
                 ?>
             </div>
 
-            <!-- Compute Gas tab — explainer + lazy-loaded cost breakdown -->
-            <div class="gs-mship-tab-panel" data-panel="compute-gas" role="tabpanel">
-                <style>
-                    .gs-compute-gas { display: flex; flex-direction: column; gap: 18px; }
-                    .gs-compute-gas__hero { background: linear-gradient(135deg, rgba(78,170,255,0.14) 0%, rgba(168,85,247,0.10) 100%); border: 1px solid rgba(78,170,255,0.25); border-radius: 16px; padding: 22px 26px; }
-                    .gs-compute-gas__badge { display: inline-flex; align-items: center; gap: 6px; padding: 4px 12px; background: rgba(78,170,255,0.18); color: #4eaaff; border-radius: 999px; font-size: 0.72rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em; }
-                    .gs-compute-gas__title { color: #fff; font-size: 1.35rem; font-weight: 700; margin: 12px 0 8px; }
-                    .gs-compute-gas__body { color: #cbd5f5; font-size: 0.95rem; line-height: 1.65; margin: 0; max-width: 760px; }
-                    .gs-compute-gas__body strong { color: #fff; }
-                    .gs-compute-gas__pillars { display: grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap: 12px; margin-top: 18px; }
-                    .gs-compute-gas__pillar { background: rgba(0,0,0,0.25); border: 1px solid rgba(255,255,255,0.08); border-radius: 12px; padding: 14px 16px; }
-                    .gs-compute-gas__pillar-icon { color: #4eaaff; font-size: 22px; }
-                    .gs-compute-gas__pillar-label { color: #fff; font-weight: 700; font-size: 0.95rem; margin-top: 6px; }
-                    .gs-compute-gas__pillar-desc { color: var(--gs-muted, #94a3b8); font-size: 0.78rem; margin-top: 4px; line-height: 1.5; }
-                    .gs-compute-gas__breakdown { background: rgba(255,255,255,0.03); border: 1px solid rgba(255,255,255,0.08); border-radius: 14px; padding: 20px; }
-                    .gs-compute-gas__loading { color: var(--gs-muted, #94a3b8); font-style: italic; padding: 18px; text-align: center; }
-                </style>
-                <div class="gs-compute-gas">
-                    <div class="gs-compute-gas__hero">
-                        <span class="gs-compute-gas__badge"><span class="dashicons dashicons-superhero" style="font-size:14px; width:14px; height:14px;"></span><?php esc_html_e( 'No monthly server fees', 'gend-society' ); ?></span>
-                        <h3 class="gs-compute-gas__title"><?php esc_html_e( 'How Compute Gas Works', 'gend-society' ); ?></h3>
-                        <p class="gs-compute-gas__body">
-                            <?php
-                            printf(
-                                /* translators: 1: bold "Blockchain Compute network", 2: bold "Gas Station Nodes" */
-                                esc_html__( 'Networked businesses on GenD don\'t pay flat monthly server or compute fees. Your storage container integrates with our %1$s, which uses the unused compute power of the servers and devices running our %2$s across the network. That same network powers every payment, every workflow, and every smart contract on the platform — so what your app uses, the network earns. You only pay for the compute you actually consume.', 'gend-society' ),
-                                '<strong>' . esc_html__( 'Blockchain Compute network', 'gend-society' ) . '</strong>',
-                                '<strong>' . esc_html__( 'Gas Station Nodes', 'gend-society' ) . '</strong>'
-                            );
-                            ?>
-                        </p>
-                        <div class="gs-compute-gas__pillars">
-                            <div class="gs-compute-gas__pillar">
-                                <span class="dashicons dashicons-money-alt gs-compute-gas__pillar-icon"></span>
-                                <div class="gs-compute-gas__pillar-label"><?php esc_html_e( 'Payments', 'gend-society' ); ?></div>
-                                <div class="gs-compute-gas__pillar-desc"><?php esc_html_e( 'Every checkout settles on the network — no merchant processor fees.', 'gend-society' ); ?></div>
-                            </div>
-                            <div class="gs-compute-gas__pillar">
-                                <span class="dashicons dashicons-performance gs-compute-gas__pillar-icon"></span>
-                                <div class="gs-compute-gas__pillar-label"><?php esc_html_e( 'Compute', 'gend-society' ); ?></div>
-                                <div class="gs-compute-gas__pillar-desc"><?php esc_html_e( 'CPU + RAM for your container is provisioned from unused capacity across the network.', 'gend-society' ); ?></div>
-                            </div>
-                            <div class="gs-compute-gas__pillar">
-                                <span class="dashicons dashicons-shield gs-compute-gas__pillar-icon"></span>
-                                <div class="gs-compute-gas__pillar-label"><?php esc_html_e( 'Smart Contracts', 'gend-society' ); ?></div>
-                                <div class="gs-compute-gas__pillar-desc"><?php esc_html_e( 'Tasks, escrows, and payouts execute on-chain — settlement is the receipt.', 'gend-society' ); ?></div>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div class="gs-compute-gas__breakdown">
-                        <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap; margin-bottom: 16px;">
-                            <div>
-                                <h4 style="color:#fff; font-size:1.05rem; margin:0;"><?php esc_html_e( 'Your Usage This Period', 'gend-society' ); ?></h4>
-                                <p style="color: var(--gs-muted, #94a3b8); font-size:0.85rem; margin:4px 0 0;"><?php esc_html_e( 'Live tally of compute gas + container fees for this install.', 'gend-society' ); ?></p>
-                            </div>
-                            <button type="button" class="gs-mship-action-btn is-secondary" data-gs-compute-gas="refresh"><?php esc_html_e( 'Refresh', 'gend-society' ); ?></button>
-                        </div>
-                        <div data-gs-compute-gas-body>
-                            <div class="gs-compute-gas__loading"><?php esc_html_e( 'Loading cost breakdown…', 'gend-society' ); ?></div>
-                        </div>
-                    </div>
-                </div>
+            <!-- Hosting tab (Compute Gas / Servers / Storage / Tables) -->
+            <div class="gs-mship-tab-panel<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-panel="hosting" role="tabpanel">
+                <?php
+                if ( function_exists( 'gs_render_hosting_tab' ) ) {
+                    gs_render_hosting_tab( $payload, array(
+                        'with_compute_gas' => true,
+                        'section_group'    => 'hosting',
+                    ) );
+                }
+                ?>
             </div>
+
             <?php endif; ?>
 
-            <!-- Orders tab (read-only, server-rendered) -->
-            <div class="gs-mship-tab-panel<?php echo $gs_default_tab === 'orders' ? ' is-active' : ''; ?>" data-panel="orders" role="tabpanel">
-                <?php if ( empty( $orders ) ) : ?>
-                    <div class="gs-mship-empty"><?php esc_html_e( 'No recent orders found for this group.', 'gend-society' ); ?></div>
-                <?php else : ?>
-                    <ul class="gs-mship-list">
-                        <?php foreach ( $orders as $o ) : ?>
-                            <li>
-                                <div>
-                                    <strong style="color:#fff;">#<?php echo (int) ( $o['id'] ?? 0 ); ?></strong>
-                                    <span class="meta"><?php echo esc_html( $o['created_at'] ?? '' ); ?></span>
-                                </div>
-                                <div>
-                                    <span class="meta"><?php echo esc_html( ucfirst( $o['status'] ?? '' ) ); ?></span>
-                                    <strong style="margin-left: 12px; color: #4eaaff;"><?php echo function_exists('wc_price') && ! empty( $o['total'] ) ? wp_kses_post( wc_price( (float) $o['total'], array( 'currency' => $o['currency'] ?? '' ) ) ) : esc_html( ( $o['currency'] ?? '' ) . ' ' . number_format( (float) ( $o['total'] ?? 0 ), 2 ) ); ?></strong>
-                                </div>
-                            </li>
-                        <?php endforeach; ?>
-                    </ul>
-                <?php endif; ?>
+            <!-- Project Contracts tab — this install's own Workspace/Projects dashboard: the
+                 SAME render the front-end group tab uses at /groups/{slug}/projects/ (Consult /
+                 Developers / Proposals / Projects / Sequences / Calendar / Applications / My Tasks),
+                 for the BuddyPress group this install is paired to ($group['id'], from the
+                 gdc_bp_group_id site meta — see gs_membership_payload_from_local()). Full render
+                 (not the AJAX "light" mode), so every sub-tab matches the live group page exactly. -->
+            <div class="gs-mship-tab-panel<?php echo $gs_default_tab === 'project-contracts' ? ' is-active' : ''; ?>" data-panel="project-contracts" role="tabpanel">
+                <style>
+                /* A legacy stylesheet (projects/assets/psoo-front.css) still loaded on this page
+                   redefines .psoo-pm-panel with opacity/visibility instead of display:none, and
+                   loads after pm-admin.css — so every sub-tab of the Workspace below (Consult /
+                   Developers / Proposals / Projects / Sequences / Calendar / Applications / My
+                   Tasks) stacks at full height simultaneously instead of only the active one
+                   showing. Restore pm-admin.js's own .psoo-pm-panel--active class as the one
+                   source of truth for this embed. */
+                [data-panel="project-contracts"] .psoo-pm-panel:not(.psoo-pm-panel--active),
+                [data-panel="project-contracts"] .psoo-pm-subpanel:not(.psoo-pm-panel--active),
+                [data-panel="project-contracts"] .psoo-pm-tertiary-panel:not(.psoo-pm-panel--active) { display: none !important; }
+                [data-panel="project-contracts"] .psoo-pm-panel.psoo-pm-panel--active { display: block !important; opacity: 1 !important; visibility: visible !important; transform: none !important; pointer-events: auto !important; }
+
+                /* Restyle the Consult/Developers/Proposals/.../My Tasks tab row to match
+                   the Hosting and Feature Suite tabs' own sidebar (.gs-hosting__sidebar /
+                   .gs-hosting__nav), instead of psoo-front.css's rounded-pill/gradient look
+                   (which loads after pm-admin.css and wins the cascade otherwise). */
+                [data-panel="project-contracts"] .psoo-pm-wrap { display: flex !important; align-items: stretch !important; gap: 24px !important; min-height: 0 !important; background: transparent !important; }
+                [data-panel="project-contracts"] .psoo-pm-tabs { flex: 0 0 220px !important; display: flex !important; flex-direction: column !important; gap: 4px !important; padding: 0 16px 0 0 !important; margin: 0 !important; background: transparent !important; border-bottom: 0 !important; border-right: 1px solid rgba(255,255,255,0.08) !important; overflow: visible !important; position: sticky !important; top: 32px !important; }
+                [data-panel="project-contracts"] .psoo-pm-tab { position: static !important; display: flex !important; align-items: center !important; gap: 10px !important; width: 100% !important; padding: 10px 14px !important; border-radius: 8px !important; background: transparent !important; border: 0 !important; color: var(--gs-muted, #94a3b8) !important; font-size: 0.9rem !important; font-weight: 600 !important; text-transform: none !important; letter-spacing: normal !important; backdrop-filter: none !important; box-shadow: none !important; transform: none !important; }
+                [data-panel="project-contracts"] .psoo-pm-tab::after { content: none !important; }
+                [data-panel="project-contracts"] .psoo-pm-tab:hover { background: rgba(255,255,255,0.04) !important; color: #fff !important; transform: none !important; box-shadow: none !important; }
+                [data-panel="project-contracts"] .psoo-pm-tab.psoo-pm-tab--active,
+                [data-panel="project-contracts"] .psoo-pm-tab.is-active { background: rgba(78,170,255,0.12) !important; color: #4eaaff !important; border: 0 !important; box-shadow: none !important; }
+                [data-panel="project-contracts"] .psoo-pm-panels { flex: 1 1 auto !important; min-width: 0 !important; padding: 0 !important; }
+                @media (max-width: 820px) {
+                    [data-panel="project-contracts"] .psoo-pm-wrap { flex-direction: column !important; }
+                    [data-panel="project-contracts"] .psoo-pm-tabs { position: static !important; flex: none !important; flex-direction: row !important; flex-wrap: wrap !important; border-right: 0 !important; border-bottom: 1px solid rgba(255,255,255,0.08) !important; padding: 0 0 12px !important; }
+                }
+            </style>
+
+            <?php
+                // See the comment above psoo_render_group_proposals_screen()'s call for why this
+                // is needed: psoo-bp.css/.js normally only load via a wp_enqueue_scripts closure
+                // that never runs on this admin page.
+                if ( defined( 'PSOO_PATH' ) && defined( 'PSOO_URL' ) && defined( 'PSOO_VER' ) && ! wp_style_is( 'psoo-bp', 'enqueued' ) ) {
+                    $gs_bp_css = PSOO_PATH . 'assets/psoo-bp.css';
+                    $gs_bp_js  = PSOO_PATH . 'assets/psoo-bp.js';
+                    if ( file_exists( $gs_bp_css ) || file_exists( $gs_bp_js ) ) {
+                        $gs_bp_ver = PSOO_VER . '-' . max(
+                            file_exists( $gs_bp_css ) ? filemtime( $gs_bp_css ) : 0,
+                            file_exists( $gs_bp_js ) ? filemtime( $gs_bp_js ) : 0,
+                            1
+                        );
+                        wp_enqueue_style( 'psoo-bp', PSOO_URL . 'assets/psoo-bp.css', array(), $gs_bp_ver );
+                        if ( ! wp_style_is( 'psoo-bp-header', 'enqueued' ) && file_exists( PSOO_PATH . 'assets/psoo-bp-header.css' ) ) {
+                            wp_enqueue_style( 'psoo-bp-header', PSOO_URL . 'assets/psoo-bp-header.css', array( 'psoo-bp' ), $gs_bp_ver );
+                        }
+                        wp_enqueue_script( 'psoo-bp', PSOO_URL . 'assets/psoo-bp.js', array( 'jquery' ), $gs_bp_ver, true );
+                        wp_localize_script( 'psoo-bp', 'PSOOBP', array(
+                            'nonce' => wp_create_nonce( 'psoo_bp' ),
+                            'ajax'  => admin_url( 'admin-ajax.php' ),
+                            'i18n'  => array(
+                                'loading_order'   => __( 'Loading order details?', 'psoo' ),
+                                'order_error'     => __( 'Unable to load order.', 'psoo' ),
+                                'assign_loading'  => __( 'Loading project managers?', 'psoo' ),
+                                'assign_none'     => __( 'No matching project managers were found.', 'psoo' ),
+                                'assign_error'    => __( 'We could not load project managers right now. Please try again.', 'psoo' ),
+                                'assign_success'  => __( 'Project Manager assigned successfully.', 'psoo' ),
+                                'assign_confirm'  => __( 'Assign', 'psoo' ),
+                            ),
+                            'no_perm' => __( 'You must be an Administrator to view this page.', 'psoo' ),
+                        ) );
+                    }
+                }
+                $gs_pm_group_id = isset( $group['id'] ) ? (int) $group['id'] : 0;
+                if ( $gs_pm_group_id > 0 && class_exists( 'PSOO_Project_Manager_Group_Extension' ) ) {
+                    // Same guard/assets as psoo_enqueue_applications_assets_on_workspace_tab()
+                    // (group-project-manager-tab.php) - that function is hooked to bp_actions,
+                    // which (like wp_enqueue_scripts) never fires on this admin page, so the
+                    // Applications sub-tab's CSS/JS (email-manager-admin.css, em-app-support,
+                    // em-postings, the Inbox SPA) never loaded here, leaving it unstyled.
+                    if ( function_exists( 'psoo_enqueue_email_manager_tab_assets' ) && defined( 'EMAIL_MANAGER_URL' ) ) {
+                        $gs_pc_site_id = (int) groups_get_groupmeta( $gs_pm_group_id, 'gdc_site_id', true );
+                        if ( $gs_pc_site_id > 0 ) {
+                            psoo_enqueue_email_manager_tab_assets( $gs_pm_group_id, $gs_pc_site_id );
+                        }
+                    }
+
+                    $gs_pc_html = PSOO_Project_Manager_Group_Extension::render_legacy_content( $gs_pm_group_id );
+                    // Strip the "Dive Into High-Velocity Execution" marketing header - redundant
+                    // in this dense admin dashboard (the Integration Hub card above already
+                    // gives context). Front-end only, so the real Workspace group tab (which
+                    // calls the same function through display(), not through here) keeps it.
+                    $gs_pc_html = preg_replace( '#<section class="workspace-header-section">.*?</section>#s', '', $gs_pc_html, 1 );
+                    // Its now-orphaned CSS rules (target a class no longer in the DOM, harmless
+                    // but dead weight) - strip those too rather than leave inert CSS behind.
+                    $gs_pc_html = preg_replace( '#\.workspace-header-section\{[^}]*\}\s*\.workspace-header-section::before\{[^}]*\}#s', '', $gs_pc_html, 1 );
+                    echo $gs_pc_html; // phpcs:ignore — already escaped internally
+                } else {
+                    echo '<div class="gs-mship-empty">' . esc_html__( 'This site is not linked to a project group yet.', 'gend-society' ) . '</div>';
+                }
+                ?>
+
+            <?php if ( $gs_can_list_users ) : ?>
+            <!-- ── User Access, injected as a real sibling of Consult / Developers /
+                 Proposals / Projects / ... rather than a separate outer wrapper.
+                 $gs_pc_html above is a THIRD-PARTY plugin's own rendered string
+                 (PSOO_Project_Manager_Group_Extension), so its .psoo-pm-tabs /
+                 .psoo-pm-panels markup isn't something this file can safely
+                 string-patch — instead this content is rendered here, off to
+                 the side (hidden), and the script below moves it into that
+                 same real list client-side once the DOM exists, reusing the
+                 exact .psoo-pm-tab / .psoo-pm-panel / *--active classes that
+                 system's own CSS (above) and click handling already key off. ── -->
+            <div id="gs-pc-user-access-source" hidden>
+                <span class="dashicons dashicons-admin-users"></span>
+                <span><?php esc_html_e( 'User Access', 'gend-society' ); ?></span>
+                <div data-gs-pc-user-access-body>
+                    <?php
+                    if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'inc/pages/feature-access.php' ) ) {
+                        ( static function () {
+                            require GS_DIR . 'inc/pages/feature-access.php';
+                        } )();
+                    }
+                    ?>
+                </div>
             </div>
+            <script>
+            (function () {
+                var pcRoot = document.querySelector('[data-panel="project-contracts"]');
+                if (!pcRoot || pcRoot.dataset.pcUaInited === '1') return;
+                var src = document.getElementById('gs-pc-user-access-source');
+                var tabsList  = pcRoot.querySelector('.psoo-pm-tabs');
+                var panelList = pcRoot.querySelector('.psoo-pm-panels');
+                if (!src || !tabsList || !panelList) return; // group not linked / workspace didn't render — nothing to attach to
+                pcRoot.dataset.pcUaInited = '1';
+
+                var label = src.querySelector('span:nth-child(2)').textContent;
+                var iconHtml = src.querySelector('.dashicons').outerHTML;
+                var body = src.querySelector('[data-gs-pc-user-access-body]');
+                var reopenOnUserAccess = <?php echo wp_json_encode( 'user-access' === $gs_project_contracts_section ); ?>;
+
+                var tab = document.createElement('button');
+                tab.type = 'button';
+                tab.className = 'psoo-pm-tab';
+                tab.setAttribute('data-gs-pc-user-access-tab', '1');
+                tab.setAttribute('role', 'tab');
+                tab.innerHTML = iconHtml + ' <span>' + label + '</span>';
+                tabsList.appendChild(tab);
+
+                var panel = document.createElement('div');
+                panel.className = 'psoo-pm-panel';
+                panel.setAttribute('data-gs-pc-user-access-panel', '1');
+                panel.appendChild(body);
+                panelList.appendChild(panel);
+                src.remove();
+
+                function activateUserAccess() {
+                    tabsList.querySelectorAll('.psoo-pm-tab').forEach(function (t) {
+                        t.classList.toggle('psoo-pm-tab--active', t === tab);
+                        t.classList.toggle('is-active', t === tab);
+                    });
+                    panelList.querySelectorAll('.psoo-pm-panel').forEach(function (p) {
+                        p.classList.toggle('psoo-pm-panel--active', p === panel);
+                    });
+                }
+                tab.addEventListener('click', activateUserAccess);
+                if (reopenOnUserAccess) { activateUserAccess(); }
+
+                // Defensive: whichever REAL tab the operator clicks, make sure
+                // this injected panel/tab step back down even if pm-admin.js's
+                // own handler doesn't already sweep every .psoo-pm-panel (it
+                // most likely does, via a live querySelectorAll, but this
+                // costs nothing to also guarantee).
+                tabsList.addEventListener('click', function (e) {
+                    var clicked = e.target.closest('.psoo-pm-tab');
+                    if (!clicked || clicked === tab) return;
+                    tab.classList.remove('psoo-pm-tab--active', 'is-active');
+                    panel.classList.remove('psoo-pm-panel--active');
+                });
+            })();
+            </script>
+            <?php endif; ?>
 
             <?php // Domain + Backups panels removed from the top tab strip.
                   // Equivalent UI lives at Hosting → Domains and Hosting → Backups.
                   // The AJAX endpoints (gs_membership_domain_*, gs_membership_backup_*)
                   // are still registered and used by the Hosting sub-panels.
             ?>
+
+            <!-- ── Gas Used: History popup — real gdc_gas_ledger rows
+                 (gs_hosting_gas_history_rows()), rendered server-side and
+                 filtered client-side (used/earned/all), same pattern the
+                 Backups/Logs filter rows already use elsewhere. ── -->
+            <div class="gs-gas-modal" id="gs-gas-history-modal" hidden aria-hidden="true">
+                <div class="gs-gas-modal__overlay" data-gs-gas-close></div>
+                <div class="gs-gas-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="gs-gas-history-title">
+                    <header class="gs-gas-modal__header">
+                        <h3 id="gs-gas-history-title"><span class="dashicons dashicons-backup" style="color:#4eaaff;"></span><?php esc_html_e( 'GAS History', 'gend-society' ); ?></h3>
+                        <button type="button" class="gs-gas-modal__close" data-gs-gas-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                    </header>
+                    <div class="gs-gas-modal__body">
+                        <div class="gs-gas-history-filters" role="tablist">
+                            <button type="button" class="gs-gas-filter is-active" data-gs-gas-filter="all"><?php esc_html_e( 'All', 'gend-society' ); ?></button>
+                            <button type="button" class="gs-gas-filter" data-gs-gas-filter="used"><?php esc_html_e( 'Used', 'gend-society' ); ?></button>
+                            <button type="button" class="gs-gas-filter" data-gs-gas-filter="earned"><?php esc_html_e( 'Earned', 'gend-society' ); ?></button>
+                        </div>
+                        <?php $gs_gas_history = function_exists( 'gs_hosting_gas_history_rows' ) ? gs_hosting_gas_history_rows( 100 ) : array(); ?>
+                        <?php if ( empty( $gs_gas_history ) ) : ?>
+                            <p style="color: var(--gs-muted, #94a3b8); font-style: italic; text-align: center; padding: 24px 0;"><?php esc_html_e( 'No GAS activity recorded yet.', 'gend-society' ); ?></p>
+                        <?php else : ?>
+                            <table class="gs-hosting__table" id="gs-gas-history-table">
+                                <thead>
+                                    <tr>
+                                        <th><?php esc_html_e( 'Date', 'gend-society' ); ?></th>
+                                        <th><?php esc_html_e( 'Type', 'gend-society' ); ?></th>
+                                        <th><?php esc_html_e( 'Detail', 'gend-society' ); ?></th>
+                                        <th style="text-align: right;"><?php esc_html_e( 'Amount', 'gend-society' ); ?></th>
+                                        <th><?php esc_html_e( 'Status', 'gend-society' ); ?></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    <?php foreach ( $gs_gas_history as $gs_h ) : ?>
+                                        <tr data-direction="<?php echo esc_attr( $gs_h['direction'] ); ?>">
+                                            <td><?php echo esc_html( $gs_h['created_at'] ); ?></td>
+                                            <td><span class="gs-hosting__pill <?php echo $gs_h['direction'] === 'earned' ? 'is-ok' : 'is-warn'; ?>"><?php echo esc_html( ucfirst( $gs_h['direction'] ) ); ?></span></td>
+                                            <td><?php echo esc_html( $gs_h['label'] ); ?></td>
+                                            <td style="text-align: right;"><?php echo esc_html( $gs_h['amount_label'] ); ?></td>
+                                            <td><?php echo esc_html( ucfirst( $gs_h['status'] ) ); ?></td>
+                                        </tr>
+                                    <?php endforeach; ?>
+                                </tbody>
+                            </table>
+                        <?php endif; ?>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Gas Used: Connected Devices popup — real devices via the
+                 existing gs_compute_gas_devices AJAX action (already shipped
+                 for the Compute Gas → Gas Stations sub-tab; reused here, not
+                 duplicated). "Reconnect" isn't a real action a web page can
+                 trigger on someone else's desktop app, so this is honestly
+                 labeled "Refresh" (re-fetches the real device list). ── -->
+            <div class="gs-gas-modal" id="gs-gas-devices-modal" hidden aria-hidden="true">
+                <div class="gs-gas-modal__overlay" data-gs-gas-close></div>
+                <div class="gs-gas-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="gs-gas-devices-title">
+                    <header class="gs-gas-modal__header">
+                        <h3 id="gs-gas-devices-title"><span class="dashicons dashicons-database-view" style="color:#4eaaff;"></span><?php esc_html_e( 'Gas Station', 'gend-society' ); ?></h3>
+                        <button type="button" class="gs-gas-modal__close" data-gs-gas-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                    </header>
+                    <div class="gs-gas-modal__body">
+                        <div id="gs-gas-devices-stats" class="gs-gas-devices-stats">
+                            <p style="color: var(--gs-muted, #94a3b8); font-style: italic;"><?php esc_html_e( 'Loading devices…', 'gend-society' ); ?></p>
+                        </div>
+                        <div style="display: flex; justify-content: space-between; align-items: center; margin: 4px 0 12px;">
+                            <h4 style="margin: 0; color: #fff; font-size: 0.95rem;"><?php esc_html_e( 'Connection', 'gend-society' ); ?></h4>
+                            <div style="display: flex; gap: 8px;">
+                                <button type="button" class="gs-hosting__btn" id="gs-gas-devices-refresh" style="background: rgba(255,255,255,0.08); font-size: 0.75rem; padding: 6px 14px;"><?php esc_html_e( 'Refresh', 'gend-society' ); ?></button>
+                                <button type="button" class="gs-hosting__btn gs-upgrade-cta" id="gs-gas-devices-add" style="background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; font-size: 0.75rem; padding: 6px 14px;"><?php esc_html_e( 'Add New', 'gend-society' ); ?></button>
+                            </div>
+                        </div>
+                        <div id="gs-gas-devices-list"></div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- ── Gas Used: Add New Device popup — 3 real tabs (Mobile /
+                 Desktop / Server). Mobile + Desktop point at gend.me's own
+                 real, already-published Gas Station landing pages
+                 (gas_station_mobile_url / gas_station_desktop_url, the same
+                 URLs the front-end group Gas Stations tab already uses -
+                 group-app-tabs.php). The Mobile QR code is a real scannable
+                 code (api.qrserver.com, no API key, standard free service)
+                 encoding that same real URL - not a fabricated deep link,
+                 since no real Expo project slug exists anywhere in this
+                 codebase. Server reuses the exact real "Add Server" checkout
+                 (gdc_plan_attach_resource_embed_url('server')) already wired
+                 to the shared .gs-upgrade-modal elsewhere on this page,
+                 rather than duplicating a second checkout flow. ── -->
+            <div class="gs-gas-modal" id="gs-gas-add-device-modal" hidden aria-hidden="true">
+                <div class="gs-gas-modal__overlay" data-gs-gas-close></div>
+                <div class="gs-gas-modal__dialog" role="dialog" aria-modal="true" aria-labelledby="gs-gas-add-device-title">
+                    <header class="gs-gas-modal__header">
+                        <h3 id="gs-gas-add-device-title"><span class="dashicons dashicons-plus-alt2" style="color:#4eaaff;"></span><?php esc_html_e( 'Add a Device', 'gend-society' ); ?></h3>
+                        <button type="button" class="gs-gas-modal__close" data-gs-gas-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+                    </header>
+                    <div class="gs-gas-modal__body">
+                        <div class="gs-gas-history-filters" role="tablist" style="margin-bottom: 18px;">
+                            <button type="button" class="gs-gas-filter is-active" data-gs-gas-device-tab="mobile" role="tab" aria-selected="true"><?php esc_html_e( 'Mobile', 'gend-society' ); ?></button>
+                            <button type="button" class="gs-gas-filter" data-gs-gas-device-tab="desktop" role="tab" aria-selected="false"><?php esc_html_e( 'Desktop', 'gend-society' ); ?></button>
+                            <button type="button" class="gs-gas-filter" data-gs-gas-device-tab="server" role="tab" aria-selected="false"><?php esc_html_e( 'Server', 'gend-society' ); ?></button>
+                        </div>
+
+                        <div data-gs-gas-device-pane="mobile">
+                            <h4 style="margin: 0 0 6px; color: #fff;"><?php esc_html_e( 'Run Gas Station on your phone', 'gend-society' ); ?></h4>
+                            <p style="color: var(--gs-muted, #94a3b8); font-size: 0.88rem; line-height: 1.6;">
+                                <?php esc_html_e( '1. Install Expo Go from the App Store or Google Play.', 'gend-society' ); ?><br>
+                                <?php esc_html_e( '2. Open Expo Go and scan the QR code below.', 'gend-society' ); ?><br>
+                                <?php esc_html_e( '3. Sign in with this account and enable Gas Station mode to register your phone.', 'gend-society' ); ?>
+                            </p>
+                            <div style="display: flex; justify-content: center; padding: 16px 0;">
+                                <img src="<?php echo esc_url( 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=' . rawurlencode( 'https://gend.me/gas-station/mobile/' ) ); ?>" alt="<?php esc_attr_e( 'Scan to open the GenD mobile app', 'gend-society' ); ?>" width="220" height="220" style="border-radius: 12px; background: #fff; padding: 8px;">
+                            </div>
+                            <p style="text-align: center;">
+                                <a href="https://gend.me/gas-station/mobile/" target="_blank" rel="noopener" style="color: #8ab4f8; font-size: 0.82rem;"><?php esc_html_e( 'Or open gend.me/gas-station/mobile on this device', 'gend-society' ); ?></a>
+                            </p>
+                        </div>
+
+                        <div data-gs-gas-device-pane="desktop" hidden>
+                            <h4 style="margin: 0 0 6px; color: #fff;"><?php esc_html_e( 'Run Gas Station on this computer', 'gend-society' ); ?></h4>
+                            <p style="color: var(--gs-muted, #94a3b8); font-size: 0.88rem; line-height: 1.6;">
+                                <?php esc_html_e( '1. Download the GenD Desktop App below.', 'gend-society' ); ?><br>
+                                <?php esc_html_e( '2. Sign in with this account.', 'gend-society' ); ?><br>
+                                <?php esc_html_e( '3. Enable Gas Station mode to register this computer — it contributes unused CPU/RAM to the network whenever your machine is idle.', 'gend-society' ); ?>
+                            </p>
+                            <div style="display: flex; justify-content: center; padding: 8px 0 4px;">
+                                <a href="https://gend.me/gas-station/desktop/" target="_blank" rel="noopener" class="gs-hosting__btn gs-upgrade-cta" style="background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; text-decoration: none; display: inline-flex; align-items: center; gap: 8px; padding: 12px 22px;">
+                                    <span class="dashicons dashicons-download"></span>
+                                    <?php esc_html_e( 'Download Desktop App', 'gend-society' ); ?>
+                                </a>
+                            </div>
+                        </div>
+
+                        <div data-gs-gas-device-pane="server" hidden>
+                            <h4 style="margin: 0 0 6px; color: #fff;"><?php esc_html_e( 'Run Gas Station on a dedicated server', 'gend-society' ); ?></h4>
+                            <p style="color: var(--gs-muted, #94a3b8); font-size: 0.88rem; line-height: 1.6;">
+                                <?php esc_html_e( 'Every server plan you run earns real GAS for the network and lets your own web apps ride 0-fee. Pick a plan below — it registers as a Gas Station automatically.', 'gend-society' ); ?>
+                            </p>
+                            <?php if ( $gs_server_embed_url !== '' ) : ?>
+                                <!-- Real checkout widget, embedded inline (same iframe + lazy-load
+                                     pattern the Hosting → Servers sub-tab already uses -
+                                     [data-gs-hosting-servers-frame] in dashboard-hosting.php), not a
+                                     button that hands off to a separate popup. -->
+                                <div style="border-radius: 12px; overflow: hidden; margin-top: 4px;">
+                                    <iframe data-gs-gas-server-frame data-src="<?php echo esc_url( $gs_server_embed_url ); ?>" src="about:blank" title="<?php esc_attr_e( 'Server plan checkout', 'gend-society' ); ?>" loading="lazy" style="width: 100%; height: 560px; border: 0; display: block; background: #0b0e14;"></iframe>
+                                </div>
+                            <?php else : ?>
+                                <p style="color: var(--gs-muted, #94a3b8); font-style: italic; text-align: center;"><?php esc_html_e( 'Server plans are not available for this account right now.', 'gend-society' ); ?></p>
+                            <?php endif; ?>
+                        </div>
+                    </div>
+                </div>
+            </div>
         </div>
     </div>
 
@@ -1148,23 +1926,38 @@ function gs_render_membership_panel( $payload = null ) {
         }
 
         // Tabs
-        var computeGasLoaded = false;
         root.querySelectorAll('.gs-mship-tab-btn').forEach(function (b) {
             b.addEventListener('click', function () {
                 var tab = b.dataset.tab;
                 root.querySelectorAll('.gs-mship-tab-btn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
                 root.querySelectorAll('.gs-mship-tab-panel').forEach(function (p) { p.classList.toggle('is-active', p.dataset.panel === tab); });
-                if (tab === 'compute-gas' && !computeGasLoaded) {
-                    computeGasLoaded = true;
-                    loadComputeGas();
-                }
             });
         });
 
-        // Compute Gas — lazy-load the cost breakdown via the existing
-        // gs_hosting_compute_gas AJAX action (the endpoint lives in
-        // dashboard-hosting.php; the panel was promoted out of the
-        // hosting sub-tabs to the top level for visibility).
+        // Jump-to-Hosting-sub-tab — used by "Manage Backups" on the Overview's
+        // Backups hero AND the Storage cards' per-resource settings icons
+        // (Media → media-library, Database → tables, Codebase → codebase).
+        // Drives the SAME .gs-mship-tab-btn / .gs-hosting__nav click handlers
+        // real users use (rather than reimplementing panel-switching here),
+        // then scrolls once both are visible.
+        root.querySelectorAll('[data-gs-hosting-goto]').forEach(function (b) {
+            b.addEventListener('click', function () {
+                var section = b.dataset.gsHostingGoto;
+                if (!section) return;
+                var hostingTabBtn = root.querySelector('.gs-mship-tab-btn[data-tab="hosting"]');
+                if (hostingTabBtn) hostingTabBtn.click();
+                var hostingRoot = document.getElementById('gs-hosting-root-hosting');
+                if (!hostingRoot) return;
+                var nav = hostingRoot.querySelector('.gs-hosting__nav[data-section="' + section + '"]');
+                if (nav) nav.click();
+                requestAnimationFrame(function () { hostingRoot.scrollIntoView({ behavior: 'smooth', block: 'start' }); });
+            });
+        });
+
+        // Compute Gas (now a Hosting sub-tab — see dashboard-hosting.php) — lazy-load the cost
+        // breakdown via the existing gs_hosting_compute_gas AJAX action. Exposed on window so
+        // dashboard-hosting.php's own script (a separate IIFE with its own sidebar click handler)
+        // can trigger it the first time that sub-tab opens.
         function loadComputeGas() {
             var body = root.querySelector('[data-gs-compute-gas-body]');
             if (!body) return;
@@ -1175,6 +1968,7 @@ function gs_render_membership_panel( $payload = null ) {
                 .then(function(resp){
                     if (resp && resp.success && resp.data) {
                         body.innerHTML = renderComputeGas(resp.data);
+                        activateComputeGasAnimations(body);
                     } else {
                         body.innerHTML = '<p style="color:var(--gs-muted,#94a3b8); padding:14px;">' +
                             ((resp && resp.data && resp.data.message) || 'Compute Gas data unavailable.') + '</p>';
@@ -1184,83 +1978,339 @@ function gs_render_membership_panel( $payload = null ) {
                     body.innerHTML = '<p style="color:#fca5a5; padding:14px;">Network error loading Compute Gas.</p>';
                 });
         }
+
+        // Real animated count-up - eased, respects prefers-reduced-motion
+        // by just jumping straight to the final value.
+        function gsCgAnimateCount(el, target, decimals, suffix) {
+            var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+            if (reduce || !target) { el.textContent = target.toFixed(decimals) + suffix; return; }
+            var duration = 900;
+            var startTime = null;
+            function step(ts) {
+                if (!startTime) startTime = ts;
+                var progress = Math.min((ts - startTime) / duration, 1);
+                var eased = 1 - Math.pow(1 - progress, 3);
+                el.textContent = (target * eased).toFixed(decimals) + suffix;
+                if (progress < 1) requestAnimationFrame(step);
+            }
+            requestAnimationFrame(step);
+        }
+
+        // Triggers the count-up numbers and the bar-fill width transitions -
+        // separate pass after the HTML lands in the DOM, so the bars start
+        // painted at width:0 and the CSS transition actually has something
+        // to animate toward rather than snapping straight to their real pct.
+        function activateComputeGasAnimations(body) {
+            body.querySelectorAll('[data-gs-cg-count]').forEach(function(el) {
+                var value = parseFloat(el.dataset.value) || 0;
+                var decimals = parseInt(el.dataset.decimals, 10) || 0;
+                gsCgAnimateCount(el, value, decimals, el.dataset.suffix || '');
+            });
+            requestAnimationFrame(function() {
+                requestAnimationFrame(function() {
+                    body.querySelectorAll('[data-gs-cg-bar]').forEach(function(el) {
+                        el.style.width = (parseFloat(el.dataset.pct) || 0) + '%';
+                    });
+                });
+            });
+        }
+
         function renderComputeGas(d) {
             function esc(s){ return String(s == null ? '' : s).replace(/[&<>"']/g, function(c){ return { '&':'&amp;', '<':'&lt;', '>':'&gt;', '"':'&quot;', "'":'&#39;' }[c]; }); }
-            var period = esc(d.period || 'This period');
-            var html = '<div style="display:grid; grid-template-columns: repeat(auto-fit, minmax(180px, 1fr)); gap:12px; margin-bottom:18px;">' +
-                '<div style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px 16px;">' +
-                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em;">Compute Gas</div>' +
-                    '<div style="color:#fff; font-size:1.5rem; font-weight:700; margin-top:6px;">' + esc(d.gas_fees_label || '$0.00') + '</div>' +
-                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; margin-top:4px;">' + period + '</div>' +
+            var period = esc(d.period || 'All time');
+            var totalVal    = parseFloat(d.total_gas_label) || 0;
+            var billedVal   = parseFloat(d.billed_gas_label) || 0;
+            var unbilledVal = parseFloat(d.unbilled_gas_label) || 0;
+
+            var html = '<div class="gs-compute-gas__stats">' +
+                '<div class="gs-compute-gas__stat" style="animation-delay:.02s;">' +
+                    '<div class="gs-compute-gas__stat-label">Total GAS Used</div>' +
+                    '<div class="gs-compute-gas__stat-value" data-gs-cg-count data-value="' + totalVal + '" data-decimals="6" data-suffix=" GAS">0 GAS</div>' +
+                    '<div style="color:var(--gs-muted,#94a3b8); font-size:.75rem; margin-top:4px;">' + period + '</div>' +
                 '</div>' +
-                '<div style="background:rgba(0,0,0,0.25); border:1px solid rgba(255,255,255,0.08); border-radius:12px; padding:14px 16px;">' +
-                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em;">Container Fees</div>' +
-                    '<div style="color:#fff; font-size:1.5rem; font-weight:700; margin-top:6px;">' + esc(d.container_fees_label || '$0.00') + '</div>' +
-                    '<div style="color: var(--gs-muted, #94a3b8); font-size:0.75rem; margin-top:4px;">' + period + '</div>' +
+                '<div class="gs-compute-gas__stat" style="animation-delay:.10s;">' +
+                    '<div class="gs-compute-gas__stat-label">Billed</div>' +
+                    '<div class="gs-compute-gas__stat-value" data-gs-cg-count data-value="' + billedVal + '" data-decimals="6" data-suffix=" GAS">0 GAS</div>' +
+                    '<div style="color:var(--gs-muted,#94a3b8); font-size:.75rem; margin-top:4px;">On real invoices</div>' +
                 '</div>' +
-                '<div style="background:linear-gradient(135deg, rgba(78,170,255,0.18), rgba(168,85,247,0.12)); border:1px solid rgba(78,170,255,0.35); border-radius:12px; padding:14px 16px;">' +
-                    '<div style="color:#a5b4fc; font-size:0.75rem; text-transform:uppercase; letter-spacing:0.06em; font-weight:700;">Total</div>' +
-                    '<div style="color:#fff; font-size:1.5rem; font-weight:700; margin-top:6px;">' + esc(d.total_label || '$0.00') + '</div>' +
-                    '<div style="color:#a5b4fc; font-size:0.75rem; margin-top:4px;">' + period + '</div>' +
+                '<div class="gs-compute-gas__stat gs-compute-gas__stat--total" style="animation-delay:.18s;">' +
+                    '<div class="gs-compute-gas__stat-label" style="color:#a5b4fc;">Pending</div>' +
+                    '<div class="gs-compute-gas__stat-value" data-gs-cg-count data-value="' + unbilledVal + '" data-decimals="6" data-suffix=" GAS">0 GAS</div>' +
+                    '<div style="color:#a5b4fc; font-size:.75rem; margin-top:4px;">Not yet invoiced</div>' +
                 '</div>' +
-                '</div>';
+            '</div>';
+
             if (Array.isArray(d.breakdown) && d.breakdown.length) {
-                html += '<table style="width:100%; border-collapse:collapse; font-size:0.85rem;">' +
-                    '<thead><tr>' +
-                    '<th style="text-align:left; padding:8px 12px; color:var(--gs-muted, #94a3b8); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.06);">Item</th>' +
-                    '<th style="text-align:left; padding:8px 12px; color:var(--gs-muted, #94a3b8); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.06);">Qty</th>' +
-                    '<th style="text-align:right; padding:8px 12px; color:var(--gs-muted, #94a3b8); text-transform:uppercase; font-size:0.7rem; letter-spacing:0.06em; border-bottom:1px solid rgba(255,255,255,0.06);">Amount</th>' +
-                    '</tr></thead><tbody>';
-                d.breakdown.forEach(function(b){
-                    html += '<tr>' +
-                        '<td style="padding:10px 12px; color:#e6edf7; border-bottom:1px solid rgba(255,255,255,0.04);">' + esc(b.label || '') + '</td>' +
-                        '<td style="padding:10px 12px; color:#e6edf7; border-bottom:1px solid rgba(255,255,255,0.04);">' + esc(b.qty || '') + '</td>' +
-                        '<td style="padding:10px 12px; color:#e6edf7; text-align:right; border-bottom:1px solid rgba(255,255,255,0.04);">' + esc(b.amount_label || '') + '</td>' +
-                    '</tr>';
+                html += '<div class="gs-compute-gas__bars">';
+                d.breakdown.forEach(function(b, i){
+                    html += '<div class="gs-compute-gas__bar-row" style="animation-delay:' + (0.05 * i) + 's;">' +
+                        '<div class="gs-compute-gas__bar-label" title="' + esc(b.label || '') + '">' + esc(b.task_id || '') + ' &middot; ' + esc(b.label || '') + '</div>' +
+                        '<div class="gs-compute-gas__bar-track"><div class="gs-compute-gas__bar-fill" data-gs-cg-bar data-pct="' + (b.pct || 0) + '"></div></div>' +
+                        '<div class="gs-compute-gas__bar-amount">' + esc(b.amount_label || '') + ' &middot; ' + esc(b.qty || 0) + 'x</div>' +
+                    '</div>';
                 });
-                html += '</tbody></table>';
+                html += '</div>';
             } else {
                 html += '<p style="color:var(--gs-muted, #94a3b8); font-style:italic; padding:14px 0; margin:0;">' +
                     (d.message ? esc(d.message) : 'No itemized breakdown available yet for this billing period.') +
                     '</p>';
             }
+
+            if (Array.isArray(d.payments) && d.payments.length) {
+                html += '<div class="gs-compute-gas__payments"><h4>GAS Usage Invoices</h4>';
+                d.payments.forEach(function(p, i){
+                    var isPending = p.status === 'pending';
+                    var badgeClass = isPending ? 'gs-compute-gas__payment-badge--pending' : 'gs-compute-gas__payment-badge--completed';
+                    html += '<div class="gs-compute-gas__payment-row" style="animation-delay:' + (0.05 * i) + 's;">' +
+                        '<div>' +
+                            '<span class="gs-compute-gas__payment-badge ' + badgeClass + '">' + esc(p.status || '') + '</span>' +
+                            '&nbsp; <strong style="color:#fff;">' + esc(p.total_label || '') + '</strong>' +
+                            '&nbsp; <span style="color:var(--gs-muted,#94a3b8); font-size:.8rem;">' + esc(p.date || '') + '</span>' +
+                        '</div>' +
+                        '<div class="gs-compute-gas__payment-links">' +
+                            (p.pay_url ? '<a href="' + esc(p.pay_url) + '" target="_blank" rel="noopener">Pay Now</a>' : '') +
+                            (p.invoice_url ? '<a href="' + esc(p.invoice_url) + '" target="_blank" rel="noopener">View Invoice</a>' : '') +
+                        '</div>' +
+                    '</div>';
+                });
+                html += '</div>';
+            }
+
             return html;
         }
+        window.gsLoadComputeGasBreakdown = loadComputeGas;
         root.addEventListener('click', function(e){
             if (e.target.closest('[data-gs-compute-gas="refresh"]')) {
-                computeGasLoaded = true; // already true, but safe
                 loadComputeGas();
             }
         });
 
-        // Plan upgrade — opens gend.me's checkout in a popup window. On
-        // popup close, refresh the dashboard cache so plan/price changes
-        // appear immediately (no full page reload required).
-        root.querySelectorAll('[data-gs-mship="upgrade-plan"]').forEach(function (btn) {
-            btn.addEventListener('click', function () {
-                if (!memberUrl) { toast('Membership URL unavailable.', 'error'); return; }
-                var w = 920, h = 760;
-                var x = (window.screen.width - w) / 2;
-                var y = (window.screen.height - h) / 2;
-                var popup = window.open(memberUrl + '?ui=embed&group=' + encodeURIComponent(btn.dataset.group || ''),
-                    'gs_mship_upgrade', 'width=' + w + ',height=' + h + ',left=' + x + ',top=' + y);
-                if (!popup) { toast('Popup blocked. Allow popups and try again.', 'error'); return; }
-                var watchdog = setInterval(function () {
-                    if (popup.closed) {
-                        clearInterval(watchdog);
-                        ajaxAction('gs_membership_refresh', {}).then(function () {
-                            toast('Refreshing membership...', 'success');
-                            setTimeout(function () { location.reload(); }, 600);
-                        }).catch(function (e) { toast(e.message, 'error'); });
+        // Compute Gas admin subtabs and Gas Station device management. (Gas Station earnings are
+        // queried here, in gs_render_membership_panel()'s own scope, rather than reusing the
+        // $gs_admin_earnings gs_render_hosting_tab() computes for its own — now nested — Compute
+        // Gas panel markup: that's a separate function call, and its locals don't survive the
+        // return back into this one.)
+        <?php
+        global $wpdb;
+        $gs_mship_gas_ledger   = $wpdb->base_prefix . 'gdc_gas_ledger';
+        $gs_mship_gas_earnings = $wpdb->get_results(
+            "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
+             FROM {$gs_mship_gas_ledger} WHERE station_id <> '' GROUP BY station_id ORDER BY owner_amount DESC",
+            ARRAY_A
+        );
+        ?>
+        var cgAdminTab = root.querySelector('[data-panel="compute-gas"]');
+        var cgAdminDevices = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-admin-devices]');
+        var cgAdminEditor = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-admin-editor]');
+        var cgAdminAddPanel = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-admin-add-panel]');
+        var cgAdminTitle = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-admin-editor-title]');
+        var cgAdminStatus = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-admin-node-status]');
+        var cgAdminDeviceId = '';
+        var cgAdminGroupId = <?php echo (int) ( $group['id'] ?? 0 ); ?>;
+        var cgAdminRestRoot = <?php echo wp_json_encode( esc_url_raw( rest_url( 'gend-cp/v1' ) ) ); ?>;
+        var cgAdminRestNonce = <?php echo wp_json_encode( wp_create_nonce( 'wp_rest' ) ); ?>;
+        var cgAdminEarnings = <?php echo wp_json_encode( array_map( function ( $row ) {
+            return array(
+                'station_id' => (string) ( $row['station_id'] ?? '' ),
+                'units' => (float) ( $row['units'] ?? 0 ),
+                'owner_amount' => (float) ( $row['owner_amount'] ?? 0 ),
+                'last_earned' => (string) ( $row['last_earned'] ?? '' ),
+            );
+        }, (array) $gs_mship_gas_earnings ) ); ?>;
+        function cgAdminEsc(value) {
+            return String(value == null ? '' : value).replace(/[&<>"']/g, function(c) {
+                return ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#039;'})[c];
+            });
+        }
+        function loadCgAdminDevices() {
+            if (!cgAdminDevices) return;
+            var deviceForm = new URLSearchParams({ action: 'gs_compute_gas_devices', _ajax_nonce: nonce, group_id: String(cgAdminGroupId || '') });
+            fetch(<?php echo wp_json_encode( esc_url_raw( admin_url( 'admin-ajax.php' ) ) ); ?>, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: deviceForm.toString()
+            }).then(function(r) { if (!r.ok) throw new Error('request_failed'); return r.json(); })
+            .then(function(payload) {
+                var result = payload && payload.data ? payload.data : payload;
+                var devices = Array.isArray(result) ? result : (Array.isArray(result.devices) ? result.devices : []);
+                var names = {};
+                devices.forEach(function(d) { var id = d.id != null ? d.id : d.device_id; names[String(id)] = d.label || d.name || id; });
+                if (!cgAdminEarnings.length) {
+                    cgAdminTab.querySelector('[data-gs-cg-admin-earnings]').innerHTML = '<p>No GAS fees have been recorded for connected devices yet.</p>';
+                } else {
+                    cgAdminTab.querySelector('[data-gs-cg-admin-earnings]').innerHTML = '<table class="gs-compute-gas__device-table"><thead><tr><th>Device</th><th>GAS units</th><th>Owner commission</th><th>Last earned</th></tr></thead><tbody>' +
+                        cgAdminEarnings.map(function(row) { return '<tr><td><strong>' + cgAdminEsc(names[row.station_id] || row.station_id) + '</strong><br><code>' + cgAdminEsc(row.station_id) + '</code></td><td>' + cgAdminEsc(Number(row.units || 0).toLocaleString()) + '</td><td><strong>' + cgAdminEsc(Number(row.owner_amount || 0).toFixed(8)) + ' GAS</strong></td><td>' + cgAdminEsc(row.last_earned || '—') + '</td></tr>'; }).join('') +
+                        '</tbody></table>';
+                }
+                if (!devices.length) { cgAdminDevices.innerHTML = '<p>No connected devices were found.</p>'; return; }
+                cgAdminDevices.innerHTML = '<table class="gs-compute-gas__device-table"><thead><tr><th>Device</th><th>Type</th><th>Status</th><th>Last seen</th><th></th></tr></thead><tbody>' +
+                    devices.map(function(d, i) {
+                        var id = d.id != null ? d.id : d.device_id, label = d.label || d.name || d.device_id || d.id || ('Device ' + (i + 1));
+                        var status = d.online === false || d.status === 'offline' ? 'Offline' : 'Connected';
+                        return '<tr><td><strong>' + cgAdminEsc(label) + '</strong><br><code>' + cgAdminEsc(id) + '</code></td><td>' + cgAdminEsc(d.type || d.platform || 'device') + '</td><td>' + status + '</td><td>' + cgAdminEsc(d.last_seen || d.last_seen_at || d.updated_at || '—') + '</td><td><button type="button" class="gs-mship-action-btn gs-cg-admin-edit" data-id="' + cgAdminEsc(id) + '" data-label="' + cgAdminEsc(label) + '">Edit</button></td></tr>';
+                    }).join('') + '</tbody></table>';
+            }).catch(function() { cgAdminDevices.innerHTML = '<p>Connected devices could not be loaded.</p>'; });
+        }
+        root.querySelectorAll('[data-gs-cg-admin-tab]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var key = btn.getAttribute('data-gs-cg-admin-tab');
+                root.querySelectorAll('[data-gs-cg-admin-tab]').forEach(function(b) { b.classList.toggle('is-active', b === btn); b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); });
+                root.querySelectorAll('[data-gs-cg-admin-panel]').forEach(function(p) { p.classList.toggle('is-active', p.getAttribute('data-gs-cg-admin-panel') === key); });
+                if (key === 'gas-stations') loadCgAdminDevices();
+                if (key === 'servers') {
+                    var serverFrame = root.querySelector('[data-gs-hosting-servers-frame]');
+                    if (serverFrame && serverFrame.dataset.src && serverFrame.getAttribute('src') === 'about:blank') {
+                        serverFrame.src = serverFrame.dataset.src;
                     }
-                }, 600);
-                // Optional: also listen for an explicit success postMessage
-                window.addEventListener('message', function onMsg(ev) {
-                    if (!ev.data || ev.data.type !== 'gs_membership_changed') return;
-                    window.removeEventListener('message', onMsg);
-                    clearInterval(watchdog);
-                    try { popup.close(); } catch (_) {}
-                    ajaxAction('gs_membership_refresh', {}).then(function () { location.reload(); });
+                }
+            });
+        });
+
+        // Codebase sub-tabs — Dashboards / Code Packages / File Breakdown,
+        // same simple show/hide pattern as the Compute Gas sub-tabs above
+        // (no lazy-loaded AJAX data here, everything is already rendered
+        // server-side, so no extra branch is needed beyond the toggle).
+        root.querySelectorAll('[data-gs-codebase-tab]').forEach(function(btn) {
+            btn.addEventListener('click', function() {
+                var key = btn.getAttribute('data-gs-codebase-tab');
+                root.querySelectorAll('[data-gs-codebase-tab]').forEach(function(b) { b.classList.toggle('is-active', b === btn); b.setAttribute('aria-selected', b === btn ? 'true' : 'false'); });
+                root.querySelectorAll('[data-gs-codebase-panel]').forEach(function(p) { p.classList.toggle('is-active', p.getAttribute('data-gs-codebase-panel') === key); });
+            });
+        });
+        root.addEventListener('click', function(e) {
+            var add = e.target.closest && e.target.closest('[data-gs-cg-admin-add]');
+            if (add && cgAdminAddPanel) { cgAdminAddPanel.hidden = !cgAdminAddPanel.hidden; return; }
+            var connect = e.target.closest && e.target.closest('[data-gs-cg-connect-type]');
+            var connectModal = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-connect-modal]');
+            if (connect && connectModal) {
+                var type = connect.getAttribute('data-gs-cg-connect-type');
+                var labels = { server: 'Add a server', desktop: 'Add a desktop', mobile: 'Add a mobile device' };
+                var copy = {
+                    server: 'Install the GenD node package on your server, sign in with this account, and it will register here automatically.',
+                    desktop: 'Install the GenD Desktop App, sign in with this account, and enable Gas Station mode to register this computer.',
+                    mobile: 'Install the GenD mobile app, sign in with this account, and enable Gas Station mode to register your phone.'
+                };
+                cgAdminTab.querySelector('[data-gs-cg-connect-title]').textContent = labels[type] || 'Add a device';
+                cgAdminTab.querySelector('[data-gs-cg-connect-copy]').textContent = copy[type] || '';
+                connectModal.hidden = false;
+                return;
+            }
+            if (e.target.closest && e.target.closest('[data-gs-cg-connect-close]') && connectModal) { connectModal.hidden = true; return; }
+            var edit = e.target.closest && e.target.closest('.gs-cg-admin-edit');
+            if (edit) { cgAdminDeviceId = edit.dataset.id || ''; cgAdminTitle.textContent = 'Run as a node — ' + (edit.dataset.label || cgAdminDeviceId); cgAdminEditor.hidden = false; return; }
+            var node = e.target.closest && e.target.closest('[data-gs-cg-admin-node]');
+            if (!node || !cgAdminDeviceId) return;
+            node.disabled = true;
+            fetch(cgAdminRestRoot + '/node/' + node.dataset.gsCgAdminNode, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'X-WP-Nonce': cgAdminRestNonce, 'Content-Type': 'application/json' },
+                body: JSON.stringify({ device_id: cgAdminDeviceId })
+            }).then(function(r) { if (!r.ok) throw new Error('node_request_failed'); return r.json(); })
+                .then(function() { cgAdminStatus.textContent = ' Updated.'; })
+                .catch(function() { cgAdminStatus.textContent = ' Could not update node participation.'; })
+                .finally(function() { node.disabled = false; });
+        });
+
+        // Plan upgrade — native, on-page picker (no popup, no iframe: a
+        // cross-origin iframe can't carry gend.me's session cookie, which
+        // is why the old embedded checkout rendered blank). Selecting a
+        // plan resolves the real checkout URL over the install-token REST
+        // proxy, then does a normal top-level redirect to gend.me to
+        // complete/confirm the price difference — gend.me renders that
+        // page fully since it's a real, first-party navigation.
+        // Now appears twice on this page (the top Membership card AND the
+        // Feature Suite → Plans tab), so the picker is found relative to
+        // each button's own parent rather than a single shared element id.
+        // Bound document-wide, not just inside #gs-mship-root: the Hosting
+        // sub-tab heroes (dashboard-hosting.php) carry the same button but
+        // render outside this root, so they were silently never wired up.
+        document.querySelectorAll('[data-gs-mship="upgrade-plan"]').forEach(function (btn) {
+            var picker = btn.parentElement ? btn.parentElement.querySelector('.gs-plan-picker') : null;
+            if (!picker) return;
+            var loaded = false;
+            // data-group="hosting" buttons ask the hub for that resource
+            // type's hosting-group plans (data-resource, e.g. "database")
+            // instead of the default dashboard-tier list - the hub's
+            // plan-options route switches catalogs on ?resource=.
+            var planParams = (btn.dataset.group === 'hosting' && btn.dataset.resource)
+                ? { resource: btn.dataset.resource }
+                : {};
+
+            function renderPlans(plans) {
+                picker.innerHTML = '';
+                var grid = document.createElement('div');
+                grid.className = 'gs-plan-picker__grid';
+                (plans || []).forEach(function (p) {
+                    var card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'gs-plan-picker__card' + (p.is_current ? ' is-current' : '');
+                    card.dataset.planId = p.id;
+                    if (p.is_current) { card.disabled = true; }
+                    var left = document.createElement('span');
+                    left.className = 'gs-plan-picker__card-name';
+                    left.textContent = p.name || ('Plan #' + p.id);
+                    var right = document.createElement('span');
+                    if (p.is_current) {
+                        right.className = 'gs-plan-picker__card-badge';
+                        right.textContent = 'Current plan';
+                    } else {
+                        right.className = 'gs-plan-picker__card-price';
+                        right.textContent = p.price_label || '';
+                    }
+                    card.appendChild(left);
+                    card.appendChild(right);
+                    card.addEventListener('click', function () {
+                        if (card.disabled) return;
+                        grid.querySelectorAll('.gs-plan-picker__card').forEach(function (c) { c.disabled = true; });
+                        var origText = right.textContent;
+                        right.textContent = 'Working...';
+                        ajaxAction('gs_membership_change_plan', { plan_id: p.id }).then(function (data) {
+                            if (!data || !data.checkout_url) { throw new Error('No checkout URL returned.'); }
+                            window.location.href = data.checkout_url;
+                        }).catch(function (e) {
+                            toast(e.message, 'error');
+                            grid.querySelectorAll('.gs-plan-picker__card').forEach(function (c) { c.disabled = !!c.classList.contains('is-current'); });
+                            right.textContent = origText;
+                        });
+                    });
+                    grid.appendChild(card);
+                });
+                picker.appendChild(grid);
+            }
+
+            btn.addEventListener('click', function () {
+                var opening = picker.hasAttribute('hidden');
+                if (opening) {
+                    picker.removeAttribute('hidden');
+                    btn.setAttribute('aria-expanded', 'true');
+                } else {
+                    picker.setAttribute('hidden', '');
+                    btn.setAttribute('aria-expanded', 'false');
+                    return;
+                }
+                if (loaded) return;
+                loaded = true;
+                var status = document.createElement('div');
+                status.className = 'gs-plan-picker__status';
+                status.textContent = 'Loading plans...';
+                picker.appendChild(status);
+                ajaxAction('gs_membership_plan_options', planParams).then(function (data) {
+                    if (!data || !data.plans || !data.plans.length) {
+                        picker.innerHTML = '';
+                        var empty = document.createElement('div');
+                        empty.className = 'gs-plan-picker__status';
+                        empty.textContent = 'No other plans are available right now.';
+                        picker.appendChild(empty);
+                        return;
+                    }
+                    renderPlans(data.plans);
+                }).catch(function (e) {
+                    loaded = false;
+                    picker.innerHTML = '';
+                    var err = document.createElement('div');
+                    err.className = 'gs-plan-picker__status';
+                    err.textContent = e.message || 'Could not load plans.';
+                    picker.appendChild(err);
                 });
             });
         });
@@ -1307,6 +2357,153 @@ function gs_render_membership_panel( $payload = null ) {
         });
     })();
     </script>
+
+    <script>
+    (function () {
+        var root = document.getElementById('gs-mship-root');
+        if (!root) return;
+        var ajax  = <?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>;
+        var groupId = <?php echo (int) ( $group['id'] ?? 0 ); ?>;
+
+        var historyModal = document.getElementById('gs-gas-history-modal');
+        var devicesModal = document.getElementById('gs-gas-devices-modal');
+        var addDeviceModal = document.getElementById('gs-gas-add-device-modal');
+        [ historyModal, devicesModal, addDeviceModal ].forEach(function (modal) {
+            if (modal && modal.parentElement !== document.body) { document.body.appendChild(modal); }
+        });
+
+        function openGasModal(modal) {
+            if (!modal) return;
+            modal.removeAttribute('hidden');
+            modal.classList.add('is-open');
+        }
+        function closeGasModals() {
+            [ historyModal, devicesModal, addDeviceModal ].forEach(function (modal) {
+                if (!modal) return;
+                modal.classList.remove('is-open');
+                modal.setAttribute('hidden', '');
+            });
+        }
+
+        function escGasHtml(v) {
+            return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) {
+                return ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#039;' })[c];
+            });
+        }
+
+        var gasDevicesLoading = false;
+        function loadGasDevices() {
+            var statsEl = document.getElementById('gs-gas-devices-stats');
+            var listEl  = document.getElementById('gs-gas-devices-list');
+            if (!statsEl || !listEl || gasDevicesLoading) return;
+            gasDevicesLoading = true;
+            statsEl.innerHTML = '<p style="color: var(--gs-muted, #94a3b8); font-style: italic;">Loading devices…</p>';
+            listEl.innerHTML = '';
+            var form = new URLSearchParams({ action: 'gs_compute_gas_devices', _ajax_nonce: <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>, group_id: String(groupId || '') });
+            fetch(ajax, {
+                method: 'POST', credentials: 'same-origin',
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: form.toString()
+            }).then(function (r) { return r.json(); }).then(function (payload) {
+                var devices = (payload && payload.success && payload.data && Array.isArray(payload.data.devices)) ? payload.data.devices : [];
+                renderGasDevices(devices);
+            }).catch(function () {
+                statsEl.innerHTML = '<p style="color:#fca5a5;">Connected devices could not be loaded.</p>';
+            }).finally(function () { gasDevicesLoading = false; });
+        }
+
+        function renderGasDevices(devices) {
+            var statsEl = document.getElementById('gs-gas-devices-stats');
+            var listEl  = document.getElementById('gs-gas-devices-list');
+            if (!statsEl || !listEl) return;
+
+            var total = devices.length;
+            var online = devices.filter(function (d) { return d.online !== false; }).length;
+            var desktopDevices = devices.filter(function (d) { return d.type === 'desktop'; });
+            var desktopOnline = desktopDevices.filter(function (d) { return d.online !== false; }).length;
+            var integrations = [];
+            devices.forEach(function (d) {
+                (d.ai_integrations || []).forEach(function (i) {
+                    if (i && i.available && i.displayName && integrations.indexOf(i.displayName) === -1) integrations.push(i.displayName);
+                });
+            });
+
+            statsEl.innerHTML =
+                '<div class="gs-gas-devices-stat"><div class="k">Desktop</div><div class="v">' + desktopOnline + ' / ' + desktopDevices.length + '</div><div class="hint">online now</div></div>' +
+                '<div class="gs-gas-devices-stat"><div class="k">AI Integration</div><div class="v">' + (integrations.length ? escGasHtml(integrations.join(', ')) : 'None') + '</div><div class="hint">available on your devices</div></div>' +
+                '<div class="gs-gas-devices-stat"><div class="k">Group Devices</div><div class="v">' + total + '</div><div class="hint">' + online + ' online now</div></div>';
+
+            if (!total) {
+                listEl.innerHTML = '<p style="color: var(--gs-muted, #94a3b8); font-style: italic; text-align:center; padding: 20px 0;">No connected devices yet. Install the GenD Desktop App or mobile app and sign in with this account.</p>';
+                return;
+            }
+
+            listEl.innerHTML = devices.map(function (d) {
+                var label = d.label || d.device_id || 'Device';
+                var isOnline = d.online !== false;
+                var models = (d.ai_integrations || []).filter(function (i) { return i && i.available; }).map(function (i) { return i.displayName; });
+                var integText = models.length ? escGasHtml(models.join(', ')) : 'no AI integrations reported';
+                var lastSeen = d.last_seen ? new Date(d.last_seen * 1000).toLocaleString() : '—';
+                return '<div class="gs-gas-device-row">' +
+                        '<div>' +
+                            '<div class="gs-gas-device-name">' + escGasHtml(label) + '</div>' +
+                            '<div class="gs-gas-device-meta">' + integText + '</div>' +
+                            '<div class="gs-gas-device-meta">' + escGasHtml(d.type || 'device') + (d.app_version ? ' · v' + escGasHtml(d.app_version) : '') + ' · last seen ' + lastSeen + '</div>' +
+                        '</div>' +
+                        '<span class="gs-hosting__pill ' + (isOnline ? 'is-ok' : 'is-warn') + '">' + (isOnline ? 'ONLINE' : 'OFFLINE') + '</span>' +
+                    '</div>';
+            }).join('');
+        }
+
+        document.addEventListener('click', function (e) {
+            var openBtn = e.target.closest && e.target.closest('[data-gs-gas-open]');
+            if (openBtn) {
+                var which = openBtn.getAttribute('data-gs-gas-open');
+                if (which === 'history') { openGasModal(historyModal); }
+                if (which === 'devices') { openGasModal(devicesModal); loadGasDevices(); }
+                return;
+            }
+            if (e.target.closest && e.target.closest('[data-gs-gas-close]')) { closeGasModals(); return; }
+            if (e.target.closest && e.target.closest('#gs-gas-devices-refresh')) { loadGasDevices(); return; }
+            if (e.target.closest && e.target.closest('#gs-gas-devices-add')) { openGasModal(addDeviceModal); return; }
+            var deviceTabBtn = e.target.closest && e.target.closest('[data-gs-gas-device-tab]');
+            if (deviceTabBtn && addDeviceModal) {
+                var tabKey = deviceTabBtn.getAttribute('data-gs-gas-device-tab');
+                addDeviceModal.querySelectorAll('[data-gs-gas-device-tab]').forEach(function (b) {
+                    b.classList.toggle('is-active', b === deviceTabBtn);
+                    b.setAttribute('aria-selected', b === deviceTabBtn ? 'true' : 'false');
+                });
+                addDeviceModal.querySelectorAll('[data-gs-gas-device-pane]').forEach(function (p) {
+                    p.hidden = p.getAttribute('data-gs-gas-device-pane') !== tabKey;
+                });
+                // Lazy-load the embedded server checkout only once it's
+                // actually shown - same pattern as the real Hosting →
+                // Servers sub-tab's own [data-gs-hosting-servers-frame].
+                if (tabKey === 'server') {
+                    var serverFrame = addDeviceModal.querySelector('[data-gs-gas-server-frame]');
+                    if (serverFrame && serverFrame.dataset.src && serverFrame.getAttribute('src') === 'about:blank') {
+                        serverFrame.src = serverFrame.dataset.src;
+                    }
+                }
+                return;
+            }
+            var filterBtn = e.target.closest && e.target.closest('[data-gs-gas-filter]');
+            if (filterBtn && historyModal) {
+                var dir = filterBtn.getAttribute('data-gs-gas-filter');
+                historyModal.querySelectorAll('[data-gs-gas-filter]').forEach(function (b) { b.classList.toggle('is-active', b === filterBtn); });
+                historyModal.querySelectorAll('#gs-gas-history-table tbody tr').forEach(function (tr) {
+                    tr.style.display = (dir === 'all' || tr.getAttribute('data-direction') === dir) ? '' : 'none';
+                });
+            }
+        });
+
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && [ historyModal, devicesModal, addDeviceModal ].some(function (m) { return m && m.classList.contains('is-open'); })) {
+                closeGasModals();
+            }
+        });
+    })();
+    </script>
     <?php
     return (string) ob_get_clean();
 }
@@ -1340,6 +2537,52 @@ function gs_get_remote_account_overview_html( array $remote ) {
  * @param mixed $membership WP_Ultimo\Models\Membership or compatible.
  * @return array|null
  */
+/**
+ * A BuddyPress group's avatar + cover photo URL, for the Integration Hub card.
+ * BuddyPress groups (and their attachments) live on the network's root blog, which isn't
+ * necessarily the current site (a subsite's own gdc_bp_group_id points at a group hosted on
+ * the hub) — switches there and back, exactly like dashboard-overview.php's own group-avatar
+ * lookup, so this works correctly regardless of which site is rendering the dashboard.
+ *
+ * @return array{avatar:string,cover:string}
+ */
+function gs_group_avatar_and_cover( $gid ) {
+    $gid    = (int) $gid;
+    $avatar = '';
+    $cover  = '';
+    if ( $gid <= 0 ) {
+        return array( 'avatar' => $avatar, 'cover' => $cover );
+    }
+    $bp_root_id = function_exists( 'bp_get_root_blog_id' ) ? (int) bp_get_root_blog_id() : get_current_blog_id();
+    $switched   = false;
+    if ( is_multisite() && get_current_blog_id() !== $bp_root_id ) {
+        switch_to_blog( $bp_root_id );
+        $switched = true;
+    }
+    if ( function_exists( 'bp_core_fetch_avatar' ) ) {
+        $avatar_url = bp_core_fetch_avatar( array(
+            'item_id'       => $gid,
+            'object'        => 'group',
+            'type'          => 'full',
+            'html'          => false,
+            'force_default' => false,
+        ) );
+        if ( ! empty( $avatar_url ) && is_string( $avatar_url ) ) {
+            $avatar = $avatar_url;
+        }
+    }
+    if ( function_exists( 'bp_attachments_get_attachment' ) ) {
+        $cover_url = bp_attachments_get_attachment( 'url', array( 'object_dir' => 'groups', 'item_id' => $gid ) );
+        if ( ! empty( $cover_url ) && is_string( $cover_url ) ) {
+            $cover = $cover_url;
+        }
+    }
+    if ( $switched ) {
+        restore_current_blog();
+    }
+    return array( 'avatar' => $avatar, 'cover' => $cover );
+}
+
 function gs_membership_payload_from_local( $membership ) {
 
     if ( ! $membership || ! is_object( $membership ) || ! method_exists( $membership, 'get_id' ) ) {
@@ -1433,11 +2676,13 @@ function gs_membership_payload_from_local( $membership ) {
             if ( ! empty( $row->name ) ) $g_name = (string) $row->name;
             if ( ! empty( $row->slug ) ) $g_slug = (string) $row->slug;
         }
+        $art          = gs_group_avatar_and_cover( $gid );
         $group_payload = array(
             'id'             => $gid,
             'name'           => $g_name,
             'slug'           => $g_slug,
-            'avatar'         => '',
+            'avatar'         => $art['avatar'],
+            'cover'          => $art['cover'],
             'members_count'  => 0,
             'projects_count' => 0,
             'files_count'    => 0,
@@ -1496,6 +2741,94 @@ function gs_membership_payload_from_local( $membership ) {
         'hosting_plan'   => $serialize_plan( $host_plan ),
         'customer'       => $customer_payload,
         'group'          => $group_payload,
+        'orders'         => array(),
+        'backups'        => array(),
+        'domains'        => array(),
+        'cache_seconds'  => 0,
+    );
+}
+
+/**
+ * Fallback payload for a site that's linked to a BuddyPress group but has no
+ * WP Ultimo membership of its own — gend.me's own site is exactly this case:
+ * it's the hub, not a customer install, so gs_dashboard_get_membership() never
+ * returns one, and gs_remote_membership_get_cached() has nothing to fetch
+ * either (there's no install_id/token pointing gend.me at itself). Without
+ * this, the whole Hosting / Feature Suite / Project Contracts panel never
+ * renders for it and the dashboard falls back to the plain admin-users list.
+ *
+ * Same group-id resolution gend-society's other blog↔group lookups and
+ * Gend_CP_App_Identity::read_local_binding() (contracts-and-payments) use:
+ * WP Ultimo site meta first, then the gdc_bp_group_id blog option every
+ * provisioned site is stamped with, then blog metadata as a last resort.
+ *
+ * Same output shape as gs_membership_payload_from_local() minus the fields
+ * that only make sense with a real membership (billing/dates/plans/customer/
+ * status all stay empty — no membership badge is shown, which is the honest
+ * state here, rather than claiming a plan/status that doesn't exist).
+ *
+ * @return array|null
+ */
+function gs_membership_payload_group_only() {
+    $blog_id = get_current_blog_id();
+
+    $gid = 0;
+    if ( function_exists( 'wu_get_site' ) ) {
+        try {
+            $wu_site = wu_get_site( $blog_id );
+            if ( $wu_site && method_exists( $wu_site, 'get_meta' ) ) $gid = (int) $wu_site->get_meta( 'gdc_bp_group_id', 0 );
+        } catch ( \Throwable $e ) {}
+    }
+    if ( ! $gid ) {
+        $gid = (int) get_blog_option( $blog_id, 'gdc_bp_group_id', 0 );
+    }
+    if ( ! $gid && function_exists( 'get_metadata' ) ) {
+        $gid = (int) get_metadata( 'blog', $blog_id, 'gdc_bp_group_id', true );
+    }
+    if ( ! $gid ) {
+        return null;
+    }
+
+    $g_name = sprintf( /* translators: %d: group id */ __( 'Group #%d', 'gend-society' ), $gid );
+    $g_slug = '';
+    global $wpdb;
+    $tbl = $wpdb->base_prefix . 'bp_groups';
+    $row = $wpdb->get_row( $wpdb->prepare( "SELECT name, slug FROM {$tbl} WHERE id = %d", $gid ) );
+    if ( $row ) {
+        if ( ! empty( $row->name ) ) $g_name = (string) $row->name;
+        if ( ! empty( $row->slug ) ) $g_slug = (string) $row->slug;
+    }
+
+    return array(
+        'install_id'     => '',
+        'membership_id'  => 0,
+        'membership_url' => '',
+        'embed_url'      => '',
+        'hub_url'        => trailingslashit( (string) network_home_url( '/' ) ),
+        'app_url'        => home_url( '/' ),
+        'app_title'      => (string) get_bloginfo( 'name' ),
+        'status'         => '',
+        'status_label'   => '',
+        'billing'        => array( 'amount' => 0, 'currency' => '', 'unit' => '', 'label' => '' ),
+        'dates'          => array( 'created' => '', 'activated' => '', 'expires' => '', 'renews' => '' ),
+        'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array() ),
+        'dashboard_plan' => null,
+        'hosting_plan'   => null,
+        'customer'       => null,
+        'group'          => array_merge(
+            array(
+                'id'             => $gid,
+                'name'           => $g_name,
+                'slug'           => $g_slug,
+                'avatar'         => '',
+                'cover'          => '',
+                'members_count'  => 0,
+                'projects_count' => 0,
+                'files_count'    => 0,
+                'messages_count' => 0,
+            ),
+            gs_group_avatar_and_cover( $gid )
+        ),
         'orders'         => array(),
         'backups'        => array(),
         'domains'        => array(),

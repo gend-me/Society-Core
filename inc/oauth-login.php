@@ -409,6 +409,17 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
         // fires a fire-and-forget webhook POST + redirects; nothing in it
         // needs an authenticated caller.
         if ( strpos( $route, '/em/v1/launch/' ) !== false ) return null;
+        // gend-pm-sync/v1 (contracts-and-payments) — container-to-hub federation
+        // push (PM/task manifests + media-optimization + media_storage_report
+        // payloads). Every container calling this is itself logged out (it's a
+        // server-to-server POST, no WP session cookie at all), and every route
+        // on this namespace is Ed25519-signature-gated INSIDE
+        // Gend_CP_PM_Sync::verify_request() (permission_callback is
+        // deliberately __return_true — auth happens post-routing via the
+        // signature, not via this filter). Discovered empirically: this was
+        // NEVER allow-listed, so every push to this namespace has always
+        // 401'd at this gate before even reaching verify_request().
+        if ( strpos( $route, '/gend-pm-sync/v1/' ) !== false ) return null;
     }
     return $result;
 }, 99 );

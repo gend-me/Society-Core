@@ -38,19 +38,19 @@
         var avatarUrl  = (data && data.gendAvatarUrl)  ? data.gendAvatarUrl  : '';
         var userName   = (data && data.userName)       ? data.userName       : 'Profile';
         var logoutUrl  = (data && data.logoutUrl)      ? data.logoutUrl      : '';
-        var here       = window.location.href;
 
-        // ── Centre: connected group menu ──────────────────────────────
+        // ── Centre: connected group menu — direct links onto the linked
+        // gend.me group's own tabs (Business Plan / Contracts / Marketing /
+        // Payments / Organization), not wp-admin pages, so they open in a
+        // new tab rather than navigating away from the dashboard.
         var groupLinks = '';
         for (var g = 0; g < groupMenu.length; g++) {
             var gi = groupMenu[g] || {};
             var gIcon = gi.icon
                 ? '<span class="dashicons ' + escapeHtml(gi.icon) + ' gs-group-nav-icon" aria-hidden="true"></span>'
                 : '';
-            // Mark the active item when the current URL targets this tab.
-            var isActive = gi.slug && here.indexOf('page=gs-group-embed') !== -1 && here.indexOf('tab=' + gi.slug) !== -1;
             groupLinks +=
-                '<a href="' + escapeHtml(gi.url) + '" class="gs-group-nav-item' + (isActive ? ' is-active' : '') + '">' +
+                '<a href="' + escapeHtml(gi.url) + '" class="gs-group-nav-item" target="_blank" rel="noopener">' +
                     gIcon +
                     '<span class="pill-content">' + escapeHtml(gi.label) + '</span>' +
                 '</a>';
@@ -285,6 +285,13 @@
     function injectHeader() {
         if (document.getElementById('main-3d-header')) { return; }
 
+        // Never inject the branded 3D header into a framed wp-admin (e.g. the
+        // owned landing/thank-you page editor embedded inside the Postings
+        // modal's iframe) — it's meant for a standalone top-level admin
+        // session, and duplicating it inside a small nested iframe just
+        // clutters the embedded preview.
+        if (window.self !== window.top) { return; }
+
         // wp-admin body never carries `logged-in`; add it so the new-header
         // CSS reveals the admin-facing action buttons.
         document.body.classList.add('logged-in');
@@ -331,11 +338,44 @@
         });
     }
 
+    // The collapsed/hover-expand rail (admin-style.css) hides menu labels
+    // via .gs-menu-label — our own add_menu_page() calls already wrap their
+    // text in that span, but third-party plugins (myCred, network menus,
+    // etc.) just pass plain text. Wrap those too so every item collapses to
+    // an icon and expands to icon+label consistently, not just ours.
+    function normalizeMenuLabels() {
+        document.querySelectorAll('#adminmenu .wp-menu-name').forEach(function (name) {
+            if (name.querySelector('.gs-menu-label')) { return; }
+            var text = name.textContent.trim();
+            if (!text) { return; }
+            name.textContent = '';
+            var label = document.createElement('span');
+            label.className = 'gs-menu-label';
+            label.textContent = text;
+            name.appendChild(label);
+        });
+    }
+
+    // Each item's own submenu now opens purely on hovering/focusing that
+    // specific item (admin-style.css: li.menu-top:hover > .wp-submenu). If
+    // that item — or the submenu it just revealed — sits near the top/
+    // bottom edge of the scrollable rail, bring it fully into view instead
+    // of leaving it clipped or the rail scrolled somewhere unrelated.
+    function scrollHoveredItemIntoView() {
+        document.querySelectorAll('#adminmenu li.menu-top').forEach(function (li) {
+            li.addEventListener('mouseenter', function () {
+                li.scrollIntoView({ block: 'nearest', behavior: 'smooth' });
+            });
+        });
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         injectHeader();
         bindProfileDropdown();
         attach3DHover();
         markActive();
         enhanceSubmenus();
+        normalizeMenuLabels();
+        scrollHoveredItemIntoView();
     });
 })();

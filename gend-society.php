@@ -275,6 +275,23 @@ if ( file_exists( GS_DIR . 'inc/collab/member-tab-collab.php' ) ) {
 	require_once GS_DIR . 'inc/collab/member-tab-collab.php';
 }
 
+// GenD Match (2026-08-16) -- "Get Matched With Business Partners" popup launcher
+// at the top of every group's Payments page. Replaces the member-profile "Match"
+// tab (nav registration retired inside member-tab-collab.php above -- its
+// gs_collab_profile_can_act_for_group() gate helper is reused here). Group
+// context is implicit (the payments page's own group), so no "Acting as"
+// picker. Renders on wp_footer; class_exists-guarded against GS_Group_Tab_Collab.
+if ( file_exists( GS_DIR . 'inc/collab/group-payments-match-launcher.php' ) ) {
+	require_once GS_DIR . 'inc/collab/group-payments-match-launcher.php';
+}
+
+// Mobile group menu (2026-08-17) -- on phones the group bridge-header menu row
+// collapses behind a sticky top-centre folder button with a dropdown of all
+// group menu items. wp_footer render, bp_is_group()-gated, file_exists-guarded.
+if ( file_exists( GS_DIR . 'inc/group-mobile-menu.php' ) ) {
+	require_once GS_DIR . 'inc/group-mobile-menu.php';
+}
+
 // GenD Match (v12.0 Phase 89-02, FED-01) — cross-app federation of the swipe/match pool.
 //   - class-collab-sync-crypto.php (89-01): Gend_GS_Collab_Sync_Crypto — the standalone
 //     ed25519 sign/verify primitive (local re-impl of the gend-pm-sync rail; NO c-and-p edit).
@@ -494,6 +511,13 @@ require_once GS_DIR . 'inc/oauth-login.php';
 // gend.me portal handshake + support access + feature gating
 require_once GS_DIR . 'inc/portal-connect.php';
 require_once GS_DIR . 'inc/support-access.php';
+// Hub-local "Switch to this Agent" identity swap + site-wide switch-back pill
+// (file_exists-guarded: same PVC-sync-lag rationale as agent-provision.php
+// below — a bare require_once on a not-yet-synced file would fatal and WP
+// would auto-deactivate the plugin).
+if ( file_exists( GS_DIR . 'inc/agent-switch.php' ) ) {
+    require_once GS_DIR . 'inc/agent-switch.php';
+}
 // Container-side agent provisioning rail (file_exists-guarded: the new include
 // may not have synced to the live PVC before this entrypoint — guard prevents a
 // require_once fatal that WP would punish with plugin auto-deactivation).
