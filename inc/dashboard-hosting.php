@@ -182,6 +182,34 @@ if ( ! function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) ) {
      */
     function gs_hosting_resource_upgrade_data_attrs( $type ) {
         $same_origin = function_exists( 'gs_oauth_is_hub_site' ) ? gs_oauth_is_hub_site() : true;
+        // Backups are two choices, not one list: a storage plan, then how
+        // often to back up. The membership page's Backups picker presents
+        // exactly that (current plans marked, one checkout, plan swapped on
+        // payment), so open it in its backups-only mode instead of the
+        // generic one-product-per-row plan-attach form.
+        if ( $same_origin && $type === 'backups' ) {
+            $gs_bk_m   = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+            $gs_bk_mid = ( $gs_bk_m && is_object( $gs_bk_m ) && method_exists( $gs_bk_m, 'get_id' ) ) ? (int) $gs_bk_m->get_id() : 0;
+            $gs_bk_choose = false;
+            if ( ! $gs_bk_mid && function_exists( 'gdc_plan_attach_get_memberships' ) ) {
+                // Dashboard not tied to a membership (e.g. the main gend.me
+                // site): use the viewer's own eligible membership(s).
+                $gs_bk_eligible = array_values( (array) gdc_plan_attach_get_memberships( 'backups' ) );
+                if ( count( $gs_bk_eligible ) === 1 ) {
+                    $gs_bk_mid = (int) ( is_array( $gs_bk_eligible[0] ) ? ( $gs_bk_eligible[0]['id'] ?? 0 ) : 0 );
+                } elseif ( count( $gs_bk_eligible ) > 1 ) {
+                    $gs_bk_choose = true; // several: let them pick on the memberships page
+                }
+            }
+            $gs_bk_account = get_home_url( get_main_site_id(), '/my-account/memberships/' );
+            if ( $gs_bk_mid ) {
+                $url = add_query_arg( array( 'gdc_open_modal' => $gs_bk_mid, 'gdc_open_backups' => 1 ), $gs_bk_account );
+                return 'data-embed-url="' . esc_attr( $url ) . '"';
+            }
+            if ( $gs_bk_choose ) {
+                return 'data-embed-url="' . esc_attr( $gs_bk_account ) . '"';
+            }
+        }
         if ( $same_origin ) {
             $url = function_exists( 'gdc_plan_attach_resource_embed_url' ) ? gdc_plan_attach_resource_embed_url( $type ) : '';
             return $url !== '' ? 'data-embed-url="' . esc_attr( $url ) . '"' : '';
