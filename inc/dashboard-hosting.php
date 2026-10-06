@@ -755,18 +755,21 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
         // the membership dashboard's Backups card reads.
         $gs_backup_plans     = function_exists( 'gdc_plan_attach_get_plans' ) ? gdc_plan_attach_get_plans( 'backups' ) : array();
         $gs_backup_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
-        $gs_backup_current_id = 0;
+        // Storage plan + frequency add-on can both be attached: collect all.
+        $gs_bk_current = array(); // [ ['name'=>..., 'price'=>...], ... ]
         if ( $gs_backup_membership && is_object( $gs_backup_membership ) && method_exists( $gs_backup_membership, 'get_all_products' ) ) {
             foreach ( (array) $gs_backup_membership->get_all_products() as $gs_bp_row ) {
                 $gs_bp_prod = is_array( $gs_bp_row ) && isset( $gs_bp_row['product'] ) ? $gs_bp_row['product'] : null;
                 if ( $gs_bp_prod && is_object( $gs_bp_prod ) && method_exists( $gs_bp_prod, 'get_subgroup' )
                     && strtolower( (string) $gs_bp_prod->get_subgroup() ) === 'backups' && method_exists( $gs_bp_prod, 'get_id' ) ) {
-                    $gs_backup_current_id = (int) $gs_bp_prod->get_id();
-                    break;
+                    $gs_bp_price = '';
+                    foreach ( $gs_backup_plans as $gs_bp ) {
+                        if ( (int) ( $gs_bp['id'] ?? 0 ) === (int) $gs_bp_prod->get_id() ) { $gs_bp_price = (string) ( $gs_bp['price'] ?? '' ); break; }
+                    }
+                    $gs_bk_current[] = array( 'name' => method_exists( $gs_bp_prod, 'get_name' ) ? (string) $gs_bp_prod->get_name() : '', 'price' => $gs_bp_price );
                 }
             }
         }
-        $gs_bk_multi_plan = count( $gs_backup_plans ) > 1;
 
         gs_hosting_render_analytics_hero( array(
             'title'  => __( 'Backups', 'gend-society' ),
@@ -785,13 +788,6 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
         // Real current-plan lookup among the real plan list, matched by id -
         // same $gs_backup_current_id resolved above from the membership's
         // own real attached products.
-        $gs_bk_current_plan = null;
-        foreach ( $gs_backup_plans as $gs_bp ) {
-            if ( $gs_backup_current_id > 0 && (int) ( $gs_bp['id'] ?? 0 ) === $gs_backup_current_id ) {
-                $gs_bk_current_plan = $gs_bp;
-                break;
-            }
-        }
         ?>
         <!-- ── Latest Backup + the ACTUAL assigned plan (or an honest "no
              plan attached" state) + Upgrade, grouped together in their own
@@ -805,39 +801,32 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
             <div class="gs-hosting__analytics-stat">
                 <span class="k"><?php esc_html_e( 'Latest Backup', 'gend-society' ); ?></span><span class="v"><?php echo esc_html( $gs_bk_latest !== '' ? $gs_bk_latest : __( 'None yet', 'gend-society' ) ); ?></span>
             </div>
-            <?php if ( $gs_bk_current_plan ) : ?>
+            <?php if ( ! empty( $gs_bk_current ) ) : foreach ( $gs_bk_current as $gs_bk_cur ) : ?>
                 <div class="gs-hosting__analytics-stat">
-                    <span class="k"><?php echo esc_html( $gs_bk_current_plan['name'] ?? __( 'Backup Plan', 'gend-society' ) ); ?></span><span class="v" style="color:#6ee7b7;"><?php echo esc_html( (string) ( $gs_bk_current_plan['price'] ?? '' ) ); ?> · <?php esc_html_e( 'Active', 'gend-society' ); ?></span>
+                    <span class="k"><?php echo esc_html( $gs_bk_cur['name'] !== '' ? $gs_bk_cur['name'] : __( 'Backup Plan', 'gend-society' ) ); ?></span><span class="v" style="color:#6ee7b7;"><?php echo esc_html( $gs_bk_cur['price'] !== '' ? $gs_bk_cur['price'] . ' · ' : '' ); ?><?php esc_html_e( 'Active', 'gend-society' ); ?></span>
                 </div>
-            <?php else : ?>
+            <?php endforeach; else : ?>
                 <div class="gs-hosting__analytics-stat">
                     <span class="k"><?php esc_html_e( 'Backup Plan', 'gend-society' ); ?></span><span class="v" style="color:#fcd34d;"><?php esc_html_e( 'No Plan Attached', 'gend-society' ); ?></span>
                 </div>
             <?php endif; ?>
-            <?php foreach ( $gs_backup_plans as $gs_bp ) :
-                $gs_bp_is_current = $gs_backup_current_id > 0 && (int) ( $gs_bp['id'] ?? 0 ) === $gs_backup_current_id;
-                $gs_bp_available  = ! empty( $gs_bp['available'] );
-                $gs_bp_upgrade_attrs = ( ! $gs_bp_is_current && $gs_bp_available && function_exists( 'gs_hosting_plan_upgrade_data_attrs' ) )
-                    ? gs_hosting_plan_upgrade_data_attrs( 'backups', $gs_bp['id'] ?? 0 )
-                    : '';
-                $gs_bp_label      = $gs_bk_multi_plan ? sprintf( __( 'Upgrade — %s', 'gend-society' ), $gs_bp['name'] ?? '' ) : __( 'Upgrade', 'gend-society' );
-            ?>
-                <?php if ( ! $gs_bp_is_current && $gs_bp_upgrade_attrs !== '' ) : ?>
-                    <button type="button"
-                            class="gs-hosting__btn gs-upgrade-cta"
-                            data-gs-upgrade-open
-                            data-resource="backups"
-                            data-resource-label="<?php echo esc_attr( $gs_bp['name'] ?? __( 'Backups', 'gend-society' ) ); ?>"
-                            <?php echo $gs_bp_upgrade_attrs; ?>
-                            style="align-self: center; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 9px 16px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
-                        <?php echo esc_html( $gs_bp_label ); ?>
-                    </button>
-                <?php elseif ( ! $gs_bp_is_current && ! empty( $gs_bp['name'] ) ) : ?>
-                    <button type="button" class="gs-hosting__btn" disabled style="align-self: center; opacity: 0.5; cursor: not-allowed;">
-                        <?php esc_html_e( 'Coming Soon', 'gend-society' ); ?>
-                    </button>
-                <?php endif; ?>
-            <?php endforeach; ?>
+            <?php
+            // ONE button opening the backups plan picker (storage tiers +
+            // frequency add-ons, current plan marked) - not one per product.
+            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
+                ? gs_hosting_resource_upgrade_data_attrs( 'backups' )
+                : '';
+            if ( $gs_bk_upgrade_attrs !== '' ) : ?>
+                <button type="button"
+                        class="gs-hosting__btn gs-upgrade-cta"
+                        data-gs-upgrade-open
+                        data-resource="backups"
+                        data-resource-label="<?php esc_attr_e( 'Backups', 'gend-society' ); ?>"
+                        <?php echo $gs_bk_upgrade_attrs; ?>
+                        style="align-self: center; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 9px 16px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
+                    <?php echo esc_html( ! empty( $gs_bk_current ) ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?>
+                </button>
+            <?php endif; ?>
         </div>
 
         <div class="gs-hosting__filter-row" style="margin-top: 20px;">

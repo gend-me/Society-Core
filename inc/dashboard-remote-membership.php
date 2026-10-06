@@ -1370,27 +1370,21 @@ function gs_render_membership_panel( $payload = null ) {
                     // already-purchased tier reads as "Current Plan" rather than
                     // just another Upgrade button.
                     $gs_backup_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
-                    $gs_backup_current_id = 0;
+                    // A membership can hold a backup STORAGE plan and a backup
+                    // FREQUENCY add-on at the same time, so collect every
+                    // backups-subgroup product, not just the first.
+                    $gs_backup_current_names = array();
                     if ( $gs_backup_membership && is_object( $gs_backup_membership ) && method_exists( $gs_backup_membership, 'get_all_products' ) ) {
                         foreach ( (array) $gs_backup_membership->get_all_products() as $gs_bp_row ) {
                             $gs_bp_prod = is_array( $gs_bp_row ) && isset( $gs_bp_row['product'] ) ? $gs_bp_row['product'] : null;
                             if ( $gs_bp_prod && is_object( $gs_bp_prod ) && method_exists( $gs_bp_prod, 'get_subgroup' )
-                                && strtolower( (string) $gs_bp_prod->get_subgroup() ) === 'backups' && method_exists( $gs_bp_prod, 'get_id' ) ) {
-                                $gs_backup_current_id = (int) $gs_bp_prod->get_id();
-                                break;
+                                && strtolower( (string) $gs_bp_prod->get_subgroup() ) === 'backups' && method_exists( $gs_bp_prod, 'get_name' ) ) {
+                                $gs_backup_current_names[] = (string) $gs_bp_prod->get_name();
                             }
                         }
                     }
-
-                    $gs_bk_multi_plan     = count( $gs_backup_plans ) > 1;
-                    $gs_bk_has_plan       = $gs_backup_current_id > 0;
-                    $gs_bk_current_name   = '';
-                    foreach ( $gs_backup_plans as $gs_bp ) {
-                        if ( $gs_backup_current_id > 0 && (int) ( $gs_bp['id'] ?? 0 ) === $gs_backup_current_id ) {
-                            $gs_bk_current_name = (string) ( $gs_bp['name'] ?? '' );
-                            break;
-                        }
-                    }
+                    $gs_bk_has_plan     = ! empty( $gs_backup_current_names );
+                    $gs_bk_current_name = implode( ' + ', $gs_backup_current_names );
                     ?>
                     <div class="gs-bk-hero">
                         <div class="gs-bk-main">
@@ -1405,30 +1399,24 @@ function gs_render_membership_panel( $payload = null ) {
                             <p class="gs-bk-sub"><?php esc_html_e( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' ); ?></p>
                         </div>
                         <div class="gs-bk-actions">
-                            <?php foreach ( $gs_backup_plans as $gs_bp ) :
-                                $gs_bp_is_current = $gs_backup_current_id > 0 && (int) ( $gs_bp['id'] ?? 0 ) === $gs_backup_current_id;
-                                $gs_bp_available  = ! empty( $gs_bp['available'] );
-                                $gs_bp_upgrade_attrs = ( ! $gs_bp_is_current && $gs_bp_available && function_exists( 'gs_hosting_plan_upgrade_data_attrs' ) )
-                                    ? gs_hosting_plan_upgrade_data_attrs( 'backups', $gs_bp['id'] ?? 0 )
-                                    : '';
-                                $gs_bp_label      = $gs_bk_multi_plan ? sprintf( __( 'Upgrade — %s', 'gend-society' ), $gs_bp['name'] ?? '' ) : __( 'Upgrade', 'gend-society' );
-                            ?>
-                                <?php if ( ! $gs_bp_is_current && $gs_bp_upgrade_attrs !== '' ) : ?>
-                                    <button type="button"
-                                            class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta"
-                                            data-gs-upgrade-open
-                                            data-resource="backups"
-                                            data-resource-label="<?php echo esc_attr( $gs_bp['name'] ?? __( 'Backups', 'gend-society' ) ); ?>"
-                                            <?php echo $gs_bp_upgrade_attrs; ?>>
-                                        <span class="dashicons dashicons-money-alt"></span>
-                                        <?php echo esc_html( $gs_bp_label ); ?>
-                                    </button>
-                                <?php elseif ( ! $gs_bp_is_current && ! empty( $gs_bp['name'] ) ) : ?>
-                                    <button type="button" class="gs-bk-btn" disabled>
-                                        <?php esc_html_e( 'Coming Soon', 'gend-society' ); ?>
-                                    </button>
-                                <?php endif; ?>
-                            <?php endforeach; ?>
+                            <?php
+                            // ONE button opening the backups plan picker (storage
+                            // tiers + frequency add-ons, current plan marked) -
+                            // not one button per product.
+                            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
+                                ? gs_hosting_resource_upgrade_data_attrs( 'backups' )
+                                : '';
+                            if ( $gs_bk_upgrade_attrs !== '' ) : ?>
+                                <button type="button"
+                                        class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta"
+                                        data-gs-upgrade-open
+                                        data-resource="backups"
+                                        data-resource-label="<?php esc_attr_e( 'Backups', 'gend-society' ); ?>"
+                                        <?php echo $gs_bk_upgrade_attrs; ?>>
+                                    <span class="dashicons dashicons-money-alt"></span>
+                                    <?php echo esc_html( $gs_bk_has_plan ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?>
+                                </button>
+                            <?php endif; ?>
                             <button type="button" class="gs-bk-btn" data-gs-mship="backup-now"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
                             <button type="button" class="gs-bk-btn" data-gs-hosting-goto="backups"><span class="dashicons dashicons-list-view"></span><?php esc_html_e( 'Manage Backups', 'gend-society' ); ?></button>
                         </div>
