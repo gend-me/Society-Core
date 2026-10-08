@@ -138,7 +138,7 @@ class Gend_GS_Calendar_Public_View {
 
 			$js_url  = plugins_url( 'assets/calendar-public-view.js', GS_DIR . 'gend-society.php' );
 			$css_url = plugins_url( 'assets/calendar-public-view.css', GS_DIR . 'gend-society.php' );
-			$ver     = defined( 'GS_VERSION' ) ? GS_VERSION : '1.0.0';
+			$ver     = GS_VERSION;
 
 			status_header( 200 );
 			nocache_headers();

@@ -2121,7 +2121,7 @@ function gs_invest_footer_assets() {
     // The yDGEN (Currency Hold) display uses contracts-and-payments styling.
     $ydgen_css = WP_CONTENT_DIR . '/plugins/contracts-and-payments/assets/css/ydgen-return.css';
     if ( file_exists( $ydgen_css ) ) {
-        echo '<link rel="stylesheet" href="' . esc_url( content_url( '/plugins/contracts-and-payments/assets/css/ydgen-return.css' ) ) . '?v=' . filemtime( $ydgen_css ) . '">';
+        echo '<link rel="stylesheet" href="' . esc_url( content_url( '/plugins/contracts-and-payments/assets/css/ydgen-return.css' ) ) . '?v=' . GS_VERSION . '.' . filemtime( $ydgen_css ) . '">';
     }
     ?>
     <script id="gci-js">
@@ -2358,8 +2358,10 @@ function gs_wallet_profile_screen_content() {
     </style>';
     
     // Direct CSS injection as a fallback to ensure styling is applied even if enqueue fails
-    $css_url = plugins_url( 'reward-programs/assets/frontend-wallet.css' );
-    echo '<link rel="stylesheet" id="gend-wallet-frontend-profile-css" href="' . esc_url( $css_url ) . '?ver=2.0.1" type="text/css" media="all" />';
+    $gs_wallet_css     = WP_PLUGIN_DIR . '/reward-programs/assets/frontend-wallet.css';
+    $gs_wallet_css_ver = GS_VERSION . '.' . ( file_exists( $gs_wallet_css ) ? filemtime( $gs_wallet_css ) : '0' );
+    $css_url = add_query_arg( 'ver', $gs_wallet_css_ver, plugins_url( 'reward-programs/assets/frontend-wallet.css' ) );
+    echo '<link rel="stylesheet" id="gend-wallet-frontend-profile-css" href="' . esc_url( $css_url ) . '" type="text/css" media="all" />';
     
     // The store my-account wallet uses the gend_wallet shortcode.
     // Sometimes plugins inject nested shortcodes (like elementor-template) into its filters.
@@ -3065,8 +3067,10 @@ function gs_member_groups_tabs_open() {
             // domain-stage tags) only auto-enqueues on is_account_page(). On
             // the BP profile we have to inject it manually, otherwise the
             // membership card renders unstyled (faded text, broken layout).
-            $gs_shared_css = plugins_url( 'vendor-app-manager/assets/css/gdc-customer-shared.css' );
-            echo '<link rel="stylesheet" id="gdc-customer-shared-bp-profile" href="' . esc_url( $gs_shared_css ) . '?ver=1.0.0" type="text/css" media="all" />';
+            $gs_shared_css_path = WP_PLUGIN_DIR . '/vendor-app-manager/assets/css/gdc-customer-shared.css';
+            $gs_shared_css_ver  = GS_VERSION . '.' . ( file_exists( $gs_shared_css_path ) ? filemtime( $gs_shared_css_path ) : '0' );
+            $gs_shared_css      = add_query_arg( 'ver', $gs_shared_css_ver, plugins_url( 'vendor-app-manager/assets/css/gdc-customer-shared.css' ) );
+            echo '<link rel="stylesheet" id="gdc-customer-shared-bp-profile" href="' . esc_url( $gs_shared_css ) . '" type="text/css" media="all" />';
             gdc_render_account_memberships_endpoint();
             ?>
         </div>
@@ -4340,9 +4344,12 @@ function gs_enqueue_wallet_profile_assets() {
     // If we are on a BuddyPress profile and the URL contains member-wallet
     if ( function_exists( 'bp_is_user' ) && bp_is_user() && ( bp_is_current_component( 'member-wallet' ) || strpos( $_SERVER['REQUEST_URI'], '/member-wallet' ) !== false ) ) {
         // Enqueue the frontend wallet assets from reward-programs
-        $url = plugins_url( 'reward-programs/' );
-        wp_enqueue_style( 'gend-wallet-frontend', $url . 'assets/frontend-wallet.css', [], '2.0.0' );
-        wp_enqueue_script( 'gend-wallet-frontend', $url . 'assets/frontend-wallet.js', [ 'jquery' ], '2.0.0', true );
+        $url           = plugins_url( 'reward-programs/' );
+        $gs_wallet_dir = WP_PLUGIN_DIR . '/reward-programs/assets/';
+        $gs_wallet_css_ver = GS_VERSION . '.' . ( file_exists( $gs_wallet_dir . 'frontend-wallet.css' ) ? filemtime( $gs_wallet_dir . 'frontend-wallet.css' ) : '0' );
+        $gs_wallet_js_ver  = GS_VERSION . '.' . ( file_exists( $gs_wallet_dir . 'frontend-wallet.js' ) ? filemtime( $gs_wallet_dir . 'frontend-wallet.js' ) : '0' );
+        wp_enqueue_style( 'gend-wallet-frontend', $url . 'assets/frontend-wallet.css', [], $gs_wallet_css_ver );
+        wp_enqueue_script( 'gend-wallet-frontend', $url . 'assets/frontend-wallet.js', [ 'jquery' ], $gs_wallet_js_ver, true );
         
         wp_localize_script( 'gend-wallet-frontend', 'GEND_WALLET', [
             'ajax'  => admin_url( 'admin-ajax.php' ),

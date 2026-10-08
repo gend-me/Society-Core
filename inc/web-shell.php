@@ -508,7 +508,7 @@ window.__WS_BOOT__ = {
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.10.0/lib/xterm-addon-fit.min.js"></script>
 <?php $js_path = dirname( __DIR__ ) . '/assets/web-shell.js'; ?>
-<script src="<?php echo esc_url( plugins_url( 'assets/web-shell.js', dirname( __DIR__ ) . '/gend-society.php' ) ); ?>?v=<?php echo (int) ( file_exists( $js_path ) ? filemtime( $js_path ) : 0 ); ?>"></script>
+<script src="<?php echo esc_url( plugins_url( 'assets/web-shell.js', dirname( __DIR__ ) . '/gend-society.php' ) ); ?>?v=<?php echo esc_attr( GS_VERSION . '.' . ( file_exists( $js_path ) ? filemtime( $js_path ) : '0' ) ); ?>"></script>
 
 </body>
 </html>

@@ -187,7 +187,7 @@ function gs_media_storage_panel_enqueue( $hook_suffix ) {
 		return;
 	}
 
-	$ver = defined( 'GS_VERSION' ) ? GS_VERSION : (string) filemtime( __FILE__ );
+	$ver = GS_VERSION;
 
 	wp_register_script( 'gs-media-storage-panel', false, array(), $ver, true );
 	wp_localize_script(

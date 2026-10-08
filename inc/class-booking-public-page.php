@@ -147,7 +147,7 @@ class Gend_GS_Booking_Public_Page {
 
 			$js_url  = plugins_url( 'assets/booking-public.js', GS_DIR . 'gend-society.php' );
 			$css_url = plugins_url( 'assets/booking-public.css', GS_DIR . 'gend-society.php' );
-			$ver     = defined( 'GS_VERSION' ) ? GS_VERSION : '1.0.0';
+			$ver     = GS_VERSION;
 
 			status_header( 200 );
 			nocache_headers();
