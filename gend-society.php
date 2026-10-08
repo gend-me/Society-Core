@@ -33,6 +33,7 @@ require_once GS_DIR . 'inc/admin-style.php';
 require_once GS_DIR . 'inc/admin-menu.php';
 require_once GS_DIR . 'inc/frontend-bar.php';
 require_once GS_DIR . 'inc/live-view.php';
+require_once GS_DIR . 'inc/seo-meta.php'; // SEO title/description box + meta, Open Graph and Twitter tags
 
 // GitHub Updater
 require_once GS_DIR . 'inc/class-gend-github-updater.php';
