@@ -74,7 +74,7 @@ function gs_collab_payments_match_launcher() {
 	} else {
 		// Verbatim mirror of the collab access predicate (super-admin OR
 		// group admin OR group mod) for a partial/out-of-order deploy.
-		$can_act = ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) )
+		$can_act = ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) // site-admin check, not a hub signal (104 audit)
 			|| ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $group_id ) )
 			|| ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $uid, $group_id ) );
 	}

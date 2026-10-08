@@ -31,6 +31,12 @@ In the commands, `<rel>` is a file path relative to the plugin root (for example
   The version on the hub must never be lower than the version in `main`.
 - If content pulled from live is being committed to this public repo, it has passed a secret scan
   (keys, tokens, passwords, private hostnames) before the push.
+- gend-society >= 1.1.6 reads its runtime mode from the hub Deployment env
+  `GEND_SOCIETY_RUNTIME=hub`. Check it on the pod before any swap:
+
+      MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- printenv GEND_SOCIETY_RUNTIME
+
+  If it does not print `hub`, stop. Do not deploy 1.1.6+ until the env is set.
 
 ## 1. MANDATORY: pull live and diff immediately before swap
 
@@ -98,6 +104,13 @@ One file at a time, in this order: assets, theme and text files first, then `inc
 3. If it matches, swap:
 
        MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'chown www-data:www-data /var/www/html/wp-content/plugins/gend-society/<rel>.new && mv -f /var/www/html/wp-content/plugins/gend-society/<rel>.new /var/www/html/wp-content/plugins/gend-society/<rel>'
+
+**Dependency-ordered swap.** When changed `inc/` files call functions that only the NEW
+entrypoint's bootstrap defines (for example `gend_society_is_hub()` from `inc/bootstrap/context.php`),
+the order above changes to: new files (absent on live) -> `gend-society.php` -> the changed `inc/`
+files. Otherwise a changed `inc/` file could run under the old entrypoint and fatal on an undefined
+function. Rollback in reverse: the changed `inc/` files first, then `gend-society.php`, then remove
+the new files.
 
 ## 6. Verify
 

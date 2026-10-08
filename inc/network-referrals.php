@@ -28,10 +28,14 @@ if (!defined('ABSPATH')) exit;
 const GDC_NR_REF_PARAM  = 'gm_ref';
 const GDC_NR_FROM_PARAM = 'gm_from';
 
-/** True on the gend.me hub network (any of its sites), false on containers/standalone installs. */
+/**
+ * True on the gend.me hub network (any of its sites), false on containers/standalone installs.
+ * Hub-ness comes from the runtime mode (104 audit); multisite + WP Ultimo stay as
+ * preconditions because callers use wu_get_site()/network_home_url().
+ */
 function gdc_nr_on_hub_network()
 {
-    return is_multisite() && function_exists('wu_get_site');
+    return gend_society_is_hub() && is_multisite() && function_exists('wu_get_site');
 }
 
 function gdc_nr_hub_url()
@@ -148,7 +152,7 @@ function gdc_nr_site_owner($blog_id)
     // admins don't count — crediting gend.me's operators is no referral).
     if (!$uid && $blog_id) {
         foreach (get_users(array('blog_id' => (int) $blog_id, 'role' => 'administrator', 'number' => 20, 'orderby' => 'ID', 'fields' => array('ID'))) as $a) {
-            if (!is_super_admin((int) $a->ID)) { $uid = (int) $a->ID; break; }
+            if (!is_super_admin((int) $a->ID)) { $uid = (int) $a->ID; break; } // site-admin check, not a hub signal (104 audit)
         }
     }
     /** Filters who a sign-up from this connected site is credited to when no affiliate is tracked. */

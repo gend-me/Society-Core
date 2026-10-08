@@ -57,16 +57,15 @@ if ( ! defined( 'ABSPATH' ) ) {
 class Gend_GS_Collab_Contract {
 
 	/**
-	 * Hub-only gate. Mirrors member-profile-header.php:213-215 /
-	 * class-task-contract.php:35 — true on the main node (or when the OAuth
-	 * resource isn't present at all, i.e. a lone hub), false on a container.
+	 * Hub gate: true when the runtime mode is hub (gend_society_is_hub(), from
+	 * GEND_SOCIETY_RUNTIME), false on containers and standalone installs.
+	 * Before 1.1.6 this inferred "hub" from a missing Gend_CP_OAuth_Resource
+	 * class, which made every standalone install look like the hub.
 	 *
 	 * @return bool
 	 */
 	private static function is_hub() : bool {
-		return ! class_exists( 'Gend_CP_OAuth_Resource' )
-			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
-			|| Gend_CP_OAuth_Resource::is_main_node();
+		return gend_society_is_hub();
 	}
 
 	/**

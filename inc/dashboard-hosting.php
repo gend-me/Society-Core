@@ -275,7 +275,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
         // members don't see them. Site admins + super admins always
         // see them.
         $gs_can_upgrade = current_user_can( 'manage_options' )
-            || is_super_admin()
+            || is_super_admin() // site-admin check, not a hub signal (104 audit)
             || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
 
         // No Media/Codebase/Database container plans on this networked site
@@ -4177,7 +4177,7 @@ add_action( 'wp_ajax_gs_hosting_media_rescan', function () {
         }
         check_ajax_referer( 'gs_membership_action', 'nonce' );
         $uid = get_current_user_id();
-        $can_act = is_super_admin( $uid )
+        $can_act = is_super_admin( $uid ) // site-admin check, not a hub signal (104 audit)
             || ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $group_id ) )
             || ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $uid, $group_id ) );
         if ( ! $can_act ) {

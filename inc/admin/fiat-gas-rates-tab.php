@@ -62,7 +62,7 @@ add_action( 'gdc_hosting_tab_render_chain-gas-rates', 'gs_fiat_gas_rates_render'
 // feedback_blog_manager_admin_tabs philosophy of NEVER adding new
 // top-level menu pages.
 add_action( 'admin_menu', function () {
-	if ( ! is_super_admin() ) {
+	if ( ! gend_society_is_hub_operator() ) {
 		return;
 	}
 	add_submenu_page(
@@ -78,7 +78,7 @@ add_action( 'admin_menu', function () {
 // Mirror to network admin so super-admins can land on the page on the
 // network admin URL too.
 add_action( 'network_admin_menu', function () {
-	if ( ! is_super_admin() ) {
+	if ( ! gend_society_is_hub_operator() ) {
 		return;
 	}
 	add_submenu_page(
@@ -97,7 +97,7 @@ add_action( 'network_admin_menu', function () {
 
 if ( ! function_exists( 'gs_fiat_gas_rates_render' ) ) {
 	function gs_fiat_gas_rates_render() {
-		if ( ! is_super_admin() || ! current_user_can( 'manage_network_options' ) ) {
+		if ( ! gend_society_is_hub_operator() || ! current_user_can( 'manage_network_options' ) ) {
 			wp_die( esc_html__( 'You do not have permission to view this page.', 'gend-society' ), 403 );
 		}
 		$rates = Gend_CP_Fiat_Gas_Charger::get_active_rates( true ); // include inactive
@@ -247,7 +247,7 @@ add_action( 'admin_post_gs_fiat_gas_rate_deactivate', 'gs_fiat_gas_rate_deactiva
 
 if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
 	function gs_fiat_gas_rate_save_handler() {
-		if ( ! is_super_admin() || ! current_user_can( 'manage_network_options' ) ) {
+		if ( ! gend_society_is_hub_operator() || ! current_user_can( 'manage_network_options' ) ) {
 			wp_die( esc_html__( 'Forbidden.', 'gend-society' ), 403 );
 		}
 		$rail  = isset( $_POST['rail'] ) ? sanitize_text_field( wp_unslash( $_POST['rail'] ) ) : '';
@@ -302,7 +302,7 @@ if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
 
 if ( ! function_exists( 'gs_fiat_gas_rate_deactivate_handler' ) ) {
 	function gs_fiat_gas_rate_deactivate_handler() {
-		if ( ! is_super_admin() || ! current_user_can( 'manage_network_options' ) ) {
+		if ( ! gend_society_is_hub_operator() || ! current_user_can( 'manage_network_options' ) ) {
 			wp_die( esc_html__( 'Forbidden.', 'gend-society' ), 403 );
 		}
 		$rail = isset( $_POST['rail'] ) ? sanitize_text_field( wp_unslash( $_POST['rail'] ) ) : '';

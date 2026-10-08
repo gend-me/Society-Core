@@ -283,7 +283,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
         }
 
         return array(
-            'is_super'              => is_super_admin( (int) $uid ),
+            'is_super'              => is_super_admin( (int) $uid ), // site-admin check, not a hub signal (104 audit)
             'compute_active'        => $compute_active,
             'compute_plan_url'      => $compute_plan_url,
             'compute_subgroup'      => $sub,
@@ -3286,7 +3286,7 @@ function gs_group_render_hosting_suite( $group_id ) {
                     // panel. Site admin / super admin / group admin (via the
                     // shared helper).
                     $gs_ct_can_upgrade = current_user_can( 'manage_options' )
-                        || is_super_admin()
+                        || is_super_admin() // site-admin check, not a hub signal (104 audit)
                         || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
                     ?>
                     <style>

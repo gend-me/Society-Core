@@ -373,7 +373,7 @@ function gs_render_frontend_bar()
   $edit_agent_slug     = '';
   $edit_agent_group_id = 0;
   if ( function_exists( 'bp_is_user' ) && bp_is_user()
-       && ( is_super_admin( $user->ID ) || current_user_can( 'manage_options' ) )
+       && ( is_super_admin( $user->ID ) || current_user_can( 'manage_options' ) ) // site-admin check, not a hub signal (104 audit)
        && function_exists( 'gs_user_is_agent' ) ) {
     $edit_agent_displayed_id = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
     if ( $edit_agent_displayed_id && gs_user_is_agent( $edit_agent_displayed_id ) ) {
@@ -715,7 +715,7 @@ function gs_build_frontend_nav()
   // Filter by capability and feature access
   $final_items = [];
   $current_user_id = get_current_user_id();
-  $is_super = is_super_admin($current_user_id) || current_user_can('manage_network');
+  $is_super = is_super_admin($current_user_id) || current_user_can('manage_network'); // site-admin check, not a hub signal (104 audit)
   $allowed_features = get_user_meta($current_user_id, 'gs_feature_access', true);
   if (!is_array($allowed_features)) {
     $allowed_features = [];

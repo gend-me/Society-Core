@@ -146,7 +146,7 @@ class GS_AI_Widget {
             'adminUrl'          => admin_url(),
             'isLoggedIn'        => true,
             'currentUserId'     => $uid,
-            'isSuperAdmin'      => is_super_admin(),
+            'isSuperAdmin'      => is_super_admin(), // site-admin check, not a hub signal (104 audit)
             'isAdmin'           => current_user_can( 'manage_options' ),
             'currentUserEmail'  => wp_get_current_user()->user_email,
             'user'              => array(

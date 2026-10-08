@@ -205,14 +205,12 @@ function gdc_topup_embed_trim_assets() {
 // vs gend_dgen_hub). On the hub the bridge variants are redundant (they'd point
 // the hub at itself), so drop them — leaving one clean option per method:
 // ppcp (PayPal/card), gend_dgen_hub (DGEN), gend_btcpay_hub (BTC/Lightning),
-// gend_evm_hub (USDC/ETH), mycred (Store Credits). Hub-only via is_main_node;
+// gend_evm_hub (USDC/ETH), mycred (Store Credits). Hub-only via gend_society_is_hub();
 // reversible (pure filter — changes no gateway settings).
 add_filter( 'woocommerce_available_payment_gateways', 'gdc_dedupe_hub_payment_gateways', 100 );
 function gdc_dedupe_hub_payment_gateways( $gateways ) {
     if ( ! is_array( $gateways ) ) return $gateways;
-    $is_hub = ! class_exists( 'Gend_CP_OAuth_Resource' )
-        || ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
-        || Gend_CP_OAuth_Resource::is_main_node();
+    $is_hub = gend_society_is_hub();
     if ( ! $is_hub ) return $gateways;
     // Container "bridge" gateways (redundant on the hub) + gend_dgen_hub: DGEN is
     // applied via the C&P wallet panel ("Apply your DGEN and/or store credit") that

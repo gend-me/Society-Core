@@ -88,7 +88,7 @@ if ( ! function_exists( 'gs_ws_sites_resolve' ) ) {
     function gs_ws_sites_can_view( $req ) {
         $uid = get_current_user_id();
         if ( $uid <= 0 ) return false;
-        if ( is_super_admin( $uid ) || user_can( $uid, 'manage_network' ) ) return true;
+        if ( gend_society_is_hub_operator( $uid ) || user_can( $uid, 'manage_network' ) ) return true;
         $site = gs_ws_sites_resolve( $req );
         if ( ! $site ) return false;
         // Customer match
