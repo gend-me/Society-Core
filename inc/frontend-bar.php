@@ -638,7 +638,7 @@ function gs_build_frontend_nav()
     $content_children[] = ['label' => __('Theme Editor', 'gend-society'), 'url' => admin_url('site-editor.php')];
   }
   if (gs_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
-    $content_children[] = ['label' => __('Content Campaigns', 'gend-society'), 'url' => admin_url('admin.php?page=blog-manager')];
+    $content_children[] = ['label' => __('Content Campaigns', 'gend-society'), 'url' => admin_url('admin.php?page=' . (defined('BM_ADMIN_SLUG') ? BM_ADMIN_SLUG : 'blog-manager'))];
   }
   if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
     $content_children[] = ['label' => __('Talk Flows', 'gend-society'), 'url' => admin_url('admin.php?page=talk-flows')];

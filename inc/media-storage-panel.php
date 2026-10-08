@@ -178,8 +178,8 @@ add_action( 'admin_enqueue_scripts', 'gs_media_storage_panel_enqueue' );
 function gs_media_storage_panel_enqueue( $hook_suffix ) {
 	// Screen gate IDENTICAL to GMO (class-gmo-admin-subtab.php:44-50).
 	$is_bm = is_string( $hook_suffix )
-		&& ( strpos( $hook_suffix, 'blog-manager' ) !== false
-			|| ( isset( $_GET['page'] ) && $_GET['page'] === 'blog-manager' ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+		&& ( strpos( $hook_suffix, 'blog-manager' ) !== false || strpos( $hook_suffix, 'content-campaigns' ) !== false
+			|| ( isset( $_GET['page'] ) && in_array( $_GET['page'], array( 'blog-manager', 'content-campaigns' ), true ) ) ); // phpcs:ignore WordPress.Security.NonceVerification.Recommended
 	if ( ! $is_bm ) {
 		return;
 	}
@@ -187,7 +187,7 @@ function gs_media_storage_panel_enqueue( $hook_suffix ) {
 		return;
 	}
 
-	$ver = defined( 'GS_VERSION' ) ? GS_VERSION : (string) filemtime( __FILE__ );
+	$ver = GS_VERSION;
 
 	wp_register_script( 'gs-media-storage-panel', false, array(), $ver, true );
 	wp_localize_script(

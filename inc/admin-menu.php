@@ -233,13 +233,14 @@ function gs_move_plugin_submenus_to_content()
 {
     // Blog Manager
     if (gs_plugin_active('blog-manager/blog-manager.php')) {
-        remove_submenu_page('gs-app', 'blog-manager');
+        $bm_slug = (defined('BM_ADMIN_SLUG') ? BM_ADMIN_SLUG : 'blog-manager');
+        remove_submenu_page('gs-app', $bm_slug);
         add_submenu_page(
             'gs-content',
             __('Content Campaigns', 'gend-society'),
             __('Content Campaigns', 'gend-society'),
             'edit_posts',
-            'blog-manager',
+            $bm_slug,
             'bm_render_page'
         );
     }
@@ -348,8 +349,9 @@ function gs_suppress_plugin_menus()
         'gdc-reward-points',
         'gdc-reward-wallets',
         'gdc-rewards',
-        // Blog Manager
+        // Content Campaigns (formerly Blog Manager)
         'blog-manager',
+        'content-campaigns',
         'gdc-blog-manager',
         'gdc-blog',
         // Email Manager

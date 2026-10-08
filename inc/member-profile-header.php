@@ -39,10 +39,10 @@ function gdc_enqueue_profile_header_styles() {
     $rp_dir = WP_CONTENT_DIR . '/plugins/reward-programs/assets/';
     $rp_url = content_url( '/plugins/reward-programs/assets/' );
     if ( file_exists( $rp_dir . 'frontend-wallet.css' ) ) {
-        wp_enqueue_style( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.css', [], filemtime( $rp_dir . 'frontend-wallet.css' ) );
+        wp_enqueue_style( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.css', [], GS_VERSION . '.' . filemtime( $rp_dir . 'frontend-wallet.css' ) );
     }
     if ( file_exists( $rp_dir . 'frontend-wallet.js' ) ) {
-        wp_enqueue_script( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.js', [ 'jquery' ], filemtime( $rp_dir . 'frontend-wallet.js' ), true );
+        wp_enqueue_script( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.js', [ 'jquery' ], GS_VERSION . '.' . filemtime( $rp_dir . 'frontend-wallet.js' ), true );
         wp_localize_script( 'gend-wallet-frontend', 'GEND_WALLET', [
             'ajax'  => admin_url( 'admin-ajax.php' ),
             'nonce' => wp_create_nonce( 'gend_wallet_nonce' ),

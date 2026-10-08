@@ -1,0 +1,43 @@
+# .drift-ignore -- paths the live-vs-main drift check skips.
+#
+# Format: one pattern per line; blank lines and lines starting with # are ignored.
+# A pattern ending in "/" is a directory prefix (everything under it is skipped).
+# Any other pattern is a bash glob matched against the full path relative to the
+# plugin root. Patterns apply to both sides: files on live and files in main.
+#
+# Every entry is a deliberate decision: either repo tooling that is never deployed,
+# or code that is in main but intentionally NOT deployed to the gend.me hub.
+# Anything not listed here must be identical between live and main.
+
+# Repo tooling: drift allowlist itself, never deployed
+.drift-ignore
+# Repo tooling: line-ending rules, never deployed
+.gitattributes
+# Repo tooling: git ignore rules, never deployed
+.gitignore
+# Repo tooling: CI workflows, never deployed
+.github/
+# Repo tooling: helper scripts (drift check, release), never deployed
+bin/
+
+# UAT batteries and runbooks; not runtime code, deployed ad hoc when a phase is verified
+handoff/
+
+# v10.0 Connect-a-Domain wizard: never deployed, file_exists-guarded in gend-society.php
+inc/dashboard-hosting-domains.php
+# v10.0 Connect-a-Domain wizard (DNS records modal): never deployed, file_exists-guarded
+inc/dashboard-hosting-records-modal.php
+# v10.0 Connect-a-Domain wizard assets: only enqueued by the guarded files above
+assets/domains-wizard.css
+# v10.0 Connect-a-Domain wizard assets: only enqueued by the guarded files above
+assets/domains-wizard.js
+# v10.0 Connect-a-Domain wizard assets: only enqueued by the guarded files above
+assets/records-editor.css
+# v10.0 Connect-a-Domain wizard assets: only enqueued by the guarded files above
+assets/records-editor.js
+
+# Fiat GAS rates tab (inc/admin/fiat-gas-rates-tab.php): never deployed, file_exists-guarded
+inc/admin/
+
+# Chat-flow wireframe seed data: never deployed; inc/wireframe-store.php only adds it as a LEO seed dir when is_dir()
+chatflows/

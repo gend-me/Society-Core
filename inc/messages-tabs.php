@@ -3270,7 +3270,7 @@ function gs_chat_tabs_enqueue() {
 	$rel  = 'assets/chat-tabs.css';
 	$url  = defined( 'GS_URL' ) ? ( GS_URL . $rel ) : plugins_url( '../' . $rel, __FILE__ );
 	$path = defined( 'GS_DIR' ) ? ( GS_DIR . $rel ) : ( dirname( __FILE__, 2 ) . '/' . $rel );
-	$ver  = ( @file_exists( $path ) ) ? @filemtime( $path ) : ( defined( 'GS_VERSION' ) ? GS_VERSION : false );
+	$ver  = GS_VERSION . '.' . ( @file_exists( $path ) ? @filemtime( $path ) : '0' );
 
 	wp_enqueue_style( 'gs-chat-tabs', $url, array(), $ver );
 }
