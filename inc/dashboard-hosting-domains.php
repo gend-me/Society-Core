@@ -28,6 +28,11 @@
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+// dashboard-hosting.php loads first and defines its own gs_render_hosting_domains_panel()
+// (guarded). Without this guard a full repo-tree install fatals with "Cannot redeclare";
+// the gend.me hub never ships this file, so the hub copy is already the one in use.
+if ( ! function_exists( 'gs_render_hosting_domains_panel' ) ) :
+
 
 /**
  * Render the Hosting▸Domains sub-panel.
@@ -188,3 +193,4 @@ function gs_render_hosting_domains_panel( $payload = array() ) {
         gs_render_hosting_records_modal( $payload );
     }
 }
+endif;
