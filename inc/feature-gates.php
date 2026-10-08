@@ -75,6 +75,7 @@ function gs_features_granular_slug_map() {
     return apply_filters( 'gs_features_granular_slug_map', array(
         'site-editor.php'             => array( 'area' => 'app',      'child' => 'app.theme_builder' ),
         'blog-manager'                => array( 'area' => 'app',      'child' => 'app.content_campaigns' ),
+        'content-campaigns'           => array( 'area' => 'app',      'child' => 'app.content_campaigns' ),
         'talk-flows'                  => array( 'area' => 'app',      'child' => 'app.talk_flows' ),
         'gdc-store-settings'          => array( 'area' => 'store',    'child' => 'store.store_management' ),
         'st_sales_team'               => array( 'area' => 'store',    'child' => 'store.sales_team' ),

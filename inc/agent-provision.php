@@ -194,7 +194,16 @@ function gs_agent_provision(\WP_REST_Request $request) {
         return new \WP_Error('gs_agent_no_domain', __('container has no resolvable mail domain', 'gend-society'), array('status' => 500));
     }
 
-    $email   = 'agent-' . $slug . '@' . $domain;
+    // The hub says which domain its agents use (email_domain: gend.me while sites share it, or this site's own);
+    // older hubs don't send it and this container's domain is used.
+    $hub_domain = strtolower(trim((string) ($payload['email_domain'] ?? '')));
+    if ($hub_domain !== '' && preg_match('/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/', $hub_domain)) {
+        $domain = $hub_domain;
+    }
+    // The hub sends the name chosen in its New Agent popup (email_local); older hubs don't, and the agent-<slug>
+    // address stays the default.
+    $local   = strtolower(preg_replace('/[^a-z0-9._-]+/i', '', (string) ($payload['email_local'] ?? '')));
+    $email   = ($local !== '' ? $local : 'agent-' . $slug) . '@' . $domain;
     $display = sanitize_text_field((string) ($payload['name'] ?? ('Agent ' . $slug)));
 
     if (!function_exists('em_inbox_provision_user')) {

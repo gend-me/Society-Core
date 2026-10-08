@@ -35,6 +35,7 @@ require_once GS_DIR . 'inc/theme-bundle.php';
 require_once GS_DIR . 'inc/admin-style.php';
 require_once GS_DIR . 'inc/admin-menu.php';
 require_once GS_DIR . 'inc/frontend-bar.php';
+require_once GS_DIR . 'inc/network-referrals.php'; // gend.me network-wide referral program
 require_once GS_DIR . 'inc/live-view.php';
 require_once GS_DIR . 'inc/seo-meta.php'; // SEO title/description box + meta, Open Graph and Twitter tags
 
@@ -50,6 +51,10 @@ require_once GS_DIR . 'inc/dashboard-remote-membership.php';
 // install pairing). Powers the "Active on linked web app" sub-status
 // on the BP-group Feature Suite tab via gdc_get_container_active_plugins.
 require_once GS_DIR . 'inc/feature-state-reporter.php';
+// gend.me mail service, container side: a paired install's mail goes out through gend.me (no SMTP setup needed).
+if ( file_exists( GS_DIR . 'inc/mail-relay.php' ) ) {
+    require_once GS_DIR . 'inc/mail-relay.php';
+}
 require_once GS_DIR . 'inc/dashboard-hosting.php';
 // Phase 72-02 (v10.0): adds dashboard-hosting-domains.php for Connect-a-Domain wizard.
 // file_exists guard mirrors Phase 71-02 partial-deploy defense (hub PVC .no-plugin-sync quirk).

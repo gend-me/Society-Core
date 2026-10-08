@@ -185,13 +185,13 @@
 			// --- Campaigns (magenta) ---
 			{ id: 'bm-post-12', source: 'campaigns', type: 'social_post',
 			  title: 'IG launch teaser', start: iso(8, 9, 0), end: null,
-			  all_day: false, color: C, status: 'scheduled', url: '/admin.php?page=blog-manager', busy: false },
+			  all_day: false, color: C, status: 'scheduled', url: '/admin.php?page=content-campaigns', busy: false },
 			{ id: 'bm-drip-5', source: 'campaigns', type: 'drip',
 			  title: 'Welcome drip step 2', start: iso(15, 8, 0), end: null,
 			  all_day: false, color: C, status: 'sent', url: null, busy: false },
 			{ id: 'bm-post-19', source: 'campaigns', type: 'social_post',
 			  title: 'Evergreen reshare', start: iso(24, 18, 30), end: null,
-			  all_day: false, color: C, status: 'scheduled', url: '/admin.php?page=blog-manager', busy: false },
+			  all_day: false, color: C, status: 'scheduled', url: '/admin.php?page=content-campaigns', busy: false },
 
 			// --- Meetings (green) ---
 			{ id: 'mt-meet-301', source: 'meetings', type: 'meeting',

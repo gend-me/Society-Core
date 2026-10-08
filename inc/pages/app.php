@@ -31,16 +31,16 @@
             <div class="gs-card">
                 <div class="gs-card-header">
                     <h3><span class="dashicons dashicons-admin-post"></span>
-                        <?php esc_html_e('Blog Manager', 'gend-society'); ?>
+                        <?php esc_html_e('Content Campaigns', 'gend-society'); ?>
                     </h3>
                 </div>
                 <div class="gs-card-body">
                     <p>
                         <?php esc_html_e('Manage your blog posts, categories, and publishing workflow.', 'gend-society'); ?>
                     </p>
-                    <a href="<?php echo esc_url(admin_url('admin.php?page=blog-manager')); ?>"
+                    <a href="<?php echo esc_url(admin_url('admin.php?page=' . (defined('BM_ADMIN_SLUG') ? BM_ADMIN_SLUG : 'blog-manager'))); ?>"
                         class="gs-btn gs-btn-primary">
-                        <?php esc_html_e('Open Blog Manager', 'gend-society'); ?>
+                        <?php esc_html_e('Open Content Campaigns', 'gend-society'); ?>
                     </a>
                 </div>
             </div>
