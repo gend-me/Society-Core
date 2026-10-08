@@ -490,7 +490,7 @@ window.__WS_BOOT__ = {
         'id'           => (int) $user->ID,
         'name'         => $user->display_name,
         'email'        => $user->user_email,
-        'is_super'     => is_super_admin( $user->ID ),
+        'is_super'     => gend_society_is_hub_operator( $user->ID ),
     ) ); ?>,
     pingPath:    '/wp-json/gs/v1/web-shell/ping',
     sitesPath:   '/wp-json/gs/v1/web-shell/sites',
@@ -600,7 +600,7 @@ if ( ! function_exists( 'gs_web_shell_rest_sites' ) ) {
         }
         // Super-admin sees every site they manage even without a membership row,
         // mirrors the desktop sidebar's behavior.
-        if ( is_super_admin( $user->ID ) && function_exists( 'wu_get_sites' ) && empty( $out ) ) {
+        if ( gend_society_is_hub_operator( $user->ID ) && function_exists( 'wu_get_sites' ) && empty( $out ) ) {
             $sites = (array) wu_get_sites( array( 'number' => 100 ) );
             foreach ( $sites as $s ) {
                 if ( ! is_object( $s ) ) continue;
@@ -629,7 +629,7 @@ if ( ! function_exists( 'gs_web_shell_rest_groups' ) ) {
         $user_id = get_current_user_id();
         // Pull groups where current user is a group admin OR mod, plus
         // any if super-admin.
-        $args = is_super_admin( $user_id )
+        $args = gend_society_is_hub_operator( $user_id )
             ? array( 'per_page' => 50, 'show_hidden' => true )
             : array( 'per_page' => 50, 'user_id' => $user_id, 'show_hidden' => true );
         $g = groups_get_groups( $args );

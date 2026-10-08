@@ -129,7 +129,7 @@ function gs_collab_profile_can_act_for_group( $uid, $gid ) {
 	if ( $uid <= 0 || $gid <= 0 ) {
 		return false;
 	}
-	if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) {
+	if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) { // site-admin check, not a hub signal (104 audit)
 		return true;
 	}
 	return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )

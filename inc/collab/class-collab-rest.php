@@ -254,9 +254,7 @@ class Gend_GS_Collab_REST {
 		}
 
 		// Hub-only: DGEN/chain live on the hub; a container accept is unauthorized.
-		$is_hub = ! class_exists( 'Gend_CP_OAuth_Resource' )
-			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
-			|| Gend_CP_OAuth_Resource::is_main_node();
+		$is_hub = gend_society_is_hub();
 		if ( ! $is_hub ) {
 			return false;
 		}
@@ -297,7 +295,7 @@ class Gend_GS_Collab_REST {
 		}
 
 		// Now the standard two-arg admin/mod check on the counterparty group.
-		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) {
+		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) { // site-admin check, not a hub signal (104 audit)
 			return true;
 		}
 		return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )
@@ -489,16 +487,15 @@ class Gend_GS_Collab_REST {
 	}
 
 	/**
-	 * Hub-only gate. Mirrors can_accept_contract @:193-196 /
-	 * class-collab-contract.php:66-70 — true on the main node (or when the OAuth
-	 * resource isn't present at all), false on a container.
+	 * Hub gate: true when the runtime mode is hub (gend_society_is_hub(), from
+	 * GEND_SOCIETY_RUNTIME), false on containers and standalone installs.
+	 * Before 1.1.6 this inferred "hub" from a missing Gend_CP_OAuth_Resource
+	 * class, which made every standalone install look like the hub.
 	 *
 	 * @return bool
 	 */
 	private static function is_hub() : bool {
-		return ! class_exists( 'Gend_CP_OAuth_Resource' )
-			|| ! method_exists( 'Gend_CP_OAuth_Resource', 'is_main_node' )
-			|| Gend_CP_OAuth_Resource::is_main_node();
+		return gend_society_is_hub();
 	}
 
 	/**
@@ -601,7 +598,7 @@ class Gend_GS_Collab_REST {
 		}
 
 		// Standard two-arg admin/mod check on the counterparty group.
-		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) {
+		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) { // site-admin check, not a hub signal (104 audit)
 			return true;
 		}
 		return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )
@@ -763,7 +760,7 @@ class Gend_GS_Collab_REST {
 		if ( $uid <= 0 || $gid <= 0 ) {
 			return false;
 		}
-		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) {
+		if ( function_exists( 'is_super_admin' ) && is_super_admin( $uid ) ) { // site-admin check, not a hub signal (104 audit)
 			return true;
 		}
 		return ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $uid, $gid ) )

@@ -2258,7 +2258,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
 
 function gs_dv_leo_admin_ok( $group_id ) {
     if ( ! is_user_logged_in() ) return false;
-    if ( current_user_can( 'manage_options' ) || is_super_admin() ) return true;
+    if ( current_user_can( 'manage_options' ) || is_super_admin() ) return true; // site-admin check, not a hub signal (104 audit)
     return function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( get_current_user_id(), (int) $group_id );
 }
 

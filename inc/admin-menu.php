@@ -382,7 +382,7 @@ function gs_suppress_plugin_menus()
         // Feature Access Control
         // Get current user and their allowed features. Super admins bypass this.
         $current_user_id = get_current_user_id();
-        if (!is_super_admin($current_user_id) && !current_user_can('manage_network')) {
+        if (!is_super_admin($current_user_id) && !current_user_can('manage_network')) { // site-admin check, not a hub signal (104 audit)
             $allowed_features = get_user_meta($current_user_id, 'gs_feature_access', true);
             if (!is_array($allowed_features)) {
                 $allowed_features = []; // Default: No access if never set
@@ -402,7 +402,7 @@ function gs_suppress_plugin_menus()
         }
 
         // Process submenu filtering if the top-level menu survived
-        if (isset($submenu[$slug]) && !is_super_admin($current_user_id) && !current_user_can('manage_network')) {
+        if (isset($submenu[$slug]) && !is_super_admin($current_user_id) && !current_user_can('manage_network')) { // site-admin check, not a hub signal (104 audit)
             foreach ($submenu[$slug] as $sub_pos => $sub_item) {
                 $sub_slug = isset($sub_item[2]) ? $sub_item[2] : '';
                 if ($sub_slug && !in_array($sub_slug, $allowed_features, true) && $sub_slug !== 'profile.php') {

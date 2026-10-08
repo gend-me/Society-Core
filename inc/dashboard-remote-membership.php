@@ -1257,7 +1257,7 @@ function gs_render_membership_panel( $payload = null ) {
                     // button just needs the matching data-gs-upgrade-open
                     // attributes - no new modal/JS required).
                     $gs_server_can_upgrade = current_user_can( 'manage_options' )
-                        || is_super_admin()
+                        || is_super_admin() // site-admin check, not a hub signal (104 audit)
                         || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
                     $gs_server_upgrade_attrs = ( $gs_server_can_upgrade && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
                         ? gs_hosting_resource_upgrade_data_attrs( 'server' )
@@ -2768,7 +2768,8 @@ function gs_membership_payload_group_only() {
         } catch ( \Throwable $e ) {}
     }
     if ( ! $gid ) {
-        $gid = (int) get_blog_option( $blog_id, 'gdc_bp_group_id', 0 );
+        // get_blog_option() exists only on multisite; a single-site install reads its own option.
+        $gid = (int) ( function_exists( 'get_blog_option' ) ? get_blog_option( $blog_id, 'gdc_bp_group_id', 0 ) : get_option( 'gdc_bp_group_id', 0 ) );
     }
     if ( ! $gid && function_exists( 'get_metadata' ) ) {
         $gid = (int) get_metadata( 'blog', $blog_id, 'gdc_bp_group_id', true );

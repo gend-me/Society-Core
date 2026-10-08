@@ -1,0 +1,30 @@
+name: manifest-check
+
+# inc/bootstrap/manifest.php is the single list of what gend-society loads.
+# This job fails when an inc/**/*.php file is missing from the manifest or
+# listed twice, when a listed path does not exist, when a tier/need is
+# invalid, when gend-society.php requires an inc/ module directly instead of
+# through the manifest, or when any inc/ file decides "am I the hub" from a
+# missing class instead of gend_society_is_hub().
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  manifest-check:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: none
+
+      - name: Manifest coverage + validity
+        run: php bin/check-manifest.php
