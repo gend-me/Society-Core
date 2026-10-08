@@ -28,6 +28,9 @@ if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) ) {
     define( 'GS_COLLAB_MARKET_PUBLIC', false );
 }
 
+// Bundled GenD Society block theme (registered before setup_theme).
+require_once GS_DIR . 'inc/theme-bundle.php';
+
 // Core includes
 require_once GS_DIR . 'inc/admin-style.php';
 require_once GS_DIR . 'inc/admin-menu.php';
