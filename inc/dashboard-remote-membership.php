@@ -2768,7 +2768,8 @@ function gs_membership_payload_group_only() {
         } catch ( \Throwable $e ) {}
     }
     if ( ! $gid ) {
-        $gid = (int) get_blog_option( $blog_id, 'gdc_bp_group_id', 0 );
+        // get_blog_option() exists only on multisite; a single-site install reads its own option.
+        $gid = (int) ( function_exists( 'get_blog_option' ) ? get_blog_option( $blog_id, 'gdc_bp_group_id', 0 ) : get_option( 'gdc_bp_group_id', 0 ) );
     }
     if ( ! $gid && function_exists( 'get_metadata' ) ) {
         $gid = (int) get_metadata( 'blog', $blog_id, 'gdc_bp_group_id', true );
