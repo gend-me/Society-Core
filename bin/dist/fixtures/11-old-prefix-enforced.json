@@ -1,8 +1,11 @@
 {
-	"name": "old-prefix PHP globals fail once enforcement is on (Plan 105-11)",
+	"name": "old-prefix PHP global in a shipped customer file fails both builds (enforced since Plan 105-11)",
 	"flags": [
 		"--enforce-old-prefix"
 	],
+	"append": {
+		"inc/portal-connect.php": "\nfunction gs_selftest_old_prefix() {\n\treturn defined( 'GS_VERSION' ) ? GS_VERSION : '';\n}\n// function gs_comment_only_is_ignored() {}\n"
+	},
 	"expect": [
 		{
 			"variant": "wporg",

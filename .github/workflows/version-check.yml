@@ -1,6 +1,6 @@
 name: version-check
 
-# GS_VERSION (gend-society.php) is the single version source. This job fails
+# GEND_SOCIETY_VERSION (gend-society.php) is the single version source. This job fails
 # when the plugin header, readme Stable tag, bundled theme Version or theme
 # readme Stable tag disagree with it, when a hard-coded asset cache-buster
 # appears in shipped PHP/JS, or when any shipped PHP file has a parse error.

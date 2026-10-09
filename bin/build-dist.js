@@ -37,8 +37,8 @@ const MAIN_FILE = 'gend-society.php';
 const ALWAYS = [MAIN_FILE, 'readme.txt'];
 const SCRIPT_ROOT = path.resolve(__dirname, '..');
 
-// Plan 105-11 sets true (after the prefix rename lands on this branch).
-const OLD_PREFIX_ENFORCED = false;
+// Enforced since Plan 105-11 (the prefix rename is on this branch): old-prefix globals only in the full build's compat files.
+const OLD_PREFIX_ENFORCED = true;
 
 const WPORG_MAX_BYTES = 10 * 1024 * 1024;
 
@@ -369,8 +369,11 @@ function assertContent(stageDir, rels, cfg, oldPrefixEnforced, fail, warn) {
 		}
 		if (src.includes(UPLOADS_URL) && !UPLOADS_ALLOWED_IN.includes(rel)) remote('gend-uploads-url', rel);
 		if (rel.endsWith('.php') && !cfg.oldPrefixAllowedIn.includes(rel)) {
+			// Code only: whole-line comments (//, #, /*, * docblock lines) may name old
+			// identifiers in prose or wp-config examples (operator constants keep GS_*).
+			const code = src.replace(/^[ \t]*(?:\/\/|#|\/\*|\*).*$/gm, '');
 			let n = 0;
-			for (const re of OLD_PREFIX_RES) n += (src.match(re) || []).length;
+			for (const re of OLD_PREFIX_RES) n += (code.match(re) || []).length;
 			if (n) oldPrefixHits.push([rel, n]);
 		}
 	}

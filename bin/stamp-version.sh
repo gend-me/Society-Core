@@ -1,13 +1,13 @@
 #!/usr/bin/env bash
 # bin/stamp-version.sh — single version source for the GenD Society plugin.
 #
-# GS_VERSION in gend-society.php is the ONLY hand-edited version. WordPress
+# GEND_SOCIETY_VERSION in gend-society.php is the ONLY hand-edited version. WordPress
 # reads plugin/theme headers statically (it never executes PHP for them), so
 # the header copies cannot be derived at runtime; this script stamps them and
 # `check` (run by CI on every push/PR) fails when anything disagrees.
 #
-#   bin/stamp-version.sh set <ver> [--force]   rewrite GS_VERSION, then stamp
-#   bin/stamp-version.sh stamp                 copy GS_VERSION into every header
+#   bin/stamp-version.sh set <ver> [--force]   rewrite GEND_SOCIETY_VERSION, then stamp
+#   bin/stamp-version.sh stamp                 copy GEND_SOCIETY_VERSION into every header
 #   bin/stamp-version.sh check                 verify headers + scan cache-busters
 #   bin/stamp-version.sh --help
 #
@@ -24,18 +24,18 @@
 # are joined across lines (up to `);` / `;`) before testing. Rules:
 #   1   literal query-string version: ?ver=<digit> / ?v=<digit>
 #   1b  ?ver= built from a bare filemtime: '?ver=' . filemtime(
-#   1c  a line echoing ?v= / ?ver= that uses filemtime( without GS_VERSION
+#   1c  a line echoing ?v= / ?ver= that uses filemtime( without GEND_SOCIETY_VERSION
 #   2   a quoted semver in a `$...ver... =` assignment (e.g. $ver = '2.1.0',
-#       or a dead `defined('GS_VERSION') ? GS_VERSION : '1.0.0'` fallback)
+#       or a dead `defined('GEND_SOCIETY_VERSION') ? GEND_SOCIETY_VERSION : '1.0.0'` fallback)
 #   3   enqueue/register call with a quoted semver literal and no http(s) src
 #       (CDN library pins such as chart.js 4.4.1 are library versions -> allowed)
 #   4   filemtime( used as a version (enqueue arg or `$...ver... =` assignment)
-#       that is not derived from GS_VERSION.
+#       that is not derived from GEND_SOCIETY_VERSION.
 #       GS-derived variable tracking: a variable becomes GS-derived when its
-#       right-hand side contains GS_VERSION or starts with a GS-derived variable.
-#       An assignment passes when its RHS STARTS with GS_VERSION / a GS-derived
+#       right-hand side contains GEND_SOCIETY_VERSION or starts with a GS-derived variable.
+#       An assignment passes when its RHS STARTS with GEND_SOCIETY_VERSION / a GS-derived
 #       variable, or every filemtime( in it is immediately preceded by
-#       `GS_VERSION . '.' .` (or `<gs-var> .`). Containing GS_VERSION somewhere
+#       `GEND_SOCIETY_VERSION . '.' .` (or `<gs-var> .`). Containing GEND_SOCIETY_VERSION somewhere
 #       else (e.g. only in a ternary fallback) does NOT pass.
 #       Tracking is per FILE, not per function: a slightly looser check, accepted.
 #
@@ -43,7 +43,7 @@
 # the offending statement). A NEW hit in the same file still fails.
 ALLOWLIST=(
   # Hub-hosted cross-origin leo plugin JS; must track leo's files, which a
-  # container's GS_VERSION cannot see.
+  # container's GEND_SOCIETY_VERSION cannot see.
   "inc/ai-widget.php|'2.1.0'"
   # Foreign blog-manager / gend-media-optimizer admin CSS; each file's own
   # mtime is the exact cache signal.
@@ -67,10 +67,10 @@ usage() {
 
 read_version() {
   local v n
-  v=$(sed -nE "s/^define\(\s*'GS_VERSION'\s*,\s*'([^']+)'\s*\);.*/\1/p" "$MAIN")
+  v=$(sed -nE "s/^define\(\s*'GEND_SOCIETY_VERSION'\s*,\s*'([^']+)'\s*\);.*/\1/p" "$MAIN")
   n=$(printf '%s\n' "$v" | grep -c . || true)
   if [ "$n" -ne 1 ] || ! printf '%s' "$v" | grep -Eq "$SEMVER_RE"; then
-    echo "ERROR: expected exactly one semver define('GS_VERSION', ...) in $MAIN, got: '${v}'" >&2
+    echo "ERROR: expected exactly one semver define('GEND_SOCIETY_VERSION', ...) in $MAIN, got: '${v}'" >&2
     exit 2
   fi
   printf '%s' "$v"
@@ -105,11 +105,11 @@ do_set() {
   if [ "$force" != "--force" ]; then
     local top; top=$(printf '%s\n%s\n' "$cur" "$new" | sort -V | tail -n1)
     if [ "$new" = "$cur" ] || [ "$top" != "$new" ]; then
-      echo "ERROR: $new is not above current GS_VERSION $cur (use --force)" >&2; exit 2
+      echo "ERROR: $new is not above current GEND_SOCIETY_VERSION $cur (use --force)" >&2; exit 2
     fi
   fi
   export STAMP_VER="$new"
-  pi "s/^(define\(\s*'GS_VERSION'\s*,\s*')[^']+('\s*\);)/\$1\$ENV{STAMP_VER}\$2/" "$MAIN"
+  pi "s/^(define\(\s*'GEND_SOCIETY_VERSION'\s*,\s*')[^']+('\s*\);)/\$1\$ENV{STAMP_VER}\$2/" "$MAIN"
   do_stamp
 }
 
@@ -133,7 +133,7 @@ scan_cache_busters() {
       push @allow, [$f, $n];
     }
     my $reasons = {
-      "inc/ai-widget.php" => "hub-hosted leo assets (track leo, not GS_VERSION)",
+      "inc/ai-widget.php" => "hub-hosted leo assets (track leo, not GEND_SOCIETY_VERSION)",
       "inc/dashboard-hosting.php" => "foreign blog-manager/gend-media-optimizer CSS (own mtime)",
       "inc/dashboard-remote-membership.php" => "projects plugin assets (PSOO_VER)",
     };
@@ -151,7 +151,7 @@ scan_cache_busters() {
       for my $line (split /\n/, $src, -1) {
         if ($line =~ /\?v(?:er)?=[\x27"]?[0-9]/) { push @ev, [$off, "rule1 literal ?ver=", $line] }
         if ($line =~ /\?ver=[\x27"]?\s*\.\s*\@?filemtime\(/) { push @ev, [$off, "rule1b ?ver= from bare filemtime", $line] }
-        elsif ($line =~ /\?v(?:er)?=/ && $line =~ /filemtime\(/ && $line !~ /GS_VERSION/) { push @ev, [$off, "rule1c echoed ?v= from filemtime without GS_VERSION", $line] }
+        elsif ($line =~ /\?v(?:er)?=/ && $line =~ /filemtime\(/ && $line !~ /GEND_SOCIETY_VERSION/) { push @ev, [$off, "rule1c echoed ?v= from filemtime without GEND_SOCIETY_VERSION", $line] }
         $off += length($line) + 1;
       }
       if ($file =~ /\.php$/) {
@@ -167,7 +167,7 @@ scan_cache_busters() {
       my %gs;
       my $gsalt = sub { my @v = sort keys %gs; return @v ? "|" . join("|", map { "\\\$\Q$_\E" } @v) : "" };
       my $fm_ok = sub {
-        my ($t) = @_; my $alt = "GS_VERSION" . $gsalt->();
+        my ($t) = @_; my $alt = "GEND_SOCIETY_VERSION" . $gsalt->();
         while ($t =~ /\@?filemtime\(/g) {
           my $pre = substr($t, 0, $-[0]);
           return 0 unless $pre =~ /(?:$alt)\s*\.\s*(?:[\x27"]\.[\x27"]\s*\.\s*)?$/;
@@ -180,13 +180,13 @@ scan_cache_busters() {
         if ($kind eq "assign") {
           my ($name, $rhs) = @$x;
           $rhs =~ s/^\s+|\s+$//g;
-          my $alt = "GS_VERSION" . $gsalt->();
+          my $alt = "GEND_SOCIETY_VERSION" . $gsalt->();
           push @hits, "rule2 quoted semver in \$$name assignment" if $rhs =~ $semq;
           if ($rhs =~ /filemtime\(/) {
-            push @hits, "rule4 \$$name from filemtime without GS_VERSION"
+            push @hits, "rule4 \$$name from filemtime without GEND_SOCIETY_VERSION"
               unless $rhs =~ /^(?:$alt)\b/ || $fm_ok->($rhs);
           }
-          if ($rhs =~ /GS_VERSION/ || $rhs =~ /^(?:$alt)\b/) { $gs{$name} = 1 } else { delete $gs{$name} }
+          if ($rhs =~ /GEND_SOCIETY_VERSION/ || $rhs =~ /^(?:$alt)\b/) { $gs{$name} = 1 } else { delete $gs{$name} }
         } elsif ($kind eq "enqueue") {
           push @hits, "rule3 enqueue with quoted semver literal" if $x =~ $semq && $x !~ m{https?://};
           push @hits, "rule4 enqueue version from bare filemtime" if $x =~ /filemtime\(/ && !$fm_ok->($x);
@@ -214,7 +214,7 @@ do_check() {
   local rc=0 row loc val
   printf '%-48s | %s\n' "location" "value"
   printf '%-48s-+-%s\n' "------------------------------------------------" "--------"
-  printf '%-48s | %s\n' "$MAIN GS_VERSION" "$ver"
+  printf '%-48s | %s\n' "$MAIN GEND_SOCIETY_VERSION" "$ver"
   for row in \
     "$MAIN header Version|$(first_value "$MAIN" '^\s\*\s*Version:\s*(.*)' 1)" \
     "$README Stable tag|$(first_value "$README" '^Stable tag:\s*(.*)')" \
@@ -224,7 +224,7 @@ do_check() {
     if [ "$val" = "$ver" ]; then
       printf '%-48s | %s\n' "$loc" "$val"
     else
-      printf '%-48s | %s   <-- MISMATCH (GS_VERSION %s)\n' "$loc" "$val" "$ver"; rc=1
+      printf '%-48s | %s   <-- MISMATCH (GEND_SOCIETY_VERSION %s)\n' "$loc" "$val" "$ver"; rc=1
     fi
   done
   echo
