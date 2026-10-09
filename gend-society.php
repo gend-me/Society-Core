@@ -17,9 +17,9 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('GS_VERSION', '1.1.7');
-define('GS_DIR', plugin_dir_path(__FILE__));
-define('GS_URL', plugin_dir_url(__FILE__));
+define('GEND_SOCIETY_VERSION', '1.1.7');
+define('GEND_SOCIETY_DIR', plugin_dir_path(__FILE__));
+define('GEND_SOCIETY_URL', plugin_dir_url(__FILE__));
 define('GEND_SOCIETY_FILE', __FILE__);
 
 // GenD Match v12.0 Phase 86 — Tier B counsel gate (default false, DOM-absent +
@@ -28,8 +28,8 @@ define('GEND_SOCIETY_FILE', __FILE__);
 // operator can pre-define it truthy in wp-config without being clobbered, and so a
 // re-define never fires. Defined BEFORE the collab requires so every collab class
 // sees it.
-if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) ) {
-    define( 'GS_COLLAB_MARKET_PUBLIC', false );
+if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) ) {
+    define( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC', false );
 }
 
 // Modules load through the manifest (inc/bootstrap/manifest.php): one ordered
@@ -39,6 +39,6 @@ if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) ) {
 // file_exists-guarded. Add new modules to the manifest, not here. These two
 // bootstrap requires are deliberately unguarded: a missing loader must fail
 // loudly rather than silently load nothing.
-require_once GS_DIR . 'inc/bootstrap/context.php';
-require_once GS_DIR . 'inc/bootstrap/loader.php';
+require_once GEND_SOCIETY_DIR . 'inc/bootstrap/context.php';
+require_once GEND_SOCIETY_DIR . 'inc/bootstrap/loader.php';
 gend_society_load_modules();

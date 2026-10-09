@@ -8,16 +8,16 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-add_action('enqueue_block_editor_assets', 'gs_enqueue_live_view_assets');
+add_action('enqueue_block_editor_assets', 'gend_society_enqueue_live_view_assets');
 
-function gs_enqueue_live_view_assets()
+function gend_society_enqueue_live_view_assets()
 {
-    $ver = GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-live-view.js');
+    $ver = GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/gs-live-view.js');
 
     // Enqueue JS
     wp_enqueue_script(
         'gs-live-view',
-        GS_URL . 'assets/gs-live-view.js',
+        GEND_SOCIETY_URL . 'assets/gs-live-view.js',
         [
             'wp-plugins',
             'wp-edit-post',
@@ -33,9 +33,9 @@ function gs_enqueue_live_view_assets()
     // Enqueue CSS
     wp_enqueue_style(
         'gs-live-view',
-        GS_URL . 'assets/gs-live-view.css',
+        GEND_SOCIETY_URL . 'assets/gs-live-view.css',
         [],
-        GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-live-view.css')
+        GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/gs-live-view.css')
     );
 
     // Pass data to JS
@@ -92,7 +92,7 @@ add_action('wp_enqueue_scripts', function () {
  */
 add_filter('template_include', function ($template) {
     if (isset($_GET['gs_live_view']) && $_GET['gs_live_view'] === '1') {
-        $blank_template = GS_DIR . 'inc/templates/live-view-blank.php';
+        $blank_template = GEND_SOCIETY_DIR . 'inc/templates/live-view-blank.php';
         if (file_exists($blank_template)) {
             return $blank_template;
         }

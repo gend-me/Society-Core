@@ -38,17 +38,17 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-const GS_AGENT_SWITCH_COOKIE = 'gs_agent_switch';
-const GS_AGENT_SWITCH_TTL    = 8 * HOUR_IN_SECONDS;
+const GEND_SOCIETY_AGENT_SWITCH_COOKIE = 'gs_agent_switch';
+const GEND_SOCIETY_AGENT_SWITCH_TTL    = 8 * HOUR_IN_SECONDS;
 
-add_action('rest_api_init', 'gs_agent_switch_register_routes');
-add_action('wp_footer', 'gs_agent_switch_render_pill');
-add_action('admin_footer', 'gs_agent_switch_render_pill');
+add_action('rest_api_init', 'gend_society_agent_switch_register_routes');
+add_action('wp_footer', 'gend_society_agent_switch_render_pill');
+add_action('admin_footer', 'gend_society_agent_switch_render_pill');
 
-function gs_agent_switch_register_routes() {
+function gend_society_agent_switch_register_routes() {
     register_rest_route('gs/v1', '/agent-switch/restore', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_switch_rest_restore',
+        'callback'            => 'gend_society_agent_switch_rest_restore',
         // The real check is inside the callback via gs_agent_switch_read_state()
         // — the current user (the agent) has no useful WP capability to gate
         // on, so we only require SOME logged-in session here.
@@ -64,7 +64,7 @@ function gs_agent_switch_register_routes() {
  * @param string $return_url       Where to send the browser back to.
  * @return array|\WP_Error array( 'redirect_url' => string ) on success.
  */
-function gs_agent_switch_activate($original_user_id, $agent_user_id, $return_url = '') {
+function gend_society_agent_switch_activate($original_user_id, $agent_user_id, $return_url = '') {
     $original_user_id = (int) $original_user_id;
     $agent_user_id    = (int) $agent_user_id;
 
@@ -77,20 +77,20 @@ function gs_agent_switch_activate($original_user_id, $agent_user_id, $return_url
 
     $token = bin2hex(random_bytes(32));
     set_transient(
-        'gs_agent_switch_' . wp_hash($token),
+        'gend_society_agent_switch_' . wp_hash($token),
         array(
             'original_user_id' => $original_user_id,
             'agent_user_id'    => $agent_user_id,
             'return_url'       => (string) $return_url,
             'created_at'       => time(),
         ),
-        GS_AGENT_SWITCH_TTL
+        GEND_SOCIETY_AGENT_SWITCH_TTL
     );
 
-    gs_agent_switch_set_cookie($token, time() + GS_AGENT_SWITCH_TTL);
+    gend_society_agent_switch_set_cookie($token, time() + GEND_SOCIETY_AGENT_SWITCH_TTL);
     // setcookie() only affects the NEXT request — make it visible to this one
     // too in case anything downstream in this same request checks state.
-    $_COOKIE[GS_AGENT_SWITCH_COOKIE] = $token;
+    $_COOKIE[GEND_SOCIETY_AGENT_SWITCH_COOKIE] = $token;
 
     wp_clear_auth_cookie();
     wp_set_current_user($agent_user_id);
@@ -106,13 +106,13 @@ function gs_agent_switch_activate($original_user_id, $agent_user_id, $return_url
  *
  * @return array|null
  */
-function gs_agent_switch_read_state() {
-    $token = isset($_COOKIE[GS_AGENT_SWITCH_COOKIE]) ? (string) $_COOKIE[GS_AGENT_SWITCH_COOKIE] : '';
+function gend_society_agent_switch_read_state() {
+    $token = isset($_COOKIE[GEND_SOCIETY_AGENT_SWITCH_COOKIE]) ? (string) $_COOKIE[GEND_SOCIETY_AGENT_SWITCH_COOKIE] : '';
     if ($token === '') {
         return null;
     }
 
-    $state = get_transient('gs_agent_switch_' . wp_hash($token));
+    $state = get_transient('gend_society_agent_switch_' . wp_hash($token));
     if (!is_array($state) || empty($state['agent_user_id']) || empty($state['original_user_id'])) {
         return null;
     }
@@ -130,15 +130,15 @@ function gs_agent_switch_read_state() {
  * @param \WP_REST_Request $request Request instance.
  * @return \WP_REST_Response|\WP_Error
  */
-function gs_agent_switch_rest_restore(\WP_REST_Request $request) {
-    $state = gs_agent_switch_read_state();
+function gend_society_agent_switch_rest_restore(\WP_REST_Request $request) {
+    $state = gend_society_agent_switch_read_state();
     if (!$state) {
         return new \WP_Error('gs_agent_switch_no_state', __('No active agent switch to restore.', 'gend-society'), array('status' => 409));
     }
 
-    $token = (string) $_COOKIE[GS_AGENT_SWITCH_COOKIE];
-    delete_transient('gs_agent_switch_' . wp_hash($token));
-    gs_agent_switch_clear_cookie();
+    $token = (string) $_COOKIE[GEND_SOCIETY_AGENT_SWITCH_COOKIE];
+    delete_transient('gend_society_agent_switch_' . wp_hash($token));
+    gend_society_agent_switch_clear_cookie();
 
     $original_user_id = (int) $state['original_user_id'];
     if (!get_userdata($original_user_id)) {
@@ -162,9 +162,9 @@ function gs_agent_switch_rest_restore(\WP_REST_Request $request) {
  * @param string $token   Raw token value.
  * @param int    $expires Unix timestamp.
  */
-function gs_agent_switch_set_cookie($token, $expires) {
+function gend_society_agent_switch_set_cookie($token, $expires) {
     setcookie(
-        GS_AGENT_SWITCH_COOKIE,
+        GEND_SOCIETY_AGENT_SWITCH_COOKIE,
         $token,
         array(
             'expires'  => (int) $expires,
@@ -177,9 +177,9 @@ function gs_agent_switch_set_cookie($token, $expires) {
     );
 }
 
-function gs_agent_switch_clear_cookie() {
-    gs_agent_switch_set_cookie('', time() - HOUR_IN_SECONDS);
-    unset($_COOKIE[GS_AGENT_SWITCH_COOKIE]);
+function gend_society_agent_switch_clear_cookie() {
+    gend_society_agent_switch_set_cookie('', time() - HOUR_IN_SECONDS);
+    unset($_COOKIE[GEND_SOCIETY_AGENT_SWITCH_COOKIE]);
 }
 
 /**
@@ -187,8 +187,8 @@ function gs_agent_switch_clear_cookie() {
  * while a switch is active. Self-contained inline markup/script — no enqueued
  * asset, since this must render unconditionally site-wide.
  */
-function gs_agent_switch_render_pill() {
-    $state = gs_agent_switch_read_state();
+function gend_society_agent_switch_render_pill() {
+    $state = gend_society_agent_switch_read_state();
     if (!$state) {
         return;
     }

@@ -22,18 +22,18 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'gs_chat_register_rest' ) ) {
+if ( ! function_exists( 'gend_society_chat_register_rest' ) ) {
 
-    function gs_chat_register_rest() {
+    function gend_society_chat_register_rest() {
         register_rest_route( 'gs/v1', '/web-shell/chat/status', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_chat_rest_status',
+            'callback'            => 'gend_society_chat_rest_status',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
         register_rest_route( 'gs/v1', '/web-shell/chat/key', array(
             array(
                 'methods'             => 'POST',
-                'callback'            => 'gs_chat_rest_key_save',
+                'callback'            => 'gend_society_chat_rest_key_save',
                 'permission_callback' => function () { return is_user_logged_in(); },
                 'args' => array(
                     'api_key' => array( 'required' => true, 'type' => 'string' ),
@@ -42,13 +42,13 @@ if ( ! function_exists( 'gs_chat_register_rest' ) ) {
             ),
             array(
                 'methods'             => 'DELETE',
-                'callback'            => 'gs_chat_rest_key_clear',
+                'callback'            => 'gend_society_chat_rest_key_clear',
                 'permission_callback' => function () { return is_user_logged_in(); },
             ),
         ) );
         register_rest_route( 'gs/v1', '/web-shell/chat/stream', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_rest_stream',
+            'callback'            => 'gend_society_chat_rest_stream',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'model'      => array( 'required' => false, 'type' => 'string' ),
@@ -59,11 +59,11 @@ if ( ! function_exists( 'gs_chat_register_rest' ) ) {
             ),
         ) );
     }
-    add_action( 'rest_api_init', 'gs_chat_register_rest' );
+    add_action( 'rest_api_init', 'gend_society_chat_register_rest' );
 }
 
-if ( ! function_exists( 'gs_chat_default_model' ) ) {
-    function gs_chat_default_model() {
+if ( ! function_exists( 'gend_society_chat_default_model' ) ) {
+    function gend_society_chat_default_model() {
         // Bumped via `update_site_option('gs_chat_default_model', '...')`
         // without a code redeploy when Anthropic ships newer models.
         $opt = get_site_option( 'gs_chat_default_model', '' );
@@ -72,25 +72,25 @@ if ( ! function_exists( 'gs_chat_default_model' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_chat_rest_status' ) ) {
+if ( ! function_exists( 'gend_society_chat_rest_status' ) ) {
 
-    function gs_chat_rest_status() {
+    function gend_society_chat_rest_status() {
         $uid = get_current_user_id();
-        $cur = get_user_meta( $uid, '_gs_chat_anthropic_key', true );
-        $key_ok = (bool) gs_gcloud_cfg( 'creds_key' ); // re-uses gcloud's encryption key constant
+        $cur = get_user_meta( $uid, '_gend_society_chat_anthropic_key', true );
+        $key_ok = (bool) gend_society_gcloud_cfg( 'creds_key' ); // re-uses gcloud's encryption key constant
         return array(
             'connected'       => ! empty( $cur ),
             'has_encryption' => $key_ok,
-            'default_model'  => gs_chat_default_model(),
-            'preferred_model'=> (string) ( get_user_meta( $uid, '_gs_chat_model', true ) ?: '' ),
+            'default_model'  => gend_society_chat_default_model(),
+            'preferred_model'=> (string) ( get_user_meta( $uid, '_gend_society_chat_model', true ) ?: '' ),
         );
     }
 }
 
-if ( ! function_exists( 'gs_chat_rest_key_save' ) ) {
+if ( ! function_exists( 'gend_society_chat_rest_key_save' ) ) {
 
-    function gs_chat_rest_key_save( WP_REST_Request $req ) {
-        if ( ! function_exists( 'gs_gcloud_encrypt' ) ) {
+    function gend_society_chat_rest_key_save( WP_REST_Request $req ) {
+        if ( ! function_exists( 'gend_society_gcloud_encrypt' ) ) {
             return new WP_Error( 'no_crypto', 'Encryption helpers unavailable (gcloud module not loaded).', array( 'status' => 503 ) );
         }
         $key   = trim( (string) $req->get_param( 'api_key' ) );
@@ -98,37 +98,37 @@ if ( ! function_exists( 'gs_chat_rest_key_save' ) ) {
         if ( $key === '' || substr( $key, 0, 7 ) !== 'sk-ant-' ) {
             return new WP_Error( 'bad_key', 'API key must start with sk-ant-.', array( 'status' => 400 ) );
         }
-        $cipher = gs_gcloud_encrypt( $key );
+        $cipher = gend_society_gcloud_encrypt( $key );
         if ( is_wp_error( $cipher ) ) return $cipher;
         $uid = get_current_user_id();
-        update_user_meta( $uid, '_gs_chat_anthropic_key', $cipher );
-        if ( $model !== '' ) update_user_meta( $uid, '_gs_chat_model', $model );
-        return array( 'connected' => true, 'model' => $model ?: gs_chat_default_model() );
+        update_user_meta( $uid, '_gend_society_chat_anthropic_key', $cipher );
+        if ( $model !== '' ) update_user_meta( $uid, '_gend_society_chat_model', $model );
+        return array( 'connected' => true, 'model' => $model ?: gend_society_chat_default_model() );
     }
 }
 
-if ( ! function_exists( 'gs_chat_rest_key_clear' ) ) {
+if ( ! function_exists( 'gend_society_chat_rest_key_clear' ) ) {
 
-    function gs_chat_rest_key_clear() {
+    function gend_society_chat_rest_key_clear() {
         $uid = get_current_user_id();
-        delete_user_meta( $uid, '_gs_chat_anthropic_key' );
-        delete_user_meta( $uid, '_gs_chat_model' );
+        delete_user_meta( $uid, '_gend_society_chat_anthropic_key' );
+        delete_user_meta( $uid, '_gend_society_chat_model' );
         return array( 'connected' => false );
     }
 }
 
-if ( ! function_exists( 'gs_chat_get_key_for_user' ) ) {
+if ( ! function_exists( 'gend_society_chat_get_key_for_user' ) ) {
 
-    function gs_chat_get_key_for_user( $user_id ) {
-        $blob = get_user_meta( (int) $user_id, '_gs_chat_anthropic_key', true );
-        if ( ! $blob || ! function_exists( 'gs_gcloud_decrypt' ) ) return new WP_Error( 'no_key', 'No API key on file.' );
-        $plain = gs_gcloud_decrypt( $blob );
+    function gend_society_chat_get_key_for_user( $user_id ) {
+        $blob = get_user_meta( (int) $user_id, '_gend_society_chat_anthropic_key', true );
+        if ( ! $blob || ! function_exists( 'gend_society_gcloud_decrypt' ) ) return new WP_Error( 'no_key', 'No API key on file.' );
+        $plain = gend_society_gcloud_decrypt( $blob );
         if ( is_wp_error( $plain ) ) return $plain;
         return (string) $plain;
     }
 }
 
-if ( ! function_exists( 'gs_chat_rest_stream' ) ) {
+if ( ! function_exists( 'gend_society_chat_rest_stream' ) ) {
 
     /**
      * SSE proxy. Reads the user's stored key, opens a streaming
@@ -140,9 +140,9 @@ if ( ! function_exists( 'gs_chat_rest_stream' ) ) {
      * use the published `content_block_delta` / `message_stop` events
      * without any translation layer.
      */
-    function gs_chat_rest_stream( WP_REST_Request $req ) {
+    function gend_society_chat_rest_stream( WP_REST_Request $req ) {
         $uid = get_current_user_id();
-        $key = gs_chat_get_key_for_user( $uid );
+        $key = gend_society_chat_get_key_for_user( $uid );
         if ( is_wp_error( $key ) ) {
             return $key;
         }
@@ -152,8 +152,8 @@ if ( ! function_exists( 'gs_chat_rest_stream' ) ) {
         $messages   = (array)  $req->get_param( 'messages' );
         $max_tokens = (int)    $req->get_param( 'max_tokens' );
         if ( $model === '' ) {
-            $pref = (string) get_user_meta( $uid, '_gs_chat_model', true );
-            $model = $pref !== '' ? $pref : gs_chat_default_model();
+            $pref = (string) get_user_meta( $uid, '_gend_society_chat_model', true );
+            $model = $pref !== '' ? $pref : gend_society_chat_default_model();
         }
         if ( $max_tokens <= 0 ) $max_tokens = 2048;
 
@@ -262,12 +262,12 @@ if ( ! function_exists( 'gs_chat_rest_stream' ) ) {
    container — same isolation as the interactive terminal.
    ════════════════════════════════════════════════════════════════════ */
 
-if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_register_rest' ) ) {
 
-    function gs_chat_tool_register_rest() {
+    function gend_society_chat_tool_register_rest() {
         register_rest_route( 'gs/v1', '/web-shell/tools/shell_exec', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_tool_shell_exec',
+            'callback'            => 'gend_society_chat_tool_shell_exec',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'command' => array( 'required' => true, 'type' => 'string' ),
@@ -275,7 +275,7 @@ if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
         ) );
         register_rest_route( 'gs/v1', '/web-shell/tools/read_file', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_tool_read_file',
+            'callback'            => 'gend_society_chat_tool_read_file',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'path' => array( 'required' => true, 'type' => 'string' ),
@@ -283,7 +283,7 @@ if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
         ) );
         register_rest_route( 'gs/v1', '/web-shell/tools/write_file', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_tool_write_file',
+            'callback'            => 'gend_society_chat_tool_write_file',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'path'    => array( 'required' => true, 'type' => 'string' ),
@@ -295,7 +295,7 @@ if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
         // exact bash invocations.
         register_rest_route( 'gs/v1', '/web-shell/tools/git_status', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_tool_git_status',
+            'callback'            => 'gend_society_chat_tool_git_status',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'cwd' => array( 'required' => false, 'type' => 'string' ),
@@ -303,7 +303,7 @@ if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
         ) );
         register_rest_route( 'gs/v1', '/web-shell/tools/git_diff', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_tool_git_diff',
+            'callback'            => 'gend_society_chat_tool_git_diff',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'cwd'    => array( 'required' => false, 'type' => 'string' ),
@@ -313,7 +313,7 @@ if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
         ) );
         register_rest_route( 'gs/v1', '/web-shell/tools/git_commit', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_chat_tool_git_commit',
+            'callback'            => 'gend_society_chat_tool_git_commit',
             'permission_callback' => function () { return is_user_logged_in(); },
             'args' => array(
                 'cwd'     => array( 'required' => false, 'type' => 'string' ),
@@ -322,12 +322,12 @@ if ( ! function_exists( 'gs_chat_tool_register_rest' ) ) {
             ),
         ) );
     }
-    add_action( 'rest_api_init', 'gs_chat_tool_register_rest' );
+    add_action( 'rest_api_init', 'gend_society_chat_tool_register_rest' );
 }
 
-if ( ! function_exists( 'gs_chat_tool_call' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_call' ) ) {
 
-    function gs_chat_tool_call( $endpoint, $body ) {
+    function gend_society_chat_tool_call( $endpoint, $body ) {
         $shell_secret = defined( 'GS_SHELL_JWT_SECRET' ) ? (string) GS_SHELL_JWT_SECRET
                        : ( getenv( 'GS_SHELL_JWT_SECRET' ) ?: '' );
         $pty_base = defined( 'GS_SHELL_PTY_URL' ) ? (string) GS_SHELL_PTY_URL
@@ -336,7 +336,7 @@ if ( ! function_exists( 'gs_chat_tool_call' ) ) {
             return new WP_Error( 'no_shared_secret', 'GS_SHELL_JWT_SECRET not configured.', array( 'status' => 503 ) );
         }
         $now = time();
-        $token = gs_web_shell_jwt_encode( array(
+        $token = gend_society_web_shell_jwt_encode( array(
             'user_id'    => (int) get_current_user_id(),
             'session_id' => 'tool-' . bin2hex( random_bytes( 6 ) ),
             'iss'        => 'web-shell-chat',
@@ -363,69 +363,69 @@ if ( ! function_exists( 'gs_chat_tool_call' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_shell_exec' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_shell_exec' ) ) {
 
-    function gs_chat_tool_shell_exec( WP_REST_Request $req ) {
+    function gend_society_chat_tool_shell_exec( WP_REST_Request $req ) {
         $cmd = (string) $req->get_param( 'command' );
         if ( trim( $cmd ) === '' ) return new WP_Error( 'no_command', 'command required.', array( 'status' => 400 ) );
-        return gs_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
+        return gend_society_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_read_file' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_read_file' ) ) {
 
-    function gs_chat_tool_read_file( WP_REST_Request $req ) {
+    function gend_society_chat_tool_read_file( WP_REST_Request $req ) {
         $path = (string) $req->get_param( 'path' );
         if ( trim( $path ) === '' ) return new WP_Error( 'no_path', 'path required.', array( 'status' => 400 ) );
-        return gs_chat_tool_call( '/tools/read_file', array( 'path' => $path ) );
+        return gend_society_chat_tool_call( '/tools/read_file', array( 'path' => $path ) );
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_write_file' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_write_file' ) ) {
 
-    function gs_chat_tool_write_file( WP_REST_Request $req ) {
+    function gend_society_chat_tool_write_file( WP_REST_Request $req ) {
         $path    = (string) $req->get_param( 'path' );
         $content = (string) $req->get_param( 'content' );
         if ( trim( $path ) === '' ) return new WP_Error( 'no_path', 'path required.', array( 'status' => 400 ) );
-        return gs_chat_tool_call( '/tools/write_file', array( 'path' => $path, 'content' => $content ) );
+        return gend_society_chat_tool_call( '/tools/write_file', array( 'path' => $path, 'content' => $content ) );
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_git_shellescape' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_git_shellescape' ) ) {
     // PHP-side single-quote shell escape, mirrors the Node helper.
-    function gs_chat_tool_git_shellescape( $s ) {
+    function gend_society_chat_tool_git_shellescape( $s ) {
         return "'" . str_replace( "'", "'\\''", (string) $s ) . "'";
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_git_status' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_git_status' ) ) {
 
-    function gs_chat_tool_git_status( WP_REST_Request $req ) {
+    function gend_society_chat_tool_git_status( WP_REST_Request $req ) {
         $cwd = (string) ( $req->get_param( 'cwd' ) ?: '/workspace' );
-        $cmd = 'cd ' . gs_chat_tool_git_shellescape( $cwd ) . ' && git status --short --branch';
-        return gs_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
+        $cmd = 'cd ' . gend_society_chat_tool_git_shellescape( $cwd ) . ' && git status --short --branch';
+        return gend_society_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_git_diff' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_git_diff' ) ) {
 
-    function gs_chat_tool_git_diff( WP_REST_Request $req ) {
+    function gend_society_chat_tool_git_diff( WP_REST_Request $req ) {
         $cwd    = (string) ( $req->get_param( 'cwd' ) ?: '/workspace' );
         $staged = (bool) $req->get_param( 'staged' );
         $paths  = (array) ( $req->get_param( 'paths' ) ?: array() );
-        $cmd = 'cd ' . gs_chat_tool_git_shellescape( $cwd ) . ' && git --no-pager diff'
+        $cmd = 'cd ' . gend_society_chat_tool_git_shellescape( $cwd ) . ' && git --no-pager diff'
              . ( $staged ? ' --cached' : '' )
              . ' --color=never';
         foreach ( $paths as $p ) {
-            $cmd .= ' -- ' . gs_chat_tool_git_shellescape( $p );
+            $cmd .= ' -- ' . gend_society_chat_tool_git_shellescape( $p );
         }
-        return gs_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
+        return gend_society_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
     }
 }
 
-if ( ! function_exists( 'gs_chat_tool_git_commit' ) ) {
+if ( ! function_exists( 'gend_society_chat_tool_git_commit' ) ) {
 
-    function gs_chat_tool_git_commit( WP_REST_Request $req ) {
+    function gend_society_chat_tool_git_commit( WP_REST_Request $req ) {
         $cwd     = (string) ( $req->get_param( 'cwd' ) ?: '/workspace' );
         $message = (string) $req->get_param( 'message' );
         $add_all = $req->get_param( 'add_all' );
@@ -436,12 +436,12 @@ if ( ! function_exists( 'gs_chat_tool_git_commit' ) ) {
         // belt-and-suspenders so the first commit on a fresh PVC works.
         $email = sanitize_email( wp_get_current_user()->user_email );
         $name  = wp_get_current_user()->display_name ?: 'GenD Web Shell User';
-        $cmd = 'cd ' . gs_chat_tool_git_shellescape( $cwd )
-             . ' && git config user.email ' . gs_chat_tool_git_shellescape( $email )
-             . ' && git config user.name '  . gs_chat_tool_git_shellescape( $name )
+        $cmd = 'cd ' . gend_society_chat_tool_git_shellescape( $cwd )
+             . ' && git config user.email ' . gend_society_chat_tool_git_shellescape( $email )
+             . ' && git config user.name '  . gend_society_chat_tool_git_shellescape( $name )
              . ( $add_all ? ' && git add -A' : '' )
-             . ' && git commit -m ' . gs_chat_tool_git_shellescape( $message );
-        return gs_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
+             . ' && git commit -m ' . gend_society_chat_tool_git_shellescape( $message );
+        return gend_society_chat_tool_call( '/tools/shell_exec', array( 'command' => $cmd ) );
     }
 }
 

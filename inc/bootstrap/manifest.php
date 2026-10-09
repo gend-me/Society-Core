@@ -91,7 +91,7 @@ return array(
 			'tier'  => 'updater',
 			'needs' => array(),
 			'after' => static function () {
-				new GenD_GitHub_Updater( GEND_SOCIETY_FILE, 'gend-me/Society-Core' );
+				new Gend_Society_GitHub_Updater( GEND_SOCIETY_FILE, 'gend-me/Society-Core' );
 			},
 		),
 		array(

@@ -26,10 +26,10 @@ if (!defined('ABSPATH')) {
 //
 // All under_score keys for grep-ability.
 
-add_action('admin_menu', 'gs_portal_connect_register_menu', 50);
-add_action('admin_post_gs_portal_connect_submit', 'gs_portal_connect_handle_submit');
+add_action('admin_menu', 'gend_society_portal_connect_register_menu', 50);
+add_action('admin_post_gend_society_portal_connect_submit', 'gend_society_portal_connect_handle_submit');
 
-function gs_portal_connect_register_menu() {
+function gend_society_portal_connect_register_menu() {
     // Add as a submenu under Settings since gend-society removes options-general,
     // we instead attach to the Dashboard top-level so it's findable before pairing.
     add_submenu_page(
@@ -38,20 +38,20 @@ function gs_portal_connect_register_menu() {
         __('Connect to gend.me', 'gend-society'),
         'manage_options',
         'gs-portal-connect',
-        'gs_portal_connect_render_page'
+        'gend_society_portal_connect_render_page'
     );
 }
 
-function gs_portal_connect_render_page() {
+function gend_society_portal_connect_render_page() {
 
     if (!current_user_can('manage_options')) {
         wp_die(esc_html__('Forbidden.', 'gend-society'));
     }
 
-    $install_id    = (string) get_option('gs_install_id', '');
-    $install_token = (string) get_option('gs_install_token', '');
-    $gend_base     = (string) get_option('gs_gend_base_url', '');
-    $connected_at  = (int) get_option('gs_connected_at', 0);
+    $install_id    = (string) get_option('gend_society_install_id', '');
+    $install_token = (string) get_option('gend_society_install_token', '');
+    $gend_base     = (string) get_option('gend_society_gend_base_url', '');
+    $connected_at  = (int) get_option('gend_society_connected_at', 0);
     $is_connected  = $install_id !== '' && $install_token !== '';
 
     $notice_cls = '';
@@ -81,7 +81,7 @@ function gs_portal_connect_render_page() {
             <p><?php esc_html_e('Disconnecting clears the local install identity. You will need a new pairing code from gend.me to reconnect.', 'gend-society'); ?></p>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('gs_portal_connect_disconnect', 'gs_portal_connect_nonce'); ?>
-                <input type="hidden" name="action" value="gs_portal_connect_submit" />
+                <input type="hidden" name="action" value="gend_society_portal_connect_submit" />
                 <input type="hidden" name="op" value="disconnect" />
                 <?php submit_button(__('Disconnect', 'gend-society'), 'delete', 'submit', false); ?>
             </form>
@@ -91,7 +91,7 @@ function gs_portal_connect_render_page() {
 
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('gs_portal_connect_submit', 'gs_portal_connect_nonce'); ?>
-                <input type="hidden" name="action" value="gs_portal_connect_submit" />
+                <input type="hidden" name="action" value="gend_society_portal_connect_submit" />
                 <input type="hidden" name="op" value="connect" />
 
                 <table class="form-table">
@@ -121,7 +121,7 @@ function gs_portal_connect_render_page() {
     <?php
 }
 
-function gs_portal_connect_handle_submit() {
+function gend_society_portal_connect_handle_submit() {
 
     if (!current_user_can('manage_options')) {
         wp_die(esc_html__('Forbidden.', 'gend-society'));
@@ -131,15 +131,15 @@ function gs_portal_connect_handle_submit() {
 
     if ($op === 'disconnect') {
         check_admin_referer('gs_portal_connect_disconnect', 'gs_portal_connect_nonce');
-        delete_option('gs_install_id');
-        delete_option('gs_install_token');
-        delete_option('gs_gend_base_url');
-        delete_option('gs_gend_pubkey');
-        delete_option('gs_keypair');
-        delete_option('gs_connected_at');
-        delete_option('gs_features_cache');
-        delete_option('gs_features_cache_expires');
-        gs_portal_connect_redirect('success', __('Disconnected.', 'gend-society'));
+        delete_option('gend_society_install_id');
+        delete_option('gend_society_install_token');
+        delete_option('gend_society_gend_base_url');
+        delete_option('gend_society_gend_pubkey');
+        delete_option('gend_society_keypair');
+        delete_option('gend_society_connected_at');
+        delete_option('gend_society_features_cache');
+        delete_option('gend_society_features_cache_expires');
+        gend_society_portal_connect_redirect('success', __('Disconnected.', 'gend-society'));
         return;
     }
 
@@ -149,20 +149,20 @@ function gs_portal_connect_handle_submit() {
     $pairing_code = isset($_POST['pairing_code']) ? strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $_POST['pairing_code'])) : '';
 
     if ($gend_base === '' || strlen($pairing_code) < 6) {
-        gs_portal_connect_redirect('error', __('Please provide both the gend.me URL and a pairing code.', 'gend-society'));
+        gend_society_portal_connect_redirect('error', __('Please provide both the gend.me URL and a pairing code.', 'gend-society'));
         return;
     }
 
     // Generate or reuse our own keypair so the install identity is stable across reconnects.
-    $keypair_b64 = (string) get_option('gs_keypair', '');
+    $keypair_b64 = (string) get_option('gend_society_keypair', '');
     $keypair_raw = $keypair_b64 !== '' ? base64_decode($keypair_b64, true) : '';
     if (!is_string($keypair_raw) || strlen($keypair_raw) !== SODIUM_CRYPTO_SIGN_KEYPAIRBYTES) {
         $keypair_raw = sodium_crypto_sign_keypair();
-        update_option('gs_keypair', base64_encode($keypair_raw), false);
+        update_option('gend_society_keypair', base64_encode($keypair_raw), false);
     }
     $pubkey_b64 = base64_encode(sodium_crypto_sign_publickey($keypair_raw));
 
-    $install_id = (string) get_option('gs_install_id', '');
+    $install_id = (string) get_option('gend_society_install_id', '');
     if ($install_id === '') {
         $install_id = wp_generate_uuid4();
     }
@@ -181,7 +181,7 @@ function gs_portal_connect_handle_submit() {
     ));
 
     if (is_wp_error($response)) {
-        gs_portal_connect_redirect('error', sprintf(
+        gend_society_portal_connect_redirect('error', sprintf(
             /* translators: %s error message */
             __('Connection failed: %s', 'gend-society'),
             $response->get_error_message()
@@ -194,7 +194,7 @@ function gs_portal_connect_handle_submit() {
 
     if ($code !== 200 || !is_array($data) || empty($data['install_token'])) {
         $msg = is_array($data) && !empty($data['message']) ? (string) $data['message'] : __('Unknown error from gend.me.', 'gend-society');
-        gs_portal_connect_redirect('error', sprintf(
+        gend_society_portal_connect_redirect('error', sprintf(
             /* translators: 1: HTTP status, 2: error message */
             __('gend.me rejected the pairing (HTTP %1$d): %2$s', 'gend-society'),
             $code,
@@ -203,16 +203,16 @@ function gs_portal_connect_handle_submit() {
         return;
     }
 
-    update_option('gs_install_id', $install_id, false);
-    update_option('gs_install_token', (string) $data['install_token'], false);
-    update_option('gs_gend_base_url', $gend_base, false);
-    update_option('gs_gend_pubkey', isset($data['gend_signing_pubkey']) ? (string) $data['gend_signing_pubkey'] : '', false);
-    update_option('gs_connected_at', time(), false);
+    update_option('gend_society_install_id', $install_id, false);
+    update_option('gend_society_install_token', (string) $data['install_token'], false);
+    update_option('gend_society_gend_base_url', $gend_base, false);
+    update_option('gend_society_gend_pubkey', isset($data['gend_signing_pubkey']) ? (string) $data['gend_signing_pubkey'] : '', false);
+    update_option('gend_society_connected_at', time(), false);
 
-    gs_portal_connect_redirect('success', __('Connected to gend.me.', 'gend-society'));
+    gend_society_portal_connect_redirect('success', __('Connected to gend.me.', 'gend-society'));
 }
 
-function gs_portal_connect_redirect($status, $message) {
+function gend_society_portal_connect_redirect($status, $message) {
     wp_safe_redirect(add_query_arg(array(
         'page'                => 'gs-portal-connect',
         'gs_connect_status'   => $status,

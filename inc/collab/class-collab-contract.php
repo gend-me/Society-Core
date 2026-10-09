@@ -563,7 +563,7 @@ class Gend_GS_Collab_Contract {
 		// Flip the match — race-safe WHERE contract_task_id IS NULL. contract_task_id =
 		// side A's task; side B's task id is stored as match meta (planner's discretion —
 		// gs_collab_matches has no second column and we avoid a DDL change for one field).
-		update_option( 'gs_collab_match_' . $match_id . '_task_b', $task_b, false );
+		update_option( 'gend_society_collab_match_' . $match_id . '_task_b', $task_b, false );
 
 		$matches = Gend_GS_Collab_Schema::matches_table();
 		$flipped = $wpdb->query( $wpdb->prepare(

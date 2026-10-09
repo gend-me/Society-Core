@@ -27,7 +27,7 @@
                 </a>
             </div>
         </div>
-        <?php if (gs_plugin_active('blog-manager/blog-manager.php')): ?>
+        <?php if (gend_society_plugin_active('blog-manager/blog-manager.php')): ?>
             <div class="gs-card">
                 <div class="gs-card-header">
                     <h3><span class="dashicons dashicons-admin-post"></span>
@@ -45,7 +45,7 @@
                 </div>
             </div>
         <?php endif; ?>
-        <?php if (gs_plugin_active('email-manager/email-manager.php')): ?>
+        <?php if (gend_society_plugin_active('email-manager/email-manager.php')): ?>
             <div class="gs-card">
                 <div class="gs-card-header">
                     <h3><span class="dashicons dashicons-email"></span>

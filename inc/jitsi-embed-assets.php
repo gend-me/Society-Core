@@ -22,32 +22,32 @@ if ( ! defined( 'ABSPATH' ) ) {
 // same data). file_exists-guarded — Pitfall 1 (.no-plugin-sync hub PVC quirk):
 // the 2 NEW asset files MUST be kubectl cp'd to the PVC BEFORE this entrypoint
 // edit. Priority 20 so it runs after the theme/Youzify base enqueues.
-if ( file_exists( GS_DIR . 'assets/jitsi-embed.js' ) && file_exists( GS_DIR . 'assets/jitsi-embed.css' ) ) {
+if ( file_exists( GEND_SOCIETY_DIR . 'assets/jitsi-embed.js' ) && file_exists( GEND_SOCIETY_DIR . 'assets/jitsi-embed.css' ) ) {
 	add_action( 'wp_enqueue_scripts', static function () {
 		if ( ! function_exists( 'bp_is_my_profile' ) || ! bp_is_my_profile() ) {
 			return;
 		}
-		$gs_jitsi_js_path  = GS_DIR . 'assets/jitsi-embed.js';
-		$gs_jitsi_css_path = GS_DIR . 'assets/jitsi-embed.css';
-		$gs_jitsi_js_ver   = GS_VERSION . '.' . filemtime( $gs_jitsi_js_path );
-		$gs_jitsi_css_ver  = GS_VERSION . '.' . filemtime( $gs_jitsi_css_path );
+		$gs_jitsi_js_path  = GEND_SOCIETY_DIR . 'assets/jitsi-embed.js';
+		$gs_jitsi_css_path = GEND_SOCIETY_DIR . 'assets/jitsi-embed.css';
+		$gs_jitsi_js_ver   = GEND_SOCIETY_VERSION . '.' . filemtime( $gs_jitsi_js_path );
+		$gs_jitsi_css_ver  = GEND_SOCIETY_VERSION . '.' . filemtime( $gs_jitsi_css_path );
 		wp_enqueue_script(
 			'gs-jitsi-embed',
-			GS_URL . 'assets/jitsi-embed.js',
+			GEND_SOCIETY_URL . 'assets/jitsi-embed.js',
 			array(),
 			$gs_jitsi_js_ver,
 			true
 		);
 		wp_enqueue_style(
 			'gs-jitsi-embed',
-			GS_URL . 'assets/jitsi-embed.css',
+			GEND_SOCIETY_URL . 'assets/jitsi-embed.css',
 			array(),
 			$gs_jitsi_css_ver
 		);
 		wp_localize_script( 'gs-jitsi-embed', 'gsJitsiData', array(
 			'restUrl' => esc_url_raw( rest_url( 'gs/v1' ) ),
 			'nonce'   => wp_create_nonce( 'wp_rest' ),
-			'domain'  => apply_filters( 'gs_jitsi_domain', 'meet.gend.me' ),
+			'domain'  => apply_filters( 'gend_society_jitsi_domain', 'meet.gend.me' ),
 		) );
 	}, 20 );
 }

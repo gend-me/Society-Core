@@ -12,16 +12,16 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-add_action( 'admin_init', 'gs_invite_settings_register_setting' );
-function gs_invite_settings_register_setting() {
-    register_setting( 'gs_invite_oauth_credentials_group', 'gs_invite_oauth_credentials', array(
+add_action( 'admin_init', 'gend_society_invite_settings_register_setting' );
+function gend_society_invite_settings_register_setting() {
+    register_setting( 'gs_invite_oauth_credentials_group', 'gend_society_invite_oauth_credentials', array(
         'type'              => 'array',
-        'sanitize_callback' => 'gs_invite_settings_sanitize',
+        'sanitize_callback' => 'gend_society_invite_settings_sanitize',
         'default'           => array(),
     ) );
 }
 
-function gs_invite_settings_sanitize( $input ) {
+function gend_society_invite_settings_sanitize( $input ) {
     $clean = array();
     foreach ( array( 'google', 'microsoft' ) as $p ) {
         $clean[ $p ] = array(
@@ -32,9 +32,9 @@ function gs_invite_settings_sanitize( $input ) {
     return $clean;
 }
 
-function gs_invite_settings_render_inline() {
+function gend_society_invite_settings_render_inline() {
     if ( ! current_user_can( 'manage_options' ) ) return;
-    $opts        = get_option( 'gs_invite_oauth_credentials', array() );
+    $opts        = get_option( 'gend_society_invite_oauth_credentials', array() );
     $google      = isset( $opts['google'] )    ? $opts['google']    : array( 'client_id' => '', 'client_secret' => '' );
     $microsoft   = isset( $opts['microsoft'] ) ? $opts['microsoft'] : array( 'client_id' => '', 'client_secret' => '' );
     $redirect_uri = rest_url( 'gs/v1/invite/oauth/callback' );

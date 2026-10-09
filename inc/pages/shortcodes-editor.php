@@ -49,13 +49,13 @@ if ( ! defined( 'ABSPATH' ) ) {
     <?php
     // Handle new shortcode save
     if (isset($_POST['gs_save_sc']) && check_admin_referer('gs_save_shortcode', 'gs_sc_nonce') && current_user_can('activate_plugins')) {
-        $tag = preg_replace('/[^a-z0-9_\-]/', '', strtolower(sanitize_key(wp_unslash($_POST['gs_sc_name'] ?? ''))));
-        $code = wp_unslash($_POST['gs_sc_code'] ?? '');
-        if ($tag && $code) {
-            $mu_file = WP_CONTENT_DIR . '/mu-plugins/gs-shortcodes.php';
-            $existing = file_exists($mu_file) ? file_get_contents($mu_file) : "<?php\n// GenD Society Custom Shortcodes\n";
-            $snippet = "\n\n// Shortcode: [{$tag}]\nadd_shortcode( '{$tag}', function( \$atts, \$content = '' ) {\n{$code}\n} );\n";
-            file_put_contents($mu_file, $existing . $snippet);
+        $gend_society_tag = preg_replace('/[^a-z0-9_\-]/', '', strtolower(sanitize_key(wp_unslash($_POST['gs_sc_name'] ?? ''))));
+        $gend_society_code = wp_unslash($_POST['gs_sc_code'] ?? '');
+        if ($gend_society_tag && $gend_society_code) {
+            $gend_society_mu_file = WP_CONTENT_DIR . '/mu-plugins/gs-shortcodes.php';
+            $gend_society_existing = file_exists($gend_society_mu_file) ? file_get_contents($gend_society_mu_file) : "<?php\n// GenD Society Custom Shortcodes\n";
+            $gend_society_snippet = "\n\n// Shortcode: [{$gend_society_tag}]\nadd_shortcode( '{$gend_society_tag}', function( \$atts, \$content = '' ) {\n{$gend_society_code}\n} );\n";
+            file_put_contents($gend_society_mu_file, $gend_society_existing . $gend_society_snippet);
             echo '<div class="notice notice-success"><p>' . esc_html__('Shortcode saved!', 'gend-society') . '</p></div>';
         }
     }

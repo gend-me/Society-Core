@@ -41,14 +41,14 @@ if ( ! defined( 'ABSPATH' ) ) {
  * moves between plugins.
  */
 add_filter( 'leo_chatflow_seed_dirs', function ( $dirs ) {
-    $dir = GS_DIR . 'chatflows/';
+    $dir = GEND_SOCIETY_DIR . 'chatflows/';
     if ( is_dir( $dir ) ) {
         $dirs[] = $dir;
     }
     return $dirs;
 } );
 
-class GS_Wireframe_Store {
+class Gend_Society_Wireframe_Store {
 
     const OPT_HTML = 'aipa_wireframe_html';
     const OPT_META = 'aipa_wireframe_meta';
@@ -199,7 +199,7 @@ class GS_Wireframe_Store {
         $membership_id = self::resolve_membership_id();
         if ( $membership_id === '' ) return;
 
-        $hub = (string) get_option( 'gs_gend_base_url', 'https://gend.me' );
+        $hub = (string) get_option( 'gend_society_gend_base_url', 'https://gend.me' );
         $hub = untrailingslashit( $hub );
         $url = $hub . '/wp-json/gdc-app-manager/v1/me/memberships/' . rawurlencode( $membership_id ) . '/wireframe-html';
 
@@ -258,4 +258,4 @@ class GS_Wireframe_Store {
     }
 }
 
-GS_Wireframe_Store::init();
+Gend_Society_Wireframe_Store::init();

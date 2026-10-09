@@ -64,19 +64,19 @@ $gend_society_sc_editor = function_exists('gend_society_mode_tiers')
                     </tr>
                 </thead>
                 <tbody>
-                    <?php foreach ($shortcode_tags as $tag => $handler):
-                        if (is_array($handler)) {
-                            $cls = is_object($handler[0]) ? get_class($handler[0]) : (is_string($handler[0]) ? $handler[0] : '(object)');
-                            $label = $cls . '::' . $handler[1];
+                    <?php foreach ($shortcode_tags as $gend_society_tag => $gend_society_handler):
+                        if (is_array($gend_society_handler)) {
+                            $gend_society_cls = is_object($gend_society_handler[0]) ? get_class($gend_society_handler[0]) : (is_string($gend_society_handler[0]) ? $gend_society_handler[0] : '(object)');
+                            $gend_society_label = $gend_society_cls . '::' . $gend_society_handler[1];
                         } else {
-                            $label = is_string($handler) ? $handler : '(closure)';
+                            $gend_society_label = is_string($gend_society_handler) ? $gend_society_handler : '(closure)';
                         }
                         ?>
                         <tr class="gs-sc-row">
-                            <td><code class="gs-code-pill">[<?php echo esc_html($tag); ?>]</code></td>
-                            <td><code class="gs-muted"><?php echo esc_html($label); ?></code></td>
+                            <td><code class="gs-code-pill">[<?php echo esc_html($gend_society_tag); ?>]</code></td>
+                            <td><code class="gs-muted"><?php echo esc_html($gend_society_label); ?></code></td>
                             <td><button type="button" class="gs-btn gs-btn-xs gs-copy-btn"
-                                    data-copy="[<?php echo esc_attr($tag); ?>]"><span
+                                    data-copy="[<?php echo esc_attr($gend_society_tag); ?>]"><span
                                         class="dashicons dashicons-clipboard"></span>
                                     <?php esc_html_e('Copy', 'gend-society'); ?>
                                 </button></td>

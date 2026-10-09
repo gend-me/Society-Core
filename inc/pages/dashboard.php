@@ -9,8 +9,8 @@ if (!defined('ABSPATH')) {
 }
 
 // 0. Handle Form Submission for App Settings
-add_action('admin_post_gs_save_app_settings', 'gs_dashboard_save_app_settings');
-function gs_dashboard_save_app_settings()
+add_action('admin_post_gend_society_save_app_settings', 'gend_society_dashboard_save_app_settings');
+function gend_society_dashboard_save_app_settings()
 {
     if (!current_user_can('manage_options')) {
         wp_die(esc_html__('You do not have permission to perform this action.', 'gend-society'));
@@ -39,8 +39,8 @@ function gs_dashboard_save_app_settings()
 // standalone wp-admin/options-permalink.php screen (was the App → Permalinks
 // submenu). Mirrors that core screen's own sanitization/update logic
 // (see wp-admin/options-permalink.php) so behavior stays identical.
-add_action('admin_post_gs_save_permalink_settings', 'gs_dashboard_save_permalink_settings');
-function gs_dashboard_save_permalink_settings()
+add_action('admin_post_gend_society_save_permalink_settings', 'gend_society_dashboard_save_permalink_settings');
+function gend_society_dashboard_save_permalink_settings()
 {
     if (!current_user_can('manage_options')) {
         wp_die(esc_html__('You do not have permission to perform this action.', 'gend-society'));
@@ -110,8 +110,8 @@ function gs_dashboard_save_permalink_settings()
 // by gs_render_application_passwords_form() below). App passwords are
 // what GenD Mobile and other API clients sign in with — never the real
 // account password.
-add_action('admin_post_gs_app_password_create', 'gs_dashboard_app_password_create');
-function gs_dashboard_app_password_create()
+add_action('admin_post_gend_society_app_password_create', 'gend_society_dashboard_app_password_create');
+function gend_society_dashboard_app_password_create()
 {
     if (!is_user_logged_in() || !current_user_can('manage_options')) {
         wp_die(esc_html__('You do not have permission to do this.', 'gend-society'));
@@ -132,7 +132,7 @@ function gs_dashboard_app_password_create()
             // stash it briefly so the dashboard can show it exactly once
             // after the redirect, then it's gone for good (core only stores
             // the hash).
-            set_transient('gs_app_pw_new_' . $user_id, array(
+            set_transient('gend_society_app_pw_new_' . $user_id, array(
                 'name'     => $name,
                 'password' => $created[0],
             ), 5 * MINUTE_IN_SECONDS);
@@ -144,8 +144,8 @@ function gs_dashboard_app_password_create()
     exit;
 }
 
-add_action('admin_post_gs_app_password_revoke', 'gs_dashboard_app_password_revoke');
-function gs_dashboard_app_password_revoke()
+add_action('admin_post_gend_society_app_password_revoke', 'gend_society_dashboard_app_password_revoke');
+function gend_society_dashboard_app_password_revoke()
 {
     if (!is_user_logged_in() || !current_user_can('manage_options')) {
         wp_die(esc_html__('You do not have permission to do this.', 'gend-society'));
@@ -167,28 +167,28 @@ function gs_dashboard_app_password_revoke()
     exit;
 }
 
-add_action('load-index.php', 'gs_dashboard_setup_custom_screen');
-function gs_dashboard_setup_custom_screen()
+add_action('load-index.php', 'gend_society_dashboard_setup_custom_screen');
+function gend_society_dashboard_setup_custom_screen()
 {
     // 1. Remove default meta boxes and welcome panel
-    add_action('wp_dashboard_setup', 'gs_dashboard_remove_default_widgets', 100);
+    add_action('wp_dashboard_setup', 'gend_society_dashboard_remove_default_widgets', 100);
     remove_action('welcome_panel', 'wp_welcome_panel');
 
     // 2. Inject our custom dashboard HTML where notices usually go (above the now-empty dashboard grid)
-    add_action('all_admin_notices', 'gs_render_custom_dashboard_screen', 0);
+    add_action('all_admin_notices', 'gend_society_render_custom_dashboard_screen', 0);
 
     // 3. Add styles to hide leftover wpbody stuff
-    add_action('admin_head-index.php', 'gs_dashboard_admin_head_styles');
+    add_action('admin_head-index.php', 'gend_society_dashboard_admin_head_styles');
 
     // 4. Remove help tabs and screen options
-    add_action('current_screen', 'gs_dashboard_strip_screen_meta', 20);
-    add_filter('screen_options_show_screen', 'gs_dashboard_hide_screen_options', 20);
+    add_action('current_screen', 'gend_society_dashboard_strip_screen_meta', 20);
+    add_filter('screen_options_show_screen', 'gend_society_dashboard_hide_screen_options', 20);
 
     // 5. Enqueue Media Uploader for App Icon
-    add_action('admin_enqueue_scripts', 'gs_dashboard_enqueue_media');
+    add_action('admin_enqueue_scripts', 'gend_society_dashboard_enqueue_media');
 }
 
-function gs_dashboard_enqueue_media() {
+function gend_society_dashboard_enqueue_media() {
     wp_enqueue_media();
     // Invite New User modal (in the User Access tab) embeds wp_editor /
     // TinyMCE via gs_invite_render_panel(). Without these enqueues, the
@@ -198,7 +198,7 @@ function gs_dashboard_enqueue_media() {
     }
 }
 
-function gs_dashboard_remove_default_widgets()
+function gend_society_dashboard_remove_default_widgets()
 {
     $widgets = array(
         'dashboard_right_now',
@@ -218,7 +218,7 @@ function gs_dashboard_remove_default_widgets()
     }
 }
 
-function gs_dashboard_strip_screen_meta($screen)
+function gend_society_dashboard_strip_screen_meta($screen)
 {
     if (!$screen || !isset($screen->id) || $screen->id !== 'dashboard') {
         return;
@@ -230,7 +230,7 @@ function gs_dashboard_strip_screen_meta($screen)
     }
 }
 
-function gs_dashboard_hide_screen_options($show)
+function gend_society_dashboard_hide_screen_options($show)
 {
     $screen = function_exists('get_current_screen') ? get_current_screen() : null;
     if ($screen && isset($screen->id) && $screen->id === 'dashboard') {
@@ -240,7 +240,7 @@ function gs_dashboard_hide_screen_options($show)
     return $show;
 }
 
-function gs_dashboard_admin_head_styles()
+function gend_society_dashboard_admin_head_styles()
 {
     // Very specific styles to completely hide the native index.php layout
     // We already have glassmorphic styles from our overall admin-style.css, but this ensures index.php is fully overridden
@@ -545,8 +545,8 @@ function gs_dashboard_admin_head_styles()
 
 // Remove X-Frame-Options so the dashboard can load inside the iframe. Must
 // run at priority 1, before send_frame_options_header fires at priority 10.
-add_action('admin_init', 'gs_dashboard_allow_embed_framing', 1);
-function gs_dashboard_allow_embed_framing()
+add_action('admin_init', 'gend_society_dashboard_allow_embed_framing', 1);
+function gend_society_dashboard_allow_embed_framing()
 {
     if (empty($_GET['gdc_dash_embed'])) {
         return;
@@ -555,8 +555,8 @@ function gs_dashboard_allow_embed_framing()
     @header_remove('X-Frame-Options');
 }
 
-add_action('admin_head-index.php', 'gs_dashboard_embed_mode_css');
-function gs_dashboard_embed_mode_css()
+add_action('admin_head-index.php', 'gend_society_dashboard_embed_mode_css');
+function gend_society_dashboard_embed_mode_css()
 {
     if (empty($_GET['gdc_dash_embed'])) {
         return;
@@ -588,7 +588,7 @@ function gs_dashboard_embed_mode_css()
 /**
  * Get membership from WP Ultimo (Stand-in for account data)
  */
-function gs_dashboard_get_membership()
+function gend_society_dashboard_get_membership()
 {
     if (function_exists('WP_Ultimo') && WP_Ultimo()->is_loaded()) {
         try {
@@ -603,7 +603,7 @@ function gs_dashboard_get_membership()
 /**
  * Render the fallback local administrators panel
  */
-function gs_dashboard_render_admin_users_panel()
+function gend_society_dashboard_render_admin_users_panel()
 {
     $blog_id = get_current_blog_id();
     $users = get_users(array(
@@ -672,7 +672,7 @@ function gs_dashboard_render_admin_users_panel()
 /**
  * Main render function hooked into all_admin_notices
  */
-function gs_render_custom_dashboard_screen()
+function gend_society_render_custom_dashboard_screen()
 {
     if (!current_user_can('read')) {
         return;
@@ -681,7 +681,7 @@ function gs_render_custom_dashboard_screen()
     $can_manage_site = current_user_can('manage_options');
     $account_section = '';
 
-    $membership = gs_dashboard_get_membership();
+    $membership = gend_society_dashboard_get_membership();
 
     // Single panel renderer used for every site type. Resolves the
     // membership payload from whichever data source is available:
@@ -695,16 +695,16 @@ function gs_render_custom_dashboard_screen()
     //      tier the Hosting / Feature Suite / Project Contracts panel
     //      never renders here and step 4 below shows the admin-users
     //      fallback instead.
-    if (function_exists('gs_render_membership_panel')) {
+    if (function_exists('gend_society_render_membership_panel')) {
         $payload = null;
 
-        if ($membership && function_exists('gs_membership_payload_from_local')) {
-            $payload = gs_membership_payload_from_local($membership);
+        if ($membership && function_exists('gend_society_membership_payload_from_local')) {
+            $payload = gend_society_membership_payload_from_local($membership);
         }
         // Tier 2 only replaces what we have if it actually carries a group — a membership found in
         // tier 1 (billing/plan/status) is worth more than an empty remote-cache miss.
-        if ((!is_array($payload) || empty($payload['group']['id'])) && function_exists('gs_remote_membership_get_cached')) {
-            $remote = gs_remote_membership_get_cached();
+        if ((!is_array($payload) || empty($payload['group']['id'])) && function_exists('gend_society_remote_membership_get_cached')) {
+            $remote = gend_society_remote_membership_get_cached();
             if (is_array($remote) && (!is_array($payload) || !empty($remote['group']['id']))) {
                 $payload = $remote;
             }
@@ -718,8 +718,8 @@ function gs_render_custom_dashboard_screen()
         // gdc_bp_group_id lookup gend.me's own dashboard-overview and every other blog↔group link in
         // this codebase already uses. This is what actually makes gend.me's own dashboard (no
         // membership of its own) show Business Group / Project Contracts correctly.
-        if ((!is_array($payload) || empty($payload['group']['id'])) && function_exists('gs_membership_payload_group_only')) {
-            $group_only = gs_membership_payload_group_only();
+        if ((!is_array($payload) || empty($payload['group']['id'])) && function_exists('gend_society_membership_payload_group_only')) {
+            $group_only = gend_society_membership_payload_group_only();
             if (is_array($group_only) && !empty($group_only['group']['id'])) {
                 if (is_array($payload)) {
                     $payload['group'] = $group_only['group'];
@@ -729,7 +729,7 @@ function gs_render_custom_dashboard_screen()
             }
         }
         if (is_array($payload)) {
-            $account_section = gs_render_membership_panel($payload);
+            $account_section = gend_society_render_membership_panel($payload);
         }
     }
 
@@ -737,7 +737,7 @@ function gs_render_custom_dashboard_screen()
     // environments, broken pairing, brand-new install before first
     // OAuth login).
     if ($account_section === '' && $can_manage_site) {
-        $account_section = gs_dashboard_render_admin_users_panel();
+        $account_section = gend_society_dashboard_render_admin_users_panel();
     } elseif ($account_section === '') {
         $account_section = '<div class="notice notice-warning"><p>No active membership found for this site.</p></div>';
     }
@@ -778,7 +778,7 @@ function gs_render_custom_dashboard_screen()
  *
  * Gated on manage_options upstream; this function does NOT re-check the cap.
  */
-function gs_render_app_settings_form()
+function gend_society_render_app_settings_form()
 {
     $current_title   = get_option('blogname');
     $current_tagline = get_option('blogdescription');
@@ -803,7 +803,7 @@ function gs_render_app_settings_form()
 
     echo '<form action="' . esc_url(admin_url('admin-post.php')) . '" method="POST">';
     wp_nonce_field('gs_app_settings_action', 'gs_app_settings_nonce');
-    echo '<input type="hidden" name="action" value="gs_save_app_settings">';
+    echo '<input type="hidden" name="action" value="gend_society_save_app_settings">';
 
     // App Title
     echo '<div class="gs-settings-form-row">';
@@ -991,7 +991,7 @@ function gs_render_app_settings_form()
  *
  * Gated on manage_options upstream; this function does NOT re-check the cap.
  */
-function gs_render_permalink_settings_form()
+function gend_society_render_permalink_settings_form()
 {
     $permalink_structure = get_option('permalink_structure');
     $category_base       = get_option('category_base');
@@ -1051,7 +1051,7 @@ function gs_render_permalink_settings_form()
 
     echo '<form action="' . esc_url(admin_url('admin-post.php')) . '" method="POST">';
     wp_nonce_field('gs_permalink_settings_action', 'gs_permalink_settings_nonce');
-    echo '<input type="hidden" name="action" value="gs_save_permalink_settings">';
+    echo '<input type="hidden" name="action" value="gend_society_save_permalink_settings">';
 
     echo '<table class="form-table permalink-structure" role="presentation" style="width:100%;border-collapse:collapse;">';
     echo '<tbody><tr><td style="padding:0;border:0;">';
@@ -1142,7 +1142,7 @@ function gs_render_permalink_settings_form()
  *
  * Gated on manage_options upstream; this function does NOT re-check the cap.
  */
-function gs_render_application_passwords_form()
+function gend_society_render_application_passwords_form()
 {
     $user_id = get_current_user_id();
 
@@ -1170,9 +1170,9 @@ function gs_render_application_passwords_form()
     }
 
     // ── One-time reveal of a freshly created password ──
-    $fresh = get_transient('gs_app_pw_new_' . $user_id);
+    $fresh = get_transient('gend_society_app_pw_new_' . $user_id);
     if (is_array($fresh) && !empty($fresh['password'])) {
-        delete_transient('gs_app_pw_new_' . $user_id);
+        delete_transient('gend_society_app_pw_new_' . $user_id);
         echo '<div style="background: rgba(78,170,255,0.10); border: 1px solid rgba(78,170,255,0.45); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;">';
         echo '<div style="color: #fff; font-weight: 600; margin-bottom: 6px;">'
             . sprintf(/* translators: %s: Application password name. */ esc_html__('New password for “%s” — copy it now, it will not be shown again:', 'gend-society'), esc_html($fresh['name']))
@@ -1201,7 +1201,7 @@ function gs_render_application_passwords_form()
             echo '</div>';
             echo '<form action="' . esc_url(admin_url('admin-post.php')) . '" method="POST" onsubmit="return confirm(\'' . esc_js(__('Revoke this application password? Any device using it will be signed out.', 'gend-society')) . '\');" style="margin: 0;">';
             wp_nonce_field('gs_app_pw_action', 'gs_app_pw_nonce');
-            echo '<input type="hidden" name="action" value="gs_app_password_revoke">';
+            echo '<input type="hidden" name="action" value="gend_society_app_password_revoke">';
             echo '<input type="hidden" name="gs_app_pw_uuid" value="' . esc_attr($item['uuid']) . '">';
             echo '<button type="submit" class="gs-btn gs-btn-secondary" style="background: rgba(214,54,56,0.12); color: #ff8085; border: 1px solid rgba(214,54,56,0.4);">' . esc_html__('Revoke', 'gend-society') . '</button>';
             echo '</form>';
@@ -1215,7 +1215,7 @@ function gs_render_application_passwords_form()
     // ── Create form ──
     echo '<form action="' . esc_url(admin_url('admin-post.php')) . '" method="POST">';
     wp_nonce_field('gs_app_pw_action', 'gs_app_pw_nonce');
-    echo '<input type="hidden" name="action" value="gs_app_password_create">';
+    echo '<input type="hidden" name="action" value="gend_society_app_password_create">';
     echo '<div class="gs-settings-form-row">';
     echo '<label for="gs_app_pw_name">' . esc_html__('New password name', 'gend-society') . '</label>';
     echo '<div class="gs-settings-input-group">';

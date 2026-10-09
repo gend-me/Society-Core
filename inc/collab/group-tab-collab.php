@@ -55,7 +55,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 	/**
 	 * GenD Match — the swipe-deck group tab (TAG-01 editor + deck mount).
 	 */
-	class GS_Group_Tab_Collab extends BP_Group_Extension {
+	class Gend_Society_Group_Tab_Collab extends BP_Group_Extension {
 
 		public function __construct() {
 			parent::init( array(
@@ -84,7 +84,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 		public function display( $group_id = null ) {
 			// Only the group's admins/mods (or super-admin) swipe on the
 			// group's behalf — locked decision. Reuse the existing gate.
-			if ( ! function_exists( 'gs_group_tabs_user_has_access' ) || ! gs_group_tabs_user_has_access() ) {
+			if ( ! function_exists( 'gend_society_group_tabs_user_has_access' ) || ! gend_society_group_tabs_user_has_access() ) {
 				echo '<p style="color:rgba(203,213,245,0.75);">' . esc_html__( 'Only group admins can use Match.', 'gend-society' ) . '</p>';
 				return;
 			}
@@ -127,13 +127,13 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 			// idiom (defeats the stale-asset pitfall). filemtime() is
 			// file_exists-guarded so a not-yet-deployed Plan-82-04 asset can
 			// never fatal display() — the tab still renders (empty deck).
-			$js_path  = GS_DIR . 'assets/collab-swipe.js';
-			$css_path = GS_DIR . 'assets/collab-swipe.css';
-			$js_ver   = file_exists( $js_path ) ? GS_VERSION . '.' . filemtime( $js_path ) : GS_VERSION;
-			$css_ver  = file_exists( $css_path ) ? GS_VERSION . '.' . filemtime( $css_path ) : GS_VERSION;
+			$js_path  = GEND_SOCIETY_DIR . 'assets/collab-swipe.js';
+			$css_path = GEND_SOCIETY_DIR . 'assets/collab-swipe.css';
+			$js_ver   = file_exists( $js_path ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $js_path ) : GEND_SOCIETY_VERSION;
+			$css_ver  = file_exists( $css_path ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $css_path ) : GEND_SOCIETY_VERSION;
 
-			wp_enqueue_script( 'gs-collab-swipe', GS_URL . 'assets/collab-swipe.js', array(), $js_ver, true );
-			wp_enqueue_style( 'gs-collab-swipe', GS_URL . 'assets/collab-swipe.css', array(), $css_ver );
+			wp_enqueue_script( 'gs-collab-swipe', GEND_SOCIETY_URL . 'assets/collab-swipe.js', array(), $js_ver, true );
+			wp_enqueue_style( 'gs-collab-swipe', GEND_SOCIETY_URL . 'assets/collab-swipe.css', array(), $css_ver );
 			wp_localize_script( 'gs-collab-swipe', 'gsCollabData', array(
 				'restUrl' => esc_url_raw( rest_url( 'gs/v1' ) ),
 				'nonce'   => wp_create_nonce( 'wp_rest' ),
@@ -143,9 +143,9 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 			// Matches-management controller (list matches + conversation + contract
 			// propose/accept/manage). Depends on gs-collab-swipe so window.gsCollabData
 			// (localized above) is available. file_exists-guarded ver like the deck.
-			$m_js_path = GS_DIR . 'assets/collab-matches.js';
-			$m_js_ver  = file_exists( $m_js_path ) ? GS_VERSION . '.' . filemtime( $m_js_path ) : GS_VERSION;
-			wp_enqueue_script( 'gs-collab-matches', GS_URL . 'assets/collab-matches.js', array( 'gs-collab-swipe' ), $m_js_ver, true );
+			$m_js_path = GEND_SOCIETY_DIR . 'assets/collab-matches.js';
+			$m_js_ver  = file_exists( $m_js_path ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $m_js_path ) : GEND_SOCIETY_VERSION;
+			wp_enqueue_script( 'gs-collab-matches', GEND_SOCIETY_URL . 'assets/collab-matches.js', array( 'gs-collab-swipe' ), $m_js_ver, true );
 
 			// Server-side pre-population (best-effort). The REST route
 			// (Plan 82-02) is the source of truth for validation + the
@@ -156,10 +156,10 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 			$cur_location = '';
 			$cur_optin    = false;
 			if ( function_exists( 'groups_get_groupmeta' ) ) {
-				$cur_category = (string) groups_get_groupmeta( $group_id, '_gs_collab_category', true );
-				$cur_industry = (string) groups_get_groupmeta( $group_id, '_gs_collab_industry', true );
-				$cur_location = (string) groups_get_groupmeta( $group_id, '_gs_collab_location', true );
-				$cur_optin    = ( '1' === (string) groups_get_groupmeta( $group_id, '_gs_collab_optin', true ) );
+				$cur_category = (string) groups_get_groupmeta( $group_id, '_gend_society_collab_category', true );
+				$cur_industry = (string) groups_get_groupmeta( $group_id, '_gend_society_collab_industry', true );
+				$cur_location = (string) groups_get_groupmeta( $group_id, '_gend_society_collab_location', true );
+				$cur_optin    = ( '1' === (string) groups_get_groupmeta( $group_id, '_gend_society_collab_optin', true ) );
 			}
 
 			$categories = class_exists( 'Gend_GS_Collab_Taxonomy' ) ? Gend_GS_Collab_Taxonomy::CATEGORIES : array();
@@ -267,7 +267,7 @@ add_action( 'bp_init', function () {
 	if ( ! function_exists( 'bp_register_group_extension' ) ) {
 		return;
 	}
-	bp_register_group_extension( 'GS_Group_Tab_Collab' );
+	bp_register_group_extension( 'Gend_Society_Group_Tab_Collab' );
 }, 10 );
 
 /**

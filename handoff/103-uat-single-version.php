@@ -29,8 +29,8 @@ $gs_uat = function ( $ok, $label, $detail = '' ) use ( &$gs_uat_fail ) {
 };
 
 // 1. Constant + plugin header.
-$gs_uat( defined( 'GS_VERSION' ), 'GS_VERSION defined' );
-$gs_ver = defined( 'GS_VERSION' ) ? GS_VERSION : '';
+$gs_uat( defined( 'GEND_SOCIETY_VERSION' ), 'GS_VERSION defined' );
+$gs_ver = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '';
 
 require_once ABSPATH . 'wp-admin/includes/plugin.php';
 $gs_plugin_dir  = WP_PLUGIN_DIR . '/gend-society';
@@ -102,7 +102,7 @@ foreach ( $gs_it as $gs_file ) {
 		}
 		if ( preg_match( '/\?ver=[\'"]?\s*\.\s*@?filemtime\(/', $line ) ) {
 			$ev[] = array( $off, 'rule1b ?ver= from bare filemtime', $line, null );
-		} elseif ( preg_match( '/\?v(?:er)?=/', $line ) && false !== strpos( $line, 'filemtime(' ) && false === strpos( $line, 'GS_VERSION' ) ) {
+		} elseif ( preg_match( '/\?v(?:er)?=/', $line ) && false !== strpos( $line, 'filemtime(' ) && false === strpos( $line, 'GEND_SOCIETY_VERSION' ) ) {
 			$ev[] = array( $off, 'rule1c echoed ?v= from filemtime without GS_VERSION', $line, null );
 		}
 		$off += strlen( $line ) + 1;
@@ -128,7 +128,7 @@ foreach ( $gs_it as $gs_file ) {
 
 	$gs_vars = array();
 	$alt     = function () use ( &$gs_vars ) {
-		$a = array( 'GS_VERSION' );
+		$a = array( 'GEND_SOCIETY_VERSION' );
 		foreach ( array_keys( $gs_vars ) as $v ) {
 			$a[] = '\$' . preg_quote( $v, '/' );
 		}
@@ -159,7 +159,7 @@ foreach ( $gs_it as $gs_file ) {
 			if ( false !== strpos( $rhs, 'filemtime(' ) && ! preg_match( '/^(?:' . $a . ')\b/', $rhs ) && ! $fm_ok( $rhs ) ) {
 				$hits[] = "rule4 \${$name} from filemtime without GS_VERSION";
 			}
-			if ( false !== strpos( $rhs, 'GS_VERSION' ) || preg_match( '/^(?:' . $a . ')\b/', $rhs ) ) {
+			if ( false !== strpos( $rhs, 'GEND_SOCIETY_VERSION' ) || preg_match( '/^(?:' . $a . ')\b/', $rhs ) ) {
 				$gs_vars[ $name ] = true;
 			} else {
 				unset( $gs_vars[ $name ] );

@@ -50,7 +50,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @return string 'members' | 'agents' | 'projects'
  */
-function gs_chat_active_tab() {
+function gend_society_chat_active_tab() {
 	$tab = '';
 	if ( isset( $_GET['gs_chat_tab'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view switch.
 		$tab = function_exists( 'sanitize_key' )
@@ -76,12 +76,12 @@ function gs_chat_active_tab() {
  * @param int    $viewer_id The profile owner (excluded from "other participants").
  * @return bool True if at least one non-viewer participant is an agent.
  */
-function gs_chat_thread_is_agent( $thread, $viewer_id = 0 ) {
+function gend_society_chat_thread_is_agent( $thread, $viewer_id = 0 ) {
 
 	// Guard the classifier — same plugin (agent-chat.php) and required earlier,
 	// but ordering-safe: if absent, treat as NOT an agent (non-breaking: the
 	// thread then classifies as a member conversation and stays visible).
-	if ( ! function_exists( 'gs_user_is_agent' ) ) {
+	if ( ! function_exists( 'gend_society_user_is_agent' ) ) {
 		return false;
 	}
 
@@ -109,7 +109,7 @@ function gs_chat_thread_is_agent( $thread, $viewer_id = 0 ) {
 		if ( $uid <= 0 || $uid === $viewer_id ) {
 			continue; // Skip the viewer / invalid ids.
 		}
-		if ( gs_user_is_agent( $uid ) ) {
+		if ( gend_society_user_is_agent( $uid ) ) {
 			return true;
 		}
 	}
@@ -145,7 +145,7 @@ function gs_chat_thread_is_agent( $thread, $viewer_id = 0 ) {
  * @param string $name Bare suffix after the pm_ prefix ('meta', 'projects').
  * @return string Prefixed table name, or '' if $wpdb is unavailable.
  */
-function gs_chat_pm_table( $name ) {
+function gend_society_chat_pm_table( $name ) {
 	global $wpdb;
 	if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! isset( $wpdb->prefix ) ) {
 		return '';
@@ -159,7 +159,7 @@ function gs_chat_pm_table( $name ) {
  * @param array $thread_ids Thread ids (ints) to look up.
  * @return array [ (int) thread_id => (int) project_id ] — only attached threads.
  */
-function gs_chat_thread_project_map( array $thread_ids ) {
+function gend_society_chat_thread_project_map( array $thread_ids ) {
 	global $wpdb;
 	if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_results' ) || ! method_exists( $wpdb, 'prepare' ) ) {
 		return array();
@@ -172,7 +172,7 @@ function gs_chat_thread_project_map( array $thread_ids ) {
 		return array();
 	}
 
-	$meta = gs_chat_pm_table( 'meta' );
+	$meta = gend_society_chat_pm_table( 'meta' );
 	if ( '' === $meta ) {
 		return array();
 	}
@@ -206,13 +206,13 @@ function gs_chat_thread_project_map( array $thread_ids ) {
  * @param int $project_id Project id.
  * @return int Group id, 0 if unlinked / unavailable.
  */
-function gs_chat_project_group_id( $project_id ) {
+function gend_society_chat_project_group_id( $project_id ) {
 	global $wpdb;
 	$project_id = (int) $project_id;
 	if ( $project_id <= 0 || ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
 		return 0;
 	}
-	$meta = gs_chat_pm_table( 'meta' );
+	$meta = gend_society_chat_pm_table( 'meta' );
 	if ( '' === $meta ) {
 		return 0;
 	}
@@ -231,14 +231,14 @@ function gs_chat_project_group_id( $project_id ) {
  * @param int $project_id Project id.
  * @return string Title.
  */
-function gs_chat_project_label( $project_id ) {
+function gend_society_chat_project_label( $project_id ) {
 	global $wpdb;
 	$project_id = (int) $project_id;
 	$fallback   = 'Project #' . $project_id;
 	if ( $project_id <= 0 || ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_var' ) || ! method_exists( $wpdb, 'prepare' ) ) {
 		return $fallback;
 	}
-	$projects = gs_chat_pm_table( 'projects' );
+	$projects = gend_society_chat_pm_table( 'projects' );
 	if ( '' === $projects ) {
 		return $fallback;
 	}
@@ -256,7 +256,7 @@ function gs_chat_project_label( $project_id ) {
  * @param int $gid Group id.
  * @return string Group name.
  */
-function gs_chat_group_name( $gid ) {
+function gend_society_chat_group_name( $gid ) {
 	$gid = (int) $gid;
 	if ( $gid <= 0 ) {
 		return '';
@@ -278,7 +278,7 @@ function gs_chat_group_name( $gid ) {
  * @param int $viewer Viewer (profile owner / current user) id.
  * @return array List of [ 'id' => int, 'title' => string ].
  */
-function gs_chat_viewer_projects( $viewer ) {
+function gend_society_chat_viewer_projects( $viewer ) {
 	global $wpdb;
 	$viewer = (int) $viewer;
 	if ( $viewer <= 0 ) {
@@ -303,8 +303,8 @@ function gs_chat_viewer_projects( $viewer ) {
 	if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'get_results' ) || ! method_exists( $wpdb, 'prepare' ) ) {
 		return array();
 	}
-	$meta     = gs_chat_pm_table( 'meta' );
-	$projects = gs_chat_pm_table( 'projects' );
+	$meta     = gend_society_chat_pm_table( 'meta' );
+	$projects = gend_society_chat_pm_table( 'projects' );
 	if ( '' === $meta || '' === $projects ) {
 		return array();
 	}
@@ -347,7 +347,7 @@ function gs_chat_viewer_projects( $viewer ) {
  * @param array|null $set When an array, replaces the stored map.
  * @return array The current [thread_id=>project_id] map.
  */
-function gs_chat_projects_rowmap( $set = null ) {
+function gend_society_chat_projects_rowmap( $set = null ) {
 	static $map = array();
 	if ( is_array( $set ) ) {
 		$map = $set;
@@ -376,7 +376,7 @@ function gs_chat_projects_rowmap( $set = null ) {
  * @param array  $r                 The parsed has-threads args.
  * @return bool  ! empty( pruned threads ) so the BP empty-state branch renders.
  */
-function gs_chat_prune_threads_by_tab( $has_threads, $messages_template = null, $r = array() ) {
+function gend_society_chat_prune_threads_by_tab( $has_threads, $messages_template = null, $r = array() ) {
 
 	// Only act on the Chat messages screen. If we cannot confirm we're on the
 	// messages component, bail (defensive: don't prune unknown contexts).
@@ -403,7 +403,7 @@ function gs_chat_prune_threads_by_tab( $has_threads, $messages_template = null, 
 	}
 	$viewer = (int) bp_displayed_user_id();
 
-	$tab = gs_chat_active_tab();
+	$tab = gend_society_chat_active_tab();
 
 	if ( 'projects' === $tab ) {
 		// Plan 44-01 — Projects tab: keep ONLY threads linked to a project via
@@ -418,7 +418,7 @@ function gs_chat_prune_threads_by_tab( $has_threads, $messages_template = null, 
 				$tids[] = (int) $t->thread_id;
 			}
 		}
-		$map = gs_chat_thread_project_map( $tids );
+		$map = gend_society_chat_thread_project_map( $tids );
 
 		// Optional single-project filter from the dropdown (degrade-safe GET).
 		$only = 0;
@@ -450,21 +450,21 @@ function gs_chat_prune_threads_by_tab( $has_threads, $messages_template = null, 
 		) );
 
 		// Hand the surviving map to the row-column hook (set/get module static).
-		if ( function_exists( 'gs_chat_projects_rowmap' ) ) {
-			gs_chat_projects_rowmap( $kept );
+		if ( function_exists( 'gend_society_chat_projects_rowmap' ) ) {
+			gend_society_chat_projects_rowmap( $kept );
 		}
 	} elseif ( 'agents' === $tab ) {
 		$messages_template->threads = array_values( array_filter(
 			$messages_template->threads,
 			function ( $thread ) use ( $viewer ) {
-				return gs_chat_thread_is_agent( $thread, $viewer );
+				return gend_society_chat_thread_is_agent( $thread, $viewer );
 			}
 		) );
 	} else { // 'members' (default): exclude agent threads, keep all human convos.
 		$messages_template->threads = array_values( array_filter(
 			$messages_template->threads,
 			function ( $thread ) use ( $viewer ) {
-				return ! gs_chat_thread_is_agent( $thread, $viewer );
+				return ! gend_society_chat_thread_is_agent( $thread, $viewer );
 			}
 		) );
 	}
@@ -483,7 +483,7 @@ function gs_chat_prune_threads_by_tab( $has_threads, $messages_template = null, 
 }
 
 if ( function_exists( 'add_filter' ) ) {
-	add_filter( 'bp_has_message_threads', 'gs_chat_prune_threads_by_tab', 99, 3 );
+	add_filter( 'bp_has_message_threads', 'gend_society_chat_prune_threads_by_tab', 99, 3 );
 }
 
 /**
@@ -492,7 +492,7 @@ if ( function_exists( 'add_filter' ) ) {
  * Fires on bp_messages_inbox_list_header (messages-loop.php). Adds one header
  * cell so the per-row Group cell aligns. All output is escaped.
  */
-function gs_chat_projects_col_header() {
+function gend_society_chat_projects_col_header() {
 	$esc = function_exists( 'esc_html' ) ? 'esc_html' : 'htmlspecialchars';
 	echo '<th class="gs-thread-group">' . $esc( __( 'Group', 'gend-society' ) ) . '</th>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped via $esc.
 }
@@ -506,11 +506,11 @@ function gs_chat_projects_col_header() {
  * when unmapped) so column alignment is preserved. All output is escaped; all
  * resolution is by ID and $wpdb-direct (fatal-safe).
  */
-function gs_chat_projects_col_item() {
+function gend_society_chat_projects_col_item() {
 	$esc = function_exists( 'esc_html' ) ? 'esc_html' : 'htmlspecialchars';
 
 	$tid = function_exists( 'bp_get_message_thread_id' ) ? (int) bp_get_message_thread_id() : 0;
-	$map = function_exists( 'gs_chat_projects_rowmap' ) ? gs_chat_projects_rowmap() : array();
+	$map = function_exists( 'gend_society_chat_projects_rowmap' ) ? gend_society_chat_projects_rowmap() : array();
 	$pid = ( $tid > 0 && isset( $map[ $tid ] ) ) ? (int) $map[ $tid ] : 0;
 
 	if ( $pid <= 0 ) {
@@ -518,9 +518,9 @@ function gs_chat_projects_col_item() {
 		return;
 	}
 
-	$gid   = gs_chat_project_group_id( $pid );
-	$group = ( $gid > 0 ) ? gs_chat_group_name( $gid ) : '';
-	$label = gs_chat_project_label( $pid );
+	$gid   = gend_society_chat_project_group_id( $pid );
+	$group = ( $gid > 0 ) ? gend_society_chat_group_name( $gid ) : '';
+	$label = gend_society_chat_project_label( $pid );
 
 	$text = ( '' !== $group ) ? ( $group . ' — ' . $label ) : $label;
 
@@ -533,7 +533,7 @@ function gs_chat_projects_col_item() {
  * (messages component, not email/dm) so the column never leaks into other
  * contexts. Runs on bp_actions (after the request action is known).
  */
-function gs_chat_projects_maybe_add_column() {
+function gend_society_chat_projects_maybe_add_column() {
 	if ( ! function_exists( 'bp_is_messages_component' ) || ! bp_is_messages_component() ) {
 		return;
 	}
@@ -543,20 +543,20 @@ function gs_chat_projects_maybe_add_column() {
 			return;
 		}
 	}
-	if ( ! function_exists( 'gs_chat_active_tab' ) || 'projects' !== gs_chat_active_tab() ) {
+	if ( ! function_exists( 'gend_society_chat_active_tab' ) || 'projects' !== gend_society_chat_active_tab() ) {
 		return;
 	}
 	if ( ! function_exists( 'add_action' ) ) {
 		return;
 	}
-	add_action( 'bp_messages_inbox_list_header', 'gs_chat_projects_col_header' );
-	add_action( 'bp_messages_inbox_list_item', 'gs_chat_projects_col_item' );
+	add_action( 'bp_messages_inbox_list_header', 'gend_society_chat_projects_col_header' );
+	add_action( 'bp_messages_inbox_list_item', 'gend_society_chat_projects_col_item' );
 }
 if ( function_exists( 'add_action' ) ) {
 	// Priority 20 on bp_actions: after BP has parsed the component/action so our
 	// gs_chat_active_tab() + bp_is_messages_component() checks are reliable, but
 	// well before the messages loop renders.
-	add_action( 'bp_actions', 'gs_chat_projects_maybe_add_column', 20 );
+	add_action( 'bp_actions', 'gend_society_chat_projects_maybe_add_column', 20 );
 }
 
 /* =========================================================================
@@ -586,7 +586,7 @@ if ( function_exists( 'add_action' ) ) {
  * Bails unless on the BP messages component. Render is cheap; the JS decides
  * (Chat mode only) whether to actually inject.
  */
-function gs_chat_tabs_footer() {
+function gend_society_chat_tabs_footer() {
 	if ( ! function_exists( 'bp_is_messages_component' ) || ! bp_is_messages_component() ) {
 		return;
 	}
@@ -614,7 +614,7 @@ function gs_chat_tabs_footer() {
 		return $base . $sep . 'gs_chat_tab=' . rawurlencode( $value );
 	};
 
-	$active = function_exists( 'gs_chat_active_tab' ) ? gs_chat_active_tab() : 'members';
+	$active = function_exists( 'gend_society_chat_active_tab' ) ? gend_society_chat_active_tab() : 'members';
 
 	// Plan 44-01 — the viewer's attachable projects (for the filter dropdown and
 	// the per-row attach picker). Computed once here, exposed to JS via GS_CHAT.
@@ -625,7 +625,7 @@ function gs_chat_tabs_footer() {
 	if ( $gs_viewer <= 0 && function_exists( 'get_current_user_id' ) ) {
 		$gs_viewer = (int) get_current_user_id();
 	}
-	$gs_projects = function_exists( 'gs_chat_viewer_projects' ) ? gs_chat_viewer_projects( $gs_viewer ) : array();
+	$gs_projects = function_exists( 'gend_society_chat_viewer_projects' ) ? gend_society_chat_viewer_projects( $gs_viewer ) : array();
 
 	// The current single-project filter selection (sticky in the dropdown).
 	$gs_project_sel = 0;
@@ -3251,7 +3251,7 @@ function gs_chat_tabs_footer() {
 	<?php
 }
 if ( function_exists( 'add_action' ) ) {
-	add_action( 'wp_footer', 'gs_chat_tabs_footer', 6 );
+	add_action( 'wp_footer', 'gend_society_chat_tabs_footer', 6 );
 }
 
 /**
@@ -3259,7 +3259,7 @@ if ( function_exists( 'add_action' ) ) {
  * Mirrors email-manager's enqueue guard (inbox-bp-messages-tabs.php:579-582):
  * load only when on the BP messages component. filemtime() cache-bust.
  */
-function gs_chat_tabs_enqueue() {
+function gend_society_chat_tabs_enqueue() {
 	if ( ! function_exists( 'bp_is_messages_component' ) || ! bp_is_messages_component() ) {
 		return;
 	}
@@ -3268,14 +3268,14 @@ function gs_chat_tabs_enqueue() {
 	}
 
 	$rel  = 'assets/chat-tabs.css';
-	$url  = defined( 'GS_URL' ) ? ( GS_URL . $rel ) : plugins_url( '../' . $rel, __FILE__ );
-	$path = defined( 'GS_DIR' ) ? ( GS_DIR . $rel ) : ( dirname( __FILE__, 2 ) . '/' . $rel );
-	$ver  = GS_VERSION . '.' . ( @file_exists( $path ) ? @filemtime( $path ) : '0' );
+	$url  = defined( 'GEND_SOCIETY_URL' ) ? ( GEND_SOCIETY_URL . $rel ) : plugins_url( '../' . $rel, __FILE__ );
+	$path = defined( 'GEND_SOCIETY_DIR' ) ? ( GEND_SOCIETY_DIR . $rel ) : ( dirname( __FILE__, 2 ) . '/' . $rel );
+	$ver  = GEND_SOCIETY_VERSION . '.' . ( @file_exists( $path ) ? @filemtime( $path ) : '0' );
 
 	wp_enqueue_style( 'gs-chat-tabs', $url, array(), $ver );
 }
 if ( function_exists( 'add_action' ) ) {
-	add_action( 'wp_enqueue_scripts', 'gs_chat_tabs_enqueue', 20 );
+	add_action( 'wp_enqueue_scripts', 'gend_society_chat_tabs_enqueue', 20 );
 }
 
 /* =========================================================================
@@ -3313,7 +3313,7 @@ if ( function_exists( 'add_action' ) ) {
  *
  * @return WP_REST_Response { ok:true, groups:[ {group_id,name,is_webapp} ] }
  */
-function gs_rest_agent_admin_groups( $req = null ) {
+function gend_society_rest_agent_admin_groups( $req = null ) {
 	$uid  = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
 	$rows = array();
 
@@ -3408,7 +3408,7 @@ function gs_rest_agent_admin_groups( $req = null ) {
  * @param WP_REST_Request $req group_id (required positive BP group id).
  * @return WP_REST_Response
  */
-function gs_rest_agent_roster( $req ) {
+function gend_society_rest_agent_roster( $req ) {
 	$gid    = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$agents = array();
 
@@ -3440,8 +3440,8 @@ function gs_rest_agent_roster( $req ) {
 			continue;
 		}
 		$is_agent = false;
-		if ( function_exists( 'gs_user_is_agent' ) ) {
-			$is_agent = (bool) gs_user_is_agent( $uid );
+		if ( function_exists( 'gend_society_user_is_agent' ) ) {
+			$is_agent = (bool) gend_society_user_is_agent( $uid );
 		} elseif ( function_exists( 'get_user_meta' ) ) {
 			$is_agent = (bool) get_user_meta( $uid, '_aipa_is_agent', true );
 		}
@@ -3494,7 +3494,7 @@ function gs_rest_agent_roster( $req ) {
  * @param WP_REST_Request $req group_id (required positive BP group id).
  * @return WP_REST_Response
  */
-function gs_rest_agent_list( $req ) {
+function gend_society_rest_agent_list( $req ) {
 	$gid    = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$agents = array();
 
@@ -3529,8 +3529,8 @@ function gs_rest_agent_list( $req ) {
 
 		// Agent classifier — prefer the canonical predicate, else the meta flag.
 		$is_agent = false;
-		if ( function_exists( 'gs_user_is_agent' ) ) {
-			$is_agent = (bool) gs_user_is_agent( $uid );
+		if ( function_exists( 'gend_society_user_is_agent' ) ) {
+			$is_agent = (bool) gend_society_user_is_agent( $uid );
 		} elseif ( function_exists( 'get_user_meta' ) ) {
 			$is_agent = (bool) get_user_meta( $uid, '_aipa_is_agent', true );
 		}
@@ -3575,7 +3575,7 @@ function gs_rest_agent_list( $req ) {
  * @param WP_REST_Request $req group_id (required positive BP group id).
  * @return WP_REST_Response
  */
-function gs_rest_group_members( $req ) {
+function gend_society_rest_group_members( $req ) {
 	$gid     = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$members = array();
 
@@ -3614,8 +3614,8 @@ function gs_rest_group_members( $req ) {
 
 		// EXCLUDE agents — prefer the canonical predicate, else the meta flag.
 		$is_agent = false;
-		if ( function_exists( 'gs_user_is_agent' ) ) {
-			$is_agent = (bool) gs_user_is_agent( $uid );
+		if ( function_exists( 'gend_society_user_is_agent' ) ) {
+			$is_agent = (bool) gend_society_user_is_agent( $uid );
 		} elseif ( function_exists( 'get_user_meta' ) ) {
 			$is_agent = (bool) get_user_meta( $uid, '_aipa_is_agent', true );
 		}
@@ -3664,7 +3664,7 @@ function gs_rest_group_members( $req ) {
  *
  * @return WP_REST_Response { ok:true, members:[ {id,name} ] }
  */
-function gs_rest_my_billable_members() {
+function gend_society_rest_my_billable_members() {
 	$uid     = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
 	$members = array();
 	if ( $uid <= 0 ) {
@@ -3706,8 +3706,8 @@ function gs_rest_my_billable_members() {
 			}
 			// EXCLUDE agents — canonical predicate, else the meta flag.
 			$is_agent = false;
-			if ( function_exists( 'gs_user_is_agent' ) ) {
-				$is_agent = (bool) gs_user_is_agent( $mid );
+			if ( function_exists( 'gend_society_user_is_agent' ) ) {
+				$is_agent = (bool) gend_society_user_is_agent( $mid );
 			} elseif ( function_exists( 'get_user_meta' ) ) {
 				$is_agent = (bool) get_user_meta( $mid, '_aipa_is_agent', true );
 			}
@@ -3737,7 +3737,7 @@ function gs_rest_my_billable_members() {
  * @param WP_REST_Request $req group_id (required positive BP group id).
  * @return WP_REST_Response
  */
-function gs_rest_group_departments( $req ) {
+function gend_society_rest_group_departments( $req ) {
 	$gid   = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$depts = array();
 	if ( $gid > 0 && function_exists( 'groups_get_groupmeta' ) ) {
@@ -3765,7 +3765,7 @@ function gs_rest_group_departments( $req ) {
  * @param WP_REST_Request $req group_id (required) + name (required).
  * @return WP_REST_Response|WP_Error
  */
-function gs_rest_group_department_create( $req ) {
+function gend_society_rest_group_department_create( $req ) {
 	$gid  = (int) $req->get_param( 'group_id' );
 	$name = trim( (string) $req->get_param( 'name' ) );
 	if ( $gid <= 0 || $name === '' ) {
@@ -3819,7 +3819,7 @@ function gs_rest_group_department_create( $req ) {
  * @param WP_REST_Request $req group_id (required positive BP group id).
  * @return WP_REST_Response { ok:true, projects:[ {id,name} ] }
  */
-function gs_rest_group_projects( $req ) {
+function gend_society_rest_group_projects( $req ) {
 	$gid      = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$projects = array();
 
@@ -3875,7 +3875,7 @@ function gs_rest_group_projects( $req ) {
  * @param WP_REST_Request $req group_id (required) + title (required).
  * @return WP_REST_Response|WP_Error
  */
-function gs_rest_group_project_create( $req ) {
+function gend_society_rest_group_project_create( $req ) {
 	$gid   = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$title = ( is_object( $req ) && method_exists( $req, 'get_param' ) ) ? trim( (string) $req->get_param( 'title' ) ) : '';
 
@@ -3930,7 +3930,7 @@ function gs_rest_group_project_create( $req ) {
  * @param WP_REST_Request $req group_id (required).
  * @return WP_REST_Response { ok, sequences:[{id,name,agentSlug}] }
  */
-function gs_rest_group_sequences( $req ) {
+function gend_society_rest_group_sequences( $req ) {
 	$gid  = is_object( $req ) && method_exists( $req, 'get_param' ) ? (int) $req->get_param( 'group_id' ) : 0;
 	$out  = array();
 	if ( $gid > 0 && function_exists( 'groups_get_groupmeta' ) ) {
@@ -3960,14 +3960,14 @@ function gs_rest_group_sequences( $req ) {
  * @param WP_REST_Request $req agent_user_id (required positive agent user id).
  * @return WP_REST_Response
  */
-function gs_rest_agent_welcome( $req ) {
+function gend_society_rest_agent_welcome( $req ) {
 	$agent_id = (int) $req->get_param( 'agent_user_id' );
 	if ( $agent_id <= 0 ) {
 		return new WP_Error( 'gs_agent_welcome_bad_id', 'A valid agent_user_id is required.', array( 'status' => 400 ) );
 	}
 
 	// Resolve agent BY ID only (gs_user_is_agent is ID-only). 400 if not an agent.
-	if ( ! function_exists( 'gs_user_is_agent' ) || ! gs_user_is_agent( $agent_id ) ) {
+	if ( ! function_exists( 'gend_society_user_is_agent' ) || ! gend_society_user_is_agent( $agent_id ) ) {
 		return new WP_Error( 'gs_agent_welcome_not_agent', 'That user is not an agent.', array( 'status' => 400 ) );
 	}
 
@@ -4017,7 +4017,7 @@ function gs_rest_agent_welcome( $req ) {
  * @param int $project_id Project id (for the group-membership fallback).
  * @return bool
  */
-function gs_chat_can_attach( $uid, $thread_id, $project_id ) {
+function gend_society_chat_can_attach( $uid, $thread_id, $project_id ) {
 	$uid        = (int) $uid;
 	$thread_id  = (int) $thread_id;
 	$project_id = (int) $project_id;
@@ -4046,7 +4046,7 @@ function gs_chat_can_attach( $uid, $thread_id, $project_id ) {
 	}
 
 	// Fallback: caller is a member of the project's linked group.
-	$gid = gs_chat_project_group_id( $project_id );
+	$gid = gend_society_chat_project_group_id( $project_id );
 	if ( $gid > 0 && function_exists( 'groups_is_user_member' ) && groups_is_user_member( $uid, $gid ) ) {
 		return true;
 	}
@@ -4065,7 +4065,7 @@ function gs_chat_can_attach( $uid, $thread_id, $project_id ) {
  * @param WP_REST_Request $req thread_id + project_id (positive ints).
  * @return WP_REST_Response|WP_Error
  */
-function gs_rest_chat_attach_project( $req ) {
+function gend_society_rest_chat_attach_project( $req ) {
 	global $wpdb;
 
 	$thread_id  = (int) $req->get_param( 'thread_id' );
@@ -4079,14 +4079,14 @@ function gs_rest_chat_attach_project( $req ) {
 		return new WP_Error( 'gs_chat_attach_no_user', 'Could not resolve the current user.', array( 'status' => 401 ) );
 	}
 
-	if ( ! gs_chat_can_attach( $uid, $thread_id, $project_id ) ) {
+	if ( ! gend_society_chat_can_attach( $uid, $thread_id, $project_id ) ) {
 		return new WP_Error( 'gs_chat_attach_forbidden', 'You cannot attach this conversation to that project.', array( 'status' => 403 ) );
 	}
 
 	if ( ! isset( $wpdb ) || ! is_object( $wpdb ) || ! method_exists( $wpdb, 'query' ) || ! method_exists( $wpdb, 'prepare' ) ) {
 		return rest_ensure_response( array( 'ok' => false, 'error' => 'db_unavailable' ) );
 	}
-	$meta = gs_chat_pm_table( 'meta' );
+	$meta = gend_society_chat_pm_table( 'meta' );
 	if ( '' === $meta ) {
 		return rest_ensure_response( array( 'ok' => false, 'error' => 'meta_table_unavailable' ) );
 	}
@@ -4130,9 +4130,9 @@ function gs_rest_chat_attach_project( $req ) {
  *
  * @return WP_REST_Response { ok:true, projects:[ {id,title} ] }
  */
-function gs_rest_chat_projects() {
+function gend_society_rest_chat_projects() {
 	$uid = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
-	$projects = ( $uid > 0 && function_exists( 'gs_chat_viewer_projects' ) ) ? gs_chat_viewer_projects( $uid ) : array();
+	$projects = ( $uid > 0 && function_exists( 'gend_society_chat_viewer_projects' ) ) ? gend_society_chat_viewer_projects( $uid ) : array();
 	return rest_ensure_response( array( 'ok' => true, 'projects' => array_values( $projects ) ) );
 }
 
@@ -4165,7 +4165,7 @@ function gs_rest_chat_projects() {
  *
  * @return array { client_id:string, client_secret:string, redirect_uri:string }
  */
-function gs_gdrive_creds() {
+function gend_society_gdrive_creds() {
 	$cid = '';
 	$sec = '';
 	if ( function_exists( 'getenv' ) ) {
@@ -4198,8 +4198,8 @@ function gs_gdrive_creds() {
  *
  * @return bool
  */
-function gs_gdrive_is_configured() {
-	$c = gs_gdrive_creds();
+function gend_society_gdrive_is_configured() {
+	$c = gend_society_gdrive_creds();
 	return ( '' !== $c['client_id'] && '' !== $c['client_secret'] );
 }
 
@@ -4209,12 +4209,12 @@ function gs_gdrive_is_configured() {
  * @param int $uid User id.
  * @return bool
  */
-function gs_gdrive_user_connected( $uid ) {
+function gend_society_gdrive_user_connected( $uid ) {
 	$uid = (int) $uid;
 	if ( $uid <= 0 || ! function_exists( 'get_user_meta' ) ) {
 		return false;
 	}
-	$refresh = (string) get_user_meta( $uid, '_gs_gdrive_refresh', true );
+	$refresh = (string) get_user_meta( $uid, '_gend_society_gdrive_refresh', true );
 	return ( '' !== trim( $refresh ) );
 }
 
@@ -4228,14 +4228,14 @@ function gs_gdrive_user_connected( $uid ) {
  * @param int $uid User id.
  * @return string Access token or ''.
  */
-function gs_gdrive_access_token( $uid ) {
+function gend_society_gdrive_access_token( $uid ) {
 	$uid = (int) $uid;
 	if ( $uid <= 0 || ! function_exists( 'get_user_meta' ) ) {
 		return '';
 	}
 
-	$access = (string) get_user_meta( $uid, '_gs_gdrive_access', true );
-	$exp    = (int) get_user_meta( $uid, '_gs_gdrive_exp', true );
+	$access = (string) get_user_meta( $uid, '_gend_society_gdrive_access', true );
+	$exp    = (int) get_user_meta( $uid, '_gend_society_gdrive_exp', true );
 
 	// Still-valid cached access token.
 	if ( '' !== trim( $access ) && $exp > time() ) {
@@ -4243,15 +4243,15 @@ function gs_gdrive_access_token( $uid ) {
 	}
 
 	// Need to refresh — require a refresh token + configured client.
-	$refresh = (string) get_user_meta( $uid, '_gs_gdrive_refresh', true );
+	$refresh = (string) get_user_meta( $uid, '_gend_society_gdrive_refresh', true );
 	if ( '' === trim( $refresh ) ) {
 		return '';
 	}
-	if ( ! gs_gdrive_is_configured() || ! function_exists( 'wp_remote_post' ) ) {
+	if ( ! gend_society_gdrive_is_configured() || ! function_exists( 'wp_remote_post' ) ) {
 		return '';
 	}
 
-	$creds = gs_gdrive_creds();
+	$creds = gend_society_gdrive_creds();
 	$resp  = wp_remote_post(
 		'https://oauth2.googleapis.com/token',
 		array(
@@ -4282,11 +4282,11 @@ function gs_gdrive_access_token( $uid ) {
 	$new_exp     = time() + max( 60, $expires_in ) - 60;
 
 	if ( function_exists( 'update_user_meta' ) ) {
-		update_user_meta( $uid, '_gs_gdrive_access', $new_access );
-		update_user_meta( $uid, '_gs_gdrive_exp', $new_exp );
+		update_user_meta( $uid, '_gend_society_gdrive_access', $new_access );
+		update_user_meta( $uid, '_gend_society_gdrive_exp', $new_exp );
 		// Google may rotate the refresh token; only overwrite if a new one came back.
 		if ( ! empty( $data['refresh_token'] ) ) {
-			update_user_meta( $uid, '_gs_gdrive_refresh', (string) $data['refresh_token'] );
+			update_user_meta( $uid, '_gend_society_gdrive_refresh', (string) $data['refresh_token'] );
 		}
 	}
 
@@ -4304,14 +4304,14 @@ function gs_gdrive_access_token( $uid ) {
  * @param int    $uid     User id whose Drive token is used.
  * @return string Text (<= ~6000 chars) or ''.
  */
-function gs_gdrive_fetch_text( $file_id, $uid ) {
+function gend_society_gdrive_fetch_text( $file_id, $uid ) {
 	$file_id = trim( (string) $file_id );
 	$uid     = (int) $uid;
 	if ( '' === $file_id || $uid <= 0 || ! function_exists( 'wp_remote_get' ) ) {
 		return '';
 	}
 
-	$token = gs_gdrive_access_token( $uid );
+	$token = gend_society_gdrive_access_token( $uid );
 	if ( '' === $token ) {
 		return '';
 	}
@@ -4395,12 +4395,12 @@ function gs_gdrive_fetch_text( $file_id, $uid ) {
  *
  * @return WP_REST_Response { ok:true, configured:bool, connected:bool }
  */
-function gs_rest_gdrive_status() {
+function gend_society_rest_gdrive_status() {
 	$uid = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
 	return rest_ensure_response( array(
 		'ok'         => true,
-		'configured' => gs_gdrive_is_configured(),
-		'connected'  => gs_gdrive_user_connected( $uid ),
+		'configured' => gend_society_gdrive_is_configured(),
+		'connected'  => gend_society_gdrive_user_connected( $uid ),
 	) );
 }
 
@@ -4413,10 +4413,10 @@ function gs_rest_gdrive_status() {
  *
  * @return void (emits a redirect or an HTML page, then exits).
  */
-function gs_rest_gdrive_connect() {
+function gend_society_rest_gdrive_connect() {
 	$uid = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
 
-	if ( ! gs_gdrive_is_configured() ) {
+	if ( ! gend_society_gdrive_is_configured() ) {
 		if ( ! headers_sent() ) {
 			header( 'Content-Type: text/html; charset=utf-8' );
 			status_header( 200 );
@@ -4442,7 +4442,7 @@ function gs_rest_gdrive_connect() {
 		exit;
 	}
 
-	$creds = gs_gdrive_creds();
+	$creds = gend_society_gdrive_creds();
 	$nonce = function_exists( 'wp_create_nonce' ) ? wp_create_nonce( 'gs_gdrive_state_' . $uid ) : '';
 	// state = uid + nonce, verified on callback (binds the grant to this uid).
 	$state = $uid . '|' . $nonce;
@@ -4478,7 +4478,7 @@ function gs_rest_gdrive_connect() {
  * @param WP_REST_Request $req code + state.
  * @return void (emits HTML, then exits).
  */
-function gs_rest_gdrive_callback( $req = null ) {
+function gend_society_rest_gdrive_callback( $req = null ) {
 	$code  = '';
 	$state = '';
 	if ( is_object( $req ) && method_exists( $req, 'get_param' ) ) {
@@ -4520,12 +4520,12 @@ function gs_rest_gdrive_callback( $req = null ) {
 		$render( false, 'No authorization code was returned. Please try again.' );
 		return;
 	}
-	if ( ! gs_gdrive_is_configured() || ! function_exists( 'wp_remote_post' ) ) {
+	if ( ! gend_society_gdrive_is_configured() || ! function_exists( 'wp_remote_post' ) ) {
 		$render( false, 'Google Drive is not configured.' );
 		return;
 	}
 
-	$creds = gs_gdrive_creds();
+	$creds = gend_society_gdrive_creds();
 	$resp  = wp_remote_post(
 		'https://oauth2.googleapis.com/token',
 		array(
@@ -4556,11 +4556,11 @@ function gs_rest_gdrive_callback( $req = null ) {
 	$exp        = time() + max( 60, $expires_in ) - 60;
 
 	if ( function_exists( 'update_user_meta' ) ) {
-		update_user_meta( $uid, '_gs_gdrive_access', $access );
-		update_user_meta( $uid, '_gs_gdrive_exp', $exp );
+		update_user_meta( $uid, '_gend_society_gdrive_access', $access );
+		update_user_meta( $uid, '_gend_society_gdrive_exp', $exp );
 		// Store the refresh token only when returned; keep the existing one otherwise.
 		if ( ! empty( $data['refresh_token'] ) ) {
-			update_user_meta( $uid, '_gs_gdrive_refresh', (string) $data['refresh_token'] );
+			update_user_meta( $uid, '_gend_society_gdrive_refresh', (string) $data['refresh_token'] );
 		}
 	}
 
@@ -4577,14 +4577,14 @@ function gs_rest_gdrive_callback( $req = null ) {
  * @param WP_REST_Request $req q (optional name substring).
  * @return WP_REST_Response { ok:true, files:[{id,name,mimeType,iconLink}], connected?:false }
  */
-function gs_rest_gdrive_files( $req = null ) {
+function gend_society_rest_gdrive_files( $req = null ) {
 	$q = '';
 	if ( is_object( $req ) && method_exists( $req, 'get_param' ) ) {
 		$q = trim( (string) $req->get_param( 'q' ) );
 	}
 
 	$uid   = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
-	$token = ( $uid > 0 ) ? gs_gdrive_access_token( $uid ) : '';
+	$token = ( $uid > 0 ) ? gend_society_gdrive_access_token( $uid ) : '';
 	if ( '' === $token ) {
 		return rest_ensure_response( array( 'ok' => true, 'files' => array(), 'connected' => false ) );
 	}
@@ -4648,7 +4648,7 @@ function gs_rest_gdrive_files( $req = null ) {
  * outgoing welcome message), so an authed cookie/nonce request is sufficient and
  * passes the hub's pri-99 REST auth gate the same way wp/v2 authed requests do.
  */
-function gs_rest_register_agent_create_routes() {
+function gend_society_rest_register_agent_create_routes() {
 	if ( ! function_exists( 'register_rest_route' ) ) {
 		return;
 	}
@@ -4657,7 +4657,7 @@ function gs_rest_register_agent_create_routes() {
 		'/agent-admin-groups',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_agent_admin_groups',
+			'callback'            => 'gend_society_rest_agent_admin_groups',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4668,7 +4668,7 @@ function gs_rest_register_agent_create_routes() {
 		'/agent-welcome',
 		array(
 			'methods'             => 'POST',
-			'callback'            => 'gs_rest_agent_welcome',
+			'callback'            => 'gend_society_rest_agent_welcome',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4686,7 +4686,7 @@ function gs_rest_register_agent_create_routes() {
 		'/chat-attach-project',
 		array(
 			'methods'             => 'POST',
-			'callback'            => 'gs_rest_chat_attach_project',
+			'callback'            => 'gend_society_rest_chat_attach_project',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4701,7 +4701,7 @@ function gs_rest_register_agent_create_routes() {
 		'/chat-projects',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_chat_projects',
+			'callback'            => 'gend_society_rest_chat_projects',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4715,7 +4715,7 @@ function gs_rest_register_agent_create_routes() {
 		'/agent-roster',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_agent_roster',
+			'callback'            => 'gend_society_rest_agent_roster',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4732,7 +4732,7 @@ function gs_rest_register_agent_create_routes() {
 		'/agent-list',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_agent_list',
+			'callback'            => 'gend_society_rest_agent_list',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4749,7 +4749,7 @@ function gs_rest_register_agent_create_routes() {
 		'/group-members',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_group_members',
+			'callback'            => 'gend_society_rest_group_members',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4769,7 +4769,7 @@ function gs_rest_register_agent_create_routes() {
 		'/my-billable-members',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_my_billable_members',
+			'callback'            => 'gend_society_rest_my_billable_members',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4784,7 +4784,7 @@ function gs_rest_register_agent_create_routes() {
 		array(
 			array(
 				'methods'             => 'GET',
-				'callback'            => 'gs_rest_group_departments',
+				'callback'            => 'gend_society_rest_group_departments',
 				'permission_callback' => function () {
 					return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 				},
@@ -4792,7 +4792,7 @@ function gs_rest_register_agent_create_routes() {
 			),
 			array(
 				'methods'             => 'POST',
-				'callback'            => 'gs_rest_group_department_create',
+				'callback'            => 'gend_society_rest_group_department_create',
 				'permission_callback' => function () {
 					return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 				},
@@ -4810,7 +4810,7 @@ function gs_rest_register_agent_create_routes() {
 		array(
 			array(
 				'methods'             => 'GET',
-				'callback'            => 'gs_rest_group_projects',
+				'callback'            => 'gend_society_rest_group_projects',
 				'permission_callback' => function () {
 					return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 				},
@@ -4818,7 +4818,7 @@ function gs_rest_register_agent_create_routes() {
 			),
 			array(
 				'methods'             => 'POST',
-				'callback'            => 'gs_rest_group_project_create',
+				'callback'            => 'gend_society_rest_group_project_create',
 				'permission_callback' => function () {
 					return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 				},
@@ -4834,7 +4834,7 @@ function gs_rest_register_agent_create_routes() {
 		'/group-sequences',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_group_sequences',
+			'callback'            => 'gend_society_rest_group_sequences',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4850,7 +4850,7 @@ function gs_rest_register_agent_create_routes() {
 		'/gdrive/status',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_gdrive_status',
+			'callback'            => 'gend_society_rest_gdrive_status',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4863,7 +4863,7 @@ function gs_rest_register_agent_create_routes() {
 		'/gdrive/connect',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_gdrive_connect',
+			'callback'            => 'gend_society_rest_gdrive_connect',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4877,7 +4877,7 @@ function gs_rest_register_agent_create_routes() {
 		'/gdrive/callback',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_gdrive_callback',
+			'callback'            => 'gend_society_rest_gdrive_callback',
 			'permission_callback' => '__return_true',
 		)
 	);
@@ -4888,7 +4888,7 @@ function gs_rest_register_agent_create_routes() {
 		'/gdrive/files',
 		array(
 			'methods'             => 'GET',
-			'callback'            => 'gs_rest_gdrive_files',
+			'callback'            => 'gend_society_rest_gdrive_files',
 			'permission_callback' => function () {
 				return function_exists( 'is_user_logged_in' ) ? is_user_logged_in() : false;
 			},
@@ -4899,5 +4899,5 @@ function gs_rest_register_agent_create_routes() {
 	);
 }
 if ( function_exists( 'add_action' ) ) {
-	add_action( 'rest_api_init', 'gs_rest_register_agent_create_routes' );
+	add_action( 'rest_api_init', 'gend_society_rest_register_agent_create_routes' );
 }

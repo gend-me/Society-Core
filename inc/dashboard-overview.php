@@ -7,8 +7,8 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-if (!function_exists('gs_get_account_overview_html')) {
-    function gs_get_account_overview_html($membership)
+if (!function_exists('gend_society_get_account_overview_html')) {
+    function gend_society_get_account_overview_html($membership)
     {
         if (!$membership) {
             return '';
@@ -77,7 +77,7 @@ if (!function_exists('gs_get_account_overview_html')) {
         // area. gs_dashboard_hub_url() prefers the OAuth hub URL on
         // container sites (where wu_get_main_site_id resolves to the
         // customer's own site, producing broken local links).
-        $hub_home = function_exists('gs_dashboard_hub_url') ? gs_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
+        $hub_home = function_exists('gend_society_dashboard_hub_url') ? gend_society_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
         $myacc = trailingslashit(rtrim($hub_home, '/') . '/my-account');
         $mid = ($membership && method_exists($membership, 'get_id')) ? (int) $membership->get_id() : 0;
 
@@ -103,7 +103,7 @@ if (!function_exists('gs_get_account_overview_html')) {
             $name = method_exists($customer, 'get_display_name') ? $customer->get_display_name() : $username;
             $user_id = method_exists($customer, 'get_user_id') ? (int) $customer->get_user_id() : 0;
 
-            $root = function_exists('gs_dashboard_hub_url') ? gs_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
+            $root = function_exists('gend_society_dashboard_hub_url') ? gend_society_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
             $profile = $root . 'members/' . rawurlencode($username) . '/';
             $messages_slug = function_exists('bp_get_messages_slug') ? bp_get_messages_slug() : 'messages';
             $msg = $profile . trailingslashit($messages_slug) . 'compose/?r=' . rawurlencode($username);
@@ -201,7 +201,7 @@ if (!function_exists('gs_get_account_overview_html')) {
                 }
             }
 
-            $root = function_exists('gs_dashboard_hub_url') ? gs_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
+            $root = function_exists('gend_society_dashboard_hub_url') ? gend_society_dashboard_hub_url() : trailingslashit((string) network_home_url('/'));
             $slug_safe = $slug ? sanitize_title($slug) : (string) $gid;
             $link = $root . 'groups/' . $slug_safe . '/';
 

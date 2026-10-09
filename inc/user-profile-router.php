@@ -32,10 +32,10 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class GS_User_Profile_Router {
+class Gend_Society_User_Profile_Router {
 
     const NS       = 'gs/v1';
-    const META_KEY = 'gs_chatflow_profile';
+    const META_KEY = 'gend_society_chatflow_profile';
 
     public static function init() {
         add_action( 'rest_api_init', array( __CLASS__, 'register_routes' ) );
@@ -144,4 +144,4 @@ class GS_User_Profile_Router {
     }
 }
 
-GS_User_Profile_Router::init();
+Gend_Society_User_Profile_Router::init();

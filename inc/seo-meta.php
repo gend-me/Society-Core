@@ -21,17 +21,17 @@
 
 defined('ABSPATH') || exit;
 
-const GS_SEO_TITLE_KEY = '_gs_seo_title';
-const GS_SEO_DESC_KEY  = '_gs_seo_description';
+const GEND_SOCIETY_SEO_TITLE_KEY = '_gend_society_seo_title';
+const GEND_SOCIETY_SEO_DESC_KEY  = '_gend_society_seo_description';
 
-function gs_seo_post_types() {
+function gend_society_seo_post_types() {
     $types = array_values(array_diff(get_post_types(array('public' => true)), array('attachment')));
-    return (array) apply_filters('gs_seo_post_types', $types);
+    return (array) apply_filters('gend_society_seo_post_types', $types);
 }
 
 add_action('init', function () {
-    foreach (gs_seo_post_types() as $type) {
-        foreach (array(GS_SEO_TITLE_KEY, GS_SEO_DESC_KEY) as $key) {
+    foreach (gend_society_seo_post_types() as $type) {
+        foreach (array(GEND_SOCIETY_SEO_TITLE_KEY, GEND_SOCIETY_SEO_DESC_KEY) as $key) {
             register_post_meta($type, $key, array(
                 'type'              => 'string',
                 'single'            => true,
@@ -48,15 +48,15 @@ add_action('init', function () {
 /* ---------------------------------------------------------------- editor */
 
 add_action('add_meta_boxes', function () {
-    foreach (gs_seo_post_types() as $type) {
-        add_meta_box('gs-seo', __('SEO', 'gend-society'), 'gs_seo_render_box', $type, 'normal', 'default');
+    foreach (gend_society_seo_post_types() as $type) {
+        add_meta_box('gs-seo', __('SEO', 'gend-society'), 'gend_society_seo_render_box', $type, 'normal', 'default');
     }
 });
 
-function gs_seo_render_box($post) {
+function gend_society_seo_render_box($post) {
     wp_nonce_field('gs_seo_save', 'gs_seo_nonce');
-    $title = (string) get_post_meta($post->ID, GS_SEO_TITLE_KEY, true);
-    $desc  = (string) get_post_meta($post->ID, GS_SEO_DESC_KEY, true);
+    $title = (string) get_post_meta($post->ID, GEND_SOCIETY_SEO_TITLE_KEY, true);
+    $desc  = (string) get_post_meta($post->ID, GEND_SOCIETY_SEO_DESC_KEY, true);
     ?>
     <p>
         <label for="gs-seo-title"><strong><?php esc_html_e('SEO title', 'gend-society'); ?></strong>
@@ -96,7 +96,7 @@ add_action('save_post', function ($post_id) {
     if ((defined('DOING_AUTOSAVE') && DOING_AUTOSAVE) || wp_is_post_revision($post_id) || !current_user_can('edit_post', $post_id)) {
         return;
     }
-    foreach (array('gs_seo_title' => GS_SEO_TITLE_KEY, 'gs_seo_description' => GS_SEO_DESC_KEY) as $field => $key) {
+    foreach (array('gs_seo_title' => GEND_SOCIETY_SEO_TITLE_KEY, 'gs_seo_description' => GEND_SOCIETY_SEO_DESC_KEY) as $field => $key) {
         $value = isset($_POST[$field]) ? sanitize_text_field(wp_unslash($_POST[$field])) : '';
         if ($value === '') {
             delete_post_meta($post_id, $key);
@@ -116,7 +116,7 @@ add_filter('youzify_display_open_graph_tags', function ($show) {
 
 add_filter('pre_get_document_title', function ($title) {
     if (is_singular()) {
-        $seo = trim((string) get_post_meta(get_queried_object_id(), GS_SEO_TITLE_KEY, true));
+        $seo = trim((string) get_post_meta(get_queried_object_id(), GEND_SOCIETY_SEO_TITLE_KEY, true));
         if ($seo !== '') {
             return $seo;
         }
@@ -127,7 +127,7 @@ add_filter('pre_get_document_title', function ($title) {
 /**
  * Plain-text summary of at most $max characters.
  */
-function gs_seo_trim($text, $max = 160) {
+function gend_society_seo_trim($text, $max = 160) {
     $text = trim(preg_replace('/\s+/', ' ', wp_strip_all_tags(strip_shortcodes(html_entity_decode((string) $text, ENT_QUOTES, 'UTF-8')), true)));
     if (mb_strlen($text) <= $max) {
         return $text;
@@ -140,12 +140,12 @@ function gs_seo_trim($text, $max = 160) {
 /**
  * @return array{title:string,description:string,url:string,image:string,type:string}
  */
-function gs_seo_current() {
+function gend_society_seo_current() {
     $out = array('title' => wp_get_document_title(), 'description' => '', 'url' => '', 'image' => '', 'type' => 'website');
 
     if (is_singular()) {
         $post = get_queried_object();
-        $desc = trim((string) get_post_meta($post->ID, GS_SEO_DESC_KEY, true));
+        $desc = trim((string) get_post_meta($post->ID, GEND_SOCIETY_SEO_DESC_KEY, true));
         if ($desc === '' && is_front_page() && get_bloginfo('description') !== '') {
             // A static front page's text usually starts with section labels;
             // the site tagline is a better summary.
@@ -154,17 +154,17 @@ function gs_seo_current() {
         if ($desc === '') {
             $desc = has_excerpt($post) ? $post->post_excerpt : $post->post_content;
         }
-        $out['description'] = gs_seo_trim($desc);
+        $out['description'] = gend_society_seo_trim($desc);
         $out['url'] = (string) get_permalink($post);
         $out['type'] = $post->post_type === 'post' ? 'article' : 'website';
         if (has_post_thumbnail($post)) {
             $out['image'] = (string) get_the_post_thumbnail_url($post, 'large');
         }
     } elseif (is_front_page() || is_home()) {
-        $out['description'] = gs_seo_trim(get_bloginfo('description'));
+        $out['description'] = gend_society_seo_trim(get_bloginfo('description'));
         $out['url'] = home_url('/');
     } elseif (is_category() || is_tag() || is_tax()) {
-        $out['description'] = gs_seo_trim(term_description());
+        $out['description'] = gend_society_seo_trim(term_description());
         $link = get_term_link(get_queried_object());
         $out['url'] = is_wp_error($link) ? '' : (string) $link;
     }
@@ -172,14 +172,14 @@ function gs_seo_current() {
     if ($out['image'] === '' && has_site_icon()) {
         $out['image'] = (string) get_site_icon_url(512);
     }
-    return (array) apply_filters('gs_seo_current', $out);
+    return (array) apply_filters('gend_society_seo_current', $out);
 }
 
 add_action('wp_head', function () {
     if (is_admin() || is_feed() || is_404() || (function_exists('bp_is_user') && bp_is_user())) {
         return;
     }
-    $seo = gs_seo_current();
+    $seo = gend_society_seo_current();
     echo "\n<!-- GenD SEO -->\n";
     if ($seo['description'] !== '') {
         printf('<meta name="description" content="%s">' . "\n", esc_attr($seo['description']));

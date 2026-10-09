@@ -36,17 +36,17 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-const GS_FEATURES_CACHE_OPTION         = 'gs_features_cache';
-const GS_FEATURES_CACHE_EXPIRES_OPTION = 'gs_features_cache_expires';
-const GS_FEATURES_DEFAULT_TTL          = 5 * MINUTE_IN_SECONDS;
+const GEND_SOCIETY_FEATURES_CACHE_OPTION         = 'gend_society_features_cache';
+const GEND_SOCIETY_FEATURES_CACHE_EXPIRES_OPTION = 'gend_society_features_cache_expires';
+const GEND_SOCIETY_FEATURES_DEFAULT_TTL          = 5 * MINUTE_IN_SECONDS;
 
 /**
  * Map allowed-area slug → admin menu slug prefix(es). Anything
  * matching one of the prefixes when the area is allowed stays
  * accessible.
  */
-function gs_features_area_map() {
-    return apply_filters( 'gs_features_area_map', array(
+function gend_society_features_area_map() {
+    return apply_filters( 'gend_society_features_area_map', array(
         'app'      => array( 'gs-app' ),
         'write'    => array( 'gs-content', 'gs-write' ),
         'store'    => array( 'gs-store', 'gdc-store-' ),
@@ -71,8 +71,8 @@ function gs_features_area_map() {
  * the existing coarse one, it never narrows it. Existing plans that
  * only ever stored bare area slugs keep working unchanged.
  */
-function gs_features_granular_slug_map() {
-    return apply_filters( 'gs_features_granular_slug_map', array(
+function gend_society_features_granular_slug_map() {
+    return apply_filters( 'gend_society_features_granular_slug_map', array(
         'site-editor.php'             => array( 'area' => 'app',      'child' => 'app.theme_builder' ),
         'blog-manager'                => array( 'area' => 'app',      'child' => 'app.content_campaigns' ),
         'content-campaigns'           => array( 'area' => 'app',      'child' => 'app.content_campaigns' ),
@@ -100,8 +100,8 @@ function gs_features_granular_slug_map() {
  * it, so hub access is granted when ANY child of the area is allowed,
  * not just the bare area slug.
  */
-function gs_features_hub_area_map() {
-    return apply_filters( 'gs_features_hub_area_map', array(
+function gend_society_features_hub_area_map() {
+    return apply_filters( 'gend_society_features_hub_area_map', array(
         'gs-content'  => 'app',
         'gs-store'    => 'store',
         'gs-social'   => 'social',
@@ -118,7 +118,7 @@ function gs_features_hub_area_map() {
  * tier they're on, hidden on networked subsites where the network
  * admin handles feature management.
  */
-function gs_features_always_allowed() {
+function gend_society_features_always_allowed() {
     $allowed = array(
         'index.php',
         'gs-users',
@@ -126,13 +126,13 @@ function gs_features_always_allowed() {
         'gs-feature-upgrade',
     );
 
-    $is_paired       = (string) get_option( 'gs_install_token', '' ) !== '';
+    $is_paired       = (string) get_option( 'gend_society_install_token', '' ) !== '';
     $is_super_admin  = is_multisite() && current_user_can( 'manage_network' );
     if ( $is_paired || $is_super_admin ) {
         $allowed[] = 'gs-features';
     }
 
-    return apply_filters( 'gs_features_always_allowed', $allowed );
+    return apply_filters( 'gend_society_features_always_allowed', $allowed );
 }
 
 /**
@@ -140,8 +140,8 @@ function gs_features_always_allowed() {
  * upgrade-redirect to know which area the user needs unlocked).
  * Returns '' when the slug isn't gated.
  */
-function gs_features_area_for_slug( string $slug ): string {
-    $map = gs_features_area_map();
+function gend_society_features_area_for_slug( string $slug ): string {
+    $map = gend_society_features_area_map();
     foreach ( $map as $area => $prefixes ) {
         foreach ( $prefixes as $p ) {
             if ( $p !== '' && strncmp( $slug, $p, strlen( $p ) ) === 0 ) {
@@ -155,7 +155,7 @@ function gs_features_area_for_slug( string $slug ): string {
 /**
  * Check if a menu slug starts with any of the allowed prefixes.
  */
-function gs_features_slug_allowed( string $slug, array $allowed_prefixes ): bool {
+function gend_society_features_slug_allowed( string $slug, array $allowed_prefixes ): bool {
     foreach ( $allowed_prefixes as $prefix ) {
         if ( $prefix !== '' && strncmp( $slug, $prefix, strlen( $prefix ) ) === 0 ) {
             return true;
@@ -169,13 +169,13 @@ function gs_features_slug_allowed( string $slug, array $allowed_prefixes ): bool
  * super-admin gating, separate from the upgrade flow). Other
  * non-allowed menus stay visible so customers see what's possible.
  */
-add_action( 'admin_menu', 'gs_features_filter_features_menu', 999 );
+add_action( 'admin_menu', 'gend_society_features_filter_features_menu', 999 );
 
-function gs_features_filter_features_menu() {
+function gend_society_features_filter_features_menu() {
     global $menu, $submenu;
     if ( empty( $menu ) || ! is_array( $menu ) ) return;
 
-    $always = gs_features_always_allowed();
+    $always = gend_society_features_always_allowed();
     if ( in_array( 'gs-features', $always, true ) ) return; // visible
 
     foreach ( $menu as $key => $entry ) {
@@ -207,7 +207,7 @@ function gs_features_filter_features_menu() {
  * @param string $page The resolved page slug (gs_features_enforce_redirect()'s $page).
  * @return string
  */
-function gs_features_capture_tab_signal( string $page ): string {
+function gend_society_features_capture_tab_signal( string $page ): string {
 
     foreach ( array( 'tab', 'section', 'subtab', 'gdc_tab', 'plugin_status' ) as $candidate ) {
         if ( isset( $_GET[ $candidate ] ) && $_GET[ $candidate ] !== '' ) {
@@ -238,7 +238,7 @@ function gs_features_capture_tab_signal( string $page ): string {
  * @param array  $learn_more_pages The `learn_more_pages` field from the cached /install/{id}/features payload.
  * @return string Absolute URL, or '' if nothing matches.
  */
-function gs_features_resolve_learn_more_url( string $required_child, string $tab, array $learn_more_pages ): string {
+function gend_society_features_resolve_learn_more_url( string $required_child, string $tab, array $learn_more_pages ): string {
 
     if ( $required_child === '' ) {
         return '';
@@ -260,9 +260,9 @@ function gs_features_resolve_learn_more_url( string $required_child, string $tab
  * Runs at admin_init so it fires BEFORE the page callback so
  * customers don't see a flash of locked content.
  */
-add_action( 'admin_init', 'gs_features_enforce_redirect' );
+add_action( 'admin_init', 'gend_society_features_enforce_redirect' );
 
-function gs_features_enforce_redirect() {
+function gend_society_features_enforce_redirect() {
 
     // Super admins + network admins bypass entirely.
     if ( is_multisite() && current_user_can( 'manage_network' ) ) return;
@@ -272,7 +272,7 @@ function gs_features_enforce_redirect() {
     if ( defined( 'REST_REQUEST' ) && REST_REQUEST ) return;
     if ( ! is_admin() ) return;
 
-    $features = gs_features_get_cached();
+    $features = gend_society_features_get_cached();
     if ( ! is_array( $features ) ) return;
     $allowed_areas = isset( $features['allowed_areas'] ) ? (array) $features['allowed_areas'] : array();
     if ( empty( $allowed_areas ) ) return; // empty = allow all
@@ -286,16 +286,16 @@ function gs_features_enforce_redirect() {
     if ( $page === '' ) return;
 
     // Always-allowed slugs (Dashboard, Users, Connect, etc.).
-    if ( in_array( $page, gs_features_always_allowed(), true ) ) return;
+    if ( in_array( $page, gend_society_features_always_allowed(), true ) ) return;
 
     // Granular slugs (the 12 restructured submenu items) mostly live
     // under real plugin page slugs that were never part of the coarse
     // prefix map, so `$required_area` alone can't be used to decide
     // "not gated" — a page only escapes gating when NEITHER lookup
     // recognizes it.
-    $granular_map   = gs_features_granular_slug_map();
+    $granular_map   = gend_society_features_granular_slug_map();
     $granular_entry = $granular_map[ $page ] ?? null;
-    $required_area  = gs_features_area_for_slug( $page );
+    $required_area  = gend_society_features_area_for_slug( $page );
 
     if ( $required_area === '' && $granular_entry === null ) return; // not a gated area at all
 
@@ -318,7 +318,7 @@ function gs_features_enforce_redirect() {
     // Hub page bypass — allow opening the area's landing page if ANY
     // of its children were individually unlocked, so the customer has
     // somewhere to click through to reach what they do have.
-    $hub_map = gs_features_hub_area_map();
+    $hub_map = gend_society_features_hub_area_map();
     if ( isset( $hub_map[ $page ] ) ) {
         foreach ( $granular_map as $entry ) {
             if ( $entry['area'] === $hub_map[ $page ] && in_array( $entry['child'], $allowed_areas, true ) ) {
@@ -338,7 +338,7 @@ function gs_features_enforce_redirect() {
     // gend.me can target it.
     $redirect_area = $required_area !== '' ? $required_area : $granular_entry['area'];
     $required_child = $granular_entry !== null ? $granular_entry['child'] : '';
-    $tab_param = gs_features_capture_tab_signal( $page );
+    $tab_param = gend_society_features_capture_tab_signal( $page );
     $upgrade_url = add_query_arg( array_filter( array(
         'page'            => 'gs-feature-upgrade',
         'required'        => $redirect_area,
@@ -354,32 +354,32 @@ function gs_features_enforce_redirect() {
  * Return cached feature gates, refetching when expired. Returns
  * null when not paired or fetch errored.
  */
-function gs_features_get_cached() {
+function gend_society_features_get_cached() {
 
-    $expires = (int) get_option( GS_FEATURES_CACHE_EXPIRES_OPTION, 0 );
+    $expires = (int) get_option( GEND_SOCIETY_FEATURES_CACHE_EXPIRES_OPTION, 0 );
     if ( $expires > time() ) {
-        $cached = get_option( GS_FEATURES_CACHE_OPTION, null );
+        $cached = get_option( GEND_SOCIETY_FEATURES_CACHE_OPTION, null );
         if ( is_array( $cached ) ) return $cached;
     }
-    $fresh = gs_features_fetch_remote();
+    $fresh = gend_society_features_fetch_remote();
     if ( is_array( $fresh ) ) {
-        $ttl = isset( $fresh['cache_seconds'] ) ? max( 60, (int) $fresh['cache_seconds'] ) : GS_FEATURES_DEFAULT_TTL;
-        update_option( GS_FEATURES_CACHE_OPTION, $fresh, false );
-        update_option( GS_FEATURES_CACHE_EXPIRES_OPTION, time() + $ttl, false );
+        $ttl = isset( $fresh['cache_seconds'] ) ? max( 60, (int) $fresh['cache_seconds'] ) : GEND_SOCIETY_FEATURES_DEFAULT_TTL;
+        update_option( GEND_SOCIETY_FEATURES_CACHE_OPTION, $fresh, false );
+        update_option( GEND_SOCIETY_FEATURES_CACHE_EXPIRES_OPTION, time() + $ttl, false );
         return $fresh;
     }
-    $cached = get_option( GS_FEATURES_CACHE_OPTION, null );
+    $cached = get_option( GEND_SOCIETY_FEATURES_CACHE_OPTION, null );
     return is_array( $cached ) ? $cached : null;
 }
 
 /**
  * One-shot fetch from gend.me /install/{install_id}/features.
  */
-function gs_features_fetch_remote() {
+function gend_society_features_fetch_remote() {
 
-    $install_id    = (string) get_option( 'gs_install_id', '' );
-    $install_token = (string) get_option( 'gs_install_token', '' );
-    $gend_base     = (string) get_option( 'gs_gend_base_url', '' );
+    $install_id    = (string) get_option( 'gend_society_install_id', '' );
+    $install_token = (string) get_option( 'gend_society_install_token', '' );
+    $gend_base     = (string) get_option( 'gend_society_gend_base_url', '' );
     if ( $install_id === '' || $install_token === '' || $gend_base === '' ) return null;
 
     $endpoint = trailingslashit( $gend_base ) . 'wp-json/gdc-app-manager/v1/install/' . rawurlencode( $install_id ) . '/features';
@@ -396,8 +396,8 @@ function gs_features_fetch_remote() {
     return is_array( $decoded ) ? $decoded : null;
 }
 
-function gs_features_invalidate() {
-    delete_option( GS_FEATURES_CACHE_EXPIRES_OPTION );
+function gend_society_features_invalidate() {
+    delete_option( GEND_SOCIETY_FEATURES_CACHE_EXPIRES_OPTION );
 }
-add_action( 'wp_login', 'gs_features_invalidate' );
-add_action( 'gs_features_invalidate', 'gs_features_invalidate' );
+add_action( 'wp_login', 'gend_society_features_invalidate' );
+add_action( 'gs_features_invalidate', 'gend_society_features_invalidate' );

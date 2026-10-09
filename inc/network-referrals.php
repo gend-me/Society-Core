@@ -25,33 +25,33 @@
 
 if (!defined('ABSPATH')) exit;
 
-const GDC_NR_REF_PARAM  = 'gm_ref';
-const GDC_NR_FROM_PARAM = 'gm_from';
+const GEND_SOCIETY_NR_REF_PARAM  = 'gm_ref';
+const GEND_SOCIETY_NR_FROM_PARAM = 'gm_from';
 
 /**
  * True on the gend.me hub network (any of its sites), false on containers/standalone installs.
  * Hub-ness comes from the runtime mode (104 audit); multisite + WP Ultimo stay as
  * preconditions because callers use wu_get_site()/network_home_url().
  */
-function gdc_nr_on_hub_network()
+function gend_society_nr_on_hub_network()
 {
     return gend_society_is_hub() && is_multisite() && function_exists('wu_get_site');
 }
 
-function gdc_nr_hub_url()
+function gend_society_nr_hub_url()
 {
-    if (gdc_nr_on_hub_network()) return untrailingslashit(network_home_url());
+    if (gend_society_nr_on_hub_network()) return untrailingslashit(network_home_url());
     $hub = (string) get_site_option('aipa_central_hub_url', '');
     return $hub !== '' ? untrailingslashit($hub) : 'https://gend.me';
 }
 
 /** gend.me's referral program (default program of the hub main site's sales-team), or null. */
-function gdc_nr_program()
+function gend_society_nr_program()
 {
     static $program = false;
     if ($program !== false) return $program;
     $program = null;
-    if (!gdc_nr_on_hub_network()) return $program;
+    if (!gend_society_nr_on_hub_network()) return $program;
     $switched = get_current_blog_id() !== get_main_site_id();
     if ($switched) switch_to_blog(get_main_site_id());
     $opt = get_option('aas_referral_programs');
@@ -78,28 +78,28 @@ function gdc_nr_program()
     return $program;
 }
 
-function gdc_nr_cookie_days()
+function gend_society_nr_cookie_days()
 {
-    $p = gdc_nr_program();
+    $p = gend_society_nr_program();
     return $p && $p['cookie_duration'] > 0 ? $p['cookie_duration'] : 90;
 }
 
-function gdc_nr_set_cookie($name, $value)
+function gend_society_nr_set_cookie($name, $value)
 {
     $_COOKIE[$name] = (string) $value;
     if (headers_sent()) return;
     // Path "/" so path-based sub-sites share it with the hub.
-    setcookie($name, (string) $value, time() + DAY_IN_SECONDS * gdc_nr_cookie_days(), '/', COOKIE_DOMAIN ?: '', is_ssl(), true);
+    setcookie($name, (string) $value, time() + DAY_IN_SECONDS * gend_society_nr_cookie_days(), '/', COOKIE_DOMAIN ?: '', is_ssl(), true);
 }
 
 /** Does THIS site run its own sales-team program? */
-function gdc_nr_site_has_own_program()
+function gend_society_nr_site_has_own_program()
 {
     return function_exists('aas_get_referral_programs') && is_multisite() && !is_main_site();
 }
 
 /** Normalise a gm_from value: "blog:<id>" or a host[/path]. */
-function gdc_nr_clean_from($v)
+function gend_society_nr_clean_from($v)
 {
     $v = strtolower(trim((string) $v));
     if (preg_match('/^blog:\d+$/', $v)) return $v;
@@ -109,9 +109,9 @@ function gdc_nr_clean_from($v)
 }
 
 /** Resolve a gm_from value / URL to a connected site's blog id on the hub network (0 = none). */
-function gdc_nr_resolve_site($from)
+function gend_society_nr_resolve_site($from)
 {
-    if (!gdc_nr_on_hub_network() || $from === '') return 0;
+    if (!gend_society_nr_on_hub_network() || $from === '') return 0;
     if (preg_match('/^blog:(\d+)$/', $from, $m)) {
         $bid = (int) $m[1];
     } else {
@@ -133,7 +133,7 @@ function gdc_nr_resolve_site($from)
 }
 
 /** The user who owns a site (its WP Ultimo membership's customer), or 0. */
-function gdc_nr_site_owner($blog_id)
+function gend_society_nr_site_owner($blog_id)
 {
     $uid = 0;
     if ($blog_id && function_exists('wu_get_site')) {
@@ -156,21 +156,21 @@ function gdc_nr_site_owner($blog_id)
         }
     }
     /** Filters who a sign-up from this connected site is credited to when no affiliate is tracked. */
-    $uid = (int) apply_filters('gdc_nr_site_owner', $uid, (int) $blog_id);
+    $uid = (int) apply_filters('gend_society_nr_site_owner', $uid, (int) $blog_id);
     return ($uid && get_userdata($uid)) ? $uid : 0;
 }
 
 /** Valid gend.me affiliate from the request: cookie, then the page's (Referer) query, then the URL. */
-function gdc_nr_request_ref()
+function gend_society_nr_request_ref()
 {
     $candidates = array();
     if (!empty($_COOKIE['gm_ref'])) $candidates[] = $_COOKIE['gm_ref'];
     // gend.me's own sales-team cookie: plain name = the hub program's.
-    if (gdc_nr_on_hub_network() && !empty($_COOKIE['aas_referrer_id'])) $candidates[] = $_COOKIE['aas_referrer_id'];
+    if (gend_society_nr_on_hub_network() && !empty($_COOKIE['aas_referrer_id'])) $candidates[] = $_COOKIE['aas_referrer_id'];
     $page = isset($_SERVER['HTTP_REFERER']) ? (string) wp_unslash($_SERVER['HTTP_REFERER']) : '';
     if ($page !== '' && wp_parse_url($page, PHP_URL_HOST) === wp_parse_url(home_url(), PHP_URL_HOST)) {
         parse_str((string) wp_parse_url($page, PHP_URL_QUERY), $q);
-        if (!empty($q[GDC_NR_REF_PARAM])) $candidates[] = $q[GDC_NR_REF_PARAM];
+        if (!empty($q[GEND_SOCIETY_NR_REF_PARAM])) $candidates[] = $q[GEND_SOCIETY_NR_REF_PARAM];
     }
     foreach ($candidates as $c) {
         $id = (int) $c;
@@ -180,68 +180,68 @@ function gdc_nr_request_ref()
 }
 
 /* ── 1. Capture (every site: hub network and containers) ─────────────── */
-add_action('init', 'gdc_nr_capture', 1);
-function gdc_nr_capture()
+add_action('init', 'gend_society_nr_capture', 1);
+function gend_society_nr_capture()
 {
     if (is_admin() && !wp_doing_ajax()) return;
     $ref = 0;
-    if (isset($_GET[GDC_NR_REF_PARAM])) {
-        $ref = (int) $_GET[GDC_NR_REF_PARAM];
-    } elseif (gdc_nr_on_hub_network() && !is_main_site() && !gdc_nr_site_has_own_program()) {
-        $p = gdc_nr_program();
+    if (isset($_GET[GEND_SOCIETY_NR_REF_PARAM])) {
+        $ref = (int) $_GET[GEND_SOCIETY_NR_REF_PARAM];
+    } elseif (gend_society_nr_on_hub_network() && !is_main_site() && !gend_society_nr_site_has_own_program()) {
+        $p = gend_society_nr_program();
         if ($p && $p['url_param'] !== '' && isset($_GET[$p['url_param']])) $ref = (int) $_GET[$p['url_param']];
     }
-    if ($ref > 0 && $ref !== get_current_user_id()) gdc_nr_set_cookie('gm_ref', $ref);
+    if ($ref > 0 && $ref !== get_current_user_id()) gend_society_nr_set_cookie('gm_ref', $ref);
 
-    if (!gdc_nr_on_hub_network() || is_user_logged_in()) return;
-    if (isset($_GET[GDC_NR_FROM_PARAM])) {
-        $from = gdc_nr_clean_from(wp_unslash($_GET[GDC_NR_FROM_PARAM]));
-        if ($from !== '') gdc_nr_set_cookie('gm_from', $from);
+    if (!gend_society_nr_on_hub_network() || is_user_logged_in()) return;
+    if (isset($_GET[GEND_SOCIETY_NR_FROM_PARAM])) {
+        $from = gend_society_nr_clean_from(wp_unslash($_GET[GEND_SOCIETY_NR_FROM_PARAM]));
+        if ($from !== '') gend_society_nr_set_cookie('gm_from', $from);
     } elseif (!is_main_site()) {
         // Browsing a connected sub-site (last touch wins).
-        if (($_COOKIE['gm_from'] ?? '') !== 'blog:' . get_current_blog_id()) gdc_nr_set_cookie('gm_from', 'blog:' . get_current_blog_id());
+        if (($_COOKIE['gm_from'] ?? '') !== 'blog:' . get_current_blog_id()) gend_society_nr_set_cookie('gm_from', 'blog:' . get_current_blog_id());
     } elseif (empty($_COOKIE['gm_from']) && !empty($_SERVER['HTTP_REFERER'])) {
         // Untagged arrival on the hub: was the previous page a connected site?
         $r = (string) wp_unslash($_SERVER['HTTP_REFERER']);
         $host = (string) wp_parse_url($r, PHP_URL_HOST);
         if ($host !== '' && $host !== wp_parse_url(home_url(), PHP_URL_HOST)) {
-            $from = gdc_nr_clean_from($host . (string) wp_parse_url($r, PHP_URL_PATH));
-            if (gdc_nr_resolve_site($from)) gdc_nr_set_cookie('gm_from', $from);
+            $from = gend_society_nr_clean_from($host . (string) wp_parse_url($r, PHP_URL_PATH));
+            if (gend_society_nr_resolve_site($from)) gend_society_nr_set_cookie('gm_from', $from);
         }
     }
 }
 
 /* ── 2. Containers / standalone sites: tag the way back to the hub ────── */
-function gdc_nr_tag_args()
+function gend_society_nr_tag_args()
 {
-    $args = array(GDC_NR_FROM_PARAM => gdc_nr_clean_from(wp_parse_url(home_url(), PHP_URL_HOST) . (string) wp_parse_url(home_url(), PHP_URL_PATH)));
+    $args = array(GEND_SOCIETY_NR_FROM_PARAM => gend_society_nr_clean_from(wp_parse_url(home_url(), PHP_URL_HOST) . (string) wp_parse_url(home_url(), PHP_URL_PATH)));
     $ref = !empty($_COOKIE['gm_ref']) ? (int) $_COOKIE['gm_ref'] : 0;
-    if ($ref > 0) $args[GDC_NR_REF_PARAM] = $ref;
+    if ($ref > 0) $args[GEND_SOCIETY_NR_REF_PARAM] = $ref;
     return $args;
 }
 
 if (!is_multisite()) {
     // Server-side redirects to the hub (e.g. "Log in with gend.me").
     add_filter('wp_redirect', function ($location) {
-        $hub_host = wp_parse_url(gdc_nr_hub_url(), PHP_URL_HOST);
+        $hub_host = wp_parse_url(gend_society_nr_hub_url(), PHP_URL_HOST);
         if ($hub_host && is_string($location) && wp_parse_url($location, PHP_URL_HOST) === $hub_host) {
-            $location = add_query_arg(gdc_nr_tag_args(), $location);
+            $location = add_query_arg(gend_society_nr_tag_args(), $location);
         }
         return $location;
     }, 20);
 
     // Links to the hub in the page.
-    add_action('wp_footer', 'gdc_nr_print_link_tagger', 99);
-    add_action('login_footer', 'gdc_nr_print_link_tagger', 99);
+    add_action('wp_footer', 'gend_society_nr_print_link_tagger', 99);
+    add_action('login_footer', 'gend_society_nr_print_link_tagger', 99);
 }
-function gdc_nr_print_link_tagger()
+function gend_society_nr_print_link_tagger()
 {
-    $hub_host = wp_parse_url(gdc_nr_hub_url(), PHP_URL_HOST);
+    $hub_host = wp_parse_url(gend_society_nr_hub_url(), PHP_URL_HOST);
     if (!$hub_host || $hub_host === wp_parse_url(home_url(), PHP_URL_HOST)) return;
     ?>
     <script>
     (function () {
-        var hubHost = <?php echo wp_json_encode($hub_host); ?>, args = <?php echo wp_json_encode(gdc_nr_tag_args()); ?>;
+        var hubHost = <?php echo wp_json_encode($hub_host); ?>, args = <?php echo wp_json_encode(gend_society_nr_tag_args()); ?>;
         function tag(a) {
             try {
                 var u = new URL(a.href, location.href);
@@ -261,9 +261,9 @@ function gdc_nr_print_link_tagger()
 /* ── 3. Attribution: who referred this visitor (hub network) ─────────── */
 
 /** The site this request's visitor came from (hub network), or 0. */
-function gdc_nr_request_from_site()
+function gend_society_nr_request_from_site()
 {
-    return !is_main_site() ? get_current_blog_id() : gdc_nr_resolve_site(gdc_nr_clean_from($_COOKIE['gm_from'] ?? ''));
+    return !is_main_site() ? get_current_blog_id() : gend_society_nr_resolve_site(gend_society_nr_clean_from($_COOKIE['gm_from'] ?? ''));
 }
 
 /**
@@ -272,72 +272,72 @@ function gdc_nr_request_from_site()
  * came from. A referrer, once set, keeps every later sale ("sign-up
  * referrer always"). $context: 'signup' | 'checkout'.
  */
-function gdc_nr_assign_user($user_id, $context = 'signup')
+function gend_society_nr_assign_user($user_id, $context = 'signup')
 {
-    if (!gdc_nr_on_hub_network()) return 0;
+    if (!gend_society_nr_on_hub_network()) return 0;
     $user_id = (int) $user_id;
     if (!$user_id) return 0;
     $existing = (int) get_user_meta($user_id, 'referrer_id', true);
     if ($existing) return $existing;
-    $program = gdc_nr_program();
+    $program = gend_society_nr_program();
     if (!$program) return 0;
     if ($context === 'signup' && !in_array($program['tracking_condition'], array('registration', 'both'), true)) return 0;
 
-    $ref       = gdc_nr_request_ref();
+    $ref       = gend_society_nr_request_ref();
     $source    = 'link';
-    $from_site = gdc_nr_request_from_site();
+    $from_site = gend_society_nr_request_from_site();
     if (!$ref || $ref === $user_id) {
-        $ref    = $from_site ? gdc_nr_site_owner($from_site) : 0;
+        $ref    = $from_site ? gend_society_nr_site_owner($from_site) : 0;
         $source = 'site_owner';
     }
     if (!$ref || $ref === $user_id) return 0;
 
     update_user_meta($user_id, 'referrer_id', $ref);
     update_user_meta($user_id, 'referrer_program_id', $program['id']);
-    update_user_meta($user_id, 'gdc_referral_source', $context === 'checkout' ? 'checkout_' . $source : $source);
-    if ($from_site) update_user_meta($user_id, 'gdc_referred_from_site', $from_site);
+    update_user_meta($user_id, 'gend_society_referral_source', $context === 'checkout' ? 'checkout_' . $source : $source);
+    if ($from_site) update_user_meta($user_id, 'gend_society_referred_from_site', $from_site);
     return $ref;
 }
 
 // A gend.me account was created anywhere on the network.
-add_action('user_register', 'gdc_nr_attribute_signup', 20);
-function gdc_nr_attribute_signup($user_id)
+add_action('user_register', 'gend_society_nr_attribute_signup', 20);
+function gend_society_nr_attribute_signup($user_id)
 {
-    gdc_nr_assign_user($user_id, 'signup');
+    gend_society_nr_assign_user($user_id, 'signup');
 }
 
 /* ── 4. gend.me checkouts: store (WooCommerce) and plans (WP Ultimo) ──── */
 
-function gdc_nr_is_hub_main()
+function gend_society_nr_is_hub_main()
 {
-    return gdc_nr_on_hub_network() && is_main_site();
+    return gend_society_nr_on_hub_network() && is_main_site();
 }
 
 // gend.me store order placed: lock in the buyer's referrer; guests get a snapshot on the order.
-add_action('woocommerce_checkout_order_processed', 'gdc_nr_store_checkout', 20, 1);
-add_action('woocommerce_store_api_checkout_order_processed', 'gdc_nr_store_checkout', 20, 1);
-function gdc_nr_store_checkout($order)
+add_action('woocommerce_checkout_order_processed', 'gend_society_nr_store_checkout', 20, 1);
+add_action('woocommerce_store_api_checkout_order_processed', 'gend_society_nr_store_checkout', 20, 1);
+function gend_society_nr_store_checkout($order)
 {
-    if (!gdc_nr_is_hub_main() || !function_exists('wc_get_order')) return;
+    if (!gend_society_nr_is_hub_main() || !function_exists('wc_get_order')) return;
     $order = is_object($order) ? $order : wc_get_order($order);
     if (!$order) return;
     $uid = (int) $order->get_customer_id();
-    if ($uid) gdc_nr_assign_user($uid, 'checkout');
-    $ref  = gdc_nr_request_ref();
-    $from = gdc_nr_request_from_site();
+    if ($uid) gend_society_nr_assign_user($uid, 'checkout');
+    $ref  = gend_society_nr_request_ref();
+    $from = gend_society_nr_request_from_site();
     if ($ref) $order->update_meta_data('_gdc_nr_ref', $ref);
     if ($from) $order->update_meta_data('_gdc_nr_from_site', $from);
     if ($ref || $from) $order->save();
 }
 
 // gend.me plan checkout (Vendor App Manager / WP Ultimo): lock in the customer's referrer.
-add_action('wu_checkout_done', 'gdc_nr_plan_checkout', 20, 3);
-function gdc_nr_plan_checkout($payment, $membership = null, $customer = null)
+add_action('wu_checkout_done', 'gend_society_nr_plan_checkout', 20, 3);
+function gend_society_nr_plan_checkout($payment, $membership = null, $customer = null)
 {
-    if (!gdc_nr_on_hub_network()) return;
+    if (!gend_society_nr_on_hub_network()) return;
     if (!$customer && $payment && method_exists($payment, 'get_customer')) $customer = $payment->get_customer();
     $uid = $customer && method_exists($customer, 'get_user_id') ? (int) $customer->get_user_id() : 0;
-    if ($uid) gdc_nr_assign_user($uid, 'checkout');
+    if ($uid) gend_society_nr_assign_user($uid, 'checkout');
 }
 
 /**
@@ -345,10 +345,10 @@ function gdc_nr_plan_checkout($payment, $membership = null, $customer = null)
  * only customers without one (incl. guests) fall back to the link used at
  * checkout, then the owner of the site they came from.
  */
-add_filter('aas_resolve_order_referrer', 'gdc_nr_resolve_store_order', 10, 2);
-function gdc_nr_resolve_store_order($resolved, $order)
+add_filter('aas_resolve_order_referrer', 'gend_society_nr_resolve_store_order', 10, 2);
+function gend_society_nr_resolve_store_order($resolved, $order)
 {
-    if (!gdc_nr_is_hub_main() || !function_exists('aas_payout_resolve_program') || !$order) return $resolved;
+    if (!gend_society_nr_is_hub_main() || !function_exists('aas_payout_resolve_program') || !$order) return $resolved;
     $uid = (int) $order->get_user_id();
     $ref = $uid ? (int) get_user_meta($uid, 'referrer_id', true) : 0;
     if ($ref) {
@@ -358,40 +358,40 @@ function gdc_nr_resolve_store_order($resolved, $order)
         $r = (int) $order->get_meta($k, true);
         if ($r && $r !== $uid && get_userdata($r)) return array('ref' => $r, 'program' => aas_payout_resolve_program(''));
     }
-    $owner = gdc_nr_site_owner((int) $order->get_meta('_gdc_nr_from_site', true));
+    $owner = gend_society_nr_site_owner((int) $order->get_meta('_gdc_nr_from_site', true));
     if ($owner && $owner !== $uid) return array('ref' => $owner, 'program' => aas_payout_resolve_program(''));
     return $resolved;
 }
 
 /* ── 5. Plan payments (WP Ultimo): commission on every paid payment ───── */
 
-const GDC_NR_WU_UNPAID = 'gdc_nr_wu_unpaid_commissions'; // site option: payment ids awaiting payout
-const GDC_NR_WU_QUEUE  = 'gdc_nr_wu_commission_queue';   // site option: completed payments to log on the main site
+const GEND_SOCIETY_NR_WU_UNPAID = 'gend_society_nr_wu_unpaid_commissions'; // site option: payment ids awaiting payout
+const GEND_SOCIETY_NR_WU_QUEUE  = 'gend_society_nr_wu_commission_queue';   // site option: completed payments to log on the main site
 
-add_action('wu_transition_payment_status', 'gdc_nr_wu_payment_status', 20, 3);
-function gdc_nr_wu_payment_status($old_status, $new_status, $payment_id)
+add_action('wu_transition_payment_status', 'gend_society_nr_wu_payment_status', 20, 3);
+function gend_society_nr_wu_payment_status($old_status, $new_status, $payment_id)
 {
-    if ($new_status !== 'completed' || !gdc_nr_on_hub_network()) return;
-    if (gdc_nr_is_hub_main() && function_exists('aas_get_commission_rate')) {
-        gdc_nr_wu_log_commission((int) $payment_id);
+    if ($new_status !== 'completed' || !gend_society_nr_on_hub_network()) return;
+    if (gend_society_nr_is_hub_main() && function_exists('aas_get_commission_rate')) {
+        gend_society_nr_wu_log_commission((int) $payment_id);
     } else {
         // gend.me's program runs on the main site — log it there on the next run.
-        $q = (array) get_site_option(GDC_NR_WU_QUEUE, array());
+        $q = (array) get_site_option(GEND_SOCIETY_NR_WU_QUEUE, array());
         $q[] = (int) $payment_id;
-        update_site_option(GDC_NR_WU_QUEUE, array_values(array_unique(array_map('intval', $q))));
+        update_site_option(GEND_SOCIETY_NR_WU_QUEUE, array_values(array_unique(array_map('intval', $q))));
     }
 }
 
 /** A WP Ultimo payment by id (filterable). */
-function gdc_nr_wu_payment($payment_id)
+function gend_society_nr_wu_payment($payment_id)
 {
-    return apply_filters('gdc_nr_wu_payment', function_exists('wu_get_payment') ? wu_get_payment($payment_id) : null, (int) $payment_id);
+    return apply_filters('gend_society_nr_wu_payment', function_exists('wu_get_payment') ? wu_get_payment($payment_id) : null, (int) $payment_id);
 }
 
 /** Record the commission for one completed WP Ultimo payment (main site context). */
-function gdc_nr_wu_log_commission($payment_id)
+function gend_society_nr_wu_log_commission($payment_id)
 {
-    $payment = gdc_nr_wu_payment($payment_id);
+    $payment = gend_society_nr_wu_payment($payment_id);
     if (!$payment || $payment->get_status() !== 'completed' || $payment->get_meta('_aas_commission_logged')) return;
     $amount = (float) $payment->get_total();
     $customer = $payment->get_customer();
@@ -425,26 +425,26 @@ function gdc_nr_wu_log_commission($payment_id)
     if ($team) $payment->update_meta('_aas_team_payouts_json', wp_json_encode($team));
     $payment->update_meta('_aas_paid', 'no');
 
-    $unpaid = (array) get_site_option(GDC_NR_WU_UNPAID, array());
+    $unpaid = (array) get_site_option(GEND_SOCIETY_NR_WU_UNPAID, array());
     $unpaid[] = (int) $payment_id;
-    update_site_option(GDC_NR_WU_UNPAID, array_values(array_unique(array_map('intval', $unpaid))));
+    update_site_option(GEND_SOCIETY_NR_WU_UNPAID, array_values(array_unique(array_map('intval', $unpaid))));
 }
 
 // Same daily run that releases store-order commissions (main site only).
-add_action('aas_release_commissions_hook', 'gdc_nr_wu_release_commissions', 20);
-function gdc_nr_wu_release_commissions()
+add_action('aas_release_commissions_hook', 'gend_society_nr_wu_release_commissions', 20);
+function gend_society_nr_wu_release_commissions()
 {
-    if (!gdc_nr_is_hub_main() || !function_exists('mycred_add')) return;
+    if (!gend_society_nr_is_hub_main() || !function_exists('mycred_add')) return;
 
-    $queue = (array) get_site_option(GDC_NR_WU_QUEUE, array());
+    $queue = (array) get_site_option(GEND_SOCIETY_NR_WU_QUEUE, array());
     if ($queue) {
-        delete_site_option(GDC_NR_WU_QUEUE);
-        foreach ($queue as $pid) gdc_nr_wu_log_commission((int) $pid);
+        delete_site_option(GEND_SOCIETY_NR_WU_QUEUE);
+        foreach ($queue as $pid) gend_society_nr_wu_log_commission((int) $pid);
     }
 
     $remaining = array();
-    foreach ((array) get_site_option(GDC_NR_WU_UNPAID, array()) as $pid) {
-        $payment = gdc_nr_wu_payment((int) $pid);
+    foreach ((array) get_site_option(GEND_SOCIETY_NR_WU_UNPAID, array()) as $pid) {
+        $payment = gend_society_nr_wu_payment((int) $pid);
         if (!$payment || $payment->get_meta('_aas_paid') === 'yes') continue;
         if (time() < (int) $payment->get_meta('_aas_payout_time')) { $remaining[] = (int) $pid; continue; }
         $program = aas_payout_resolve_program($payment->get_meta('_aas_referrer_program_id'));
@@ -460,5 +460,5 @@ function gdc_nr_wu_release_commissions()
         }
         $payment->update_meta('_aas_paid', 'yes');
     }
-    update_site_option(GDC_NR_WU_UNPAID, $remaining);
+    update_site_option(GEND_SOCIETY_NR_WU_UNPAID, $remaining);
 }

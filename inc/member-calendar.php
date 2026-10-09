@@ -31,8 +31,8 @@ if ( ! defined( 'ABSPATH' ) ) {
  * social-network (where BP ships), so touching BP at include time fatals
  * (Pitfall 19).
  */
-add_action( 'bp_setup_nav', 'gs_add_calendar_profile_tab', 100 );
-function gs_add_calendar_profile_tab() {
+add_action( 'bp_setup_nav', 'gend_society_add_calendar_profile_tab', 100 );
+function gend_society_add_calendar_profile_tab() {
 	if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
 		return;
 	}
@@ -53,7 +53,7 @@ function gs_add_calendar_profile_tab() {
 	bp_core_new_nav_item( [
 		'name'                    => __( 'Calendar', 'gend-society' ),
 		'slug'                    => 'member-calendar',
-		'screen_function'         => 'gs_calendar_profile_screen',
+		'screen_function'         => 'gend_society_calendar_profile_screen',
 		'position'                => $pos,
 		'item_css_id'             => 'calendar',
 		// Required NOW so the Phase 29 shared public-booking view can render on
@@ -77,9 +77,9 @@ function gs_add_calendar_profile_tab() {
  * Screen callback for the CALENDAR tab — loads the BP plugins template and
  * routes its title/content to our handlers.
  */
-function gs_calendar_profile_screen() {
+function gend_society_calendar_profile_screen() {
 	add_action( 'bp_template_title', '__return_empty_string' );
-	add_action( 'bp_template_content', 'gs_calendar_profile_screen_content' );
+	add_action( 'bp_template_content', 'gend_society_calendar_profile_screen_content' );
 	bp_core_load_template( 'members/single/plugins' );
 }
 
@@ -91,7 +91,7 @@ function gs_calendar_profile_screen() {
  * adds that body class automatically for the component slug), the calendar root
  * container that 26-02's JS mounts into, and the per-tab asset enqueue.
  */
-function gs_calendar_profile_screen_content() {
+function gend_society_calendar_profile_screen_content() {
 	// On someone ELSE'S profile: render a READ-ONLY calendar IF the logged-in
 	// viewer is in the displayed owner's visibility.members allow-list (Phase 42
 	// "share with specific members"). Otherwise keep the private message. The
@@ -100,8 +100,8 @@ function gs_calendar_profile_screen_content() {
 		$gs_owner_id  = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
 		$gs_viewer_id = (int) get_current_user_id();
 		if ( $gs_viewer_id > 0 && $gs_owner_id > 0
-			&& gs_calendar_viewer_is_shared_member( $gs_owner_id, $gs_viewer_id ) ) {
-			gs_calendar_render_shared_view( $gs_owner_id );
+			&& gend_society_calendar_viewer_is_shared_member( $gs_owner_id, $gs_viewer_id ) ) {
+			gend_society_calendar_render_shared_view( $gs_owner_id );
 			return;
 		}
 		echo '<p>' . esc_html__( 'This calendar is private.', 'gend-society' ) . '</p>';
@@ -218,12 +218,12 @@ function gs_calendar_profile_screen_content() {
 	// Enqueue the calendar assets on the screen callback so they only load on
 	// the calendar tab. filemtime-busted single-version idiom (admin-style.php:9-11);
 	// file_exists-guard the filemtime so a missing asset degrades to no warning.
-	$css_path = GS_DIR . 'assets/member-calendar.css';
-	$js_path  = GS_DIR . 'assets/member-calendar.js';
-	$css_ver  = GS_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
-	$js_ver   = GS_VERSION . ( file_exists( $js_path ) ? '.' . filemtime( $js_path ) : '' );
-	wp_enqueue_style( 'gs-member-calendar', GS_URL . 'assets/member-calendar.css', [], $css_ver );
-	wp_enqueue_script( 'gs-member-calendar', GS_URL . 'assets/member-calendar.js', [], $js_ver, true );
+	$css_path = GEND_SOCIETY_DIR . 'assets/member-calendar.css';
+	$js_path  = GEND_SOCIETY_DIR . 'assets/member-calendar.js';
+	$css_ver  = GEND_SOCIETY_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
+	$js_ver   = GEND_SOCIETY_VERSION . ( file_exists( $js_path ) ? '.' . filemtime( $js_path ) : '' );
+	wp_enqueue_style( 'gs-member-calendar', GEND_SOCIETY_URL . 'assets/member-calendar.css', [], $css_ver );
+	wp_enqueue_script( 'gs-member-calendar', GEND_SOCIETY_URL . 'assets/member-calendar.js', [], $js_ver, true );
 
 	// Phase 27 wire-up: feed the calendar JS the REST base + a wp_rest nonce so it
 	// can GET gs/v1/calendar/events (cookie-authed own events => X-WP-Nonce header).
@@ -236,12 +236,12 @@ function gs_calendar_profile_screen_content() {
 	// Phase 28-03: the availability Settings panel + overlay styles. Depend on
 	// gs-member-calendar so they load after the calendar controller. filemtime-
 	// busted single-version idiom (file_exists-guarded so a missing asset degrades).
-	$avail_css_path = GS_DIR . 'assets/availability-settings.css';
-	$avail_js_path  = GS_DIR . 'assets/availability-settings.js';
-	$avail_css_ver  = GS_VERSION . ( file_exists( $avail_css_path ) ? '.' . filemtime( $avail_css_path ) : '' );
-	$avail_js_ver   = GS_VERSION . ( file_exists( $avail_js_path ) ? '.' . filemtime( $avail_js_path ) : '' );
-	wp_enqueue_style( 'gs-availability-settings', GS_URL . 'assets/availability-settings.css', array( 'gs-member-calendar' ), $avail_css_ver );
-	wp_enqueue_script( 'gs-availability-settings', GS_URL . 'assets/availability-settings.js', array( 'gs-member-calendar' ), $avail_js_ver, true );
+	$avail_css_path = GEND_SOCIETY_DIR . 'assets/availability-settings.css';
+	$avail_js_path  = GEND_SOCIETY_DIR . 'assets/availability-settings.js';
+	$avail_css_ver  = GEND_SOCIETY_VERSION . ( file_exists( $avail_css_path ) ? '.' . filemtime( $avail_css_path ) : '' );
+	$avail_js_ver   = GEND_SOCIETY_VERSION . ( file_exists( $avail_js_path ) ? '.' . filemtime( $avail_js_path ) : '' );
+	wp_enqueue_style( 'gs-availability-settings', GEND_SOCIETY_URL . 'assets/availability-settings.css', array( 'gs-member-calendar' ), $avail_css_ver );
+	wp_enqueue_script( 'gs-availability-settings', GEND_SOCIETY_URL . 'assets/availability-settings.js', array( 'gs-member-calendar' ), $avail_js_ver, true );
 	wp_localize_script( 'gs-availability-settings', 'gsAvailNonce', wp_create_nonce( 'wp_rest' ) );
 
 	// Phase 29 Plan 02 — Schedule Meeting modal assets (BOOK-10 + MEET-01..04).
@@ -249,21 +249,21 @@ function gs_calendar_profile_screen_content() {
 	// already enforces this). filemtime-busted single-version idiom; file_exists-
 	// guarded so a missing asset on the PVC (.no-plugin-sync, Pitfall 1) degrades
 	// to "no Schedule button" instead of a 404.
-	$sched_js_path  = GS_DIR . 'assets/schedule-meeting.js';
-	$sched_css_path = GS_DIR . 'assets/schedule-meeting.css';
+	$sched_js_path  = GEND_SOCIETY_DIR . 'assets/schedule-meeting.js';
+	$sched_css_path = GEND_SOCIETY_DIR . 'assets/schedule-meeting.css';
 	if ( file_exists( $sched_js_path ) ) {
-		$sched_js_ver  = GS_VERSION . '.' . filemtime( $sched_js_path );
-		$sched_css_ver = GS_VERSION . ( file_exists( $sched_css_path ) ? '.' . filemtime( $sched_css_path ) : '' );
+		$sched_js_ver  = GEND_SOCIETY_VERSION . '.' . filemtime( $sched_js_path );
+		$sched_css_ver = GEND_SOCIETY_VERSION . ( file_exists( $sched_css_path ) ? '.' . filemtime( $sched_css_path ) : '' );
 		wp_enqueue_script(
 			'gs-schedule-meeting',
-			GS_URL . 'assets/schedule-meeting.js',
+			GEND_SOCIETY_URL . 'assets/schedule-meeting.js',
 			array( 'gs-member-calendar' ),
 			$sched_js_ver,
 			true
 		);
 		wp_enqueue_style(
 			'gs-schedule-meeting',
-			GS_URL . 'assets/schedule-meeting.css',
+			GEND_SOCIETY_URL . 'assets/schedule-meeting.css',
 			array( 'gs-member-calendar' ),
 			$sched_css_ver
 		);
@@ -310,21 +310,21 @@ function gs_calendar_profile_screen_content() {
 	// so the Phase 26 event-detail popover, Phase 29 confirmation, and the
 	// wallet meeting feed can all open the glassmorphic embed by rendering a
 	// button carrying that attribute.
-	$gs_jitsi_js_path  = GS_DIR . 'assets/jitsi-embed.js';
-	$gs_jitsi_css_path = GS_DIR . 'assets/jitsi-embed.css';
+	$gs_jitsi_js_path  = GEND_SOCIETY_DIR . 'assets/jitsi-embed.js';
+	$gs_jitsi_css_path = GEND_SOCIETY_DIR . 'assets/jitsi-embed.css';
 	if ( file_exists( $gs_jitsi_js_path ) && file_exists( $gs_jitsi_css_path ) ) {
-		$gs_jitsi_js_ver  = GS_VERSION . '.' . filemtime( $gs_jitsi_js_path );
-		$gs_jitsi_css_ver = GS_VERSION . '.' . filemtime( $gs_jitsi_css_path );
+		$gs_jitsi_js_ver  = GEND_SOCIETY_VERSION . '.' . filemtime( $gs_jitsi_js_path );
+		$gs_jitsi_css_ver = GEND_SOCIETY_VERSION . '.' . filemtime( $gs_jitsi_css_path );
 		wp_enqueue_script(
 			'gs-jitsi-embed',
-			GS_URL . 'assets/jitsi-embed.js',
+			GEND_SOCIETY_URL . 'assets/jitsi-embed.js',
 			array(),
 			$gs_jitsi_js_ver,
 			true
 		);
 		wp_enqueue_style(
 			'gs-jitsi-embed',
-			GS_URL . 'assets/jitsi-embed.css',
+			GEND_SOCIETY_URL . 'assets/jitsi-embed.css',
 			array(),
 			$gs_jitsi_css_ver
 		);
@@ -334,7 +334,7 @@ function gs_calendar_profile_screen_content() {
 		wp_localize_script( 'gs-jitsi-embed', 'gsJitsiData', array(
 			'restUrl' => esc_url_raw( rest_url( 'gs/v1' ) ),
 			'nonce'   => wp_create_nonce( 'wp_rest' ),
-			'domain'  => apply_filters( 'gs_jitsi_domain', 'meet.gend.me' ),
+			'domain'  => apply_filters( 'gend_society_jitsi_domain', 'meet.gend.me' ),
 		) );
 
 		// Join-button template for the JS-rendered event-detail popover.
@@ -368,7 +368,7 @@ function gs_calendar_profile_screen_content() {
 	// document-level click delegate in schedule-meeting.js, opening the same
 	// modal as the profile-icon trigger. file_exists-guard the schedule asset so
 	// the button only shows when the modal script is actually deployed.
-	if ( file_exists( GS_DIR . 'assets/schedule-meeting.js' ) ) {
+	if ( file_exists( GEND_SOCIETY_DIR . 'assets/schedule-meeting.js' ) ) {
 		echo '<style>
 			.gs-cal-actionbar{display:flex;flex-wrap:wrap;justify-content:flex-end;align-items:center;gap:10px;margin:18px 0 14px;}
 			.gs-cal-newbtn{display:inline-flex;align-items:center;gap:8px;cursor:pointer;
@@ -392,7 +392,7 @@ function gs_calendar_profile_screen_content() {
 		// primary "New Meeting" CTA. The two tool buttons are gated on the
 		// availability-settings.js asset (their open delegates live there).
 		$gs_avail_btns = '';
-		if ( file_exists( GS_DIR . 'assets/availability-settings.js' ) ) {
+		if ( file_exists( GEND_SOCIETY_DIR . 'assets/availability-settings.js' ) ) {
 			$gs_avail_btns =
 				  '<button type="button" class="gs-cal-toolbtn" data-gs-avail-open="1">Availability</button>'
 				. '<button type="button" class="gs-cal-toolbtn" data-gs-vis-open="1">Visibility</button>';
@@ -430,7 +430,7 @@ function gs_calendar_profile_screen_content() {
  * @param int $viewer_id
  * @return bool
  */
-function gs_calendar_viewer_is_shared_member( $owner_id, $viewer_id ) {
+function gend_society_calendar_viewer_is_shared_member( $owner_id, $viewer_id ) {
 	$owner_id  = (int) $owner_id;
 	$viewer_id = (int) $viewer_id;
 	if ( $owner_id <= 0 || $viewer_id <= 0 ) { return false; }
@@ -459,21 +459,21 @@ function gs_calendar_viewer_is_shared_member( $owner_id, $viewer_id ) {
  *
  * @param int $owner_id
  */
-function gs_calendar_render_shared_view( $owner_id ) {
+function gend_society_calendar_render_shared_view( $owner_id ) {
 	$owner_id = (int) $owner_id;
 
 	// Reuse the calendar root full-width strip styles already emitted above by
 	// scoping to .member-calendar (BP adds that body class for this slug).
-	$css_path = GS_DIR . 'assets/calendar-public-view.css';
-	$js_path  = GS_DIR . 'assets/calendar-public-view.js';
+	$css_path = GEND_SOCIETY_DIR . 'assets/calendar-public-view.css';
+	$js_path  = GEND_SOCIETY_DIR . 'assets/calendar-public-view.js';
 	if ( ! file_exists( $js_path ) ) {
 		echo '<p>' . esc_html__( 'This calendar is private.', 'gend-society' ) . '</p>';
 		return;
 	}
-	$css_ver = GS_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
-	$js_ver  = GS_VERSION . '.' . filemtime( $js_path );
+	$css_ver = GEND_SOCIETY_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
+	$js_ver  = GEND_SOCIETY_VERSION . '.' . filemtime( $js_path );
 	if ( file_exists( $css_path ) ) {
-		wp_enqueue_style( 'gs-calendar-public-view', GS_URL . 'assets/calendar-public-view.css', array(), $css_ver );
+		wp_enqueue_style( 'gs-calendar-public-view', GEND_SOCIETY_URL . 'assets/calendar-public-view.css', array(), $css_ver );
 	}
 
 	// Light width strip for the shared (non-owner) view: collapse the Youzify
@@ -499,7 +499,7 @@ function gs_calendar_render_shared_view( $owner_id ) {
 		}
 		.gs-cal-root { width: 100% !important; max-width: 100% !important; box-sizing: border-box !important; }
 	</style>';
-	wp_enqueue_script( 'gs-calendar-public-view', GS_URL . 'assets/calendar-public-view.js', array(), $js_ver, true );
+	wp_enqueue_script( 'gs-calendar-public-view', GEND_SOCIETY_URL . 'assets/calendar-public-view.js', array(), $js_ver, true );
 
 	// Authed shared mode: ownerId + nonce switch the viewer to the /shared/ routes.
 	wp_localize_script( 'gs-calendar-public-view', 'gsCalViewData', array(
@@ -519,8 +519,8 @@ function gs_calendar_render_shared_view( $owner_id ) {
 
 // Make the .member-calendar body class authoritative server-side for the
 // calendar tab (belt-and-braces with the inline <script> above).
-add_filter( 'body_class', 'gs_calendar_body_class' );
-function gs_calendar_body_class( $classes ) {
+add_filter( 'body_class', 'gend_society_calendar_body_class' );
+function gend_society_calendar_body_class( $classes ) {
 	if ( function_exists( 'bp_is_user' ) && bp_is_user()
 		&& function_exists( 'bp_current_component' ) && bp_current_component() === 'member-calendar' ) {
 		$classes[] = 'member-calendar';

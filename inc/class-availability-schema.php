@@ -38,7 +38,7 @@ class Gend_GS_Availability_Schema {
 	 * re-run dbDelta on every blog whose option is below this value.
 	 */
 	const DB_VERSION     = '1.0.0';
-	const DB_VERSION_OPT = 'gs_calendar_db_version';
+	const DB_VERSION_OPT = 'gend_society_calendar_db_version';
 
 	/**
 	 * Wire all hooks. Called from gend-society.php after the require_once
@@ -61,7 +61,7 @@ class Gend_GS_Availability_Schema {
 		// path — passed in via GS_DIR since __FILE__ here resolves to the
 		// include, not the main plugin file.
 		register_activation_hook(
-			GS_DIR . 'gend-society.php',
+			GEND_SOCIETY_DIR . 'gend-society.php',
 			array( __CLASS__, 'install_all_sites' )
 		);
 	}

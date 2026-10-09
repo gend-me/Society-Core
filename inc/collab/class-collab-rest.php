@@ -342,9 +342,9 @@ class Gend_GS_Collab_REST {
 				? bp_core_fetch_avatar( array( 'item_id' => $counter_gid, 'object' => 'group', 'type' => 'full', 'html' => false ) )
 				: '';
 			$permalink = ( $grp && function_exists( 'bp_get_group_permalink' ) ) ? bp_get_group_permalink( $grp ) : '';
-			$cat = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gs_collab_category', true ) : '';
-			$ind = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gs_collab_industry', true ) : '';
-			$loc = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gs_collab_location', true ) : '';
+			$cat = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gend_society_collab_category', true ) : '';
+			$ind = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gend_society_collab_industry', true ) : '';
+			$loc = $has_groupmeta ? (string) groups_get_groupmeta( $counter_gid, '_gend_society_collab_location', true ) : '';
 
 			// Contract state.
 			$phase    = 'matched';
@@ -483,7 +483,7 @@ class Gend_GS_Collab_REST {
 	 * @return string Option name.
 	 */
 	private static function cancel_intent_key( int $match_id ) : string {
-		return 'gs_collab_cancel_intent_' . $match_id;
+		return 'gend_society_collab_cancel_intent_' . $match_id;
 	}
 
 	/**
@@ -933,7 +933,7 @@ class Gend_GS_Collab_REST {
 			: array( 'category' => '', 'industry' => '', 'location' => '' );
 
 		$optin = function_exists( 'groups_get_groupmeta' )
-			? (bool) groups_get_groupmeta( $gid, '_gs_collab_optin', true )
+			? (bool) groups_get_groupmeta( $gid, '_gend_society_collab_optin', true )
 			: false;
 
 		return rest_ensure_response( array(
@@ -976,22 +976,22 @@ class Gend_GS_Collab_REST {
 			return new WP_Error( 'gs_collab_bad_industry', 'unknown industry', array( 'status' => 400 ) );
 		}
 
-		groups_update_groupmeta( $gid, '_gs_collab_category', sanitize_key( $category ) );
-		groups_update_groupmeta( $gid, '_gs_collab_industry', sanitize_key( $industry ) );
-		groups_update_groupmeta( $gid, '_gs_collab_location', sanitize_text_field( $location ) );
+		groups_update_groupmeta( $gid, '_gend_society_collab_category', sanitize_key( $category ) );
+		groups_update_groupmeta( $gid, '_gend_society_collab_industry', sanitize_key( $industry ) );
+		groups_update_groupmeta( $gid, '_gend_society_collab_location', sanitize_text_field( $location ) );
 
 		// Opt-in gate (locked decision). An explicit optin=0 clears discoverability.
 		// Otherwise, opt-in is granted ONLY when both category and industry are set.
 		$explicit_optout = ( null !== $optin_in && 0 === (int) $optin_in );
 		if ( $explicit_optout ) {
-			groups_update_groupmeta( $gid, '_gs_collab_optin', 0 );
+			groups_update_groupmeta( $gid, '_gend_society_collab_optin', 0 );
 			$optin = false;
 		} elseif ( '' !== $category && '' !== $industry ) {
-			groups_update_groupmeta( $gid, '_gs_collab_optin', 1 );
+			groups_update_groupmeta( $gid, '_gend_society_collab_optin', 1 );
 			$optin = true;
 		} else {
 			// Can't be discoverable without both tags — force off.
-			groups_update_groupmeta( $gid, '_gs_collab_optin', 0 );
+			groups_update_groupmeta( $gid, '_gend_society_collab_optin', 0 );
 			$optin = false;
 		}
 

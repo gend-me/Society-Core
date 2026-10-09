@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * Provider config. Endpoints, scopes, response shapes.
  */
-function gs_invite_oauth_provider_config( $provider ) {
+function gend_society_invite_oauth_provider_config( $provider ) {
     $providers = array(
         'google' => array(
             'auth_url'  => 'https://accounts.google.com/o/oauth2/v2/auth',
@@ -53,15 +53,15 @@ function gs_invite_oauth_provider_config( $provider ) {
 /**
  * The redirect URI we register with each provider. Must match exactly.
  */
-function gs_invite_oauth_redirect_uri() {
+function gend_society_invite_oauth_redirect_uri() {
     return rest_url( 'gs/v1/invite/oauth/callback' );
 }
 
 /**
  * Site-wide credentials — entered by an admin in the Settings page.
  */
-function gs_invite_oauth_credentials( $provider ) {
-    $opts = get_option( 'gs_invite_oauth_credentials', array() );
+function gend_society_invite_oauth_credentials( $provider ) {
+    $opts = get_option( 'gend_society_invite_oauth_credentials', array() );
     if ( ! is_array( $opts ) ) return null;
     $key = $provider;
     if ( ! isset( $opts[ $key ] ) || empty( $opts[ $key ]['client_id'] ) || empty( $opts[ $key ]['client_secret'] ) ) {
@@ -78,7 +78,7 @@ function gs_invite_oauth_credentials( $provider ) {
  * we round-trip through the provider so the callback can prove the redirect
  * is for this WP user. 10-minute TTL.
  */
-function gs_invite_oauth_pack_state( $user_id, $provider ) {
+function gend_society_invite_oauth_pack_state( $user_id, $provider ) {
     $payload = array(
         'u'   => (int) $user_id,
         'p'   => (string) $provider,
@@ -90,7 +90,7 @@ function gs_invite_oauth_pack_state( $user_id, $provider ) {
     $sig  = hash_hmac( 'sha256', $b64, wp_salt( 'auth' ) );
     return $b64 . '.' . $sig;
 }
-function gs_invite_oauth_unpack_state( $state ) {
+function gend_society_invite_oauth_unpack_state( $state ) {
     if ( ! is_string( $state ) || strpos( $state, '.' ) === false ) return null;
     list( $b64, $sig ) = explode( '.', $state, 2 );
     $expect = hash_hmac( 'sha256', $b64, wp_salt( 'auth' ) );
@@ -105,16 +105,16 @@ function gs_invite_oauth_unpack_state( $state ) {
 /**
  * Build the authorization URL the frontend opens in a popup.
  */
-function gs_invite_oauth_auth_url( $user_id, $provider ) {
-    $cfg  = gs_invite_oauth_provider_config( $provider );
-    $cred = gs_invite_oauth_credentials( $provider );
+function gend_society_invite_oauth_auth_url( $user_id, $provider ) {
+    $cfg  = gend_society_invite_oauth_provider_config( $provider );
+    $cred = gend_society_invite_oauth_credentials( $provider );
     if ( ! $cfg || ! $cred ) return null;
     $params = array_merge( array(
         'client_id'     => $cred['client_id'],
-        'redirect_uri'  => gs_invite_oauth_redirect_uri(),
+        'redirect_uri'  => gend_society_invite_oauth_redirect_uri(),
         'response_type' => 'code',
         'scope'         => $cfg['scope'],
-        'state'         => gs_invite_oauth_pack_state( $user_id, $provider ),
+        'state'         => gend_society_invite_oauth_pack_state( $user_id, $provider ),
     ), isset( $cfg['extra'] ) ? $cfg['extra'] : array() );
     return $cfg['auth_url'] . '?' . http_build_query( $params );
 }
@@ -123,9 +123,9 @@ function gs_invite_oauth_auth_url( $user_id, $provider ) {
  * Exchange authorization code for access + refresh tokens. Stores them in
  * user meta keyed by provider.
  */
-function gs_invite_oauth_exchange_code( $user_id, $provider, $code ) {
-    $cfg  = gs_invite_oauth_provider_config( $provider );
-    $cred = gs_invite_oauth_credentials( $provider );
+function gend_society_invite_oauth_exchange_code( $user_id, $provider, $code ) {
+    $cfg  = gend_society_invite_oauth_provider_config( $provider );
+    $cred = gend_society_invite_oauth_credentials( $provider );
     if ( ! $cfg || ! $cred ) return new WP_Error( 'gs_invite_oauth_cfg', 'Provider not configured.' );
 
     $resp = wp_remote_post( $cfg['token_url'], array(
@@ -134,7 +134,7 @@ function gs_invite_oauth_exchange_code( $user_id, $provider, $code ) {
         'body'    => array(
             'client_id'     => $cred['client_id'],
             'client_secret' => $cred['client_secret'],
-            'redirect_uri'  => gs_invite_oauth_redirect_uri(),
+            'redirect_uri'  => gend_society_invite_oauth_redirect_uri(),
             'grant_type'    => 'authorization_code',
             'code'          => $code,
         ),
@@ -151,15 +151,15 @@ function gs_invite_oauth_exchange_code( $user_id, $provider, $code ) {
         'expires'       => time() + (int) ( $body['expires_in'] ?? 3600 ) - 30,
         'scope'         => isset( $body['scope'] ) ? (string) $body['scope'] : $cfg['scope'],
     );
-    update_user_meta( $user_id, 'gs_invite_oauth_' . $provider, $tokens );
+    update_user_meta( $user_id, 'gend_society_invite_oauth_' . $provider, $tokens );
     return $tokens;
 }
 
 /**
  * Return a valid access token for $user_id/$provider, refreshing if expired.
  */
-function gs_invite_oauth_get_access_token( $user_id, $provider ) {
-    $tokens = get_user_meta( $user_id, 'gs_invite_oauth_' . $provider, true );
+function gend_society_invite_oauth_get_access_token( $user_id, $provider ) {
+    $tokens = get_user_meta( $user_id, 'gend_society_invite_oauth_' . $provider, true );
     if ( ! is_array( $tokens ) || empty( $tokens['access_token'] ) ) {
         return new WP_Error( 'gs_invite_oauth_none', 'Not connected.' );
     }
@@ -170,8 +170,8 @@ function gs_invite_oauth_get_access_token( $user_id, $provider ) {
         return new WP_Error( 'gs_invite_oauth_expired', 'Token expired and no refresh token.' );
     }
 
-    $cfg  = gs_invite_oauth_provider_config( $provider );
-    $cred = gs_invite_oauth_credentials( $provider );
+    $cfg  = gend_society_invite_oauth_provider_config( $provider );
+    $cred = gend_society_invite_oauth_credentials( $provider );
     if ( ! $cfg || ! $cred ) return new WP_Error( 'gs_invite_oauth_cfg', 'Provider not configured.' );
 
     $resp = wp_remote_post( $cfg['token_url'], array(
@@ -192,7 +192,7 @@ function gs_invite_oauth_get_access_token( $user_id, $provider ) {
     $tokens['access_token'] = (string) $body['access_token'];
     $tokens['expires']      = time() + (int) ( $body['expires_in'] ?? 3600 ) - 30;
     if ( ! empty( $body['refresh_token'] ) ) $tokens['refresh_token'] = (string) $body['refresh_token'];
-    update_user_meta( $user_id, 'gs_invite_oauth_' . $provider, $tokens );
+    update_user_meta( $user_id, 'gend_society_invite_oauth_' . $provider, $tokens );
     return $tokens['access_token'];
 }
 
@@ -200,8 +200,8 @@ function gs_invite_oauth_get_access_token( $user_id, $provider ) {
  * Fetch contacts from the provider's API. Returns an array of
  * { email, name } items, deduplicated by email.
  */
-function gs_invite_oauth_fetch_contacts( $user_id, $provider ) {
-    $token = gs_invite_oauth_get_access_token( $user_id, $provider );
+function gend_society_invite_oauth_fetch_contacts( $user_id, $provider ) {
+    $token = gend_society_invite_oauth_get_access_token( $user_id, $provider );
     if ( is_wp_error( $token ) ) return $token;
 
     $contacts = array();
@@ -277,8 +277,8 @@ function gs_invite_oauth_fetch_contacts( $user_id, $provider ) {
    REST routes
    ============================================================= */
 
-add_action( 'rest_api_init', 'gs_invite_oauth_register_routes' );
-function gs_invite_oauth_register_routes() {
+add_action( 'rest_api_init', 'gend_society_invite_oauth_register_routes' );
+function gend_society_invite_oauth_register_routes() {
     $auth = function () {
         return is_user_logged_in()
             ? true
@@ -287,7 +287,7 @@ function gs_invite_oauth_register_routes() {
 
     register_rest_route( 'gs/v1', '/invite/oauth/auth-url', array(
         'methods'             => WP_REST_Server::READABLE,
-        'callback'            => 'gs_invite_oauth_rest_auth_url',
+        'callback'            => 'gend_society_invite_oauth_rest_auth_url',
         'permission_callback' => $auth,
         'args'                => array( 'provider' => array( 'required' => true, 'type' => 'string' ) ),
     ) );
@@ -297,54 +297,54 @@ function gs_invite_oauth_register_routes() {
     // session cookie to validate the request.
     register_rest_route( 'gs/v1', '/invite/oauth/callback', array(
         'methods'             => WP_REST_Server::READABLE,
-        'callback'            => 'gs_invite_oauth_rest_callback',
+        'callback'            => 'gend_society_invite_oauth_rest_callback',
         'permission_callback' => '__return_true',
     ) );
 
     register_rest_route( 'gs/v1', '/invite/oauth/status', array(
         'methods'             => WP_REST_Server::READABLE,
-        'callback'            => 'gs_invite_oauth_rest_status',
+        'callback'            => 'gend_society_invite_oauth_rest_status',
         'permission_callback' => $auth,
         'args'                => array( 'provider' => array( 'required' => true, 'type' => 'string' ) ),
     ) );
 
     register_rest_route( 'gs/v1', '/invite/oauth/disconnect', array(
         'methods'             => WP_REST_Server::CREATABLE,
-        'callback'            => 'gs_invite_oauth_rest_disconnect',
+        'callback'            => 'gend_society_invite_oauth_rest_disconnect',
         'permission_callback' => $auth,
         'args'                => array( 'provider' => array( 'required' => true, 'type' => 'string' ) ),
     ) );
 
     register_rest_route( 'gs/v1', '/invite/oauth/contacts', array(
         'methods'             => WP_REST_Server::READABLE,
-        'callback'            => 'gs_invite_oauth_rest_contacts',
+        'callback'            => 'gend_society_invite_oauth_rest_contacts',
         'permission_callback' => $auth,
         'args'                => array( 'provider' => array( 'required' => true, 'type' => 'string' ) ),
     ) );
 }
 
-function gs_invite_oauth_rest_auth_url( WP_REST_Request $req ) {
+function gend_society_invite_oauth_rest_auth_url( WP_REST_Request $req ) {
     $provider = sanitize_key( $req->get_param( 'provider' ) );
-    $url = gs_invite_oauth_auth_url( get_current_user_id(), $provider );
+    $url = gend_society_invite_oauth_auth_url( get_current_user_id(), $provider );
     if ( ! $url ) {
         return new WP_Error( 'gs_invite_oauth_cfg', 'Provider not configured. An admin must add OAuth credentials.', array( 'status' => 400 ) );
     }
     return rest_ensure_response( array( 'ok' => true, 'url' => $url ) );
 }
 
-function gs_invite_oauth_rest_callback( WP_REST_Request $req ) {
+function gend_society_invite_oauth_rest_callback( WP_REST_Request $req ) {
     $provider = sanitize_key( $req->get_param( 'provider' ) );
     $code     = (string) $req->get_param( 'code' );
     $state    = (string) $req->get_param( 'state' );
     $error    = (string) $req->get_param( 'error' );
 
     if ( $error ) {
-        return gs_invite_oauth_render_callback_page( false, "Provider returned error: $error" );
+        return gend_society_invite_oauth_render_callback_page( false, "Provider returned error: $error" );
     }
 
-    $st = gs_invite_oauth_unpack_state( $state );
+    $st = gend_society_invite_oauth_unpack_state( $state );
     if ( ! $st ) {
-        return gs_invite_oauth_render_callback_page( false, 'Invalid or expired state token.' );
+        return gend_society_invite_oauth_render_callback_page( false, 'Invalid or expired state token.' );
     }
     $provider = $provider ?: $st['p'];
     $user_id  = (int) $st['u'];
@@ -363,24 +363,24 @@ function gs_invite_oauth_rest_callback( WP_REST_Request $req ) {
         }
     }
     if ( ! $current_user_id || $current_user_id !== $user_id ) {
-        return gs_invite_oauth_render_callback_page( false, 'Authentication mismatch — please retry from your profile.' );
+        return gend_society_invite_oauth_render_callback_page( false, 'Authentication mismatch — please retry from your profile.' );
     }
     if ( ! $code ) {
-        return gs_invite_oauth_render_callback_page( false, 'No authorization code returned.' );
+        return gend_society_invite_oauth_render_callback_page( false, 'No authorization code returned.' );
     }
 
-    $tokens = gs_invite_oauth_exchange_code( $user_id, $provider, $code );
+    $tokens = gend_society_invite_oauth_exchange_code( $user_id, $provider, $code );
     if ( is_wp_error( $tokens ) ) {
-        return gs_invite_oauth_render_callback_page( false, $tokens->get_error_message() );
+        return gend_society_invite_oauth_render_callback_page( false, $tokens->get_error_message() );
     }
-    return gs_invite_oauth_render_callback_page( true, "Connected to " . ucfirst( $provider ) . ".", $provider );
+    return gend_society_invite_oauth_render_callback_page( true, "Connected to " . ucfirst( $provider ) . ".", $provider );
 }
 
 /**
  * Render a tiny self-closing HTML page that postMessages the parent and
  * closes itself. This is the popup window's terminal view.
  */
-function gs_invite_oauth_render_callback_page( $success, $message, $provider = '' ) {
+function gend_society_invite_oauth_render_callback_page( $success, $message, $provider = '' ) {
     $payload = array(
         'gs_invite_oauth' => true,
         'success'         => (bool) $success,
@@ -423,9 +423,9 @@ function gs_invite_oauth_render_callback_page( $success, $message, $provider = '
     exit;
 }
 
-function gs_invite_oauth_rest_status( WP_REST_Request $req ) {
+function gend_society_invite_oauth_rest_status( WP_REST_Request $req ) {
     $provider = sanitize_key( $req->get_param( 'provider' ) );
-    $tokens   = get_user_meta( get_current_user_id(), 'gs_invite_oauth_' . $provider, true );
+    $tokens   = get_user_meta( get_current_user_id(), 'gend_society_invite_oauth_' . $provider, true );
     $connected = is_array( $tokens ) && ! empty( $tokens['access_token'] );
     return rest_ensure_response( array(
         'ok'        => true,
@@ -434,15 +434,15 @@ function gs_invite_oauth_rest_status( WP_REST_Request $req ) {
     ) );
 }
 
-function gs_invite_oauth_rest_disconnect( WP_REST_Request $req ) {
+function gend_society_invite_oauth_rest_disconnect( WP_REST_Request $req ) {
     $provider = sanitize_key( $req->get_param( 'provider' ) );
-    delete_user_meta( get_current_user_id(), 'gs_invite_oauth_' . $provider );
+    delete_user_meta( get_current_user_id(), 'gend_society_invite_oauth_' . $provider );
     return rest_ensure_response( array( 'ok' => true ) );
 }
 
-function gs_invite_oauth_rest_contacts( WP_REST_Request $req ) {
+function gend_society_invite_oauth_rest_contacts( WP_REST_Request $req ) {
     $provider = sanitize_key( $req->get_param( 'provider' ) );
-    $contacts = gs_invite_oauth_fetch_contacts( get_current_user_id(), $provider );
+    $contacts = gend_society_invite_oauth_fetch_contacts( get_current_user_id(), $provider );
     if ( is_wp_error( $contacts ) ) {
         return new WP_Error( $contacts->get_error_code(), $contacts->get_error_message(), array( 'status' => 400 ) );
     }

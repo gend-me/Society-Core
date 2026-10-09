@@ -20,7 +20,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 /**
  * Render the Completed Contracts panel for a displayed member.
  */
-function gdc_render_completed_contracts_panel( $displayed_user_id ) {
+function gend_society_render_completed_contracts_panel( $displayed_user_id ) {
     $displayed_user_id = (int) $displayed_user_id;
     if ( ! $displayed_user_id ) return;
 
@@ -38,7 +38,7 @@ function gdc_render_completed_contracts_panel( $displayed_user_id ) {
     }
 
     // ── 2. Completed sales proposals (sales-team) ────────────────────────────
-    $sales = gdc_get_user_completed_sales_proposals( $displayed_user_id );
+    $sales = gend_society_get_user_completed_sales_proposals( $displayed_user_id );
     if ( ! empty( $sales ) ) {
         ?>
         <section class="gdc-contracts-sales">
@@ -66,7 +66,7 @@ function gdc_render_completed_contracts_panel( $displayed_user_id ) {
 
     echo '</div>';
 
-    gdc_contracts_panel_styles();
+    gend_society_contracts_panel_styles();
 }
 
 /**
@@ -76,7 +76,7 @@ function gdc_render_completed_contracts_panel( $displayed_user_id ) {
  *
  * @return array<int,array{title:string,url:string,id:int}>
  */
-function gdc_get_user_completed_sales_proposals( $user_id ) {
+function gend_society_get_user_completed_sales_proposals( $user_id ) {
     $user_id = (int) $user_id;
     if ( ! $user_id ) return array();
     if ( ! post_type_exists( 'st_proposal' ) ) return array();
@@ -111,7 +111,7 @@ function gdc_get_user_completed_sales_proposals( $user_id ) {
 /**
  * Styling for the sales-contracts section appended below the PSOO panel.
  */
-function gdc_contracts_panel_styles() {
+function gend_society_contracts_panel_styles() {
     static $done = false;
     if ( $done ) return;
     $done = true;

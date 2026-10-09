@@ -44,7 +44,7 @@ class Gend_GS_Calendar_Public_View {
 	const PATH_PREFIX = '/calendar-view/';
 
 	/** Option key tracking the rewrite-rules version we last flushed for. */
-	const REWRITE_VERSION_OPT = 'gs_calendar_view_rewrite_ver';
+	const REWRITE_VERSION_OPT = 'gend_society_calendar_view_rewrite_ver';
 
 	/** Wire up rewrite rule + template_redirect interceptor. */
 	public static function init() : void {
@@ -67,7 +67,7 @@ class Gend_GS_Calendar_Public_View {
 			'top'
 		);
 
-		$want = defined( 'GS_VERSION' ) ? GS_VERSION : '1.0.0';
+		$want = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '1.0.0';
 		$have = get_option( self::REWRITE_VERSION_OPT );
 		if ( $have !== $want ) {
 			flush_rewrite_rules( false );
@@ -136,9 +136,9 @@ class Gend_GS_Calendar_Public_View {
 				'token'    => $share_token,
 			);
 
-			$js_url  = plugins_url( 'assets/calendar-public-view.js', GS_DIR . 'gend-society.php' );
-			$css_url = plugins_url( 'assets/calendar-public-view.css', GS_DIR . 'gend-society.php' );
-			$ver     = GS_VERSION;
+			$js_url  = plugins_url( 'assets/calendar-public-view.js', GEND_SOCIETY_DIR . 'gend-society.php' );
+			$css_url = plugins_url( 'assets/calendar-public-view.css', GEND_SOCIETY_DIR . 'gend-society.php' );
+			$ver     = GEND_SOCIETY_VERSION;
 
 			status_header( 200 );
 			nocache_headers();

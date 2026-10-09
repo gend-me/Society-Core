@@ -25,15 +25,15 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 // Pull in Blog Manager's Library styling on the Overview page so the Playlists
 // sub-tab renders with its dashboard look. No-op if blog-manager isn't loaded.
-add_action( 'wp_enqueue_scripts', 'gs_portfolio_enqueue_playlists_assets' );
-function gs_portfolio_enqueue_playlists_assets () {
-    if ( ! gs_portfolio_is_target() ) return;
+add_action( 'wp_enqueue_scripts', 'gend_society_portfolio_enqueue_playlists_assets' );
+function gend_society_portfolio_enqueue_playlists_assets () {
+    if ( ! gend_society_portfolio_is_target() ) return;
     if ( function_exists( 'bm_enqueue_library_assets' ) ) {
         bm_enqueue_library_assets();
     }
 }
 
-function gs_portfolio_is_target () {
+function gend_society_portfolio_is_target () {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return false;
     // Now the Overview tab (the panels are hosted there), not the media route.
     return function_exists( 'bp_is_current_component' ) && bp_is_current_component( 'overview' );
@@ -45,7 +45,7 @@ function gs_portfolio_is_target () {
  * under the Overview tab (gdc_inject_profile_page_embed()); this emits once,
  * called from gs_portfolio_render_posts().
  */
-function gs_portfolio_panels_styles () {
+function gend_society_portfolio_panels_styles () {
     static $done = false;
     if ( $done ) return;
     $done = true;
@@ -119,7 +119,7 @@ function gs_portfolio_panels_styles () {
  * networks (xprofile "Social Networks" field) as a card grid, with a
  * placeholder hint for recent-posts integration.
  */
-function gs_portfolio_render_schedule ( $own_profile ) {
+function gend_society_portfolio_render_schedule ( $own_profile ) {
     if ( $own_profile ) {
         if ( function_exists( 'aas_get_social_poster_modal_markup' ) ) {
             // FullCalendar powers the Calendar tab and Chart.js the Analytics
@@ -240,7 +240,7 @@ function gs_portfolio_render_schedule ( $own_profile ) {
     // from xprofile field "Social Networks" (Youzify's standard field) by
     // walking xprofile data and collecting URL/value pairs.
     $user_id = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
-    $links   = gs_portfolio_collect_social_links( $user_id );
+    $links   = gend_society_portfolio_collect_social_links( $user_id );
     if ( empty( $links ) ) {
         echo '<p class="gs-portfolio-empty">' . esc_html__( 'This member has no linked social platforms yet.', 'gend-society' ) . '</p>';
         return;
@@ -261,7 +261,7 @@ function gs_portfolio_render_schedule ( $own_profile ) {
  * Walk the displayed user's xprofile data + user_meta and collect anything
  * that looks like a social-platform URL. Returns array of { label, url }.
  */
-function gs_portfolio_collect_social_links ( $user_id ) {
+function gend_society_portfolio_collect_social_links ( $user_id ) {
     if ( ! $user_id ) return array();
     $platforms = array(
         'twitter'   => array( 'X / Twitter',  array( 'twitter.com', 'x.com' ) ),
@@ -331,7 +331,7 @@ function gs_portfolio_collect_social_links ( $user_id ) {
  * Posts panel — list of WP posts authored by the displayed user, plus a
  * search-and-filter toggle that pivots the same panel to "All gend.me posts".
  */
-function gs_portfolio_render_posts () {
+function gend_society_portfolio_render_posts () {
     $user_id = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
 
     $mine = $user_id ? new WP_Query( array(
@@ -347,7 +347,7 @@ function gs_portfolio_render_posts () {
         'posts_per_page' => 60,
         'no_found_rows'  => true,
     ) );
-    gs_portfolio_panels_styles();
+    gend_society_portfolio_panels_styles();
     ?>
     <div data-gs-posts-root>
     <div class="gs-portfolio-posts-bar">
@@ -359,10 +359,10 @@ function gs_portfolio_render_posts () {
     </div>
 
     <div data-gs-posts-grid="mine" class="gs-portfolio-posts-grid">
-        <?php gs_portfolio_render_post_grid( $mine, 'mine' ); ?>
+        <?php gend_society_portfolio_render_post_grid( $mine, 'mine' ); ?>
     </div>
     <div data-gs-posts-grid="all" class="gs-portfolio-posts-grid" style="display:none;">
-        <?php gs_portfolio_render_post_grid( $all, 'all' ); ?>
+        <?php gend_society_portfolio_render_post_grid( $all, 'all' ); ?>
     </div>
     </div><!-- /[data-gs-posts-root] -->
     <?php
@@ -370,7 +370,7 @@ function gs_portfolio_render_posts () {
     wp_reset_postdata();
 }
 
-function gs_portfolio_render_post_grid ( $q, $scope ) {
+function gend_society_portfolio_render_post_grid ( $q, $scope ) {
     if ( ! $q || ! $q->have_posts() ) {
         $msg = ( $scope === 'mine' )
             ? __( 'No posts authored yet.', 'gend-society' )

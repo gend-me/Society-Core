@@ -579,7 +579,7 @@ class Gend_GS_Booking_Public_REST {
             return new WP_Error( 'gs_book_fatal', 'Booking failed', array( 'status' => 500 ) );
         }
 
-        do_action( 'gs_booking_created', $meeting_id, $host_user_id );
+        do_action( 'gend_society_booking_created', $meeting_id, $host_user_id );
 
         $member_tz = class_exists( 'Gend_GS_Calendar_Events_REST' )
             ? Gend_GS_Calendar_Events_REST::get_member_timezone( $host_user_id )
@@ -676,7 +676,7 @@ class Gend_GS_Booking_Public_REST {
             if ( $upd === false ) {
                 return new WP_Error( 'gs_book_db', 'Cancel update failed', array( 'status' => 500 ) );
             }
-            do_action( 'gs_booking_cancelled', (int) $row['id'], (int) $row['member_id'], 'guest' );
+            do_action( 'gend_society_booking_cancelled', (int) $row['id'], (int) $row['member_id'], 'guest' );
             return rest_ensure_response( array( 'status' => 'cancelled', 'meeting_id' => (int) $row['id'] ) );
         } catch ( \Throwable $e ) {
             error_log( 'GS_BOOK_FATAL handle_cancel: ' . $e->getMessage() );
@@ -780,7 +780,7 @@ class Gend_GS_Booking_Public_REST {
             return new WP_Error( 'gs_book_fatal', 'Reschedule failed', array( 'status' => 500 ) );
         }
 
-        do_action( 'gs_booking_rescheduled', (int) $row['id'], (int) $row['member_id'], $old_starts );
+        do_action( 'gend_society_booking_rescheduled', (int) $row['id'], (int) $row['member_id'], $old_starts );
 
         return rest_ensure_response( array(
             'status'        => 'rescheduled',
@@ -1109,7 +1109,7 @@ class Gend_GS_Booking_Public_REST {
      * Returns WP_Error 429 if limit exceeded, null otherwise.
      */
     private static function rate_limit_check( string $bucket, int $limit, int $window_sec = 60 ) : ?WP_Error {
-        $key   = 'gs_book_rl_' . md5( $bucket );
+        $key   = 'gend_society_book_rl_' . md5( $bucket );
         $count = (int) get_transient( $key );
         if ( $count >= $limit ) {
             return new WP_Error( 'rate_limited', 'Too many requests', array( 'status' => 429 ) );

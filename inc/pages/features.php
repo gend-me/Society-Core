@@ -59,7 +59,7 @@
     <?php
     // -- Overflow: other plugin menus not owned by GenD Society
     global $menu;
-    $gs_slugs = [
+    $gend_society_slugs = [
         'gs-dashboard',
         'gs-users',
         'gs-app',
@@ -81,16 +81,16 @@
         'separator1',
         'separator2'
     ];
-    $overflow = [];
+    $gend_society_overflow = [];
     if (is_array($menu)) {
-        foreach ($menu as $item) {
-            $slug = isset($item[2]) ? $item[2] : '';
-            if ($slug && !in_array($slug, $gs_slugs, true) && !empty($item[0]) && current_user_can($item[1] ?? 'manage_options')) {
-                $overflow[] = $item;
+        foreach ($menu as $gend_society_item) {
+            $gend_society_slug = isset($gend_society_item[2]) ? $gend_society_item[2] : '';
+            if ($gend_society_slug && !in_array($gend_society_slug, $gend_society_slugs, true) && !empty($gend_society_item[0]) && current_user_can($gend_society_item[1] ?? 'manage_options')) {
+                $gend_society_overflow[] = $gend_society_item;
             }
         }
     }
-    if ($overflow): ?>
+    if ($gend_society_overflow): ?>
         <div class="gs-card" style="margin-top:24px;">
             <div class="gs-card-header" id="gs-overflow-header" style="cursor:pointer;user-select:none;"
                 onclick="document.getElementById('gs-overflow-list').classList.toggle('gs-hidden');">
@@ -99,15 +99,15 @@
                 </h3>
             </div>
             <div class="gs-card-body gs-quick-links" id="gs-overflow-list">
-                <?php foreach ($overflow as $item):
-                    $label = wp_strip_all_tags($item[0]);
-                    $slug = $item[2];
-                    $url = (strpos($slug, '.php') !== false) ? admin_url($slug) : admin_url('admin.php?page=' . $slug);
+                <?php foreach ($gend_society_overflow as $gend_society_item):
+                    $gend_society_label = wp_strip_all_tags($gend_society_item[0]);
+                    $gend_society_slug = $gend_society_item[2];
+                    $gend_society_url = (strpos($gend_society_slug, '.php') !== false) ? admin_url($gend_society_slug) : admin_url('admin.php?page=' . $gend_society_slug);
                     ?>
-                    <a href="<?php echo esc_url($url); ?>" class="gs-quick-link">
+                    <a href="<?php echo esc_url($gend_society_url); ?>" class="gs-quick-link">
                         <span class="dashicons dashicons-admin-generic"></span>
                         <span>
-                            <?php echo esc_html($label); ?>
+                            <?php echo esc_html($gend_society_label); ?>
                         </span>
                     </a>
                 <?php endforeach; ?>

@@ -44,7 +44,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *                       data-zone-id/data-zone-host from the row).
  * @return void
  */
-function gs_render_hosting_records_modal( $payload = array() ) {
+function gend_society_render_hosting_records_modal( $payload = array() ) {
     if ( ! current_user_can( 'manage_options' ) ) {
         return;
     }
@@ -52,16 +52,16 @@ function gs_render_hosting_records_modal( $payload = array() ) {
     // Enqueue records-editor assets. GS_VERSION cascade + filemtime cache-buster
     // per project_social_membership_assets convention (single-source bump in
     // gend-society.php cascades to every wp_enqueue site-wide).
-    $js_ver  = defined( 'GS_VERSION' ) ? GS_VERSION : '0';
+    $js_ver  = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '0';
     $css_ver = $js_ver;
-    if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'assets/records-editor.js' ) ) {
-        $js_ver = $js_ver . '.' . filemtime( GS_DIR . 'assets/records-editor.js' );
+    if ( defined( 'GEND_SOCIETY_DIR' ) && file_exists( GEND_SOCIETY_DIR . 'assets/records-editor.js' ) ) {
+        $js_ver = $js_ver . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/records-editor.js' );
     }
-    if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'assets/records-editor.css' ) ) {
-        $css_ver = $css_ver . '.' . filemtime( GS_DIR . 'assets/records-editor.css' );
+    if ( defined( 'GEND_SOCIETY_DIR' ) && file_exists( GEND_SOCIETY_DIR . 'assets/records-editor.css' ) ) {
+        $css_ver = $css_ver . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/records-editor.css' );
     }
-    wp_enqueue_style( 'gs-records-editor', GS_URL . 'assets/records-editor.css', array(), $css_ver );
-    wp_enqueue_script( 'gs-records-editor', GS_URL . 'assets/records-editor.js', array(), $js_ver, true );
+    wp_enqueue_style( 'gs-records-editor', GEND_SOCIETY_URL . 'assets/records-editor.css', array(), $css_ver );
+    wp_enqueue_script( 'gs-records-editor', GEND_SOCIETY_URL . 'assets/records-editor.js', array(), $js_ver, true );
     wp_localize_script(
         'gs-records-editor',
         'gsRecordsEditor',

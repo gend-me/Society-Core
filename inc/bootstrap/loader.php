@@ -71,11 +71,11 @@ if ( ! function_exists( 'gend_society_require_module' ) ) {
 	 */
 	function gend_society_require_module( array $entry ): void {
 		$file = $entry['file'];
-		if ( ! file_exists( GS_DIR . $file ) ) {
+		if ( ! file_exists( GEND_SOCIETY_DIR . $file ) ) {
 			gend_society_module_record( $file, 'missing' );
 			return;
 		}
-		require_once GS_DIR . $file;
+		require_once GEND_SOCIETY_DIR . $file;
 		gend_society_module_record( $file );
 		if ( isset( $entry['after'] ) && is_callable( $entry['after'] ) ) {
 			call_user_func( $entry['after'] );
@@ -95,7 +95,7 @@ if ( ! function_exists( 'gend_society_load_modules' ) ) {
 		}
 		$done = true;
 
-		$manifest = require GS_DIR . 'inc/bootstrap/manifest.php';
+		$manifest = require GEND_SOCIETY_DIR . 'inc/bootstrap/manifest.php';
 		$tiers    = gend_society_mode_tiers( gend_society_runtime_mode() );
 
 		foreach ( $manifest['modules'] as $entry ) {

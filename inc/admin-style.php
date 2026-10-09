@@ -27,13 +27,13 @@ add_action('admin_init', function () {
     }
 });
 
-add_action('admin_enqueue_scripts', 'gs_enqueue_admin_assets');
-function gs_enqueue_admin_assets()
+add_action('admin_enqueue_scripts', 'gend_society_enqueue_admin_assets');
+function gend_society_enqueue_admin_assets()
 {
-    $ver = GS_VERSION . '.' . filemtime(GS_DIR . 'assets/admin-style.css');
-    wp_enqueue_style('gs-admin-style', GS_URL . 'assets/admin-style.css', ['dashicons'], $ver);
-    wp_enqueue_style('gs-animation-utilities', GS_URL . 'assets/animation-utilities.css', [], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/animation-utilities.css'));
-    wp_enqueue_script('gs-admin-script', GS_URL . 'assets/admin-script.js', [], $ver, true);
+    $ver = GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/admin-style.css');
+    wp_enqueue_style('gs-admin-style', GEND_SOCIETY_URL . 'assets/admin-style.css', ['dashicons'], $ver);
+    wp_enqueue_style('gs-animation-utilities', GEND_SOCIETY_URL . 'assets/animation-utilities.css', [], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/animation-utilities.css'));
+    wp_enqueue_script('gs-admin-script', GEND_SOCIETY_URL . 'assets/admin-script.js', [], $ver, true);
 
     $current_user = wp_get_current_user();
 
@@ -43,7 +43,7 @@ function gs_enqueue_admin_assets()
     // (or prompts them to sign in there) — so the same markup works for
     // OAuth-linked, unlinked, and hub-side users without branching.
     $is_gend_oauth = true;
-    $hub_url       = function_exists('gs_oauth_hub_url') ? gs_oauth_hub_url() : 'https://gend.me';
+    $hub_url       = function_exists('gend_society_oauth_hub_url') ? gend_society_oauth_hub_url() : 'https://gend.me';
     $hub_url       = rtrim($hub_url, '/');
     $members_base  = $hub_url . '/members/me/';
 
@@ -74,11 +74,11 @@ function gs_enqueue_admin_assets()
         // header. Each item opens admin.php?page=gs-group-embed&tab=<slug>
         // which renders that group section inline (not iframe). Capability-
         // filtered server-side by gs_group_embed_menu_items().
-        'gendGroupMenu' => function_exists('gs_group_embed_menu_items') ? gs_group_embed_menu_items() : [],
-        'gendGroupName' => function_exists('gs_group_embed_group_name') ? gs_group_embed_group_name() : '',
+        'gendGroupMenu' => function_exists('gend_society_group_embed_menu_items') ? gend_society_group_embed_menu_items() : [],
+        'gendGroupName' => function_exists('gend_society_group_embed_group_name') ? gend_society_group_embed_group_name() : '',
         // Inputs the header's Login-to-GenD button needs to drive the same
         // PKCE popup flow as wp-login.php (see oauth-login.php).
-        'gendOauthClientId' => function_exists('gs_oauth_client_id') ? gs_oauth_client_id() : '',
+        'gendOauthClientId' => function_exists('gend_society_oauth_client_id') ? gend_society_oauth_client_id() : '',
         'gendOauthRestUrl'  => esc_url_raw(rest_url('gend-society/v1/oauth/login')),
         // Header nav-pill backgrounds from the consent-gated gend.me table
         // (inc/remote-assets.php); '' = render the neutral placeholder.
@@ -92,8 +92,8 @@ function gs_enqueue_admin_assets()
 
     global $pagenow;
     if ($pagenow === 'site-editor.php') {
-        wp_enqueue_script('gs-template-modal', GS_URL . 'assets/gs-template-modal.js', ['jquery', 'wp-data', 'wp-blocks'], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-template-modal.js'), true);
-        wp_enqueue_script('gs-site-editor-init', GS_URL . 'assets/gs-site-editor-init.js', ['gs-template-modal'], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-site-editor-init.js'), true);
+        wp_enqueue_script('gs-template-modal', GEND_SOCIETY_URL . 'assets/gs-template-modal.js', ['jquery', 'wp-data', 'wp-blocks'], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/gs-template-modal.js'), true);
+        wp_enqueue_script('gs-site-editor-init', GEND_SOCIETY_URL . 'assets/gs-site-editor-init.js', ['gs-template-modal'], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/gs-site-editor-init.js'), true);
 
         wp_localize_script('gs-template-modal', 'GS_TEMPLATE_MODAL', [
             'rest_url' => esc_url_raw(rest_url()),

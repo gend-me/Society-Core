@@ -16,8 +16,8 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 // ─── CPT Registration ─────────────────────────────────────────────────────────
 
-add_action( 'init', 'gdc_register_profile_page_cpt' );
-function gdc_register_profile_page_cpt() {
+add_action( 'init', 'gend_society_register_profile_page_cpt' );
+function gend_society_register_profile_page_cpt() {
     register_post_type( 'gdc_profile_page', [
         'label'              => 'Profile Pages',
         'labels'             => [
@@ -50,8 +50,8 @@ function gdc_register_profile_page_cpt() {
 // ── Performance: dequeue non-Gutenberg admin scripts/styles in embed mode ─────
 // Many plugins (WooCommerce, etc.) enqueue heavy assets on every admin page.
 // In embed mode we only need Gutenberg; strip everything else.
-add_action( 'admin_enqueue_scripts', 'gdc_embed_strip_admin_scripts', 9999 );
-function gdc_embed_strip_admin_scripts() {
+add_action( 'admin_enqueue_scripts', 'gend_society_embed_strip_admin_scripts', 9999 );
+function gend_society_embed_strip_admin_scripts() {
     if ( empty( $_GET['gdc_embed'] ) ) return;
     $post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
     if ( ! $post_id || get_post_type( $post_id ) !== 'gdc_profile_page' ) return;
@@ -82,8 +82,8 @@ function gdc_embed_strip_admin_scripts() {
 }
 
 // ── Performance: slow down Heartbeat in embed mode — no need for frequent pings
-add_filter( 'heartbeat_settings', 'gdc_embed_heartbeat_settings' );
-function gdc_embed_heartbeat_settings( $settings ) {
+add_filter( 'heartbeat_settings', 'gend_society_embed_heartbeat_settings' );
+function gend_society_embed_heartbeat_settings( $settings ) {
     if ( ! empty( $_GET['gdc_embed'] ) ) {
         $settings['interval'] = 120; // default 60 s → 120 s
     }
@@ -92,8 +92,8 @@ function gdc_embed_heartbeat_settings( $settings ) {
 
 // Remove X-Frame-Options header so the block editor can load inside our iframe.
 // Must run at priority 1 (before send_frame_options_header fires at priority 10).
-add_action( 'admin_init', 'gdc_allow_embed_framing', 1 );
-function gdc_allow_embed_framing() {
+add_action( 'admin_init', 'gend_society_allow_embed_framing', 1 );
+function gend_society_allow_embed_framing() {
     if ( empty( $_GET['gdc_embed'] ) ) return;
     $post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
     if ( ! $post_id || get_post_type( $post_id ) !== 'gdc_profile_page' ) return;
@@ -101,8 +101,8 @@ function gdc_allow_embed_framing() {
     @header_remove( 'X-Frame-Options' );
 }
 
-add_action( 'admin_head', 'gdc_minimal_block_editor_css' );
-function gdc_minimal_block_editor_css() {
+add_action( 'admin_head', 'gend_society_minimal_block_editor_css' );
+function gend_society_minimal_block_editor_css() {
     if ( empty( $_GET['gdc_embed'] ) ) return;
     $post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
     if ( ! $post_id || get_post_type( $post_id ) !== 'gdc_profile_page' ) return;
@@ -153,8 +153,8 @@ function gdc_minimal_block_editor_css() {
 
 // Activate WP's native fullscreen mode via wp.data so the Gutenberg editor
 // fills the iframe and hides the sidebar/admin-bar using WP's own CSS.
-add_action( 'admin_footer', 'gdc_embed_fullscreen_js' );
-function gdc_embed_fullscreen_js() {
+add_action( 'admin_footer', 'gend_society_embed_fullscreen_js' );
+function gend_society_embed_fullscreen_js() {
     if ( empty( $_GET['gdc_embed'] ) ) return;
     $post_id = isset( $_GET['post'] ) ? (int) $_GET['post'] : 0;
     if ( ! $post_id || get_post_type( $post_id ) !== 'gdc_profile_page' ) return;
@@ -215,8 +215,8 @@ function gdc_embed_fullscreen_js() {
 // We detect a gdc_profile_page cap request by checking if any required
 // primitive cap contains the string 'gdc_profile_page'.
 
-add_filter( 'user_has_cap', 'gdc_profile_page_user_caps', 10, 4 );
-function gdc_profile_page_user_caps( $allcaps, $caps, $args, $user ) {
+add_filter( 'user_has_cap', 'gend_society_profile_page_user_caps', 10, 4 );
+function gend_society_profile_page_user_caps( $allcaps, $caps, $args, $user ) {
     if ( ! ( $user instanceof WP_User ) || ! $user->ID ) {
         return $allcaps;
     }
@@ -239,7 +239,7 @@ function gdc_profile_page_user_caps( $allcaps, $caps, $args, $user ) {
     // (this filter fires many times per page load).
     static $id_cache = [];
     if ( ! array_key_exists( $user_id, $id_cache ) ) {
-        $id_cache[ $user_id ] = (int) get_user_meta( $user_id, '_gdc_profile_page_id', true );
+        $id_cache[ $user_id ] = (int) get_user_meta( $user_id, '_gend_society_profile_page_id', true );
     }
     $own_page_id = $id_cache[ $user_id ];
 
@@ -262,19 +262,19 @@ function gdc_profile_page_user_caps( $allcaps, $caps, $args, $user ) {
 // ─── Rendered-content cache invalidation ──────────────────────────────────────
 // Bust the cached HTML when the user saves their profile page post.
 
-add_action( 'save_post', 'gdc_bust_profile_page_render_cache', 10, 2 );
-function gdc_bust_profile_page_render_cache( $post_id, $post ) {
+add_action( 'save_post', 'gend_society_bust_profile_page_render_cache', 10, 2 );
+function gend_society_bust_profile_page_render_cache( $post_id, $post ) {
     if ( ! $post instanceof WP_Post ) return;
     if ( $post->post_type !== 'gdc_profile_page' ) return;
-    delete_transient( 'gdc_ppe_html_' . $post_id );
+    delete_transient( 'gend_society_ppe_html_' . $post_id );
 }
 
 // ─── Auto-create a profile page for new users ─────────────────────────────────
 
-add_action( 'user_register', 'gdc_create_user_profile_page', 20 );
-function gdc_create_user_profile_page( $user_id ) {
+add_action( 'user_register', 'gend_society_create_user_profile_page', 20 );
+function gend_society_create_user_profile_page( $user_id ) {
     // Bail if the user already has a valid post
-    $existing_id = get_user_meta( $user_id, '_gdc_profile_page_id', true );
+    $existing_id = get_user_meta( $user_id, '_gend_society_profile_page_id', true );
     if ( $existing_id && get_post( (int) $existing_id ) ) return;
 
     $user = get_user_by( 'id', $user_id );
@@ -290,7 +290,7 @@ function gdc_create_user_profile_page( $user_id ) {
     ] );
 
     if ( ! is_wp_error( $post_id ) ) {
-        update_user_meta( $user_id, '_gdc_profile_page_id', $post_id );
+        update_user_meta( $user_id, '_gend_society_profile_page_id', $post_id );
     }
 }
 
@@ -301,22 +301,22 @@ function gdc_create_user_profile_page( $user_id ) {
 
 // ─── Helper: get (or lazily create) a user's profile page post ID ─────────────
 
-function gdc_get_user_profile_page_id( $user_id ) {
-    $post_id = (int) get_user_meta( $user_id, '_gdc_profile_page_id', true );
+function gend_society_get_user_profile_page_id( $user_id ) {
+    $post_id = (int) get_user_meta( $user_id, '_gend_society_profile_page_id', true );
 
     if ( $post_id && get_post( $post_id ) ) {
         return $post_id;
     }
 
     // Create on-demand if missing (e.g. user pre-dates migration)
-    gdc_create_user_profile_page( $user_id );
-    return (int) get_user_meta( $user_id, '_gdc_profile_page_id', true );
+    gend_society_create_user_profile_page( $user_id );
+    return (int) get_user_meta( $user_id, '_gend_society_profile_page_id', true );
 }
 
 // ─── BuddyPress: inject profile page embed on the member Overview/home tab ───
 
-add_action( 'bp_before_member_home_content', 'gdc_inject_profile_page_embed', 1 );
-function gdc_inject_profile_page_embed() {
+add_action( 'bp_before_member_home_content', 'gend_society_inject_profile_page_embed', 1 );
+function gend_society_inject_profile_page_embed() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
 
     // Only on Youzify's Overview tab — the default member profile landing page
@@ -350,19 +350,19 @@ function gdc_inject_profile_page_embed() {
         </div>
 
         <div class="gs-overview-panel is-active" data-gs-ov-panel="cover" role="tabpanel">
-            <?php gdc_render_cover_panel(); ?>
+            <?php gend_society_render_cover_panel(); ?>
         </div>
 
         <div class="gs-overview-panel" data-gs-ov-panel="resume" role="tabpanel">
-            <?php if ( function_exists( 'gdc_render_resume_panel' ) ) gdc_render_resume_panel( $viewed_user_id, $is_own_profile ); ?>
+            <?php if ( function_exists( 'gend_society_render_resume_panel' ) ) gend_society_render_resume_panel( $viewed_user_id, $is_own_profile ); ?>
         </div>
 
         <div class="gs-overview-panel" data-gs-ov-panel="social" role="tabpanel">
-            <?php if ( function_exists( 'gs_portfolio_render_schedule' ) ) gs_portfolio_render_schedule( $is_own_profile ); ?>
+            <?php if ( function_exists( 'gend_society_portfolio_render_schedule' ) ) gend_society_portfolio_render_schedule( $is_own_profile ); ?>
         </div>
 
         <div class="gs-overview-panel" data-gs-ov-panel="posts" role="tabpanel">
-            <?php if ( function_exists( 'gs_portfolio_render_posts' ) ) gs_portfolio_render_posts(); ?>
+            <?php if ( function_exists( 'gend_society_portfolio_render_posts' ) ) gend_society_portfolio_render_posts(); ?>
         </div>
 
         <div class="gs-overview-panel" data-gs-ov-panel="media" role="tabpanel">
@@ -377,14 +377,14 @@ function gdc_inject_profile_page_embed() {
 
     </div>
     <?php
-    gdc_overview_tabs_assets();
+    gend_society_overview_tabs_assets();
 }
 
 /**
  * Overview sub-tab CSS + tab-switch JS. Mirrors the former .gs-portfolio-*
  * tab styling/toggler and force-full-width approach used by the groups page.
  */
-function gdc_overview_tabs_assets() {
+function gend_society_overview_tabs_assets() {
     ?>
     <style>
     .gs-overview-wrap { width:100%; max-width:none; padding-top:18px; }
@@ -459,11 +459,11 @@ function gdc_overview_tabs_assets() {
  * entire Overview tab body; extracted verbatim so it can render inside the
  * Overview sub-tab strip as the first ("Cover") panel.
  */
-function gdc_render_cover_panel() {
+function gend_society_render_cover_panel() {
     $viewed_user_id = (int) bp_displayed_user_id();
     if ( ! $viewed_user_id ) return;
 
-    $post_id = gdc_get_user_profile_page_id( $viewed_user_id );
+    $post_id = gend_society_get_user_profile_page_id( $viewed_user_id );
     if ( ! $post_id ) return;
 
     $current_user_id = (int) get_current_user_id();
@@ -477,7 +477,7 @@ function gdc_render_cover_panel() {
     // Cache the rendered HTML to skip do_blocks() + the_content on repeat views.
     // Busted by gdc_bust_profile_page_render_cache() on save_post.
     if ( $has_content ) {
-        $cache_key = 'gdc_ppe_html_' . $post_id;
+        $cache_key = 'gend_society_ppe_html_' . $post_id;
         $rendered  = get_transient( $cache_key );
         if ( false === $rendered ) {
             $rendered = apply_filters( 'the_content', do_blocks( $raw_content ) );
@@ -649,17 +649,17 @@ function gdc_render_cover_panel() {
 
 // ─── Enqueue front-end styles ─────────────────────────────────────────────────
 
-add_action( 'wp_enqueue_scripts', 'gdc_enqueue_profile_page_styles' );
-function gdc_enqueue_profile_page_styles() {
+add_action( 'wp_enqueue_scripts', 'gend_society_enqueue_profile_page_styles' );
+function gend_society_enqueue_profile_page_styles() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
 
     // Register a virtual handle so we can attach inline CSS cleanly
-    wp_register_style( 'gdc-profile-page', false, [], GS_VERSION );
+    wp_register_style( 'gdc-profile-page', false, [], GEND_SOCIETY_VERSION );
     wp_enqueue_style( 'gdc-profile-page' );
-    wp_add_inline_style( 'gdc-profile-page', gdc_profile_page_css() );
+    wp_add_inline_style( 'gdc-profile-page', gend_society_profile_page_css() );
 }
 
-function gdc_profile_page_css() {
+function gend_society_profile_page_css() {
     return '
 /* ── GDC Member Profile Page — Design Tokens ─────────────────────────── */
 .profile-init-bridge {
@@ -1000,8 +1000,8 @@ function gdc_profile_page_css() {
 
 // ─── BuddyPress Wallet Profile Tab ──────────────────────────────────────────
 
-add_action( 'bp_setup_nav', 'gs_add_wallet_profile_tab', 100 );
-function gs_add_wallet_profile_tab() {
+add_action( 'bp_setup_nav', 'gend_society_add_wallet_profile_tab', 100 );
+function gend_society_add_wallet_profile_tab() {
     if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
         return;
     }
@@ -1009,7 +1009,7 @@ function gs_add_wallet_profile_tab() {
     bp_core_new_nav_item( [
         'name'                    => __( 'Wallet', 'gend-society' ),
         'slug'                    => 'member-wallet',
-        'screen_function'         => 'gs_wallet_profile_screen',
+        'screen_function'         => 'gend_society_wallet_profile_screen',
         'position'                => 35,
         'item_css_id'             => 'wallet',
         'show_for_displayed_user' => true,
@@ -1025,32 +1025,32 @@ function gs_add_wallet_profile_tab() {
     }
 }
 
-function gs_wallet_profile_screen() {
+function gend_society_wallet_profile_screen() {
     add_action( 'bp_template_title', '__return_empty_string' );
-    add_action( 'bp_template_content', 'gs_wallet_profile_screen_content' );
+    add_action( 'bp_template_content', 'gend_society_wallet_profile_screen_content' );
     bp_core_load_template( 'members/single/plugins' );
 }
 
 // ── "Invest" profile tab — the wallet's Fund content on its own nav item,
 // placed right after Connections (position 33, between Connections and Wallet=35).
-add_action( 'bp_setup_nav', 'gs_add_invest_profile_tab', 101 );
-function gs_add_invest_profile_tab() {
+add_action( 'bp_setup_nav', 'gend_society_add_invest_profile_tab', 101 );
+function gend_society_add_invest_profile_tab() {
     if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
         return;
     }
     bp_core_new_nav_item( [
         'name'                    => __( 'Contracts', 'gend-society' ),
         'slug'                    => 'invest',
-        'screen_function'         => 'gs_invest_profile_screen',
+        'screen_function'         => 'gend_society_invest_profile_screen',
         'position'                => 33,
         'item_css_id'             => 'invest',
         'show_for_displayed_user' => true,
     ] );
 }
 
-function gs_invest_profile_screen() {
+function gend_society_invest_profile_screen() {
     add_action( 'bp_template_title', '__return_empty_string' );
-    add_action( 'bp_template_content', 'gs_invest_profile_screen_content' );
+    add_action( 'bp_template_content', 'gend_society_invest_profile_screen_content' );
     bp_core_load_template( 'members/single/plugins' );
 }
 
@@ -1060,7 +1060,7 @@ function gs_invest_profile_screen() {
  * (earned this month / last payout / lifetime / next payout). Rendered via the
  * contracts-and-payments yDGEN display classes.
  */
-function gci_render_currency_hold( $uid ) {
+function gend_society_render_currency_hold( $uid ) {
     $uid = (int) $uid;
     if ( ! class_exists( 'Gend_CP_yDGEN_Display' ) ) {
         return '<div class="gci-placeholder"><h3>' . esc_html__( 'Currency Hold', 'gend-society' ) . '</h3><p>' . esc_html__( 'The DGEN Accelerator is not available.', 'gend-society' ) . '</p></div>';
@@ -1082,9 +1082,9 @@ function gci_render_currency_hold( $uid ) {
         Gend_CP_yDGEN_Return_Display::render_yield_summary( $uid );
         $out .= ob_get_clean();
     }
-    $out .= gci_render_currency_hold_optin( $uid );
-    $out .= gci_render_currency_hold_allocation( $uid );
-    $out .= gci_render_currency_hold_horizons();
+    $out .= gend_society_render_currency_hold_optin( $uid );
+    $out .= gend_society_render_currency_hold_allocation( $uid );
+    $out .= gend_society_render_currency_hold_horizons();
     $out .= '</div>';
     return $out;
 }
@@ -1094,7 +1094,7 @@ function gci_render_currency_hold( $uid ) {
  * Gend_CP_Strategy_Opt_In and renders a toggle form that posts to our
  * admin-post handler. Members can opt into "best" mode (auto-track champion).
  */
-function gci_render_currency_hold_optin( $uid ) {
+function gend_society_render_currency_hold_optin( $uid ) {
     if ( ! class_exists( 'Gend_CP_Strategy_Opt_In' ) ) return '';
     $uid = (int) $uid;
     if ( ! $uid ) return '';
@@ -1131,14 +1131,14 @@ function gci_render_currency_hold_optin( $uid ) {
         }
         $out .= '</div>';
         $out .= '<form class="gci-ch-optin__form" method="post" action="' . $action_url . '">'
-            . '<input type="hidden" name="action" value="gci_currency_hold_toggle">'
+            . '<input type="hidden" name="action" value="gend_society_currency_hold_toggle">'
             . '<input type="hidden" name="mode" value="opt_out">'
             . '<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">'
             . '<button type="submit" class="gci-ch-optin__btn gci-ch-optin__btn--off">' . esc_html__( 'Turn OFF Auto Investor', 'gend-society' ) . '</button>'
             . '</form>';
     } else {
         $out .= '<form class="gci-ch-optin__form" method="post" action="' . $action_url . '">'
-            . '<input type="hidden" name="action" value="gci_currency_hold_toggle">'
+            . '<input type="hidden" name="action" value="gend_society_currency_hold_toggle">'
             . '<input type="hidden" name="mode" value="opt_in_best">'
             . '<input type="hidden" name="_wpnonce" value="' . esc_attr( $nonce ) . '">'
             . '<button type="submit" class="gci-ch-optin__btn gci-ch-optin__btn--on">' . esc_html__( 'Turn ON Auto Investor', 'gend-society' ) . '</button>'
@@ -1154,7 +1154,7 @@ function gci_render_currency_hold_optin( $uid ) {
  * percentage. v1 is read-only — member custom weights are gated on backend
  * routing infrastructure not yet shipped.
  */
-function gci_render_currency_hold_allocation( $uid ) {
+function gend_society_render_currency_hold_allocation( $uid ) {
     if ( ! class_exists( 'Gend_CP_Champion_Strategy' ) ) return '';
     $current = Gend_CP_Champion_Strategy::current();
     $weights = isset( $current['weights'] ) && is_array( $current['weights'] ) ? $current['weights'] : array();
@@ -1202,7 +1202,7 @@ function gci_render_currency_hold_allocation( $uid ) {
  * annualized rate — long horizons cannot reflect live performance since the
  * strategy has not existed that long.
  */
-function gci_render_currency_hold_horizons() {
+function gend_society_render_currency_hold_horizons() {
     if ( ! class_exists( 'Gend_CP_Champion_Strategy' ) ) return '';
     $current = Gend_CP_Champion_Strategy::current();
 
@@ -1259,7 +1259,7 @@ function gci_render_currency_hold_horizons() {
 /**
  * admin-post handler for Currency Hold Auto Investor opt-in/out toggle.
  */
-function gci_currency_hold_toggle_handler() {
+function gend_society_currency_hold_toggle_handler() {
     if ( ! is_user_logged_in() ) { auth_redirect(); exit; }
     $uid = (int) get_current_user_id();
     if ( ! isset( $_POST['_wpnonce'] ) || ! wp_verify_nonce( wp_unslash( $_POST['_wpnonce'] ), 'gci_currency_hold_toggle_' . $uid ) ) {
@@ -1281,7 +1281,7 @@ function gci_currency_hold_toggle_handler() {
     }
     exit;
 }
-add_action( 'admin_post_gci_currency_hold_toggle', 'gci_currency_hold_toggle_handler' );
+add_action( 'admin_post_gend_society_currency_hold_toggle', 'gend_society_currency_hold_toggle_handler' );
 
 /**
  * AJAX handler for the Auto Investor opt-in toggle. Same input contract as the
@@ -1289,7 +1289,7 @@ add_action( 'admin_post_gci_currency_hold_toggle', 'gci_currency_hold_toggle_han
  * card HTML so the client can replace it in-place without a full page reload
  * (which would kick the user back to the default Fund sub-tab).
  */
-function gci_currency_hold_toggle_ajax_handler() {
+function gend_society_currency_hold_toggle_ajax_handler() {
     if ( ! is_user_logged_in() ) {
         wp_send_json_error( array( 'message' => 'not_logged_in' ), 401 );
     }
@@ -1306,15 +1306,15 @@ function gci_currency_hold_toggle_ajax_handler() {
     } else {
         wp_send_json_error( array( 'message' => 'bad_mode' ), 400 );
     }
-    wp_send_json_success( array( 'html' => gci_render_currency_hold_optin( $uid ) ) );
+    wp_send_json_success( array( 'html' => gend_society_render_currency_hold_optin( $uid ) ) );
 }
-add_action( 'wp_ajax_gci_currency_hold_toggle', 'gci_currency_hold_toggle_ajax_handler' );
+add_action( 'wp_ajax_gend_society_currency_hold_toggle', 'gend_society_currency_hold_toggle_ajax_handler' );
 
 /**
  * Growth Investments tab — a marketplace list of OPEN growth-investment funding
  * requests across every web app (group) that has put one out to market.
  */
-function gci_render_growth_market() {
+function gend_society_render_growth_market() {
     if ( ! class_exists( 'PSOO_Funding_Requests' ) || ! function_exists( 'groups_get_groupmeta' ) ) {
         return '<div class="gci-placeholder"><h3>' . esc_html__( 'Growth Investments', 'gend-society' ) . '</h3><p>' . esc_html__( 'Unavailable.', 'gend-society' ) . '</p></div>';
     }
@@ -1366,7 +1366,7 @@ function gci_render_growth_market() {
  * live progress bar (raised / goal DGEN, funded_pct). Investor CTA links to the
  * connected web app's group where the invest flow is wired.
  */
-function gci_render_project_market() {
+function gend_society_render_project_market() {
     if ( ! class_exists( 'PSOO_Funding_Requests' ) || ! function_exists( 'groups_get_groupmeta' ) ) {
         return '<div class="gci-placeholder"><h3>' . esc_html__( 'Project Investments', 'gend-society' ) . '</h3><p>' . esc_html__( 'Unavailable.', 'gend-society' ) . '</p></div>';
     }
@@ -1424,7 +1424,7 @@ function gci_render_project_market() {
  * Rendered ABOVE the Growth marketplace on the Growth tab. Gated on
  * GS_MARKETING_FUND_POOL_PUBLIC; DOM-absent when off. No empty state.
  */
-function gci_render_marketing_fund_pool_summary( $viewer_id ) {
+function gend_society_render_marketing_fund_pool_summary( $viewer_id ) {
     if ( ! defined( 'GS_MARKETING_FUND_POOL_PUBLIC' ) || ! GS_MARKETING_FUND_POOL_PUBLIC ) {
         return '';
     }
@@ -1535,7 +1535,7 @@ function gci_render_marketing_fund_pool_summary( $viewer_id ) {
  * Rendered above the tab strip so it's discoverable regardless of which
  * sub-tab is active. No-op when the viewer admins zero connected web apps.
  */
-function gci_render_web_apps_you_manage( $viewer_id ) {
+function gend_society_render_web_apps_you_manage( $viewer_id ) {
     if ( ! function_exists( 'groups_get_user_groups' ) || ! function_exists( 'groups_is_user_admin' ) || ! function_exists( 'groups_get_groupmeta' ) ) {
         return '';
     }
@@ -1593,7 +1593,7 @@ function gci_render_web_apps_you_manage( $viewer_id ) {
         . '</section>';
 }
 
-function gs_invest_profile_screen_content() {
+function gend_society_invest_profile_screen_content() {
     if ( ! bp_is_my_profile() ) {
         echo '<p>' . esc_html__( 'This is private.', 'gend-society' ) . '</p>';
         return;
@@ -1720,7 +1720,7 @@ function gs_invest_profile_screen_content() {
                 <button type="submit" class="gci-topup-btn"><?php esc_html_e( 'Top Up DGEN', 'gend-society' ); ?></button>
             </form>
         </div>
-        <?php echo gci_render_web_apps_you_manage( $topup_uid ); // phpcs:ignore ?>
+        <?php echo gend_society_render_web_apps_you_manage( $topup_uid ); // phpcs:ignore ?>
         <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" checked>
         <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
@@ -1736,11 +1736,11 @@ function gs_invest_profile_screen_content() {
         <div class="gci-panel gci-panel--fund" role="tabpanel">
             <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
-        <div class="gci-panel gci-panel--hold" role="tabpanel"><?php echo gci_render_currency_hold( (int) bp_displayed_user_id() ); // phpcs:ignore ?></div>
-        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gci_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gci_render_growth_market(); // phpcs:ignore ?></div>
-        <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gci_render_project_market(); // phpcs:ignore ?></div>
+        <div class="gci-panel gci-panel--hold" role="tabpanel"><?php echo gend_society_render_currency_hold( (int) bp_displayed_user_id() ); // phpcs:ignore ?></div>
+        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gend_society_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gend_society_render_growth_market(); // phpcs:ignore ?></div>
+        <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gend_society_render_project_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--completed" role="tabpanel">
-            <?php if ( function_exists( 'gdc_render_completed_contracts_panel' ) ) gdc_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
+            <?php if ( function_exists( 'gend_society_render_completed_contracts_panel' ) ) gend_society_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
         </div>
     </div>
     <?php
@@ -1750,8 +1750,8 @@ function gs_invest_profile_screen_content() {
 // component) so they are NOT stripped/neutralized by bp_template_content on this
 // screen (the inline copies inside the screen content are not honored there).
 // Tab switching is by INDEX so it survives even if data-attributes are altered.
-add_action( 'wp_footer', 'gs_invest_footer_assets', 50 );
-function gs_invest_footer_assets() {
+add_action( 'wp_footer', 'gend_society_invest_footer_assets', 50 );
+function gend_society_invest_footer_assets() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
     if ( ! function_exists( 'bp_current_component' ) || bp_current_component() !== 'invest' ) return;
     ?>
@@ -2121,7 +2121,7 @@ function gs_invest_footer_assets() {
     // The yDGEN (Currency Hold) display uses contracts-and-payments styling.
     $ydgen_css = WP_CONTENT_DIR . '/plugins/contracts-and-payments/assets/css/ydgen-return.css';
     if ( file_exists( $ydgen_css ) ) {
-        echo '<link rel="stylesheet" href="' . esc_url( content_url( '/plugins/contracts-and-payments/assets/css/ydgen-return.css' ) ) . '?v=' . GS_VERSION . '.' . filemtime( $ydgen_css ) . '">';
+        echo '<link rel="stylesheet" href="' . esc_url( content_url( '/plugins/contracts-and-payments/assets/css/ydgen-return.css' ) ) . '?v=' . GEND_SOCIETY_VERSION . '.' . filemtime( $ydgen_css ) . '">';
     }
     ?>
     <script id="gci-js">
@@ -2157,7 +2157,7 @@ function gs_invest_footer_assets() {
                 if (btn) { btn.disabled = true; btn.dataset.origLabel = btn.textContent; btn.textContent = '…'; }
                 if (card) card.classList.add('gci-ch-optin--busy');
                 var fd = new FormData(form);
-                // Preserve action=gci_currency_hold_toggle so wp_ajax_ routes here.
+                // Preserve action=gend_society_currency_hold_toggle so wp_ajax_ routes here.
                 fetch(GCI_AJAX_URL, { method: 'POST', body: fd, credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
                     .then(function (res) {
@@ -2241,7 +2241,7 @@ function gs_invest_footer_assets() {
     <?php
 }
 
-function gs_wallet_profile_screen_content() {
+function gend_society_wallet_profile_screen_content() {
     // Only show if it is the current user's profile
     if ( ! bp_is_my_profile() ) {
         echo '<p>' . esc_html__( 'This wallet is private.', 'gend-society' ) . '</p>';
@@ -2359,7 +2359,7 @@ function gs_wallet_profile_screen_content() {
     
     // Direct CSS injection as a fallback to ensure styling is applied even if enqueue fails
     $gs_wallet_css     = WP_PLUGIN_DIR . '/reward-programs/assets/frontend-wallet.css';
-    $gs_wallet_css_ver = GS_VERSION . '.' . ( file_exists( $gs_wallet_css ) ? filemtime( $gs_wallet_css ) : '0' );
+    $gs_wallet_css_ver = GEND_SOCIETY_VERSION . '.' . ( file_exists( $gs_wallet_css ) ? filemtime( $gs_wallet_css ) : '0' );
     $css_url = add_query_arg( 'ver', $gs_wallet_css_ver, plugins_url( 'reward-programs/assets/frontend-wallet.css' ) );
     echo '<link rel="stylesheet" id="gend-wallet-frontend-profile-css" href="' . esc_url( $css_url ) . '" type="text/css" media="all" />';
     
@@ -2388,8 +2388,8 @@ function gs_wallet_profile_screen_content() {
 }
 
 // Make the .member-wallet body class authoritative server-side for the wallet tab.
-add_filter( 'body_class', 'gs_wallet_body_class' );
-function gs_wallet_body_class( $classes ) {
+add_filter( 'body_class', 'gend_society_wallet_body_class' );
+function gend_society_wallet_body_class( $classes ) {
     if ( function_exists( 'bp_is_user' ) && bp_is_user()
          && function_exists( 'bp_current_component' ) && bp_current_component() === 'member-wallet' ) {
         $classes[] = 'member-wallet';
@@ -2407,8 +2407,8 @@ function gs_wallet_body_class( $classes ) {
 // Hooks: bp_before_member_groups_content / bp_after_member_groups_content
 // (defined in bp-legacy members/single/groups.php, case 'my-groups').
 
-add_action( 'bp_before_member_groups_content', 'gs_member_groups_tabs_open', 1 );
-add_action( 'bp_after_member_groups_content',  'gs_member_groups_tabs_close', 99 );
+add_action( 'bp_before_member_groups_content', 'gend_society_member_groups_tabs_open', 1 );
+add_action( 'bp_after_member_groups_content',  'gend_society_member_groups_tabs_close', 99 );
 
 /**
  * Render one page of a member's BP activity as glass cards. Used by the
@@ -2416,7 +2416,7 @@ add_action( 'bp_after_member_groups_content',  'gs_member_groups_tabs_close', 99
  * gs_profile_activity_page admin-ajax handler (Load More). Returns the
  * number of items rendered.
  */
-function gs_render_profile_activity_items( $user_id, $page = 1, $per_page = 20 ) {
+function gend_society_render_profile_activity_items( $user_id, $page = 1, $per_page = 20 ) {
     if ( ! function_exists( 'bp_has_activities' ) ) {
         return 0;
     }
@@ -2453,7 +2453,7 @@ function gs_render_profile_activity_items( $user_id, $page = 1, $per_page = 20 )
  * viewable by anyone (nopriv included); hidden activity only for the
  * member themselves (show_hidden gate inside the renderer).
  */
-function gs_profile_activity_page_ajax() {
+function gend_society_profile_activity_page_ajax() {
     check_ajax_referer( 'gs_profile_activity', 'nonce' );
     $user_id = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
     $page    = isset( $_POST['page'] ) ? max( 1, absint( $_POST['page'] ) ) : 1;
@@ -2461,17 +2461,17 @@ function gs_profile_activity_page_ajax() {
         wp_send_json_error();
     }
     ob_start();
-    $count = gs_render_profile_activity_items( $user_id, $page, 20 );
+    $count = gend_society_render_profile_activity_items( $user_id, $page, 20 );
     wp_send_json_success( array(
         'html'  => ob_get_clean(),
         'count' => $count,
         'more'  => $count >= 20,
     ) );
 }
-add_action( 'wp_ajax_gs_profile_activity_page', 'gs_profile_activity_page_ajax' );
-add_action( 'wp_ajax_nopriv_gs_profile_activity_page', 'gs_profile_activity_page_ajax' );
+add_action( 'wp_ajax_gend_society_profile_activity_page', 'gend_society_profile_activity_page_ajax' );
+add_action( 'wp_ajax_nopriv_gend_society_profile_activity_page', 'gend_society_profile_activity_page_ajax' );
 
-function gs_member_groups_tabs_open() {
+function gend_society_member_groups_tabs_open() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
         return;
     }
@@ -3029,7 +3029,7 @@ function gs_member_groups_tabs_open() {
                     data-gs-panel="projects"
                     role="tab"
                     aria-selected="<?php echo 'projects' === $gs_default_panel ? 'true' : 'false'; ?>">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('projects') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('projects') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'My Projects', 'gend-society' ); ?></span>
             </button>
             <?php if ( $gs_show_memberships ) : ?>
@@ -3038,7 +3038,7 @@ function gs_member_groups_tabs_open() {
                     data-gs-panel="memberships"
                     role="tab"
                     aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('memberships') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('memberships') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Memberships', 'gend-society' ); ?></span>
             </button>
             <?php endif; ?>
@@ -3047,7 +3047,7 @@ function gs_member_groups_tabs_open() {
                     data-gs-panel="groups"
                     role="tab"
                     aria-selected="<?php echo 'groups' === $gs_default_panel ? 'true' : 'false'; ?>">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('groups') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('groups') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Hubs', 'gend-society' ); ?></span>
             </button>
             <button type="button"
@@ -3055,7 +3055,7 @@ function gs_member_groups_tabs_open() {
                     data-gs-panel="activity"
                     role="tab"
                     aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('overview') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('overview') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Activity', 'gend-society' ); ?></span>
             </button>
         </div>
@@ -3068,7 +3068,7 @@ function gs_member_groups_tabs_open() {
             // the BP profile we have to inject it manually, otherwise the
             // membership card renders unstyled (faded text, broken layout).
             $gs_shared_css_path = WP_PLUGIN_DIR . '/vendor-app-manager/assets/css/gdc-customer-shared.css';
-            $gs_shared_css_ver  = GS_VERSION . '.' . ( file_exists( $gs_shared_css_path ) ? filemtime( $gs_shared_css_path ) : '0' );
+            $gs_shared_css_ver  = GEND_SOCIETY_VERSION . '.' . ( file_exists( $gs_shared_css_path ) ? filemtime( $gs_shared_css_path ) : '0' );
             $gs_shared_css      = add_query_arg( 'ver', $gs_shared_css_ver, plugins_url( 'vendor-app-manager/assets/css/gdc-customer-shared.css' ) );
             echo '<link rel="stylesheet" id="gdc-customer-shared-bp-profile" href="' . esc_url( $gs_shared_css ) . '" type="text/css" media="all" />';
             gdc_render_account_memberships_endpoint();
@@ -3117,7 +3117,7 @@ function gs_member_groups_tabs_open() {
     <?php
 }
 
-function gs_member_groups_tabs_close() {
+function gend_society_member_groups_tabs_close() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
         return;
     }
@@ -3432,16 +3432,16 @@ function gs_member_groups_tabs_close() {
 // ?gdc_tab_only=1, and the page renders only the activity stream (no header,
 // no profile nav, no footer, no cover). Keeps the iframe lightweight and
 // avoids duplicate profile chrome inside a chrome-having parent.
-add_filter( 'body_class', 'gdc_tab_only_body_class' );
-function gdc_tab_only_body_class( $classes ) {
+add_filter( 'body_class', 'gend_society_tab_only_body_class' );
+function gend_society_tab_only_body_class( $classes ) {
     if ( ! empty( $_GET['gdc_tab_only'] ) ) {
         $classes[] = 'gdc-tab-only';
     }
     return $classes;
 }
 
-add_action( 'wp_head', 'gdc_tab_only_strip_chrome', 999 );
-function gdc_tab_only_strip_chrome() {
+add_action( 'wp_head', 'gend_society_tab_only_strip_chrome', 999 );
+function gend_society_tab_only_strip_chrome() {
     if ( empty( $_GET['gdc_tab_only'] ) ) return;
     ?>
     <style id="gdc-tab-only-strip">
@@ -3631,16 +3631,16 @@ add_filter( 'show_admin_bar', function ( $show ) {
     return empty( $_GET['gdc_tab_only'] ) ? $show : false;
 }, 60 );
 
-add_action( 'wp', 'gdc_tab_only_lighten', 1 );
-function gdc_tab_only_lighten() {
+add_action( 'wp', 'gend_society_tab_only_lighten', 1 );
+function gend_society_tab_only_lighten() {
     if ( empty( $_GET['gdc_tab_only'] ) ) return;
     // Heavy per-request renders (each does its own queries).
-    remove_action( 'youzify_profile_before_header', 'gdc_render_profile_header', 1 );
-    remove_action( 'bp_before_member_home_content', 'gdc_inject_profile_page_embed', 1 );
-    remove_action( 'wp_footer', 'gdc_render_wallet_source', 5 );
-    remove_action( 'wp_footer', 'gs_render_frontend_bar', 5 );
-    remove_action( 'wp_footer', 'gs_inject_mini_cart', 20 );
-    remove_action( 'wp_footer', 'gs_invest_footer_assets', 50 );
+    remove_action( 'youzify_profile_before_header', 'gend_society_render_profile_header', 1 );
+    remove_action( 'bp_before_member_home_content', 'gend_society_inject_profile_page_embed', 1 );
+    remove_action( 'wp_footer', 'gend_society_render_wallet_source', 5 );
+    remove_action( 'wp_footer', 'gend_society_render_frontend_bar', 5 );
+    remove_action( 'wp_footer', 'gend_society_inject_mini_cart', 20 );
+    remove_action( 'wp_footer', 'gend_society_invest_footer_assets', 50 );
     // Chat widgets (LEO + email-manager) — dead weight inside an iframe;
     // the parent page already has both.
     remove_action( 'wp_footer', 'aipa_widget_render_footer', 99999 );
@@ -3648,18 +3648,18 @@ function gdc_tab_only_lighten() {
     remove_action( 'wp_enqueue_scripts', 'aipa_widget_load_assets', 10 );
     remove_action( 'wp_enqueue_scripts', 'em_chat_widget_enqueue', 20 );
     remove_action( 'wp_footer', 'em_chat_widget_mount', 50 );
-    if ( class_exists( 'GS_AI_Widget' ) ) {
-        remove_action( 'wp_footer', array( 'GS_AI_Widget', 'render_footer' ), 99999 );
-        remove_action( 'wp_enqueue_scripts', array( 'GS_AI_Widget', 'enqueue' ), 5 );
+    if ( class_exists( 'Gend_Society_AI_Widget' ) ) {
+        remove_action( 'wp_footer', array( 'Gend_Society_AI_Widget', 'render_footer' ), 99999 );
+        remove_action( 'wp_enqueue_scripts', array( 'Gend_Society_AI_Widget', 'enqueue' ), 5 );
     }
 }
 
 // Asset diet — same pattern as gdc_topup_embed_trim_assets but keeping the
 // BuddyPress/Youzify stack the feed runs on. Runs twice: normal enqueue
 // pass + right before footer prints (late block/render-time enqueues).
-add_action( 'wp_enqueue_scripts', 'gdc_tab_only_trim_assets', 9999 );
-add_action( 'wp_print_footer_scripts', 'gdc_tab_only_trim_assets', 1 );
-function gdc_tab_only_trim_assets() {
+add_action( 'wp_enqueue_scripts', 'gend_society_tab_only_trim_assets', 9999 );
+add_action( 'wp_print_footer_scripts', 'gend_society_tab_only_trim_assets', 1 );
+function gend_society_tab_only_trim_assets() {
     if ( empty( $_GET['gdc_tab_only'] ) ) return;
     $kill = array( 'aipa-widget', 'leo-flow', 'leo-widget', 'gs-frontend-bar', 'gs-template-modal', 'gs-site-editor', 'gs-animation', 'em-chat', 'em-inbox', 'gdc-membership', 'membership-system', 'gdc-customer-shared', 'woocommerce', 'wc-', 'wc_', 'elementor', 'sourcebuster' );
     $keep = array( 'youzify', 'yz-', 'yzpr', 'bp-', 'buddypress', 'jquery', 'wp-', 'dashicons', 'admin-bar' );
@@ -3685,8 +3685,8 @@ function gdc_tab_only_trim_assets() {
 // activity post. The modal centers itself in the VISIBLE part of the
 // auto-sized iframe by reading the parent viewport (same origin), instead of
 // landing at the top of the feed.
-add_action( 'wp_footer', 'gdc_tab_only_share_modal', 20 );
-function gdc_tab_only_share_modal() {
+add_action( 'wp_footer', 'gend_society_tab_only_share_modal', 20 );
+function gend_society_tab_only_share_modal() {
     if ( empty( $_GET['gdc_tab_only'] ) || ! is_user_logged_in() ) return;
     if ( ! function_exists( 'bp_is_activity_component' ) || ! bp_is_activity_component() ) return;
     ?>
@@ -3780,7 +3780,7 @@ function gdc_tab_only_share_modal() {
             if ( loadedKey === key ) return;
             loadedKey = key;
             body.innerHTML = '<div class="gdc-act-share__loading"><span class="gdc-act-share__spin"></span><?php echo esc_js( __( 'Loading share options…', 'gend-society' ) ); ?></div>';
-            fetch( ajax + '?action=gs_invite_panel_fragment&share_url=' + encodeURIComponent( url ) + '&share_title=' + encodeURIComponent( title || '' ), { credentials: 'same-origin' } )
+            fetch( ajax + '?action=gend_society_invite_panel_fragment&share_url=' + encodeURIComponent( url ) + '&share_title=' + encodeURIComponent( title || '' ), { credentials: 'same-origin' } )
                 .then( function ( r ) { return r.text(); } )
                 .then( function ( html ) {
                     body.innerHTML = html;
@@ -3846,10 +3846,10 @@ function gdc_tab_only_share_modal() {
 // directly, so guaranteed to fire regardless of which BP template stack is active).
 // Guards: bp_is_user_friends() ensures we only wrap the friends/connections page.
 
-add_action( 'bp_before_member_body', 'gs_member_friends_tabs_open', 1 );
-add_action( 'bp_after_member_body',  'gs_member_friends_tabs_close', 99 );
+add_action( 'bp_before_member_body', 'gend_society_member_friends_tabs_open', 1 );
+add_action( 'bp_after_member_body',  'gend_society_member_friends_tabs_close', 99 );
 
-function gs_member_friends_tabs_open() {
+function gend_society_member_friends_tabs_open() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
         return;
     }
@@ -4145,7 +4145,7 @@ function gs_member_friends_tabs_open() {
                     data-gs-panel="connections"
                     role="tab"
                     aria-selected="true">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('connections') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('connections') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'My Connections', 'gend-society' ); ?></span>
             </button>
             <button type="button"
@@ -4153,7 +4153,7 @@ function gs_member_friends_tabs_open() {
                     data-gs-panel="referral-sales"
                     role="tab"
                     aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('referral-sales') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('referral-sales') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Referral Sales', 'gend-society' ); ?></span>
             </button>
             <button type="button"
@@ -4161,7 +4161,7 @@ function gs_member_friends_tabs_open() {
                     data-gs-panel="sales-team"
                     role="tab"
                     aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('sales-team') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('sales-team') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Sales Team', 'gend-society' ); ?></span>
             </button>
             <button type="button"
@@ -4169,7 +4169,7 @@ function gs_member_friends_tabs_open() {
                     data-gs-panel="invite"
                     role="tab"
                     aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gdc_get_profile_nav_icon') ? gdc_get_profile_nav_icon('invite') : ''; ?></span>
+                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('invite') : ''; ?></span>
                 <span class="gs-tab-label"><?php esc_html_e( 'Invite', 'gend-society' ); ?></span>
             </button>
         </div>
@@ -4178,7 +4178,7 @@ function gs_member_friends_tabs_open() {
     <?php
 }
 
-function gs_member_friends_tabs_close() {
+function gend_society_member_friends_tabs_close() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
         return;
     }
@@ -4215,8 +4215,8 @@ function gs_member_friends_tabs_close() {
 
         <div class="gs-member-friends-panel" data-gs-panel="invite" role="tabpanel">
             <?php
-            if ( function_exists( 'gs_invite_render_panel' ) ) {
-                gs_invite_render_panel();
+            if ( function_exists( 'gend_society_invite_render_panel' ) ) {
+                gend_society_invite_render_panel();
             } else {
                 echo '<p class="psoo-pm-empty">' . esc_html__( 'Invite UI not available.', 'gend-society' ) . '</p>';
             }
@@ -4339,15 +4339,15 @@ function gs_member_friends_tabs_close() {
 }
 
 // ─── Enqueue wallet assets for the BuddyPress profile wallet tab ──────────────
-add_action( 'wp_enqueue_scripts', 'gs_enqueue_wallet_profile_assets', 20 );
-function gs_enqueue_wallet_profile_assets() {
+add_action( 'wp_enqueue_scripts', 'gend_society_enqueue_wallet_profile_assets', 20 );
+function gend_society_enqueue_wallet_profile_assets() {
     // If we are on a BuddyPress profile and the URL contains member-wallet
     if ( function_exists( 'bp_is_user' ) && bp_is_user() && ( bp_is_current_component( 'member-wallet' ) || strpos( $_SERVER['REQUEST_URI'], '/member-wallet' ) !== false ) ) {
         // Enqueue the frontend wallet assets from reward-programs
         $url           = plugins_url( 'reward-programs/' );
         $gs_wallet_dir = WP_PLUGIN_DIR . '/reward-programs/assets/';
-        $gs_wallet_css_ver = GS_VERSION . '.' . ( file_exists( $gs_wallet_dir . 'frontend-wallet.css' ) ? filemtime( $gs_wallet_dir . 'frontend-wallet.css' ) : '0' );
-        $gs_wallet_js_ver  = GS_VERSION . '.' . ( file_exists( $gs_wallet_dir . 'frontend-wallet.js' ) ? filemtime( $gs_wallet_dir . 'frontend-wallet.js' ) : '0' );
+        $gs_wallet_css_ver = GEND_SOCIETY_VERSION . '.' . ( file_exists( $gs_wallet_dir . 'frontend-wallet.css' ) ? filemtime( $gs_wallet_dir . 'frontend-wallet.css' ) : '0' );
+        $gs_wallet_js_ver  = GEND_SOCIETY_VERSION . '.' . ( file_exists( $gs_wallet_dir . 'frontend-wallet.js' ) ? filemtime( $gs_wallet_dir . 'frontend-wallet.js' ) : '0' );
         wp_enqueue_style( 'gend-wallet-frontend', $url . 'assets/frontend-wallet.css', [], $gs_wallet_css_ver );
         wp_enqueue_script( 'gend-wallet-frontend', $url . 'assets/frontend-wallet.js', [ 'jquery' ], $gs_wallet_js_ver, true );
         

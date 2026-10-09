@@ -54,7 +54,7 @@ class Gend_GS_Collab_Schema {
 	// idempotency) + gs_collab_markets.resolved_outcome/resolved_at/paid_at (resolve metadata).
 	// 1.6.0 (Phase 89-01): gs_collab_outbox (container push retry) + gs_collab_federated_business (hub contribute-up shadow).
 	const DB_VERSION     = '1.6.0';
-	const DB_VERSION_OPT = 'gs_collab_db_version';
+	const DB_VERSION_OPT = 'gend_society_collab_db_version';
 
 	/**
 	 * Wire all hooks. Called from gend-society.php after the require_once
@@ -75,7 +75,7 @@ class Gend_GS_Collab_Schema {
 		// path — passed in via GS_DIR since __FILE__ here resolves to the
 		// include, not the main plugin file.
 		register_activation_hook(
-			GS_DIR . 'gend-society.php',
+			GEND_SOCIETY_DIR . 'gend-society.php',
 			array( __CLASS__, 'install_all_sites' )
 		);
 	}

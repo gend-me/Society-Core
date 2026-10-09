@@ -31,9 +31,9 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'gs_gcloud_cfg' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_cfg' ) ) {
 
-    function gs_gcloud_cfg( $key ) {
+    function gend_society_gcloud_cfg( $key ) {
         $const = 'GS_GCLOUD_' . strtoupper( $key );
         if ( defined( $const ) ) return (string) constant( $const );
         $envk = 'GS_GCLOUD_' . strtoupper( $key );
@@ -41,11 +41,11 @@ if ( ! function_exists( 'gs_gcloud_cfg' ) ) {
         return $v === false ? '' : (string) $v;
     }
 
-    function gs_gcloud_redirect_uri() {
+    function gend_society_gcloud_redirect_uri() {
         return rest_url( 'gs/v1/web-shell/gcloud/callback' );
     }
 
-    function gs_gcloud_scopes() {
+    function gend_society_gcloud_scopes() {
         // Same scope bundle gcloud's own auth flow asks for so any
         // command the user runs in the Web Shell terminal has the
         // perms they'd have logging in via the CLI directly.
@@ -63,10 +63,10 @@ if ( ! function_exists( 'gs_gcloud_cfg' ) ) {
 
 /* ────────────────── encryption ────────────────── */
 
-if ( ! function_exists( 'gs_gcloud_encrypt' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_encrypt' ) ) {
 
-    function gs_gcloud_encrypt( $plain ) {
-        $keyHex = gs_gcloud_cfg( 'creds_key' );
+    function gend_society_gcloud_encrypt( $plain ) {
+        $keyHex = gend_society_gcloud_cfg( 'creds_key' );
         if ( $keyHex === '' || ! ctype_xdigit( $keyHex ) || strlen( $keyHex ) !== 64 ) {
             return new WP_Error( 'gs_gcloud_no_key', 'GS_GCLOUD_CREDS_KEY missing or not 32 bytes hex.' );
         }
@@ -78,8 +78,8 @@ if ( ! function_exists( 'gs_gcloud_encrypt' ) ) {
         return base64_encode( $iv . $tag . $ct );
     }
 
-    function gs_gcloud_decrypt( $b64 ) {
-        $keyHex = gs_gcloud_cfg( 'creds_key' );
+    function gend_society_gcloud_decrypt( $b64 ) {
+        $keyHex = gend_society_gcloud_cfg( 'creds_key' );
         if ( $keyHex === '' || strlen( $keyHex ) !== 64 ) return new WP_Error( 'gs_gcloud_no_key', 'GS_GCLOUD_CREDS_KEY missing.' );
         $key = hex2bin( $keyHex );
         $bin = base64_decode( (string) $b64, true );
@@ -95,27 +95,27 @@ if ( ! function_exists( 'gs_gcloud_encrypt' ) ) {
 
 /* ────────────────── REST routes ────────────────── */
 
-if ( ! function_exists( 'gs_gcloud_register_rest' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_register_rest' ) ) {
 
-    function gs_gcloud_register_rest() {
+    function gend_society_gcloud_register_rest() {
         register_rest_route( 'gs/v1', '/web-shell/gcloud/start', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_gcloud_rest_start',
+            'callback'            => 'gend_society_gcloud_rest_start',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
         register_rest_route( 'gs/v1', '/web-shell/gcloud/callback', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_gcloud_rest_callback',
+            'callback'            => 'gend_society_gcloud_rest_callback',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
         register_rest_route( 'gs/v1', '/web-shell/gcloud/status', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_gcloud_rest_status',
+            'callback'            => 'gend_society_gcloud_rest_status',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
         register_rest_route( 'gs/v1', '/web-shell/gcloud/disconnect', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_gcloud_rest_disconnect',
+            'callback'            => 'gend_society_gcloud_rest_disconnect',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
         // Internal: PTY service fetches a user's ADC at session start.
@@ -125,27 +125,27 @@ if ( ! function_exists( 'gs_gcloud_register_rest' ) ) {
         // and we verify here.
         register_rest_route( 'gs/v1', '/web-shell/gcloud/adc', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_gcloud_rest_adc',
+            'callback'            => 'gend_society_gcloud_rest_adc',
             'permission_callback' => '__return_true', // verified inside via service JWT
         ) );
     }
-    add_action( 'rest_api_init', 'gs_gcloud_register_rest' );
+    add_action( 'rest_api_init', 'gend_society_gcloud_register_rest' );
 }
 
-if ( ! function_exists( 'gs_gcloud_rest_start' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_rest_start' ) ) {
 
-    function gs_gcloud_rest_start() {
-        $client_id = gs_gcloud_cfg( 'oauth_client_id' );
+    function gend_society_gcloud_rest_start() {
+        $client_id = gend_society_gcloud_cfg( 'oauth_client_id' );
         if ( $client_id === '' ) {
             return new WP_Error( 'gs_gcloud_no_client', 'GS_GCLOUD_OAUTH_CLIENT_ID not configured on the hub.', array( 'status' => 503 ) );
         }
         $state = wp_generate_password( 24, false, false );
-        set_transient( 'gs_gcloud_state_' . get_current_user_id(), $state, 600 );
+        set_transient( 'gend_society_gcloud_state_' . get_current_user_id(), $state, 600 );
         $authorize = add_query_arg( array(
             'client_id'              => $client_id,
-            'redirect_uri'           => gs_gcloud_redirect_uri(),
+            'redirect_uri'           => gend_society_gcloud_redirect_uri(),
             'response_type'          => 'code',
-            'scope'                  => gs_gcloud_scopes(),
+            'scope'                  => gend_society_gcloud_scopes(),
             'access_type'            => 'offline',
             'prompt'                 => 'consent',           // force refresh-token reissue
             'include_granted_scopes' => 'true',
@@ -155,28 +155,28 @@ if ( ! function_exists( 'gs_gcloud_rest_start' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_gcloud_rest_callback' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_rest_callback' ) ) {
 
-    function gs_gcloud_rest_callback( WP_REST_Request $req ) {
+    function gend_society_gcloud_rest_callback( WP_REST_Request $req ) {
         $code  = (string) $req->get_param( 'code' );
         $state = (string) $req->get_param( 'state' );
         $uid   = get_current_user_id();
         if ( $code === '' ) return new WP_Error( 'no_code', 'Missing authorization code.', array( 'status' => 400 ) );
-        $expected = get_transient( 'gs_gcloud_state_' . $uid );
+        $expected = get_transient( 'gend_society_gcloud_state_' . $uid );
         if ( ! $expected || ! hash_equals( (string) $expected, $state ) ) {
             return new WP_Error( 'bad_state', 'State mismatch — restart the flow.', array( 'status' => 400 ) );
         }
-        delete_transient( 'gs_gcloud_state_' . $uid );
+        delete_transient( 'gend_society_gcloud_state_' . $uid );
 
-        $client_id     = gs_gcloud_cfg( 'oauth_client_id' );
-        $client_secret = gs_gcloud_cfg( 'oauth_client_secret' );
+        $client_id     = gend_society_gcloud_cfg( 'oauth_client_id' );
+        $client_secret = gend_society_gcloud_cfg( 'oauth_client_secret' );
         $resp = wp_remote_post( 'https://oauth2.googleapis.com/token', array(
             'timeout' => 15,
             'body'    => array(
                 'code'          => $code,
                 'client_id'     => $client_id,
                 'client_secret' => $client_secret,
-                'redirect_uri'  => gs_gcloud_redirect_uri(),
+                'redirect_uri'  => gend_society_gcloud_redirect_uri(),
                 'grant_type'    => 'authorization_code',
             ),
         ) );
@@ -205,15 +205,15 @@ if ( ! function_exists( 'gs_gcloud_rest_callback' ) ) {
 
         $payload = wp_json_encode( array(
             'refresh_token' => $body['refresh_token'],
-            'scope'         => $body['scope'] ?? gs_gcloud_scopes(),
+            'scope'         => $body['scope'] ?? gend_society_gcloud_scopes(),
             'token_type'    => $body['token_type'] ?? 'Bearer',
             'google_email'  => $google_email,
             'connected_at'  => gmdate( 'c' ),
         ) );
-        $cipher = gs_gcloud_encrypt( $payload );
+        $cipher = gend_society_gcloud_encrypt( $payload );
         if ( is_wp_error( $cipher ) ) return $cipher;
-        update_user_meta( $uid, '_gs_gcloud_creds', $cipher );
-        update_user_meta( $uid, '_gs_gcloud_email', $google_email );
+        update_user_meta( $uid, '_gend_society_gcloud_creds', $cipher );
+        update_user_meta( $uid, '_gend_society_gcloud_email', $google_email );
 
         // Bounce back to the Web Shell terminal tab; the SPA detects the
         // ?gcloud_connected=1 query string and refreshes its status pill.
@@ -222,31 +222,31 @@ if ( ! function_exists( 'gs_gcloud_rest_callback' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_gcloud_rest_status' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_rest_status' ) ) {
 
-    function gs_gcloud_rest_status() {
+    function gend_society_gcloud_rest_status() {
         $uid   = get_current_user_id();
-        $cur   = get_user_meta( $uid, '_gs_gcloud_creds', true );
-        $email = get_user_meta( $uid, '_gs_gcloud_email', true );
+        $cur   = get_user_meta( $uid, '_gend_society_gcloud_creds', true );
+        $email = get_user_meta( $uid, '_gend_society_gcloud_email', true );
         return array(
             'connected'         => ! empty( $cur ),
             'google_email'      => $email ?: null,
-            'has_oauth_client'  => gs_gcloud_cfg( 'oauth_client_id' ) !== '',
-            'has_encryption_key'=> gs_gcloud_cfg( 'creds_key' ) !== '',
+            'has_oauth_client'  => gend_society_gcloud_cfg( 'oauth_client_id' ) !== '',
+            'has_encryption_key'=> gend_society_gcloud_cfg( 'creds_key' ) !== '',
         );
     }
 }
 
-if ( ! function_exists( 'gs_gcloud_rest_disconnect' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_rest_disconnect' ) ) {
 
-    function gs_gcloud_rest_disconnect() {
+    function gend_society_gcloud_rest_disconnect() {
         $uid = get_current_user_id();
-        $cur = get_user_meta( $uid, '_gs_gcloud_creds', true );
+        $cur = get_user_meta( $uid, '_gend_society_gcloud_creds', true );
         // Best-effort revoke at Google so the refresh token is dead
         // even if our copy were leaked. Failures are non-fatal —
         // wiping our copy is the security-critical step.
         if ( $cur ) {
-            $dec = gs_gcloud_decrypt( $cur );
+            $dec = gend_society_gcloud_decrypt( $cur );
             if ( ! is_wp_error( $dec ) ) {
                 $payload = json_decode( $dec, true );
                 if ( is_array( $payload ) && ! empty( $payload['refresh_token'] ) ) {
@@ -257,13 +257,13 @@ if ( ! function_exists( 'gs_gcloud_rest_disconnect' ) ) {
                 }
             }
         }
-        delete_user_meta( $uid, '_gs_gcloud_creds' );
-        delete_user_meta( $uid, '_gs_gcloud_email' );
+        delete_user_meta( $uid, '_gend_society_gcloud_creds' );
+        delete_user_meta( $uid, '_gend_society_gcloud_email' );
         return array( 'connected' => false );
     }
 }
 
-if ( ! function_exists( 'gs_gcloud_rest_adc' ) ) {
+if ( ! function_exists( 'gend_society_gcloud_rest_adc' ) ) {
 
     /**
      * Internal: PTY service → wp-hub call to fetch a user's ADC at
@@ -273,7 +273,7 @@ if ( ! function_exists( 'gs_gcloud_rest_adc' ) ) {
      * Request:  POST { token: <service-JWT containing {user_id, exp, iss: 'web-shell-pty'}> }
      * Response: { ok: true, adc: {...json...} } or { ok: false, ... }
      */
-    function gs_gcloud_rest_adc( WP_REST_Request $req ) {
+    function gend_society_gcloud_rest_adc( WP_REST_Request $req ) {
         $shell_secret = defined( 'GS_SHELL_JWT_SECRET' ) ? (string) GS_SHELL_JWT_SECRET
                        : ( getenv( 'GS_SHELL_JWT_SECRET' ) ?: '' );
         if ( $shell_secret === '' ) {
@@ -282,20 +282,20 @@ if ( ! function_exists( 'gs_gcloud_rest_adc' ) ) {
         $raw = $req->get_json_params();
         if ( ! is_array( $raw ) ) $raw = $req->get_params();
         $tok = (string) ( $raw['token'] ?? '' );
-        $decoded = gs_jwt_decode( $tok, $shell_secret );
+        $decoded = gend_society_jwt_decode( $tok, $shell_secret );
         if ( is_wp_error( $decoded ) ) {
             return new WP_REST_Response( array( 'ok' => false, 'error' => $decoded->get_error_code() ), 401 );
         }
         if ( ( $decoded['iss'] ?? '' ) !== 'web-shell-pty' || empty( $decoded['user_id'] ) ) {
             return new WP_REST_Response( array( 'ok' => false, 'error' => 'bad_claims' ), 401 );
         }
-        $adc = gs_web_shell_gcloud_get_adc_for_user( (int) $decoded['user_id'] );
+        $adc = gend_society_web_shell_gcloud_get_adc_for_user( (int) $decoded['user_id'] );
         if ( is_wp_error( $adc ) ) return new WP_REST_Response( array( 'ok' => false, 'error' => $adc->get_error_code() ), 404 );
         return array( 'ok' => true, 'adc' => $adc );
     }
 }
 
-if ( ! function_exists( 'gs_web_shell_gcloud_get_adc_for_user' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_gcloud_get_adc_for_user' ) ) {
 
     /**
      * Build the JSON the gcloud CLI expects at
@@ -303,10 +303,10 @@ if ( ! function_exists( 'gs_web_shell_gcloud_get_adc_for_user' ) ) {
      * `gcloud …` call from the user's pod auto-authenticates without
      * a separate `gcloud auth login` step.
      */
-    function gs_web_shell_gcloud_get_adc_for_user( $user_id ) {
-        $blob = get_user_meta( (int) $user_id, '_gs_gcloud_creds', true );
+    function gend_society_web_shell_gcloud_get_adc_for_user( $user_id ) {
+        $blob = get_user_meta( (int) $user_id, '_gend_society_gcloud_creds', true );
         if ( ! $blob ) return new WP_Error( 'no_creds', 'User has no stored gcloud creds.' );
-        $dec = gs_gcloud_decrypt( $blob );
+        $dec = gend_society_gcloud_decrypt( $blob );
         if ( is_wp_error( $dec ) ) return $dec;
         $data = json_decode( $dec, true );
         if ( ! is_array( $data ) || empty( $data['refresh_token'] ) ) {
@@ -314,14 +314,14 @@ if ( ! function_exists( 'gs_web_shell_gcloud_get_adc_for_user' ) ) {
         }
         return array(
             'type'          => 'authorized_user',
-            'client_id'     => gs_gcloud_cfg( 'oauth_client_id' ),
-            'client_secret' => gs_gcloud_cfg( 'oauth_client_secret' ),
+            'client_id'     => gend_society_gcloud_cfg( 'oauth_client_id' ),
+            'client_secret' => gend_society_gcloud_cfg( 'oauth_client_secret' ),
             'refresh_token' => $data['refresh_token'],
         );
     }
 }
 
-if ( ! function_exists( 'gs_jwt_decode' ) ) {
+if ( ! function_exists( 'gend_society_jwt_decode' ) ) {
 
     /**
      * Minimal HS256 JWT decoder paired with gs_web_shell_jwt_encode.
@@ -329,7 +329,7 @@ if ( ! function_exists( 'gs_jwt_decode' ) ) {
      * WP_Error on any failure. Used by /gs/v1/web-shell/gcloud/adc to
      * authenticate the PTY service.
      */
-    function gs_jwt_decode( $token, $secret ) {
+    function gend_society_jwt_decode( $token, $secret ) {
         $parts = explode( '.', (string) $token );
         if ( count( $parts ) !== 3 ) return new WP_Error( 'bad_token', 'Malformed JWT.' );
         list( $h, $b, $sig ) = $parts;

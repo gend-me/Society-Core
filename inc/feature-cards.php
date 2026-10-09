@@ -20,7 +20,7 @@ function gend_society_feature_card_image($slug)
 /**
  * Returns hardcoded feature definitions for the GenD Society dashboard.
  */
-function gs_get_feature_definitions()
+function gend_society_get_feature_definitions()
 {
     return array(
         'wireframe' => array(
@@ -92,7 +92,7 @@ function gs_get_feature_definitions()
 /**
  * Check if a specific plugin has an update available
  */
-function gs_has_plugin_update($plugin_file)
+function gend_society_has_plugin_update($plugin_file)
 {
     $current = get_site_transient('update_plugins');
     if (isset($current->response[$plugin_file])) {
@@ -112,13 +112,13 @@ function gs_has_plugin_update($plugin_file)
  *                          Defaults false so every OTHER caller of this
  *                          widget (front-end group tabs, etc.) is unaffected.
  */
-function gs_render_feature_cards_widget($show_sizes = false)
+function gend_society_render_feature_cards_widget($show_sizes = false)
 {
-    $features = gs_get_feature_definitions();
+    $features = gend_society_get_feature_definitions();
 
     $gs_fc_sizes = array();
-    if ($show_sizes && function_exists('gs_hosting_collect_codebase_breakdown')) {
-        foreach (gs_hosting_collect_codebase_breakdown() as $gs_fc_entry) {
+    if ($show_sizes && function_exists('gend_society_hosting_collect_codebase_breakdown')) {
+        foreach (gend_society_hosting_collect_codebase_breakdown() as $gs_fc_entry) {
             if (($gs_fc_entry['type'] ?? '') === 'plugin') {
                 $gs_fc_sizes[$gs_fc_entry['name']] = (int) $gs_fc_entry['bytes'];
             }
@@ -155,10 +155,10 @@ function gs_render_feature_cards_widget($show_sizes = false)
         if (isset($feature['is_ultimo']) && $feature['is_ultimo']) {
             $is_active = function_exists('WP_Ultimo');
         } else {
-            $is_active = gs_plugin_active($feature['plugin']);
+            $is_active = gend_society_plugin_active($feature['plugin']);
         }
 
-        $has_update = gs_has_plugin_update($feature['plugin']);
+        $has_update = gend_society_has_plugin_update($feature['plugin']);
         $nonce = wp_create_nonce('gs_plugin_actions');
 
         // Folder name (plugin_basename's dirname) matches the same top-level
@@ -233,8 +233,8 @@ function gs_render_feature_cards_widget($show_sizes = false)
 /**
  * AJAX Handler: Activate Plugin
  */
-add_action('wp_ajax_gs_activate_plugin', 'gs_ajax_activate_plugin');
-function gs_ajax_activate_plugin() {
+add_action('wp_ajax_gend_society_activate_plugin', 'gend_society_ajax_activate_plugin');
+function gend_society_ajax_activate_plugin() {
     check_ajax_referer('gs_plugin_actions', 'nonce');
 
     if (!current_user_can('activate_plugins')) {
@@ -258,8 +258,8 @@ function gs_ajax_activate_plugin() {
 /**
  * AJAX Handler: Update Plugin
  */
-add_action('wp_ajax_gs_update_plugin', 'gs_ajax_update_plugin');
-function gs_ajax_update_plugin() {
+add_action('wp_ajax_gend_society_update_plugin', 'gend_society_ajax_update_plugin');
+function gend_society_ajax_update_plugin() {
     check_ajax_referer('gs_plugin_actions', 'nonce');
 
     if (!current_user_can('update_plugins')) {
@@ -295,8 +295,8 @@ function gs_ajax_update_plugin() {
  * Every file is attempted independently; the response reports a per-file
  * result so one bad ZIP in a multi-file batch doesn't block the rest.
  */
-add_action('wp_ajax_gs_upload_plugin', 'gs_ajax_upload_plugin');
-function gs_ajax_upload_plugin() {
+add_action('wp_ajax_gend_society_upload_plugin', 'gend_society_ajax_upload_plugin');
+function gend_society_ajax_upload_plugin() {
     check_ajax_referer('gs_plugin_actions', 'nonce');
 
     if (!current_user_can('install_plugins')) {
@@ -380,8 +380,8 @@ function gs_ajax_upload_plugin() {
 /**
  * Enqueue JavaScript for AJAX plugin actions
  */
-add_action('admin_footer', 'gs_feature_cards_ajax_script');
-function gs_feature_cards_ajax_script() {
+add_action('admin_footer', 'gend_society_feature_cards_ajax_script');
+function gend_society_feature_cards_ajax_script() {
     ?>
     <script>
     jQuery(document).ready(function($) {
@@ -401,7 +401,7 @@ function gs_feature_cards_ajax_script() {
                 $btn.addClass('updating').html('<span class="dashicons dashicons-update" style="animation: spin 2s linear infinite;"></span>');
             }
 
-            var ajaxAction = action === 'activate' ? 'gs_activate_plugin' : 'gs_update_plugin';
+            var ajaxAction = action === 'activate' ? 'gend_society_activate_plugin' : 'gend_society_update_plugin';
 
             $.ajax({
                 url: ajaxurl,
@@ -468,7 +468,7 @@ function gs_feature_cards_ajax_script() {
                 return;
             }
             var fd = new FormData();
-            fd.append('action', 'gs_upload_plugin');
+            fd.append('action', 'gend_society_upload_plugin');
             fd.append('nonce', $form.data('nonce'));
             for (var i = 0; i < input.files.length; i++) {
                 fd.append('plugin_zip[]', input.files[i]);

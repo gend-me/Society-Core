@@ -60,7 +60,7 @@ class Gend_GS_Collab_Market_REST {
 
 		// COUNSEL FLAG: routes are registered ONLY when the market surface is public.
 		// Off (default) => routes never bound => 404 route-absent (never 403).
-		if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC ) {
+		if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC ) {
 			return;
 		}
 

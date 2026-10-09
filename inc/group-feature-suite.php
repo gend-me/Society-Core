@@ -40,7 +40,7 @@ defined('ABSPATH') || exit;
  * Top-level renderer for the Feature Suite group tab. Called from
  * GS_Group_Tab_Feature_Suite::display() in group-app-tabs.php.
  */
-function gs_render_group_feature_suite($group_id, $show_hero = true) {
+function gend_society_render_group_feature_suite($group_id, $show_hero = true) {
     $group_id = (int) $group_id;
     if (!$group_id) {
         echo '<p style="color:rgba(203,213,245,0.7);">' . esc_html__('No group context — feature suite cannot resolve a membership.', 'gend-society') . '</p>';
@@ -57,7 +57,7 @@ function gs_render_group_feature_suite($group_id, $show_hero = true) {
     $current_plan = $current_plan_slug !== '' && isset($plan_catalog[$current_plan_slug]) ? $plan_catalog[$current_plan_slug] : null;
 
     // Linked install id → container-side plugin probe (best effort).
-    $install_id = function_exists('gs_group_get_linked_install_id') ? gs_group_get_linked_install_id($group_id) : '';
+    $install_id = function_exists('gend_society_group_get_linked_install_id') ? gend_society_group_get_linked_install_id($group_id) : '';
     $active_on_app = function_exists('gdc_get_container_active_plugins') ? gdc_get_container_active_plugins($install_id) : array();
     $probe_available = !empty($active_on_app);
     $active_lookup = array();
@@ -100,7 +100,7 @@ function gs_render_group_feature_suite($group_id, $show_hero = true) {
         );
     }
 
-    $hub_base = function_exists('gs_oauth_hub_url') ? gs_oauth_hub_url() : (string) get_option('gs_gend_base_url', 'https://gend.me');
+    $hub_base = function_exists('gend_society_oauth_hub_url') ? gend_society_oauth_hub_url() : (string) get_option('gend_society_gend_base_url', 'https://gend.me');
     $hub_base = $hub_base ? rtrim($hub_base, '/') : 'https://gend.me';
     $upgrade_url = function ($plan_slug) use ($hub_base, $membership_id) {
         if ($membership_id <= 0) return $hub_base . '/my-account/memberships/';
@@ -544,7 +544,7 @@ function gs_render_group_feature_suite($group_id, $show_hero = true) {
                             <?php if ($status === 'included') : ?>
                                 <?php
                                 $app_admin = '';
-                                if ($install_id !== '' && function_exists('gs_group_get_linked_install_id')) {
+                                if ($install_id !== '' && function_exists('gend_society_group_get_linked_install_id')) {
                                     // Resolve the linked site URL via groupmeta lookup again — gs_group_tab_open
                                     // already does this; we duplicate the read here so the CTA points at the
                                     // customer's wp-admin instead of the marketing page.

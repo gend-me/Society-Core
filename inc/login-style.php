@@ -7,23 +7,23 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-add_action( 'login_enqueue_scripts', 'gs_login_styling' );
-add_action( 'wp_enqueue_scripts', 'gs_register_styling' );
+add_action( 'login_enqueue_scripts', 'gend_society_login_styling' );
+add_action( 'wp_enqueue_scripts', 'gend_society_register_styling' );
 
-function gs_login_styling() {
-    gs_render_glass_css( 'login' );
+function gend_society_login_styling() {
+    gend_society_render_glass_css( 'login' );
 }
 
-function gs_register_styling() {
+function gend_society_register_styling() {
     if ( function_exists( 'bp_is_register_page' ) && bp_is_register_page() ) {
-        gs_render_glass_css( 'register' );
+        gend_society_render_glass_css( 'register' );
     }
 }
 
 /**
  * Shared Futuristic Glassmorphic CSS
  */
-function gs_render_glass_css( $context = 'login' ) {
+function gend_society_render_glass_css( $context = 'login' ) {
     ?>
     <style type="text/css">
         /* ── Design Tokens ──────────────────────────────────────────────────── */
@@ -292,13 +292,13 @@ function gs_render_glass_css( $context = 'login' ) {
 }
 
 // Custom Login Logo URL
-add_filter( 'login_headerurl', 'gs_login_logo_url' );
-function gs_login_logo_url() {
+add_filter( 'login_headerurl', 'gend_society_login_logo_url' );
+function gend_society_login_logo_url() {
     return home_url();
 }
 
 // Custom Login Logo Title
-add_filter( 'login_headertext', 'gs_login_logo_title' );
-function gs_login_logo_title() {
+add_filter( 'login_headertext', 'gend_society_login_logo_title' );
+function gend_society_login_logo_title() {
     return get_bloginfo( 'name' );
 }

@@ -71,7 +71,7 @@ class Gend_GS_Collab_Sync_Crypto {
 	 * @return string|null The raw keypair, or null if absent/malformed.
 	 */
 	public static function keypair() : ?string {
-		$raw = base64_decode( (string) get_option( 'gs_keypair', '' ), true );
+		$raw = base64_decode( (string) get_option( 'gend_society_keypair', '' ), true );
 		if ( ! is_string( $raw ) || strlen( $raw ) !== SODIUM_CRYPTO_SIGN_KEYPAIRBYTES ) {
 			return null;
 		}

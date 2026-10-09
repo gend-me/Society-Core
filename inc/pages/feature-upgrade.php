@@ -27,14 +27,14 @@ add_action( 'admin_menu', function () {
         __( 'Upgrade Feature Access', 'gend-society' ),
         'read',
         'gs-feature-upgrade',
-        'gs_render_feature_upgrade_page'
+        'gend_society_render_feature_upgrade_page'
     );
 }, 60 );
 
 /**
  * Pretty area name for the prompt copy.
  */
-function gs_feature_area_label( string $area ): string {
+function gend_society_feature_area_label( string $area ): string {
     $map = array(
         'app'      => __( 'App', 'gend-society' ),
         'write'    => __( 'Content', 'gend-society' ),
@@ -55,8 +55,8 @@ function gs_feature_area_label( string $area ): string {
  * fetched feature payload already contains the customer's CURRENT
  * tier; we use this list to show what's available.
  */
-function gs_feature_upgrade_tiers() {
-    return apply_filters( 'gs_feature_upgrade_tiers', array(
+function gend_society_feature_upgrade_tiers() {
+    return apply_filters( 'gend_society_feature_upgrade_tiers', array(
         array(
             'slug'     => 'content-builder',
             'name'     => __( 'Content Builder', 'gend-society' ),
@@ -81,7 +81,7 @@ function gs_feature_upgrade_tiers() {
     ) );
 }
 
-function gs_render_feature_upgrade_page() {
+function gend_society_render_feature_upgrade_page() {
 
     if ( ! current_user_can( 'read' ) ) wp_die( esc_html__( 'Sign in required.', 'gend-society' ) );
 
@@ -94,27 +94,27 @@ function gs_render_feature_upgrade_page() {
     $required_child = isset( $_GET['required_child'] )
         ? preg_replace( '/[^a-z0-9._-]/', '', strtolower( (string) wp_unslash( $_GET['required_child'] ) ) )
         : '';
-    $features = function_exists( 'gs_features_get_cached' ) ? gs_features_get_cached() : null;
+    $features = function_exists( 'gend_society_features_get_cached' ) ? gend_society_features_get_cached() : null;
     $current_areas = is_array( $features ) && isset( $features['allowed_areas'] ) ? (array) $features['allowed_areas'] : array();
     $current_plan  = is_array( $features ) && ! empty( $features['plan_name'] ) ? (string) $features['plan_name'] : '';
     $learn_more_pages = is_array( $features ) && isset( $features['learn_more_pages'] ) ? (array) $features['learn_more_pages'] : array();
-    $learn_more_url = function_exists( 'gs_features_resolve_learn_more_url' )
-        ? gs_features_resolve_learn_more_url( $required_child, $tab, $learn_more_pages )
+    $learn_more_url = function_exists( 'gend_society_features_resolve_learn_more_url' )
+        ? gend_society_features_resolve_learn_more_url( $required_child, $tab, $learn_more_pages )
         : '';
 
     // Membership URL on gend.me — the popup target. ?ui=embed strips
     // the theme chrome so the popup looks like a focused modal.
-    $hub        = function_exists( 'gs_oauth_hub_url' ) ? gs_oauth_hub_url() : (string) get_option( 'gs_gend_base_url', 'https://gend.me' );
+    $hub        = function_exists( 'gend_society_oauth_hub_url' ) ? gend_society_oauth_hub_url() : (string) get_option( 'gend_society_gend_base_url', 'https://gend.me' );
     $remote_mid = 0;
-    if ( function_exists( 'gs_remote_membership_get_cached' ) ) {
-        $rm = gs_remote_membership_get_cached();
+    if ( function_exists( 'gend_society_remote_membership_get_cached' ) ) {
+        $rm = gend_society_remote_membership_get_cached();
         if ( is_array( $rm ) && ! empty( $rm['membership_id'] ) ) $remote_mid = (int) $rm['membership_id'];
     }
     $membership_url = $remote_mid > 0
         ? rtrim( $hub, '/' ) . '/my-account/membership/' . $remote_mid . '/?ui=embed&group=dashboard'
         : rtrim( $hub, '/' ) . '/my-account/memberships/';
 
-    $tiers = gs_feature_upgrade_tiers();
+    $tiers = gend_society_feature_upgrade_tiers();
 
     $back_url = $from !== ''
         ? add_query_arg( 'page', $from, admin_url( 'admin.php' ) )
@@ -149,7 +149,7 @@ function gs_render_feature_upgrade_page() {
         <div class="gs-up-shell">
 
             <?php if ( $required !== '' ) : ?>
-                <span class="gs-up-current">⨯ <?php echo esc_html( sprintf( /* translators: %s: Feature area name. */ __( '%s requires an upgrade', 'gend-society' ), gs_feature_area_label( $required ) ) ); ?></span>
+                <span class="gs-up-current">⨯ <?php echo esc_html( sprintf( /* translators: %s: Feature area name. */ __( '%s requires an upgrade', 'gend-society' ), gend_society_feature_area_label( $required ) ) ); ?></span>
             <?php elseif ( $current_plan !== '' ) : ?>
                 <span class="gs-up-current">● <?php echo esc_html( sprintf( /* translators: %s: Current plan name. */ __( 'Current plan: %s', 'gend-society' ), $current_plan ) ); ?></span>
             <?php endif; ?>
@@ -167,7 +167,7 @@ function gs_render_feature_upgrade_page() {
                     echo esc_html( sprintf(
                         /* translators: %s: Feature area name. */
                         __( 'The %s area is locked on your current plan. Upgrade to a Dashboard tier that includes it and your wp-admin will unlock instantly when checkout completes.', 'gend-society' ),
-                        gs_feature_area_label( $required )
+                        gend_society_feature_area_label( $required )
                     ) );
                 } else {
                     esc_html_e( 'Each tier unlocks more wp-admin areas. Upgrades take effect immediately after checkout.', 'gend-society' );
@@ -190,7 +190,7 @@ function gs_render_feature_upgrade_page() {
                         <p class="gs-up-tagline"><?php echo esc_html( $tier['tagline'] ); ?></p>
                         <div class="gs-up-areas">
                             <?php foreach ( $unlocks as $a ) : ?>
-                                <span><?php echo esc_html( gs_feature_area_label( $a ) ); ?></span>
+                                <span><?php echo esc_html( gend_society_feature_area_label( $a ) ); ?></span>
                             <?php endforeach; ?>
                         </div>
                         <?php if ( $is_current ) : ?>
@@ -239,7 +239,7 @@ function gs_render_feature_upgrade_page() {
                     // Force a fresh fetch of the feature payload, then
                     // bounce back to the original page (or Dashboard).
                     var fd = new FormData();
-                    fd.append('action', 'gs_features_refresh');
+                    fd.append('action', 'gend_society_features_refresh');
                     fd.append('nonce', nonce);
                     fetch(ajax, { method: 'POST', body: fd, credentials: 'same-origin' })
                         .then(function () {
@@ -270,11 +270,11 @@ function gs_render_feature_upgrade_page() {
  * AJAX hook the upgrade page calls after the popup closes — busts
  * both feature + membership caches and refetches.
  */
-add_action( 'wp_ajax_gs_features_refresh', function () {
+add_action( 'wp_ajax_gend_society_features_refresh', function () {
     if ( ! is_user_logged_in() ) wp_send_json_error();
     check_ajax_referer( 'gs_membership_action', 'nonce' );
-    if ( function_exists( 'gs_features_invalidate' ) )         gs_features_invalidate();
-    if ( function_exists( 'gs_remote_membership_invalidate' ) ) gs_remote_membership_invalidate();
-    $f = function_exists( 'gs_features_get_cached' ) ? gs_features_get_cached() : null;
+    if ( function_exists( 'gend_society_features_invalidate' ) )         gend_society_features_invalidate();
+    if ( function_exists( 'gend_society_remote_membership_invalidate' ) ) gend_society_remote_membership_invalidate();
+    $f = function_exists( 'gend_society_features_get_cached' ) ? gend_society_features_get_cached() : null;
     wp_send_json_success( array( 'features' => $f ) );
 } );

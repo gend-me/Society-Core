@@ -17,13 +17,13 @@
 if ( ! defined( 'ABSPATH' ) ) exit;
 
 /** Maximum rows we persist per repeatable section (defensive cap). */
-if ( ! defined( 'GDC_RESUME_MAX_ROWS' ) ) define( 'GDC_RESUME_MAX_ROWS', 40 );
+if ( ! defined( 'GEND_SOCIETY_RESUME_MAX_ROWS' ) ) define( 'GEND_SOCIETY_RESUME_MAX_ROWS', 40 );
 
 /**
  * Fetch a user's saved resume, normalized to the expected shape.
  */
-function gdc_get_resume( $user_id ) {
-    $data = get_user_meta( (int) $user_id, '_gdc_resume', true );
+function gend_society_get_resume( $user_id ) {
+    $data = get_user_meta( (int) $user_id, '_gend_society_resume', true );
     if ( ! is_array( $data ) ) $data = array();
     return array(
         'headline'   => isset( $data['headline'] ) ? (string) $data['headline'] : '',
@@ -38,7 +38,7 @@ function gdc_get_resume( $user_id ) {
 /**
  * Sanitize an incoming resume payload (from the AJAX save) into the stored shape.
  */
-function gdc_sanitize_resume( $data ) {
+function gend_society_sanitize_resume( $data ) {
     $out = array(
         'headline'   => sanitize_text_field( $data['headline'] ?? '' ),
         'summary'    => sanitize_textarea_field( $data['summary'] ?? '' ),
@@ -49,7 +49,7 @@ function gdc_sanitize_resume( $data ) {
     );
 
     if ( ! empty( $data['experience'] ) && is_array( $data['experience'] ) ) {
-        foreach ( array_slice( $data['experience'], 0, GDC_RESUME_MAX_ROWS ) as $row ) {
+        foreach ( array_slice( $data['experience'], 0, GEND_SOCIETY_RESUME_MAX_ROWS ) as $row ) {
             if ( ! is_array( $row ) ) continue;
             $role    = sanitize_text_field( $row['role'] ?? '' );
             $company = sanitize_text_field( $row['company'] ?? '' );
@@ -62,7 +62,7 @@ function gdc_sanitize_resume( $data ) {
     }
 
     if ( ! empty( $data['education'] ) && is_array( $data['education'] ) ) {
-        foreach ( array_slice( $data['education'], 0, GDC_RESUME_MAX_ROWS ) as $row ) {
+        foreach ( array_slice( $data['education'], 0, GEND_SOCIETY_RESUME_MAX_ROWS ) as $row ) {
             if ( ! is_array( $row ) ) continue;
             $school     = sanitize_text_field( $row['school'] ?? '' );
             $credential = sanitize_text_field( $row['credential'] ?? '' );
@@ -73,14 +73,14 @@ function gdc_sanitize_resume( $data ) {
     }
 
     if ( ! empty( $data['skills'] ) && is_array( $data['skills'] ) ) {
-        foreach ( array_slice( $data['skills'], 0, GDC_RESUME_MAX_ROWS ) as $skill ) {
+        foreach ( array_slice( $data['skills'], 0, GEND_SOCIETY_RESUME_MAX_ROWS ) as $skill ) {
             $skill = sanitize_text_field( is_array( $skill ) ? '' : $skill );
             if ( $skill !== '' ) $out['skills'][] = $skill;
         }
     }
 
     if ( ! empty( $data['links'] ) && is_array( $data['links'] ) ) {
-        foreach ( array_slice( $data['links'], 0, GDC_RESUME_MAX_ROWS ) as $row ) {
+        foreach ( array_slice( $data['links'], 0, GEND_SOCIETY_RESUME_MAX_ROWS ) as $row ) {
             if ( ! is_array( $row ) ) continue;
             $label = sanitize_text_field( $row['label'] ?? '' );
             $url   = esc_url_raw( $row['url'] ?? '' );
@@ -95,8 +95,8 @@ function gdc_sanitize_resume( $data ) {
 /**
  * AJAX: save the current user's resume.
  */
-add_action( 'wp_ajax_gdc_save_resume', 'gdc_ajax_save_resume' );
-function gdc_ajax_save_resume() {
+add_action( 'wp_ajax_gend_society_save_resume', 'gend_society_ajax_save_resume' );
+function gend_society_ajax_save_resume() {
     check_ajax_referer( 'gdc_resume', 'nonce' );
     $uid = get_current_user_id();
     if ( ! $uid ) {
@@ -107,31 +107,31 @@ function gdc_ajax_save_resume() {
     if ( ! is_array( $data ) ) {
         wp_send_json_error( array( 'message' => 'Malformed resume data.' ), 400 );
     }
-    $clean = gdc_sanitize_resume( $data );
-    update_user_meta( $uid, '_gdc_resume', $clean );
+    $clean = gend_society_sanitize_resume( $data );
+    update_user_meta( $uid, '_gend_society_resume', $clean );
     wp_send_json_success( array( 'message' => 'Saved.' ) );
 }
 
 /**
  * Render the Resume panel. Editable for the owner; read-only for visitors.
  */
-function gdc_render_resume_panel( $displayed_user_id, $is_own ) {
+function gend_society_render_resume_panel( $displayed_user_id, $is_own ) {
     $displayed_user_id = (int) $displayed_user_id;
-    $resume = gdc_get_resume( $displayed_user_id );
+    $resume = gend_society_get_resume( $displayed_user_id );
 
-    gdc_resume_panel_styles();
+    gend_society_resume_panel_styles();
 
     if ( $is_own ) {
-        gdc_render_resume_editor( $resume );
+        gend_society_render_resume_editor( $resume );
     } else {
-        gdc_render_resume_readonly( $resume, $displayed_user_id );
+        gend_society_render_resume_readonly( $resume, $displayed_user_id );
     }
 }
 
 /**
  * Read-only resume view (visitors / other members' profiles).
  */
-function gdc_render_resume_readonly( $resume, $user_id ) {
+function gend_society_render_resume_readonly( $resume, $user_id ) {
     $is_empty = $resume['headline'] === '' && $resume['summary'] === ''
         && empty( $resume['experience'] ) && empty( $resume['education'] )
         && empty( $resume['skills'] ) && empty( $resume['links'] );
@@ -224,7 +224,7 @@ function gdc_render_resume_readonly( $resume, $user_id ) {
 /**
  * Editable resume form (profile owner).
  */
-function gdc_render_resume_editor( $resume ) {
+function gend_society_render_resume_editor( $resume ) {
     $nonce    = wp_create_nonce( 'gdc_resume' );
     $ajax_url = admin_url( 'admin-ajax.php' );
     ?>
@@ -260,7 +260,7 @@ function gdc_render_resume_editor( $resume ) {
                 <button type="button" class="gdc-resume-add" data-add="experience">+ <?php esc_html_e( 'Add', 'gend-society' ); ?></button>
             </div>
             <div class="gdc-resume-rows" data-rows="experience">
-                <?php foreach ( $resume['experience'] as $row ) gdc_resume_row_experience( $row ); ?>
+                <?php foreach ( $resume['experience'] as $row ) gend_society_resume_row_experience( $row ); ?>
             </div>
         </section>
 
@@ -271,7 +271,7 @@ function gdc_render_resume_editor( $resume ) {
                 <button type="button" class="gdc-resume-add" data-add="education">+ <?php esc_html_e( 'Add', 'gend-society' ); ?></button>
             </div>
             <div class="gdc-resume-rows" data-rows="education">
-                <?php foreach ( $resume['education'] as $row ) gdc_resume_row_education( $row ); ?>
+                <?php foreach ( $resume['education'] as $row ) gend_society_resume_row_education( $row ); ?>
             </div>
         </section>
 
@@ -282,7 +282,7 @@ function gdc_render_resume_editor( $resume ) {
                 <button type="button" class="gdc-resume-add" data-add="skills">+ <?php esc_html_e( 'Add', 'gend-society' ); ?></button>
             </div>
             <div class="gdc-resume-rows" data-rows="skills">
-                <?php foreach ( $resume['skills'] as $skill ) gdc_resume_row_skill( $skill ); ?>
+                <?php foreach ( $resume['skills'] as $skill ) gend_society_resume_row_skill( $skill ); ?>
             </div>
         </section>
 
@@ -293,21 +293,21 @@ function gdc_render_resume_editor( $resume ) {
                 <button type="button" class="gdc-resume-add" data-add="links">+ <?php esc_html_e( 'Add', 'gend-society' ); ?></button>
             </div>
             <div class="gdc-resume-rows" data-rows="links">
-                <?php foreach ( $resume['links'] as $row ) gdc_resume_row_link( $row ); ?>
+                <?php foreach ( $resume['links'] as $row ) gend_society_resume_row_link( $row ); ?>
             </div>
         </section>
 
         <!-- Row templates (cloned by JS for new rows) -->
-        <template data-tpl="experience"><?php gdc_resume_row_experience( array() ); ?></template>
-        <template data-tpl="education"><?php gdc_resume_row_education( array() ); ?></template>
-        <template data-tpl="skills"><?php gdc_resume_row_skill( '' ); ?></template>
-        <template data-tpl="links"><?php gdc_resume_row_link( array() ); ?></template>
+        <template data-tpl="experience"><?php gend_society_resume_row_experience( array() ); ?></template>
+        <template data-tpl="education"><?php gend_society_resume_row_education( array() ); ?></template>
+        <template data-tpl="skills"><?php gend_society_resume_row_skill( '' ); ?></template>
+        <template data-tpl="links"><?php gend_society_resume_row_link( array() ); ?></template>
     </div>
     <?php
-    gdc_resume_editor_script();
+    gend_society_resume_editor_script();
 }
 
-function gdc_resume_row_experience( $row ) {
+function gend_society_resume_row_experience( $row ) {
     ?>
     <div class="gdc-resume-row" data-row="experience">
         <div class="gdc-resume-row-grid">
@@ -322,7 +322,7 @@ function gdc_resume_row_experience( $row ) {
     <?php
 }
 
-function gdc_resume_row_education( $row ) {
+function gend_society_resume_row_education( $row ) {
     ?>
     <div class="gdc-resume-row" data-row="education">
         <div class="gdc-resume-row-grid">
@@ -335,7 +335,7 @@ function gdc_resume_row_education( $row ) {
     <?php
 }
 
-function gdc_resume_row_skill( $skill ) {
+function gend_society_resume_row_skill( $skill ) {
     ?>
     <div class="gdc-resume-row gdc-resume-row--inline" data-row="skills">
         <input type="text" data-f="value" placeholder="<?php esc_attr_e( 'Skill', 'gend-society' ); ?>" value="<?php echo esc_attr( is_array( $skill ) ? '' : $skill ); ?>" />
@@ -344,7 +344,7 @@ function gdc_resume_row_skill( $skill ) {
     <?php
 }
 
-function gdc_resume_row_link( $row ) {
+function gend_society_resume_row_link( $row ) {
     ?>
     <div class="gdc-resume-row gdc-resume-row--inline" data-row="links">
         <input type="text" data-f="label" placeholder="<?php esc_attr_e( 'Label', 'gend-society' ); ?>" value="<?php echo esc_attr( $row['label'] ?? '' ); ?>" />
@@ -357,7 +357,7 @@ function gdc_resume_row_link( $row ) {
 /**
  * Resume CSS — emitted once per request. Matches the obsidian/magenta palette.
  */
-function gdc_resume_panel_styles() {
+function gend_society_resume_panel_styles() {
     static $done = false;
     if ( $done ) return;
     $done = true;
@@ -422,7 +422,7 @@ function gdc_resume_panel_styles() {
 /**
  * Editor JS — collects the form into JSON and POSTs to admin-ajax.
  */
-function gdc_resume_editor_script() {
+function gend_society_resume_editor_script() {
     ?>
     <script>
     (function () {
@@ -497,7 +497,7 @@ function gdc_resume_editor_script() {
             statusEl.textContent = '<?php echo esc_js( __( 'Saving…', 'gend-society' ) ); ?>';
 
             var body = new URLSearchParams();
-            body.set('action', 'gdc_save_resume');
+            body.set('action', 'gend_society_save_resume');
             body.set('nonce', nonce);
             body.set('data', JSON.stringify(collect()));
 
