@@ -92,6 +92,9 @@ const GS_INV_REVIEW = array(
 	"user_meta\0gs_invite_template"        => array( 'new' => 'auto', 'owner' => 'gend-society', 'keep_guarded' => true, 'note' => 'a WP_Error code of the same name (profile-invite.php) stays' ),
 	"function\0gs_gcloud_encrypt"          => array( 'new' => 'auto', 'owner' => 'gend-society', 'keep_guarded' => true, 'note' => 'a WP_Error code of the same name (web-shell-gcloud.php) stays' ),
 	"function\0gs_gcloud_decrypt"          => array( 'new' => 'auto', 'owner' => 'gend-society', 'keep_guarded' => true, 'note' => 'a WP_Error code of the same name (web-shell-gcloud.php) stays' ),
+	// Live-only listener (2026-10-09): contracts-and-payments class-dgen-topup.php hooks this filter at priority 99
+	// to blank the DGEN top-up card while gend_dgen_topup_enabled is off. Rename it, but bridge new -> old listeners.
+	"hook\0gdc_profile_header_balances"   => array( 'new' => 'auto', 'owner' => 'gend-society', 'external_manual' => array( 'contracts-and-payments' ), 'external_roles' => array( 'listen' => array( 'contracts-and-payments' ) ), 'note' => 'C&P listens (priority 99) to hide the DGEN top-up while purchases are disabled; compat must apply old-name listeners when the new hook fires' ),
 	"hook\0gs_install_paired"              => array( 'new' => null, 'owner' => 'public pairing hook', 'note' => 'listened to by gend-society; fired by nobody in repo or live; keep' ),
 );
 
@@ -1184,7 +1187,7 @@ function gs_inv_make_map( array $inv, array $callers, ?array $prev ): array {
 			if ( array_key_exists( 'new', $r ) ) {
 				$e['new'] = 'auto' === $r['new'] ? gs_inv_new_name( $e['old'], $e['kind'] ) : $r['new'];
 			}
-			foreach ( array( 'owner', 'note', 'keep_guarded', 'external_manual' ) as $col ) {
+			foreach ( array( 'owner', 'note', 'keep_guarded', 'external_manual', 'external_roles' ) as $col ) {
 				if ( isset( $r[ $col ] ) ) {
 					$e[ $col ] = $r[ $col ];
 				}

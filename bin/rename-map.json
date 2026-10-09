@@ -8227,7 +8227,19 @@
             "at": [
                 "inc/member-profile-header.php:740"
             ],
-            "external": []
+            "external": [
+                "contracts-and-payments"
+            ],
+            "external_manual": [
+                "contracts-and-payments"
+            ],
+            "external_roles": {
+                "listen": [
+                    "contracts-and-payments"
+                ]
+            },
+            "reviewed": true,
+            "note": "C&P listens (priority 99) to hide the DGEN top-up while purchases are disabled; compat must apply old-name listeners when the new hook fires"
         },
         {
             "old": "gdc_profile_linked_app",
