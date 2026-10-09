@@ -1,0 +1,38 @@
+<?xml version="1.0"?>
+<ruleset name="GenD Society">
+	<description>GenD Society compliance gate: every global is prefixed (WPCS PrefixAllGlobals) and the code runs on PHP 8.1+ (PHPCompatibilityWP). Run on a built tree: vendor/bin/phpcs --standard=phpcs.xml.dist dist/wporg/gend-society</description>
+
+	<arg name="extensions" value="php"/>
+	<arg name="colors"/>
+	<arg value="s"/>
+
+	<!-- Default target when run without a path: the plugin source in the repo root. -->
+	<file>.</file>
+
+	<!-- Repo tooling, UAT material and build output never ship. -->
+	<exclude-pattern>*/handoff/*</exclude-pattern>
+	<exclude-pattern>*/bin/*</exclude-pattern>
+	<exclude-pattern>*/vendor/*</exclude-pattern>
+	<exclude-pattern>*/node_modules/*</exclude-pattern>
+	<exclude-pattern>*/.cache/*</exclude-pattern>
+	<!-- The bundled block theme is its own WordPress theme (theme prefix rules, not this plugin's). -->
+	<exclude-pattern>*/themes/*</exclude-pattern>
+
+	<!-- Old-name compat layer (full build only): these files exist to hold the
+	     pre-rename gs_/gdc_/gci_/GS_ names for sibling plugins, so they cannot be prefixed. -->
+	<exclude-pattern>*/inc/compat-aliases.php</exclude-pattern>
+	<exclude-pattern>*/inc/compat-bridges.php</exclude-pattern>
+
+	<rule ref="WordPress.NamingConventions.PrefixAllGlobals">
+		<properties>
+			<property name="prefixes" type="array">
+				<element value="gend_society"/>
+				<element value="gend_gs"/>
+			</property>
+		</properties>
+	</rule>
+
+	<!-- Requires PHP: 8.1 (plugin header + readme). -->
+	<config name="testVersion" value="8.1-"/>
+	<rule ref="PHPCompatibilityWP"/>
+</ruleset>

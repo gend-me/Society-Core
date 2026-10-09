@@ -1,0 +1,8 @@
+{
+	"name": "clean copy of the repo",
+	"expect": "clean",
+	"knownBaseline_note": "Baseline of main d9f08ca: hot-linked gend.me images in core/customer files. Plans 105-04/05 move them behind inc/remote-assets.php; Plan 105-11 empties this list so the clean build must exit 0.",
+	"knownBaseline": [
+		"^BUILD FAIL wporg: gend-uploads-url: (assets/admin-script.js|inc/admin-style.php|inc/feature-cards.php)$"
+	]
+}

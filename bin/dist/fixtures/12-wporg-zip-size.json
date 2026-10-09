@@ -1,0 +1,24 @@
+{
+	"name": "wporg zip over 10 MB",
+	"random": {
+		"assets/zz-big.webp": 11534336
+	},
+	"exclude": {
+		"wporg": {
+			"add": [
+				"# allow-unreferenced: assets/zz-big.webp"
+			]
+		},
+		"full": {
+			"add": [
+				"# allow-unreferenced: assets/zz-big.webp"
+			]
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "zip-size"
+		}
+	]
+}

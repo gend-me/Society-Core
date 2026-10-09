@@ -1,0 +1,16 @@
+{
+	"name": "inc/ PHP file missing from the manifest",
+	"write": {
+		"inc/zz-unlisted.php": "<?php\n// not in the manifest\n"
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "unlisted-inc-php"
+		},
+		{
+			"variant": "full",
+			"rule": "unlisted-inc-php"
+		}
+	]
+}

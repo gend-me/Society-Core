@@ -1,0 +1,16 @@
+{
+	"name": "themes/ reaches the wporg build when its exclude line is removed",
+	"exclude": {
+		"wporg": {
+			"remove": [
+				"themes/"
+			]
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "forbidden-path themes"
+		}
+	]
+}

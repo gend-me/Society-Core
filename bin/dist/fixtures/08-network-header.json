@@ -1,0 +1,16 @@
+{
+	"name": "Network: header shipped (header transform bypassed)",
+	"flags": [
+		"--no-header-transform"
+	],
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "network-header"
+		},
+		{
+			"variant": "full",
+			"rule": "network-header"
+		}
+	]
+}

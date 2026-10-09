@@ -41,3 +41,22 @@ inc/admin/
 
 # Chat-flow wireframe seed data: never deployed; inc/wireframe-store.php only adds it as a LEO seed dir when is_dir()
 chatflows/
+
+# Repo tooling: npm manifest for the dist build (bin/build-dist.js), never deployed
+package.json
+# Repo tooling: npm lockfile for the dist build, never deployed
+package-lock.json
+# Repo tooling: Composer dev-only manifest (PHPCS/WPCS/PHPCompatibilityWP), never deployed
+composer.json
+# Repo tooling: Composer lockfile for the dev-only coding-standards tools, never deployed
+composer.lock
+# Repo tooling: PHPCS ruleset for the compliance gate, never deployed
+phpcs.xml.dist
+# Repo tooling: build output (git-ignored), never deployed
+dist/
+# Repo tooling: npm dev dependencies (git-ignored), never deployed
+node_modules/
+# Repo tooling: Composer dev dependencies (git-ignored), never deployed
+vendor/
+# Repo tooling: local Plugin Check / PHPCS caches (git-ignored), never deployed
+.cache/

@@ -1,0 +1,24 @@
+{
+    "name": "gend-me/gend-society-dev",
+    "description": "Dev-only tooling for the GenD Society plugin (coding standards). Nothing here ships.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require-dev": {
+        "squizlabs/php_codesniffer": "^3.13.5",
+        "wp-coding-standards/wpcs": "^3.4.1",
+        "phpcompatibility/phpcompatibility-wp": "^2.1.8",
+        "dealerdirect/phpcodesniffer-composer-installer": "^1.0"
+    },
+    "config": {
+        "allow-plugins": {
+            "dealerdirect/phpcodesniffer-composer-installer": true
+        },
+        "platform": {
+            "php": "8.1"
+        }
+    },
+    "scripts": {
+        "phpcs:wporg": "phpcs --standard=phpcs.xml.dist dist/wporg/gend-society",
+        "phpcs:full": "phpcs --standard=phpcs.xml.dist dist/full/gend-society"
+    }
+}

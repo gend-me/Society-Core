@@ -1,0 +1,14 @@
+{
+  "name": "gend-society-build",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Build tooling for the GenD Society plugin (dist zips). Never shipped.",
+  "license": "GPL-2.0-or-later",
+  "scripts": {
+    "build": "node bin/build-dist.js",
+    "build:self-test": "node bin/build-dist.js --self-test"
+  },
+  "devDependencies": {
+    "archiver": "^7.0.1"
+  }
+}

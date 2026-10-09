@@ -120,7 +120,7 @@ first_value() { # first_value <file> <perl-regex capturing value> [docblock-only
 
 scan_cache_busters() {
   local files
-  files=$(find . \( -path ./.git -o -path ./handoff -o -path ./themes -o -name node_modules \) -prune -o \
+  files=$(find . \( -path ./.git -o -path ./handoff -o -path ./themes -o -path ./dist -o -path ./vendor -o -path ./.cache -o -name node_modules \) -prune -o \
           -type f \( -name '*.php' -o -name '*.js' \) -print | sed 's#^\./##' | sort)
   # shellcheck disable=SC2086
   printf '%s\n' "${ALLOWLIST[@]}" | perl -e '
