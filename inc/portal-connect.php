@@ -54,18 +54,18 @@ function gs_portal_connect_render_page() {
     $connected_at  = (int) get_option('gs_connected_at', 0);
     $is_connected  = $install_id !== '' && $install_token !== '';
 
-    $notice = '';
+    $notice_cls = '';
+    $message    = '';
     if (isset($_GET['gs_connect_status'])) {
         $status = sanitize_text_field((string) $_GET['gs_connect_status']);
         $message = isset($_GET['gs_connect_message']) ? sanitize_text_field((string) $_GET['gs_connect_message']) : '';
-        $cls = $status === 'success' ? 'notice-success' : 'notice-error';
-        $notice = '<div class="notice ' . esc_attr($cls) . '"><p>' . esc_html($message) . '</p></div>';
+        $notice_cls = $status === 'success' ? 'notice-success' : 'notice-error';
     }
 
     ?>
     <div class="wrap">
         <h1><?php esc_html_e('Connect to gend.me', 'gend-society'); ?></h1>
-        <?php echo $notice; // already escaped above ?>
+        <?php if ($notice_cls !== '') : ?><div class="notice <?php echo esc_attr($notice_cls); ?>"><p><?php echo esc_html($message); ?></p></div><?php endif; ?>
 
         <?php if ($is_connected) : ?>
             <p><strong><?php esc_html_e('This site is connected.', 'gend-society'); ?></strong></p>

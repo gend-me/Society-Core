@@ -109,6 +109,7 @@ function gs_render_hosting_records_modal( $payload = array() ) {
                 'errTypeInvalid'     => __( 'Unsupported record type.', 'gend-society' ),
                 'warnDeleteMx'       => __( 'Deleting this MX record will break inbound email for this domain.', 'gend-society' ),
                 'warnDeleteApexA'    => __( 'Removing the apex A record while this zone is active will take the site offline.', 'gend-society' ),
+                /* translators: %s: Human-readable time difference, e.g. 5 mins. */
                 'lastChangeAgo'      => __( 'Last change: %s ago', 'gend-society' ),
                 'cfAuthMissing'      => __( 'Cloudflare is not configured on the hub. Contact your operator.', 'gend-society' ),
                 'cfRateLimit'        => __( 'Cloudflare rate-limited. Retry in {n} seconds.', 'gend-society' ),

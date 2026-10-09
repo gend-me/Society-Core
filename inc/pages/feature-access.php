@@ -15,7 +15,7 @@
 // truncating the rest of the page (including the footer scripts that apply
 // the full-width layout class) and surfacing as a 500 on the whole request.
 if (!current_user_can('list_users') && !(function_exists('gs_group_tabs_user_has_access') && gs_group_tabs_user_has_access())) {
-    wp_die(__('You do not have sufficient permissions to access this page.', 'gend-society'));
+    wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'gend-society'));
 }
 
 // Handle form submission to save feature access
@@ -65,7 +65,7 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
             ?>
             <div class="gs-card">
                 <div class="gs-card-header">
-                    <h3><?php printf(esc_html__('Editing Access for: %s', 'gend-society'), esc_html($edit_user_obj->display_name)); ?></h3>
+                    <h3><?php printf(/* translators: %s: User display name. */ esc_html__('Editing Access for: %s', 'gend-society'), esc_html($edit_user_obj->display_name)); ?></h3>
                     <a href="<?php echo esc_url(admin_url('admin.php?page=gs-feature-access')); ?>" class="button"><?php esc_html_e('&larr; Back to List', 'gend-society'); ?></a>
                 </div>
                 <div class="gs-card-body">
@@ -73,7 +73,7 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
                         <?php wp_nonce_field('gs_save_feature_access', 'gs_feature_access_nonce'); ?>
                         <input type="hidden" name="target_user_id" value="<?php echo esc_attr($edit_user_id); ?>">
                         
-                        <?php echo gs_render_menu_access_checkboxes($edit_user_id); ?>
+                        <?php echo gs_render_menu_access_checkboxes($edit_user_id); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Checkbox form markup built with esc_attr()/esc_html() in gs_render_menu_access_checkboxes(); kses would strip the <input>s. ?>
                         
                         <p class="submit">
                             <input type="submit" name="submit" id="submit" class="button button-primary" value="<?php esc_attr_e('Save Feature Access', 'gend-society'); ?>">
