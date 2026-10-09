@@ -131,7 +131,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:222"
+                "inc/feature-cards.php:236"
             ],
             "external": []
         },
@@ -177,7 +177,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2389"
+                "inc/group-davinci-ai-tab.php:2395"
             ],
             "external": []
         },
@@ -188,7 +188,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2447"
+                "inc/group-davinci-ai-tab.php:2453"
             ],
             "external": []
         },
@@ -199,7 +199,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2339"
+                "inc/group-davinci-ai-tab.php:2345"
             ],
             "external": []
         },
@@ -232,7 +232,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/pages/feature-upgrade.php:272"
+                "inc/pages/feature-upgrade.php:273"
             ],
             "external": []
         },
@@ -262,7 +262,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3833"
+                "inc/dashboard-hosting.php:3836"
             ],
             "external": []
         },
@@ -273,7 +273,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3822"
+                "inc/dashboard-hosting.php:3825"
             ],
             "external": []
         },
@@ -284,7 +284,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4148"
+                "inc/dashboard-hosting.php:4151"
             ],
             "external": []
         },
@@ -295,7 +295,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4155"
+                "inc/dashboard-hosting.php:4158"
             ],
             "external": []
         },
@@ -306,7 +306,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4162"
+                "inc/dashboard-hosting.php:4165"
             ],
             "external": []
         },
@@ -317,7 +317,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4216"
+                "inc/dashboard-hosting.php:4219"
             ],
             "external": []
         },
@@ -328,7 +328,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3846"
+                "inc/dashboard-hosting.php:3849"
             ],
             "external": []
         },
@@ -339,7 +339,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3868"
+                "inc/dashboard-hosting.php:3871"
             ],
             "external": []
         },
@@ -350,7 +350,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3853"
+                "inc/dashboard-hosting.php:3856"
             ],
             "external": []
         },
@@ -656,7 +656,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:247"
+                "inc/feature-cards.php:261"
             ],
             "external": []
         },
@@ -667,7 +667,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:284"
+                "inc/feature-cards.php:298"
             ],
             "external": []
         },
@@ -678,7 +678,7 @@
             "owner": "vendor-app-manager",
             "tier": "customer",
             "at": [
-                "inc/dashboard-remote-membership.php:2775 read"
+                "inc/dashboard-remote-membership.php:2778 read"
             ],
             "note": "owned by vendor-app-manager; never migrated or renamed",
             "external": [
@@ -1130,7 +1130,7 @@
             "owner": "gend-society",
             "tier": "core",
             "at": [
-                "gend-society.php:29"
+                "gend-society.php:32"
             ],
             "external": []
         },
@@ -1141,7 +1141,7 @@
             "owner": "gend-society",
             "tier": "core",
             "at": [
-                "gend-society.php:18"
+                "gend-society.php:21"
             ],
             "external": []
         },
@@ -1328,7 +1328,7 @@
             "owner": "gend-society",
             "tier": "core",
             "at": [
-                "gend-society.php:19"
+                "gend-society.php:22"
             ],
             "external": []
         },
@@ -1339,7 +1339,7 @@
             "owner": "gend-society",
             "tier": "core",
             "at": [
-                "gend-society.php:17"
+                "gend-society.php:20"
             ],
             "external": [
                 "blog-manager",
@@ -1445,8 +1445,8 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2520 read",
-                "inc/group-davinci-ai-tab.php:2521 write"
+                "inc/group-davinci-ai-tab.php:2526 read",
+                "inc/group-davinci-ai-tab.php:2527 write"
             ],
             "external": []
         },
@@ -1719,8 +1719,8 @@
             "tier": null,
             "note": "defined outside gend-society; never renamed",
             "at": [
-                "inc/admin-style.php:105",
-                "inc/admin-style.php:106"
+                "inc/admin-style.php:113",
+                "inc/admin-style.php:114"
             ],
             "external": []
         },
@@ -2408,10 +2408,10 @@
             "note": "defined outside gend-society; never renamed",
             "at": [
                 "inc/dashboard-hosting.php:784",
-                "inc/dashboard-hosting.php:3589",
-                "inc/dashboard-hosting.php:3595",
-                "inc/dashboard-hosting.php:3667",
-                "inc/dashboard-hosting.php:3668",
+                "inc/dashboard-hosting.php:3593",
+                "inc/dashboard-hosting.php:3599",
+                "inc/dashboard-hosting.php:3671",
+                "inc/dashboard-hosting.php:3672",
                 "inc/dashboard-remote-membership.php:1365"
             ],
             "external": [
@@ -2441,8 +2441,8 @@
             "at": [
                 "inc/dashboard-hosting.php:214",
                 "inc/dashboard-hosting.php:234",
-                "inc/dashboard-hosting.php:1498",
-                "inc/dashboard-hosting.php:2041",
+                "inc/dashboard-hosting.php:1501",
+                "inc/dashboard-hosting.php:2045",
                 "inc/dashboard-remote-membership.php:1274",
                 "inc/dashboard-remote-membership.php:1275"
             ],
@@ -3453,7 +3453,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:223"
+                "inc/feature-cards.php:237"
             ],
             "external": []
         },
@@ -3486,7 +3486,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:248"
+                "inc/feature-cards.php:262"
             ],
             "external": []
         },
@@ -3497,7 +3497,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:285"
+                "inc/feature-cards.php:299"
             ],
             "external": []
         },
@@ -3508,7 +3508,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/frontend-bar.php:609"
+                "inc/frontend-bar.php:610"
             ],
             "external": []
         },
@@ -3519,7 +3519,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/frontend-bar.php:790"
+                "inc/frontend-bar.php:791"
             ],
             "external": []
         },
@@ -4325,7 +4325,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2259"
+                "inc/group-davinci-ai-tab.php:2265"
             ],
             "external": []
         },
@@ -4336,7 +4336,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2288"
+                "inc/group-davinci-ai-tab.php:2294"
             ],
             "external": []
         },
@@ -4347,7 +4347,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2390"
+                "inc/group-davinci-ai-tab.php:2396"
             ],
             "external": []
         },
@@ -4358,7 +4358,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2440"
+                "inc/group-davinci-ai-tab.php:2446"
             ],
             "external": []
         },
@@ -4369,7 +4369,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2315"
+                "inc/group-davinci-ai-tab.php:2321"
             ],
             "external": []
         },
@@ -4380,7 +4380,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2448"
+                "inc/group-davinci-ai-tab.php:2454"
             ],
             "external": []
         },
@@ -4391,7 +4391,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2415"
+                "inc/group-davinci-ai-tab.php:2421"
             ],
             "external": []
         },
@@ -4402,7 +4402,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2419"
+                "inc/group-davinci-ai-tab.php:2425"
             ],
             "external": []
         },
@@ -4413,7 +4413,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2526"
+                "inc/group-davinci-ai-tab.php:2532"
             ],
             "external": []
         },
@@ -4424,7 +4424,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2433"
+                "inc/group-davinci-ai-tab.php:2439"
             ],
             "external": []
         },
@@ -4435,7 +4435,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2295"
+                "inc/group-davinci-ai-tab.php:2301"
             ],
             "external": []
         },
@@ -4446,7 +4446,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2304"
+                "inc/group-davinci-ai-tab.php:2310"
             ],
             "external": []
         },
@@ -4457,7 +4457,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2340"
+                "inc/group-davinci-ai-tab.php:2346"
             ],
             "external": []
         },
@@ -4468,7 +4468,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2266"
+                "inc/group-davinci-ai-tab.php:2272"
             ],
             "external": []
         },
@@ -4479,7 +4479,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2590"
+                "inc/group-davinci-ai-tab.php:2596"
             ],
             "external": []
         },
@@ -4521,7 +4521,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/frontend-bar.php:310"
+                "inc/frontend-bar.php:311"
             ],
             "external": []
         },
@@ -4543,7 +4543,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/frontend-bar.php:998"
+                "inc/frontend-bar.php:999"
             ],
             "external": []
         },
@@ -4576,7 +4576,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:370"
+                "inc/feature-cards.php:384"
             ],
             "external": []
         },
@@ -5124,7 +5124,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:13"
+                "inc/feature-cards.php:23"
             ],
             "external": []
         },
@@ -5135,7 +5135,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-remote-membership.php:2507"
+                "inc/dashboard-remote-membership.php:2510"
             ],
             "external": []
         },
@@ -5157,7 +5157,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-remote-membership.php:2537"
+                "inc/dashboard-remote-membership.php:2540"
             ],
             "external": []
         },
@@ -5375,7 +5375,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:85"
+                "inc/feature-cards.php:95"
             ],
             "external": []
         },
@@ -5397,7 +5397,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3795"
+                "inc/dashboard-hosting.php:3798"
             ],
             "external": []
         },
@@ -5408,7 +5408,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3231"
+                "inc/dashboard-hosting.php:3235"
             ],
             "external": []
         },
@@ -5419,7 +5419,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3808"
+                "inc/dashboard-hosting.php:3811"
             ],
             "external": []
         },
@@ -5430,7 +5430,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3245"
+                "inc/dashboard-hosting.php:3249"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5448,7 +5448,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3301"
+                "inc/dashboard-hosting.php:3305"
             ],
             "external": []
         },
@@ -5459,7 +5459,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3124"
+                "inc/dashboard-hosting.php:3128"
             ],
             "external": [
                 "projects"
@@ -5480,7 +5480,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3081"
+                "inc/dashboard-hosting.php:3085"
             ],
             "external": [
                 "gend-media-optimizer",
@@ -5512,7 +5512,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3034"
+                "inc/dashboard-hosting.php:3038"
             ],
             "external": [
                 "projects",
@@ -5537,7 +5537,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3897"
+                "inc/dashboard-hosting.php:3900"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5555,7 +5555,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3483"
+                "inc/dashboard-hosting.php:3487"
             ],
             "external": []
         },
@@ -5566,7 +5566,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3533"
+                "inc/dashboard-hosting.php:3537"
             ],
             "external": []
         },
@@ -5577,7 +5577,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3587"
+                "inc/dashboard-hosting.php:3591"
             ],
             "external": []
         },
@@ -5588,7 +5588,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3221"
+                "inc/dashboard-hosting.php:3225"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5606,7 +5606,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4063"
+                "inc/dashboard-hosting.php:4066"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5624,7 +5624,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4098"
+                "inc/dashboard-hosting.php:4101"
             ],
             "external": []
         },
@@ -5635,7 +5635,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:4009"
+                "inc/dashboard-hosting.php:4012"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5653,7 +5653,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3226"
+                "inc/dashboard-hosting.php:3230"
             ],
             "external": [
                 "gend-media-optimizer",
@@ -5676,7 +5676,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3764"
+                "inc/dashboard-hosting.php:3767"
             ],
             "external": []
         },
@@ -5687,7 +5687,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3465"
+                "inc/dashboard-hosting.php:3469"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5705,7 +5705,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3690"
+                "inc/dashboard-hosting.php:3694"
             ],
             "external": []
         },
@@ -5727,7 +5727,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3713"
+                "inc/dashboard-hosting.php:3717"
             ],
             "external": []
         },
@@ -5770,7 +5770,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3367"
+                "inc/dashboard-hosting.php:3371"
             ],
             "external": []
         },
@@ -5781,7 +5781,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3696"
+                "inc/dashboard-hosting.php:3700"
             ],
             "external": []
         },
@@ -5814,7 +5814,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3640"
+                "inc/dashboard-hosting.php:3644"
             ],
             "external": [
                 "vendor-app-manager"
@@ -5832,7 +5832,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/frontend-bar.php:881"
+                "inc/frontend-bar.php:882"
             ],
             "external": [
                 "projects"
@@ -6604,7 +6604,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-remote-membership.php:2574"
+                "inc/dashboard-remote-membership.php:2577"
             ],
             "external": []
         },
@@ -6615,7 +6615,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-remote-membership.php:2760"
+                "inc/dashboard-remote-membership.php:2763"
             ],
             "external": []
         },
@@ -7039,7 +7039,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/pages/dashboard.php:1132"
+                "inc/pages/dashboard.php:1145"
             ],
             "external": []
         },
@@ -7061,7 +7061,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/feature-cards.php:105"
+                "inc/feature-cards.php:115"
             ],
             "external": []
         },
@@ -7083,7 +7083,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/frontend-bar.php:330"
+                "inc/frontend-bar.php:331"
             ],
             "external": [
                 "mu:gdc-iframe-embed.php",
@@ -8001,12 +8001,12 @@
             "tier": "customer,container",
             "scope": "group",
             "at": [
-                "inc/dashboard-hosting.php:4186 read",
+                "inc/dashboard-hosting.php:4189 read",
                 "inc/dashboard-remote-membership.php:1615 read",
                 "inc/group-app-tabs.php:2733 read",
-                "inc/group-davinci-ai-tab.php:1410 read",
-                "inc/group-davinci-ai-tab.php:2345 read",
-                "inc/group-davinci-ai-tab.php:2549 read"
+                "inc/group-davinci-ai-tab.php:1416 read",
+                "inc/group-davinci-ai-tab.php:2351 read",
+                "inc/group-davinci-ai-tab.php:2555 read"
             ],
             "note": "owned by vendor-app-manager; never migrated or renamed",
             "external": [
@@ -8230,6 +8230,7 @@
             "external": [
                 "contracts-and-payments"
             ],
+            "note": "C&P listens (priority 99) to hide the DGEN top-up while purchases are disabled; compat must apply old-name listeners when the new hook fires",
             "external_manual": [
                 "contracts-and-payments"
             ],
@@ -8238,8 +8239,7 @@
                     "contracts-and-payments"
                 ]
             },
-            "reviewed": true,
-            "note": "C&P listens (priority 99) to hide the DGEN top-up while purchases are disabled; compat must apply old-name listeners when the new hook fires"
+            "reviewed": true
         },
         {
             "old": "gdc_profile_linked_app",
@@ -8397,7 +8397,7 @@
             "owner": "gend-society",
             "tier": "container",
             "at": [
-                "inc/group-davinci-ai-tab.php:2525"
+                "inc/group-davinci-ai-tab.php:2531"
             ],
             "external": []
         },
@@ -8498,7 +8498,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3236"
+                "inc/dashboard-hosting.php:3240"
             ],
             "external": []
         },
@@ -8509,8 +8509,8 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:2072",
-                "inc/dashboard-hosting.php:3191"
+                "inc/dashboard-hosting.php:2076",
+                "inc/dashboard-hosting.php:3195"
             ],
             "external": [
                 "vendor-app-manager"
@@ -8555,7 +8555,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3218"
+                "inc/dashboard-hosting.php:3222"
             ],
             "external": []
         },
@@ -8566,7 +8566,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3223"
+                "inc/dashboard-hosting.php:3227"
             ],
             "external": []
         },
@@ -8577,7 +8577,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/dashboard-hosting.php:3228"
+                "inc/dashboard-hosting.php:3232"
             ],
             "external": []
         },
@@ -8965,7 +8965,7 @@
             "scope": "blog",
             "at": [
                 "inc/dashboard-overview.php:167 read",
-                "inc/dashboard-remote-membership.php:2772 read",
+                "inc/dashboard-remote-membership.php:2775 read",
                 "inc/group-embed.php:138 read"
             ],
             "note": "owned by vendor-app-manager; never migrated or renamed",
@@ -9438,7 +9438,7 @@
             "scope": "blog",
             "prefix": true,
             "at": [
-                "inc/dashboard-hosting.php:3879 write"
+                "inc/dashboard-hosting.php:3882 write"
             ],
             "external": []
         },
@@ -9450,7 +9450,7 @@
             "tier": "customer",
             "scope": "blog",
             "at": [
-                "inc/dashboard-hosting.php:3861 read"
+                "inc/dashboard-hosting.php:3864 read"
             ],
             "note": "written through the owned dynamic prefix gs_hosting_",
             "external": []
@@ -9463,7 +9463,7 @@
             "tier": "customer",
             "scope": "blog",
             "at": [
-                "inc/dashboard-hosting.php:3860 read"
+                "inc/dashboard-hosting.php:3863 read"
             ],
             "note": "written through the owned dynamic prefix gs_hosting_",
             "external": []
@@ -9476,7 +9476,7 @@
             "tier": "customer",
             "scope": "blog",
             "at": [
-                "inc/dashboard-hosting.php:3859 read"
+                "inc/dashboard-hosting.php:3862 read"
             ],
             "note": "written through the owned dynamic prefix gs_hosting_",
             "external": []
@@ -9950,9 +9950,9 @@
             "tier": "container",
             "scope": "network",
             "at": [
-                "inc/group-davinci-ai-tab.php:2416 read",
-                "inc/group-davinci-ai-tab.php:2438 write",
-                "inc/group-davinci-ai-tab.php:2578 write"
+                "inc/group-davinci-ai-tab.php:2422 read",
+                "inc/group-davinci-ai-tab.php:2444 write",
+                "inc/group-davinci-ai-tab.php:2584 write"
             ],
             "external": []
         },
@@ -10055,8 +10055,8 @@
             "prefix": true,
             "at": [
                 "inc/pages/dashboard.php:135 write",
-                "inc/pages/dashboard.php:1160 read",
-                "inc/pages/dashboard.php:1162 delete"
+                "inc/pages/dashboard.php:1173 read",
+                "inc/pages/dashboard.php:1175 delete"
             ],
             "external": []
         },
@@ -10185,8 +10185,8 @@
                 "$cache_key"
             ],
             "at": [
-                "inc/dashboard-hosting.php:3303 read",
-                "inc/dashboard-hosting.php:3351 write"
+                "inc/dashboard-hosting.php:3307 read",
+                "inc/dashboard-hosting.php:3355 write"
             ],
             "external": []
         },
@@ -10201,8 +10201,8 @@
                 "$cache_key"
             ],
             "at": [
-                "inc/dashboard-hosting.php:3247 read",
-                "inc/dashboard-hosting.php:3287 write"
+                "inc/dashboard-hosting.php:3251 read",
+                "inc/dashboard-hosting.php:3291 write"
             ],
             "external": []
         },
@@ -10217,10 +10217,10 @@
                 "$key"
             ],
             "at": [
-                "inc/dashboard-hosting.php:3083 read",
-                "inc/dashboard-hosting.php:3110 write",
-                "inc/dashboard-hosting.php:4191 delete",
-                "inc/dashboard-hosting.php:4200 delete"
+                "inc/dashboard-hosting.php:3087 read",
+                "inc/dashboard-hosting.php:3114 write",
+                "inc/dashboard-hosting.php:4194 delete",
+                "inc/dashboard-hosting.php:4203 delete"
             ],
             "external": []
         },
@@ -10578,7 +10578,7 @@
                 "inc/admin-menu.php:386 read",
                 "inc/admin-menu.php:534 read",
                 "inc/admin-menu.php:621 write",
-                "inc/frontend-bar.php:719 read",
+                "inc/frontend-bar.php:720 read",
                 "inc/pages/feature-access.php:28 write"
             ],
             "external": [
@@ -10694,7 +10694,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/pages/shortcodes.php:97"
+                "inc/pages/shortcodes.php:69"
             ],
             "scope": "file",
             "files": [
@@ -10707,13 +10707,13 @@
             "new": "$gend_society_code",
             "kind": "variable",
             "owner": "gend-society",
-            "tier": "customer",
+            "tier": "container",
             "at": [
-                "inc/pages/shortcodes.php:57"
+                "inc/pages/shortcodes-editor.php:53"
             ],
             "scope": "file",
             "files": [
-                "inc/pages/shortcodes.php"
+                "inc/pages/shortcodes-editor.php"
             ],
             "external": []
         },
@@ -10782,13 +10782,13 @@
             "new": "$gend_society_existing",
             "kind": "variable",
             "owner": "gend-society",
-            "tier": "customer",
+            "tier": "container",
             "at": [
-                "inc/pages/shortcodes.php:60"
+                "inc/pages/shortcodes-editor.php:56"
             ],
             "scope": "file",
             "files": [
-                "inc/pages/shortcodes.php"
+                "inc/pages/shortcodes-editor.php"
             ],
             "external": []
         },
@@ -10858,7 +10858,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/pages/shortcodes.php:95"
+                "inc/pages/shortcodes.php:67"
             ],
             "scope": "file",
             "files": [
@@ -10906,8 +10906,8 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/pages/shortcodes.php:98",
-                "inc/pages/shortcodes.php:100"
+                "inc/pages/shortcodes.php:70",
+                "inc/pages/shortcodes.php:72"
             ],
             "scope": "file",
             "files": [
@@ -10921,13 +10921,13 @@
             "new": "$gend_society_mu_file",
             "kind": "variable",
             "owner": "gend-society",
-            "tier": "customer",
+            "tier": "container",
             "at": [
-                "inc/pages/shortcodes.php:59"
+                "inc/pages/shortcodes-editor.php:55"
             ],
             "scope": "file",
             "files": [
-                "inc/pages/shortcodes.php"
+                "inc/pages/shortcodes-editor.php"
             ],
             "external": []
         },
@@ -10998,14 +10998,30 @@
             "new": "$gend_society_snippet",
             "kind": "variable",
             "owner": "gend-society",
-            "tier": "customer",
+            "tier": "container",
             "at": [
-                "inc/pages/shortcodes.php:61"
+                "inc/pages/shortcodes-editor.php:57"
             ],
             "scope": "file",
             "files": [
-                "inc/pages/shortcodes.php"
+                "inc/pages/shortcodes-editor.php"
             ],
+            "external": []
+        },
+        {
+            "old": "$tag",
+            "new": "$gend_society_tag",
+            "kind": "variable",
+            "owner": "gend-society",
+            "tier": "container",
+            "at": [
+                "inc/pages/shortcodes-editor.php:52"
+            ],
+            "scope": "file",
+            "files": [
+                "inc/pages/shortcodes-editor.php"
+            ],
+            "note": "includer inc/pages/shortcodes.php uses the same variable name; renamed inside the partial only (the partial assigns it before use)",
             "external": []
         },
         {
@@ -11015,8 +11031,7 @@
             "owner": "gend-society",
             "tier": "customer",
             "at": [
-                "inc/pages/shortcodes.php:56",
-                "inc/pages/shortcodes.php:95"
+                "inc/pages/shortcodes.php:67"
             ],
             "scope": "file",
             "files": [
