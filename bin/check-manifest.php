@@ -12,8 +12,10 @@
  *   - a tier is not one of core|customer|container|hub|updater
  *   - a need is not one of bp|wu|paired|skin|admin
  *   - a partial has no 'loaded_by' array
- *   - gend-society.php does not require exactly inc/bootstrap/context.php and
- *     inc/bootstrap/loader.php, or requires/includes any other inc/ file
+ *   - gend-society.php does not require exactly inc/bootstrap/context.php,
+ *     inc/bootstrap/key-migration.php and inc/bootstrap/loader.php (in that
+ *     order), or requires/includes any other inc/ file
+ *   - inc/compat-aliases.php exists but is not the last module (tier container)
  *   - any inc/ file decides hub-ness from a missing class
  *     (class_exists( 'Gend_CP_OAuth_Resource' )), or one of the two inline
  *     hub checks no longer calls gend_society_is_hub()
@@ -34,8 +36,8 @@ $gs_root = dirname( __DIR__ );
 if ( ! defined( 'ABSPATH' ) ) {
 	define( 'ABSPATH', $gs_root . '/' );
 }
-if ( ! defined( 'GS_DIR' ) ) {
-	define( 'GS_DIR', $gs_root . '/' );
+if ( ! defined( 'GEND_SOCIETY_DIR' ) ) {
+	define( 'GEND_SOCIETY_DIR', $gs_root . '/' );
 }
 
 $gs_errors = array();
@@ -146,7 +148,15 @@ foreach ( $gs_listed as $rel => $count ) {
 	}
 }
 
-// ── 3. gend-society.php requires only the two bootstrap files from inc/. ──
+// ── 2b. The generated compat layer loads last (every renamed name exists before its alias). ──
+if ( is_file( $gs_root . '/inc/compat-aliases.php' ) ) {
+	$gs_last = end( $gs_manifest['modules'] );
+	if ( ! is_array( $gs_last ) || ( $gs_last['file'] ?? '' ) !== 'inc/compat-aliases.php' || ( $gs_last['tier'] ?? '' ) !== 'container' ) {
+		$gs_err( "inc/compat-aliases.php: must be the LAST module, tier 'container'" );
+	}
+}
+
+// ── 3. gend-society.php requires only the three bootstrap files from inc/. ──
 $gs_entry_src = @file_get_contents( $gs_root . '/gend-society.php' );
 if ( ! is_string( $gs_entry_src ) ) {
 	$gs_err( 'gend-society.php: not readable' );
@@ -170,15 +180,15 @@ if ( ! is_string( $gs_entry_src ) ) {
 		if ( ! preg_match( '#inc/#', $arg ) ) {
 			continue;
 		}
-		if ( preg_match( '#[\'"]inc/bootstrap/(context|loader)\.php[\'"]#', $arg, $bm ) ) {
+		if ( preg_match( '#[\'"]inc/bootstrap/(context|key-migration|loader)\.php[\'"]#', $arg, $bm ) ) {
 			$bootstrap[] = $bm[1];
 			continue;
 		}
 		$gs_err( 'gend-society.php: direct ' . strtolower( $stmt[1] ) . ' of an inc/ module (' . trim( $arg ) . '); add it to the manifest instead' );
 	}
-	sort( $bootstrap );
-	if ( array( 'context', 'loader' ) !== $bootstrap ) {
-		$gs_err( 'gend-society.php: must require inc/bootstrap/context.php and inc/bootstrap/loader.php exactly once each (found: ' . ( $bootstrap ? implode( ', ', $bootstrap ) : 'none' ) . ')' );
+	// Order matters: the key migration runs after the runtime-mode resolver and before any module loads.
+	if ( array( 'context', 'key-migration', 'loader' ) !== $bootstrap ) {
+		$gs_err( 'gend-society.php: must require inc/bootstrap/context.php, inc/bootstrap/key-migration.php and inc/bootstrap/loader.php exactly once each, in that order (found: ' . ( $bootstrap ? implode( ', ', $bootstrap ) : 'none' ) . ')' );
 	}
 }
 
