@@ -23,36 +23,37 @@ if ( ! function_exists( 'gend_society_remote_asset_urls' ) ) {
 	/**
 	 * Key => URL table of every gend.me-hosted asset the plugin uses.
 	 *
-	 * Plan 105-05 replaces these URLs with the re-encoded (WebP / short
-	 * loop) uploads; until then they are the original files, so the hub
-	 * renders exactly as before.
+	 * Re-encoded uploads in gend.me's media library (plan 105-05,
+	 * 2026-10-09; attachment ids 154160-154176 on blog 1): animated and
+	 * still images as WebP at their displayed size, the Business Brain
+	 * loop as a smaller H.264 MP4. Originals stay in the library untouched.
 	 *
 	 * @return array<string,string>
 	 */
 	function gend_society_remote_asset_urls(): array {
 		return array(
 			// Admin + groups background (inc/admin-style.php, inc/frontend-bar.php).
-			'account_background'         => 'https://gend.me/wp-content/uploads/2026/03/account-background.gif',
+			'account_background'         => 'https://gend.me/wp-content/uploads/2026/10/gs105-account_background.webp',
 			// wp-admin header nav pills (assets/admin-script.js via gsAdminData).
-			'nav_pill_digital_business'  => 'https://gend.me/wp-content/uploads/2025/12/Web-App-Building-Waiting.gif',
-			'nav_pill_build_with_leo'    => 'https://gend.me/wp-content/uploads/2026/03/Untitleddesign1-ezgif.com-video-to-gif-converter.gif',
-			'nav_pill_contract_wallet'   => 'https://gend.me/wp-content/uploads/2025/11/20251113_1637_New-Video_simple_compose_01k9zjcc05e6tbycty113spf54.gif',
+			'nav_pill_digital_business'  => 'https://gend.me/wp-content/uploads/2026/10/gs105-nav_pill_digital_business.webp',
+			'nav_pill_build_with_leo'    => 'https://gend.me/wp-content/uploads/2026/10/gs105-nav_pill_build_with_leo.webp',
+			'nav_pill_contract_wallet'   => 'https://gend.me/wp-content/uploads/2026/10/gs105-nav_pill_contract_wallet.webp',
 			// AI widget (inc/ai-widget.php).
-			'ai_widget_icon'             => 'https://gend.me/wp-content/uploads/2025/12/Futuristic_Logo_Animation_Generation-ezgif.com-crop-1.gif',
-			'ai_widget_leo_avatar'       => 'https://gend.me/wp-content/uploads/2025/12/Animated_Profile_Picture_At_Desk-ezgif.com-optimize.gif',
+			'ai_widget_icon'             => 'https://gend.me/wp-content/uploads/2026/10/gs105-ai_widget_icon.webp',
+			'ai_widget_leo_avatar'       => 'https://gend.me/wp-content/uploads/2026/10/gs105-ai_widget_leo_avatar.webp',
 			// Feature cards (inc/feature-cards.php).
-			'feature_card_wireframe'     => 'https://gend.me/wp-content/uploads/2026/02/Wireframe-Generation.png',
-			'feature_card_blog'          => 'https://gend.me/wp-content/uploads/2026/02/Social-Blogs.png',
-			'feature_card_email'         => 'https://gend.me/wp-content/uploads/2026/02/Email-Nurturing.png',
-			'feature_card_store'         => 'https://gend.me/wp-content/uploads/2026/02/Store-Management.png',
-			'feature_card_sales'         => 'https://gend.me/wp-content/uploads/2026/02/Sales-Team.png',
-			'feature_card_projects'      => 'https://gend.me/wp-content/uploads/2026/02/Remote-Projects.png',
-			'feature_card_social'        => 'https://gend.me/wp-content/uploads/2026/02/Social-Profiles.png',
-			'feature_card_membership'    => 'https://gend.me/wp-content/uploads/2026/02/Membership-Management.png',
-			'feature_card_rewards'       => 'https://gend.me/wp-content/uploads/2026/02/Member-Rewards.png',
+			'feature_card_wireframe'     => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_wireframe.webp',
+			'feature_card_blog'          => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_blog.webp',
+			'feature_card_email'         => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_email.webp',
+			'feature_card_store'         => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_store.webp',
+			'feature_card_sales'         => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_sales.webp',
+			'feature_card_projects'      => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_projects.webp',
+			'feature_card_social'        => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_social.webp',
+			'feature_card_membership'    => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_membership.webp',
+			'feature_card_rewards'       => 'https://gend.me/wp-content/uploads/2026/10/gs105-feature_card_rewards.webp',
 			// Davinci "Business Brain" hub (inc/group-davinci-ai-tab.php).
-			'business_brain'             => 'https://gend.me/wp-content/uploads/2026/06/Resized-Business-Brain.png',
-			'business_brain_video'       => 'https://gend.me/wp-content/uploads/2026/06/animate_this_ina_looping_anima.mp4',
+			'business_brain'             => 'https://gend.me/wp-content/uploads/2026/10/gs105-business_brain.webp',
+			'business_brain_video'       => 'https://gend.me/wp-content/uploads/2026/10/gs105-business_brain_video.mp4',
 		);
 	}
 }
