@@ -619,6 +619,13 @@ return array(
 			'loaded_by' => array( 'inc/admin-menu.php' ),
 		),
 		array(
+			'file'      => 'inc/pages/shortcodes-editor.php',
+			'tier'      => 'container',
+			'needs'     => array(),
+			'loaded_by' => array( 'inc/pages/shortcodes.php' ),
+			'note'      => 'Phase 105: the "New Shortcode" PHP writer (mu-plugins/gs-shortcodes.php); not in the wordpress.org build.',
+		),
+		array(
 			'file'      => 'inc/pages/store.php',
 			'tier'      => 'customer',
 			'needs'     => array(),
