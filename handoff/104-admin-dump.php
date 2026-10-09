@@ -121,7 +121,7 @@ $gs104d_out = array(
 	'user'         => $gs104d_login,
 	'user_id'      => get_current_user_id(),
 	'runtime_mode' => function_exists( 'gend_society_runtime_mode' ) ? gend_society_runtime_mode() : null,
-	'gs_version'   => defined( 'GS_VERSION' ) ? GS_VERSION : null,
+	'gs_version'   => defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : ( defined( 'GS_VERSION' ) ? GS_VERSION : null ),
 );
 
 if ( 0 === $gs104d_out['user_id'] ) {
