@@ -169,7 +169,10 @@ if ( is_array( $gs105u_map ) && ! empty( $gs105u_map['entries'] ) ) {
 		switch ( $e['kind'] ) {
 			case 'function':
 				if ( $ext ) {
-					$gs105u_ok( function_exists( $old ), "compat function $old()" );
+					// A module that is not loaded in this context (e.g. group tabs on a subsite
+					// without BuddyPress groups) defines neither name; 1.1.x did not define the
+					// old name there either.
+					$gs105u_ok( function_exists( $old ) || ! function_exists( $e['new'] ), "compat function $old()", function_exists( $e['new'] ) ? '' : 'new function not loaded in this context' );
 				}
 				break;
 			case 'class':
