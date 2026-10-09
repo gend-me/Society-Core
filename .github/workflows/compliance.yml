@@ -1,0 +1,79 @@
+name: compliance
+
+# wordpress.org compliance gate (Phase 105).
+#   build:        node bin/build-dist.js builds dist/full + dist/wporg from the module
+#                 manifest and fails on any forbidden path/tier, Network or Update URI
+#                 header, CDN host or hot-linked gend.me upload in the wporg zip.
+#   phpcs:        WPCS PrefixAllGlobals (gend_society / gend_gs) + PHPCompatibilityWP
+#                 (testVersion 8.1-) on both built trees (phpcs.xml.dist).
+#   plugin-check: the same Plugin Check the wordpress.org submission form runs
+#                 (plugin_repo + security) on dist/wporg/gend-society.
+# Every gate reports even when an earlier one failed, so one run shows every problem.
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: composer
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Build dist/full + dist/wporg (assertions)
+        id: build
+        run: npm ci && node bin/build-dist.js
+
+      - name: Composer dev tools (PHPCS 3, WPCS, PHPCompatibilityWP)
+        if: ${{ !cancelled() }}
+        run: composer install --no-progress --no-interaction
+
+      - name: WPCS + PHPCompatibilityWP (wporg build)
+        if: ${{ !cancelled() }}
+        run: vendor/bin/phpcs --standard=phpcs.xml.dist dist/wporg/gend-society
+
+      - name: WPCS + PHPCompatibilityWP (full build)
+        if: ${{ !cancelled() }}
+        run: vendor/bin/phpcs --standard=phpcs.xml.dist dist/full/gend-society
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ !cancelled() }}
+        with:
+          name: dist
+          path: dist/
+          if-no-files-found: error
+
+  plugin-check:
+    needs: build
+    if: ${{ !cancelled() }}
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: dist
+          path: dist/
+
+      # v1.1.9; the slug is basename(build-dir) = gend-society (text-domain check).
+      - uses: wordpress/plugin-check-action@10857da14b6c2246d15402b3e69f777edcf8c12e
+        with:
+          build-dir: ./dist/wporg/gend-society
+          slug: gend-society
+          categories: |
+            plugin_repo
+            security
+          strict: false
