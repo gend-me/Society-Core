@@ -49,6 +49,12 @@ return array(
 			'note'  => 'Bundled GenD Society block theme (registered before setup_theme).',
 		),
 		array(
+			'file'  => 'inc/remote-assets.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Consent-gated gend.me image table (Phase 105).',
+		),
+		array(
 			'file'  => 'inc/admin-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),
@@ -611,6 +617,13 @@ return array(
 			'tier'      => 'customer',
 			'needs'     => array(),
 			'loaded_by' => array( 'inc/admin-menu.php' ),
+		),
+		array(
+			'file'      => 'inc/pages/shortcodes-editor.php',
+			'tier'      => 'container',
+			'needs'     => array(),
+			'loaded_by' => array( 'inc/pages/shortcodes.php' ),
+			'note'      => 'Phase 105: the "New Shortcode" PHP writer (mu-plugins/gs-shortcodes.php); not in the wordpress.org build.',
 		),
 		array(
 			'file'      => 'inc/pages/store.php',

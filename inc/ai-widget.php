@@ -133,8 +133,8 @@ class GS_AI_Widget {
             'oauthClientId'     => $oauth_client_id,
             'centralHubUrl'     => $oauth_hub_url,
             'oauthClientID'     => $oauth_client_id, // alt-case alias some widget builds read
-            'icon'              => 'https://gend.me/wp-content/uploads/2025/12/Futuristic_Logo_Animation_Generation-ezgif.com-crop-1.gif',
-            'leo_avatar'        => 'https://gend.me/wp-content/uploads/2025/12/Animated_Profile_Picture_At_Desk-ezgif.com-optimize.gif',
+            'icon'              => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_icon' ) : '',
+            'leo_avatar'        => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_leo_avatar' ) : '',
             'user_avatar'       => self::user_avatar_url(),
             'version'           => '2.1.0',
             'siteName'          => get_bloginfo( 'name' ),

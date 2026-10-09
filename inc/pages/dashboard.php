@@ -13,7 +13,7 @@ add_action('admin_post_gs_save_app_settings', 'gs_dashboard_save_app_settings');
 function gs_dashboard_save_app_settings()
 {
     if (!current_user_can('manage_options')) {
-        wp_die(__('You do not have permission to perform this action.'));
+        wp_die(esc_html__('You do not have permission to perform this action.', 'gend-society'));
     }
 
     check_admin_referer('gs_app_settings_action', 'gs_app_settings_nonce');
@@ -43,7 +43,7 @@ add_action('admin_post_gs_save_permalink_settings', 'gs_dashboard_save_permalink
 function gs_dashboard_save_permalink_settings()
 {
     if (!current_user_can('manage_options')) {
-        wp_die(__('You do not have permission to perform this action.'));
+        wp_die(esc_html__('You do not have permission to perform this action.', 'gend-society'));
     }
 
     check_admin_referer('gs_permalink_settings_action', 'gs_permalink_settings_nonce');
@@ -749,7 +749,7 @@ function gs_render_custom_dashboard_screen()
     // are no longer rendered — the panel covers everything they did.
     if ($account_section !== '') {
         echo '<section class="gs-dashboard__surface">';
-        echo $account_section;
+        echo $account_section; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Plugin-built panel markup (inline <style>/<script>/forms), escaped at construction in gs_render_membership_panel() / gs_dashboard_render_admin_users_panel(); kses would strip it.
         echo '</section>';
     }
 
@@ -1008,30 +1008,43 @@ function gs_render_permalink_settings_form()
     $url_base = home_url($blog_prefix . $index_php_prefix);
 
     $default_structures = array(
-        array('id' => 'plain', 'label' => __('Plain'), 'value' => '', 'example' => home_url('/?p=123')),
-        array('id' => 'day-name', 'label' => __('Day and name'), 'value' => $index_php_prefix . '/%year%/%monthnum%/%day%/%postname%/', 'example' => $url_base . '/' . gmdate('Y/m/d') . '/sample-post/'),
-        array('id' => 'month-name', 'label' => __('Month and name'), 'value' => $index_php_prefix . '/%year%/%monthnum%/%postname%/', 'example' => $url_base . '/' . gmdate('Y/m') . '/sample-post/'),
-        array('id' => 'numeric', 'label' => __('Numeric'), 'value' => $index_php_prefix . '/archives/%post_id%', 'example' => $url_base . '/archives/123'),
-        array('id' => 'post-name', 'label' => __('Post name'), 'value' => $index_php_prefix . '/%postname%/', 'example' => $url_base . '/sample-post/'),
+        array('id' => 'plain', 'label' => __('Plain', 'gend-society'), 'value' => '', 'example' => home_url('/?p=123')),
+        array('id' => 'day-name', 'label' => __('Day and name', 'gend-society'), 'value' => $index_php_prefix . '/%year%/%monthnum%/%day%/%postname%/', 'example' => $url_base . '/' . gmdate('Y/m/d') . '/sample-post/'),
+        array('id' => 'month-name', 'label' => __('Month and name', 'gend-society'), 'value' => $index_php_prefix . '/%year%/%monthnum%/%postname%/', 'example' => $url_base . '/' . gmdate('Y/m') . '/sample-post/'),
+        array('id' => 'numeric', 'label' => __('Numeric', 'gend-society'), 'value' => $index_php_prefix . '/archives/%post_id%', 'example' => $url_base . '/archives/123'),
+        array('id' => 'post-name', 'label' => __('Post name', 'gend-society'), 'value' => $index_php_prefix . '/%postname%/', 'example' => $url_base . '/sample-post/'),
     );
     $default_structure_values = wp_list_pluck($default_structures, 'value');
 
     $available_tags = array(
-        'year'     => __('%s (The year of the post, four digits, for example 2004.)'),
-        'monthnum' => __('%s (Month of the year, for example 05.)'),
-        'day'      => __('%s (Day of the month, for example 28.)'),
-        'hour'     => __('%s (Hour of the day, for example 15.)'),
-        'minute'   => __('%s (Minute of the hour, for example 43.)'),
-        'second'   => __('%s (Second of the minute, for example 33.)'),
-        'post_id'  => __('%s (The unique ID of the post, for example 423.)'),
-        'postname' => __('%s (The sanitized post title (slug).)'),
-        'category' => __('%s (Category slug. Nested sub-categories appear as nested directories in the URL.)'),
-        'author'   => __('%s (A sanitized version of the author name.)'),
+        /* translators: %s: Permalink structure tag. */
+        'year'     => __('%s (The year of the post, four digits, for example 2004.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'monthnum' => __('%s (Month of the year, for example 05.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'day'      => __('%s (Day of the month, for example 28.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'hour'     => __('%s (Hour of the day, for example 15.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'minute'   => __('%s (Minute of the hour, for example 43.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'second'   => __('%s (Second of the minute, for example 33.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'post_id'  => __('%s (The unique ID of the post, for example 423.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'postname' => __('%s (The sanitized post title (slug).)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'category' => __('%s (Category slug. Nested sub-categories appear as nested directories in the URL.)', 'gend-society'),
+        /* translators: %s: Permalink structure tag. */
+        'author'   => __('%s (A sanitized version of the author name.)', 'gend-society'),
     );
     $available_tags = apply_filters('available_permalink_structure_tags', $available_tags);
-    $tag_added         = __('%s added to permalink structure');
-    $tag_removed       = __('%s removed from permalink structure');
-    $tag_already_used  = __('%s (already used in permalink structure)');
+    /* translators: %s: Permalink structure tag. */
+    $tag_added         = __('%s added to permalink structure', 'gend-society');
+    /* translators: %s: Permalink structure tag. */
+    $tag_removed       = __('%s removed from permalink structure', 'gend-society');
+    /* translators: %s: Permalink structure tag. */
+    $tag_already_used  = __('%s (already used in permalink structure)', 'gend-society');
 
     echo '<h2 style="margin:0 0 8px 0;color:#fff;font-size:1.1rem;">' . esc_html__('Permalinks', 'gend-society') . '</h2>';
     echo '<p style="color:var(--gs-muted);margin:0 0 24px 0;">' . esc_html__('Choose the URL structure used for posts, pages, and archives on this site.', 'gend-society') . '</p>';
@@ -1162,7 +1175,7 @@ function gs_render_application_passwords_form()
         delete_transient('gs_app_pw_new_' . $user_id);
         echo '<div style="background: rgba(78,170,255,0.10); border: 1px solid rgba(78,170,255,0.45); border-radius: 12px; padding: 18px 20px; margin-bottom: 20px;">';
         echo '<div style="color: #fff; font-weight: 600; margin-bottom: 6px;">'
-            . sprintf(esc_html__('New password for “%s” — copy it now, it will not be shown again:', 'gend-society'), esc_html($fresh['name']))
+            . sprintf(/* translators: %s: Application password name. */ esc_html__('New password for “%s” — copy it now, it will not be shown again:', 'gend-society'), esc_html($fresh['name']))
             . '</div>';
         echo '<code id="gs-app-pw-plain" style="display: inline-block; background: rgba(0,0,0,0.35); color: #4eaaff; font-size: 1.15rem; letter-spacing: 1px; padding: 10px 14px; border-radius: 8px; user-select: all;">' . esc_html($fresh['password']) . '</code>';
         echo ' <button type="button" class="gs-btn gs-btn-secondary" style="vertical-align: middle; margin-left: 8px;" onclick="navigator.clipboard.writeText(document.getElementById(\'gs-app-pw-plain\').textContent).then(function(){ var b = event.target; b.textContent = \'' . esc_js(__('Copied ✓', 'gend-society')) . '\'; });">' . esc_html__('Copy', 'gend-society') . '</button>';
@@ -1182,7 +1195,7 @@ function gs_render_application_passwords_form()
             echo '<div style="flex: 1; min-width: 0;">';
             echo '<div style="color: #fff; font-weight: 600;">' . esc_html($item['name']) . '</div>';
             echo '<div class="gs-settings-help-text" style="margin: 2px 0 0;">'
-                . sprintf(esc_html__('Created %1$s · Last used %2$s', 'gend-society'), esc_html($created), esc_html($last_used))
+                . sprintf(/* translators: 1: Date created, 2: Date last used. */ esc_html__('Created %1$s · Last used %2$s', 'gend-society'), esc_html($created), esc_html($last_used))
                 . (!empty($item['last_ip']) ? ' · ' . esc_html($item['last_ip']) : '')
                 . '</div>';
             echo '</div>';

@@ -270,8 +270,8 @@ function gs_move_plugin_submenus_to_content()
         if (class_exists('Gend_CP_Admin_Page')) {
             add_submenu_page(
                 'gs-social',
-                __('Contracts & Payments', 'contracts-and-payments'),
-                __('Contracts & Payments', 'contracts-and-payments'),
+                __('Contracts & Payments', 'gend-society'),
+                __('Contracts & Payments', 'gend-society'),
                 'manage_options',
                 'gend-contracts-payments',
                 ['Gend_CP_Admin_Page', 'render']

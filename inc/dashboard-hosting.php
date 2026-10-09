@@ -131,7 +131,7 @@ if ( ! function_exists( 'gs_hosting_render_analytics_hero' ) ) {
                         <?php endif; ?>
                     </div>
                     <?php if ( $cta !== '' ) : ?>
-                        <?php echo $cta; ?>
+                        <?php echo wp_kses_post( $cta ); ?>
                     <?php endif; ?>
                 </div>
                 <?php if ( ! empty( $stats ) ) : ?>
@@ -371,7 +371,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
                         </div>
                     <?php elseif ( ! empty( $r['starting_price']['label'] ) ) : ?>
                         <div class="gs-hosting__resource-card-usage" style="margin-top: 6px; font-size: 0.85rem; color: var(--gs-muted, #94a3b8);">
-                            <?php echo esc_html( sprintf( __( 'From %s', 'gend-society' ), $r['starting_price']['label'] ) ); ?>
+                            <?php echo esc_html( sprintf( /* translators: %s: Starting price. */ __( 'From %s', 'gend-society' ), $r['starting_price']['label'] ) ); ?>
                         </div>
                     <?php else : ?>
                         <div class="gs-hosting__resource-card-meta" style="margin-top: 6px; font-style: italic;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></div>
@@ -390,7 +390,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
                             data-gs-upgrade-open
                             data-resource="<?php echo esc_attr( $r['slug'] ); ?>"
                             data-resource-label="<?php echo esc_attr( $r['label'] ); ?>"
-                            <?php echo $gs_res_upgrade_attrs; ?>
+                            <?php echo $gs_res_upgrade_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute string built by gs_hosting_resource_upgrade_data_attrs(); every value esc_attr()'d there. ?>
                             style="margin-top: auto; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 8px 14px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
                         <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
                     </button>
@@ -850,7 +850,7 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
                         data-gs-upgrade-open
                         data-resource="backups"
                         data-resource-label="<?php esc_attr_e( 'Backups', 'gend-society' ); ?>"
-                        <?php echo $gs_bk_upgrade_attrs; ?>
+                        <?php echo $gs_bk_upgrade_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute string built by gs_hosting_resource_upgrade_data_attrs(); every value esc_attr()'d there. ?>
                         style="align-self: center; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 9px 16px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
                     <?php echo esc_html( ! empty( $gs_bk_current ) ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?>
                 </button>
@@ -1444,8 +1444,11 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                         global $wpdb;
                         $gs_admin_ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
                         $gs_admin_earnings = $wpdb->get_results(
-                            "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
-                             FROM {$gs_admin_ledger} WHERE station_id <> '' GROUP BY station_id ORDER BY owner_amount DESC",
+                            $wpdb->prepare(
+                                "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
+                             FROM %i WHERE station_id <> '' GROUP BY station_id ORDER BY owner_amount DESC",
+                                $gs_admin_ledger
+                            ),
                             ARRAY_A
                         );
                         ?>
@@ -1934,10 +1937,11 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                     $gmo_css_rel  = 'plugins/' . $gmo_css['plugin'] . '/' . $gmo_css['file'];
                     $gmo_css_path = trailingslashit( WP_CONTENT_DIR ) . $gmo_css_rel;
                     if ( file_exists( $gmo_css_path ) ) {
-                        printf(
-                            '<link rel="stylesheet" href="%s">',
-                            esc_url( trailingslashit( content_url() ) . $gmo_css_rel . '?ver=' . filemtime( $gmo_css_path ) )
-                        );
+                        // Registered + printed in place (not enqueued for the
+                        // footer): same <link> at the same position.
+                        $gmo_css_handle = 'gs-hosting-media-' . sanitize_title( $gmo_css['plugin'] . '-' . basename( $gmo_css['file'], '.css' ) );
+                        wp_register_style( $gmo_css_handle, trailingslashit( content_url() ) . $gmo_css_rel, array(), (string) filemtime( $gmo_css_path ) );
+                        wp_print_styles( $gmo_css_handle );
                     }
                 }
                 ?>
@@ -3442,7 +3446,7 @@ if ( ! function_exists( 'gs_hosting_render_codebase_packages' ) ) {
                     <span class="gs-pkg-icon"><span class="dashicons dashicons-admin-plugins"></span></span>
                     <div class="gs-pkg-info">
                         <div class="gs-pkg-name"><?php echo esc_html( $gs_pkg_name ); ?></div>
-                        <div class="gs-pkg-version"><?php echo esc_html( ! empty( $gs_pkg['Version'] ) ? sprintf( __( 'v%s', 'gend-society' ), $gs_pkg['Version'] ) : __( 'Version unknown', 'gend-society' ) ); ?></div>
+                        <div class="gs-pkg-version"><?php echo esc_html( ! empty( $gs_pkg['Version'] ) ? sprintf( /* translators: %s: Package version number. */ __( 'v%s', 'gend-society' ), $gs_pkg['Version'] ) : __( 'Version unknown', 'gend-society' ) ); ?></div>
                     </div>
                     <span class="gs-pkg-status gs-hosting__pill<?php echo $gs_pkg_active ? ' is-ok' : ''; ?>"><?php echo $gs_pkg_active ? esc_html__( 'Active', 'gend-society' ) : esc_html__( 'Inactive', 'gend-society' ); ?></span>
                     <div class="gs-pkg-action">
@@ -3732,14 +3736,13 @@ function gs_hosting_read_logs( $limit = 200 ) {
         if ( $size === false ) continue;
         // Tail the last ~512 KB so we don't slurp gigantic logs into memory.
         $read_bytes = min( $size, 512 * 1024 );
-        $fp = @fopen( $s['path'], 'rb' );
-        if ( ! $fp ) continue;
+        $buf = @file_get_contents( $s['path'], false, null, $size - $read_bytes ); // Tail read at an offset (WP_Filesystem has no offset read).
+        if ( false === $buf ) continue;
         if ( $size > $read_bytes ) {
-            fseek( $fp, $size - $read_bytes );
-            fgets( $fp ); // Discard partial first line.
+            // Discard partial first line.
+            $gs_nl = strpos( $buf, "\n" );
+            $buf   = false === $gs_nl ? '' : (string) substr( $buf, $gs_nl + 1 );
         }
-        $buf = stream_get_contents( $fp );
-        fclose( $fp );
         $lines = preg_split( "/\r?\n/", (string) $buf );
         foreach ( $lines as $line ) {
             $line = trim( $line );
@@ -3903,8 +3906,8 @@ function gs_hosting_compute_gas_real_data() {
         "SELECT task_id, COUNT(*) AS event_count, SUM(units) AS units, SUM(sales_amount) AS sales_amount,
                 SUM(CASE WHEN status = 'billed' THEN sales_amount ELSE 0 END) AS billed_amount,
                 SUM(CASE WHEN status = 'recorded' THEN sales_amount ELSE 0 END) AS unbilled_amount
-         FROM {$ledger} WHERE site_id = %d GROUP BY task_id ORDER BY sales_amount DESC",
-        $site_id
+         FROM %i WHERE site_id = %d GROUP BY task_id ORDER BY sales_amount DESC",
+        $ledger, $site_id
     ), ARRAY_A );
 
     $catalog = function_exists( '\\WP_Ultimo\\Integrations\\gdc_gas_catalog' ) ? \WP_Ultimo\Integrations\gdc_gas_catalog() : array();
@@ -4015,8 +4018,8 @@ if ( ! function_exists( 'gs_hosting_gas_month_over_month' ) ) {
             "SELECT
                 SUM(CASE WHEN created_at >= DATE_FORMAT(NOW(), '%%Y-%%m-01') THEN sales_amount ELSE 0 END) AS this_month,
                 SUM(CASE WHEN created_at >= DATE_FORMAT(NOW() - INTERVAL 1 MONTH, '%%Y-%%m-01') AND created_at < DATE_FORMAT(NOW(), '%%Y-%%m-01') THEN sales_amount ELSE 0 END) AS last_month
-             FROM {$ledger} WHERE site_id = %d",
-            $site_id
+             FROM %i WHERE site_id = %d",
+            $ledger, $site_id
         ), ARRAY_A );
 
         $this_month = $row ? (float) $row['this_month'] : 0.0;
@@ -4065,8 +4068,8 @@ function gs_hosting_gas_earned_summary( $user_id ) {
     $ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
     $row    = $wpdb->get_row( $wpdb->prepare(
         "SELECT COUNT(*) AS event_count, COALESCE(SUM(owner_amount), 0) AS total_earned, MAX(created_at) AS last_earned
-         FROM {$ledger} WHERE station_user_id = %d",
-        (int) $user_id
+         FROM %i WHERE station_user_id = %d",
+        $ledger, (int) $user_id
     ), ARRAY_A );
 
     $total_earned = $row ? (float) $row['total_earned'] : 0.0;
@@ -4105,14 +4108,14 @@ function gs_hosting_gas_history_rows( $limit = 100 ) {
 
     $used_rows = $wpdb->get_results( $wpdb->prepare(
         "SELECT task_id, sales_amount AS amount, status, created_at
-         FROM {$ledger} WHERE site_id = %d ORDER BY created_at DESC LIMIT %d",
-        $site_id, $limit
+         FROM %i WHERE site_id = %d ORDER BY created_at DESC LIMIT %d",
+        $ledger, $site_id, $limit
     ), ARRAY_A );
 
     $earned_rows = $wpdb->get_results( $wpdb->prepare(
         "SELECT task_id, station_id, owner_amount AS amount, status, created_at
-         FROM {$ledger} WHERE station_user_id = %d ORDER BY created_at DESC LIMIT %d",
-        $user_id, $limit
+         FROM %i WHERE station_user_id = %d ORDER BY created_at DESC LIMIT %d",
+        $ledger, $user_id, $limit
     ), ARRAY_A );
 
     $out = array();
@@ -4244,7 +4247,7 @@ add_action( 'wp_ajax_gs_hosting_query_run', function () {
         // Cap the result set so a runaway `SELECT *` doesn't blow up the
         // response payload. We don't rewrite the query — just slice the
         // returned rows.
-        $rows = $wpdb->get_results( $sql, ARRAY_A );
+        $rows = $wpdb->get_results( $sql, ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Admin SQL console by design: the query IS the input (manage_options + nonce via gs_hosting_ajax_authorize()).
         $err  = $wpdb->last_error;
         $wpdb->suppress_errors( $prev_suppress );
         $wpdb->show_errors = $prev_show;
@@ -4269,7 +4272,7 @@ add_action( 'wp_ajax_gs_hosting_query_run', function () {
         ) );
     }
 
-    $affected = $wpdb->query( $sql );
+    $affected = $wpdb->query( $sql ); // phpcs:ignore WordPress.DB.PreparedSQL.NotPrepared, PluginCheck.Security.DirectDB.UnescapedDBParameter -- Admin SQL console by design: the query IS the input (manage_options + nonce via gs_hosting_ajax_authorize()).
     $err = $wpdb->last_error;
     $wpdb->suppress_errors( $prev_suppress );
     $wpdb->show_errors = $prev_show;
