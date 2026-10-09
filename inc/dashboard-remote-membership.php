@@ -1167,7 +1167,7 @@ function gs_render_membership_panel( $payload = null ) {
                                 <div class="gs-mship-plan-text">
                                     <div class="gs-mship-plan-name"><?php echo esc_html( $dash_plan['name'] ); ?></div>
                                     <?php if ( ! empty( $dash_plan['amount_label'] ) ) : ?>
-                                        <div class="gs-mship-plan-price"><?php echo esc_html( $dash_plan['amount_label'] ); ?> <?php echo ! empty( $dash_plan['duration_unit'] ) ? esc_html( sprintf( __( 'every %s', 'gend-society' ), $dash_plan['duration_unit'] ) ) : ''; ?></div>
+                                        <div class="gs-mship-plan-price"><?php echo esc_html( $dash_plan['amount_label'] ); ?> <?php echo ! empty( $dash_plan['duration_unit'] ) ? esc_html( sprintf( /* translators: %s: Billing period unit, e.g. month. */ __( 'every %s', 'gend-society' ), $dash_plan['duration_unit'] ) ) : ''; ?></div>
                                     <?php endif; ?>
                                 </div>
                             </div>
@@ -1233,10 +1233,10 @@ function gs_render_membership_panel( $payload = null ) {
                         $gs_server_price_label = $gs_server_price['current']['label'] . ( ! empty( $gs_server_price['current']['unit'] ) ? ' / ' . $gs_server_price['current']['unit'] : '' );
                         $gs_server_count       = (int) ( $gs_server_price['current']['count'] ?? 0 );
                         if ( $gs_server_count > 0 ) {
-                            $gs_server_count_label = sprintf( _n( '%d server attached', '%d servers attached', $gs_server_count, 'gend-society' ), $gs_server_count );
+                            $gs_server_count_label = sprintf( /* translators: %d: Number of servers. */ _n( '%d server attached', '%d servers attached', $gs_server_count, 'gend-society' ), $gs_server_count );
                         }
                     } elseif ( ! empty( $gs_server_price['starting']['label'] ) ) {
-                        $gs_server_price_label = sprintf( __( 'From %s', 'gend-society' ), $gs_server_price['starting']['label'] );
+                        $gs_server_price_label = sprintf( /* translators: %s: Starting price. */ __( 'From %s', 'gend-society' ), $gs_server_price['starting']['label'] );
                         $gs_server_count_label = __( 'No servers attached', 'gend-society' );
                     } else {
                         $gs_server_price_label = __( 'Not available yet', 'gend-society' );
@@ -1295,7 +1295,7 @@ function gs_render_membership_panel( $payload = null ) {
                                             data-gs-upgrade-open
                                             data-resource="server"
                                             data-resource-label="<?php esc_attr_e( 'Server', 'gend-society' ); ?>"
-                                            <?php echo $gs_server_upgrade_attrs; ?>>
+                                            <?php echo $gs_server_upgrade_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute string built by gs_hosting_resource_upgrade_data_attrs(); every value esc_attr()'d there. ?>>
                                         <span class="dashicons dashicons-networking"></span>
                                         <?php esc_html_e( 'Add Server', 'gend-society' ); ?>
                                     </button>
@@ -1325,7 +1325,7 @@ function gs_render_membership_panel( $payload = null ) {
                                 <?php if ( $gs_gas_pending_payment ) : ?>
                                     <a href="<?php echo esc_url( $gs_gas_pending_payment['pay_url'] ); ?>" class="gs-bcg-btn gs-bcg-btn--cta" style="margin-top: 10px; padding: 6px 14px; font-size: 0.72rem;">
                                         <span class="dashicons dashicons-money-alt"></span>
-                                        <?php echo esc_html( sprintf( __( 'Pay %s', 'gend-society' ), $gs_gas_pending_payment['total_label'] ) ); ?>
+                                        <?php echo esc_html( sprintf( /* translators: %s: Amount due. */ __( 'Pay %s', 'gend-society' ), $gs_gas_pending_payment['total_label'] ) ); ?>
                                     </a>
                                 <?php endif; ?>
                             </div>
@@ -1391,7 +1391,7 @@ function gs_render_membership_panel( $payload = null ) {
                             <?php if ( empty( $gs_backup_plans ) ) : ?>
                                 <span class="gs-bk-badge is-neutral"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Backup Plans Configured', 'gend-society' ); ?></span>
                             <?php elseif ( $gs_bk_has_plan ) : ?>
-                                <span class="gs-bk-badge"><span class="dashicons dashicons-backup"></span><?php echo esc_html( sprintf( __( 'Active: %s', 'gend-society' ), $gs_bk_current_name ) ); ?></span>
+                                <span class="gs-bk-badge"><span class="dashicons dashicons-backup"></span><?php echo esc_html( sprintf( /* translators: %s: Backup plan name. */ __( 'Active: %s', 'gend-society' ), $gs_bk_current_name ) ); ?></span>
                             <?php else : ?>
                                 <span class="gs-bk-badge is-warn"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Active Plan', 'gend-society' ); ?></span>
                             <?php endif; ?>
@@ -1412,7 +1412,7 @@ function gs_render_membership_panel( $payload = null ) {
                                         data-gs-upgrade-open
                                         data-resource="backups"
                                         data-resource-label="<?php esc_attr_e( 'Backups', 'gend-society' ); ?>"
-                                        <?php echo $gs_bk_upgrade_attrs; ?>>
+                                        <?php echo $gs_bk_upgrade_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute string built by gs_hosting_resource_upgrade_data_attrs(); every value esc_attr()'d there. ?>>
                                     <span class="dashicons dashicons-money-alt"></span>
                                     <?php echo esc_html( $gs_bk_has_plan ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?>
                                 </button>
@@ -1592,15 +1592,15 @@ function gs_render_membership_panel( $payload = null ) {
                             'nonce' => wp_create_nonce( 'psoo_bp' ),
                             'ajax'  => admin_url( 'admin-ajax.php' ),
                             'i18n'  => array(
-                                'loading_order'   => __( 'Loading order details?', 'psoo' ),
-                                'order_error'     => __( 'Unable to load order.', 'psoo' ),
-                                'assign_loading'  => __( 'Loading project managers?', 'psoo' ),
-                                'assign_none'     => __( 'No matching project managers were found.', 'psoo' ),
-                                'assign_error'    => __( 'We could not load project managers right now. Please try again.', 'psoo' ),
-                                'assign_success'  => __( 'Project Manager assigned successfully.', 'psoo' ),
-                                'assign_confirm'  => __( 'Assign', 'psoo' ),
+                                'loading_order'   => __( 'Loading order details?', 'gend-society' ),
+                                'order_error'     => __( 'Unable to load order.', 'gend-society' ),
+                                'assign_loading'  => __( 'Loading project managers?', 'gend-society' ),
+                                'assign_none'     => __( 'No matching project managers were found.', 'gend-society' ),
+                                'assign_error'    => __( 'We could not load project managers right now. Please try again.', 'gend-society' ),
+                                'assign_success'  => __( 'Project Manager assigned successfully.', 'gend-society' ),
+                                'assign_confirm'  => __( 'Assign', 'gend-society' ),
                             ),
-                            'no_perm' => __( 'You must be an Administrator to view this page.', 'psoo' ),
+                            'no_perm' => __( 'You must be an Administrator to view this page.', 'gend-society' ),
                         ) );
                     }
                 }
@@ -1627,7 +1627,7 @@ function gs_render_membership_panel( $payload = null ) {
                     // Its now-orphaned CSS rules (target a class no longer in the DOM, harmless
                     // but dead weight) - strip those too rather than leave inert CSS behind.
                     $gs_pc_html = preg_replace( '#\.workspace-header-section\{[^}]*\}\s*\.workspace-header-section::before\{[^}]*\}#s', '', $gs_pc_html, 1 );
-                    echo $gs_pc_html; // phpcs:ignore — already escaped internally
+                    echo $gs_pc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Third-party (projects plugin) rendered workspace markup, already escaped internally; kses would strip its inline style/script.
                 } else {
                     echo '<div class="gs-mship-empty">' . esc_html__( 'This site is not linked to a project group yet.', 'gend-society' ) . '</div>';
                 }
@@ -2082,8 +2082,11 @@ function gs_render_membership_panel( $payload = null ) {
         global $wpdb;
         $gs_mship_gas_ledger   = $wpdb->base_prefix . 'gdc_gas_ledger';
         $gs_mship_gas_earnings = $wpdb->get_results(
-            "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
-             FROM {$gs_mship_gas_ledger} WHERE station_id <> '' GROUP BY station_id ORDER BY owner_amount DESC",
+            $wpdb->prepare(
+                "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
+             FROM %i WHERE station_id <> '' GROUP BY station_id ORDER BY owner_amount DESC",
+                $gs_mship_gas_ledger
+            ),
             ARRAY_A
         );
         ?>
@@ -2655,7 +2658,7 @@ function gs_membership_payload_from_local( $membership ) {
     $group_payload = null;
     $gid = $site && method_exists( $site, 'get_meta' ) ? (int) $site->get_meta( 'gdc_bp_group_id', 0 ) : 0;
     if ( $gid > 0 ) {
-        $g_name = sprintf( __( 'Group #%d', 'gend-society' ), $gid );
+        $g_name = sprintf( /* translators: %d: Group ID. */ __( 'Group #%d', 'gend-society' ), $gid );
         $g_slug = '';
         global $wpdb;
         $tbl = $wpdb->base_prefix . 'bp_groups';
