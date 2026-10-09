@@ -598,7 +598,7 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     // ── Log in ─────────────────────────────────────────────────────────
     wp_set_current_user( $user->ID, $user->user_login );
     wp_set_auth_cookie( $user->ID, true );
-    do_action( 'wp_login', $user->user_login, $user );
+    do_action( 'wp_login', $user->user_login, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
 
     /**
      * Filter the post-OAuth-login redirect destination.

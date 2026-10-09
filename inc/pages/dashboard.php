@@ -1038,7 +1038,7 @@ function gend_society_render_permalink_settings_form()
         /* translators: %s: Permalink structure tag. */
         'author'   => __('%s (A sanitized version of the author name.)', 'gend-society'),
     );
-    $available_tags = apply_filters('available_permalink_structure_tags', $available_tags);
+    $available_tags = apply_filters('available_permalink_structure_tags', $available_tags); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
     /* translators: %s: Permalink structure tag. */
     $tag_added         = __('%s added to permalink structure', 'gend-society');
     /* translators: %s: Permalink structure tag. */

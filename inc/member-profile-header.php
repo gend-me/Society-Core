@@ -101,7 +101,7 @@ function gend_society_handle_wallet_topup_purchase() {
     WC()->cart->empty_cart();
 
     if ( 'tasks' === $kind ) {
-        $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 );
+        $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from sales-team.
         $n = max( 1, $qty );
         if ( ! $extra_pid ) { wp_safe_redirect( $back ); exit; }
         $rate = 50.0;
@@ -385,7 +385,7 @@ function gend_society_topup_price_task_credits( $cart ) {
 add_filter( 'woocommerce_payment_complete_order_status', 'gend_society_topup_autocomplete', 10, 3 );
 function gend_society_topup_autocomplete( $status, $order_id, $order ) {
     if ( ! is_a( $order, 'WC_Order' ) ) return $status;
-    $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 );
+    $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from sales-team.
     foreach ( $order->get_items() as $item ) {
         $product = $item->get_product();
         $sku     = $product ? $product->get_sku() : '';

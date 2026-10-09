@@ -480,7 +480,7 @@ function gend_society_render_cover_panel() {
         $cache_key = 'gend_society_ppe_html_' . $post_id;
         $rendered  = get_transient( $cache_key );
         if ( false === $rendered ) {
-            $rendered = apply_filters( 'the_content', do_blocks( $raw_content ) );
+            $rendered = apply_filters( 'the_content', do_blocks( $raw_content ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
             set_transient( $cache_key, $rendered, HOUR_IN_SECONDS );
         }
     } else {

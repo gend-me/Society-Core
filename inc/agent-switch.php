@@ -112,7 +112,10 @@ function gend_society_agent_switch_read_state() {
         return null;
     }
 
-    $state = get_transient('gend_society_agent_switch_' . wp_hash($token));
+    // 1.2.0: read-once fallback to a pre-rename gs_agent_switch_* transient (key-migration.php).
+    $state = function_exists('gend_society_get_agent_switch_transient')
+        ? gend_society_get_agent_switch_transient(wp_hash($token))
+        : get_transient('gend_society_agent_switch_' . wp_hash($token));
     if (!is_array($state) || empty($state['agent_user_id']) || empty($state['original_user_id'])) {
         return null;
     }
