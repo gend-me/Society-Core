@@ -150,3 +150,186 @@ place (same command as step 5.3). For a file that was "absent" before the deploy
 
 Merge the PR if it is not merged yet, and confirm the drift check (the `gs-live-drift-check`
 workflow) is green.
+
+## 10. Image-owned loose mu-plugins on the hub
+
+The hub's WordPress image owns the loose files in `wp-content/mu-plugins/` (for example
+`gdc-iframe-embed.php`, `zzz-gend-local-native-login.php`, `gdc-local-content-endpoint.php`).
+The image entrypoint copies them back over the persistent volume on every pod start, so an
+edit made only on the volume is silently undone by the next restart. A volume copy is
+therefore allowed ONLY when it is byte-identical to a file that is merged to gend-web-builder
+`master` AND already baked into a successfully built base image. This is the one exception to
+"Edit image-owned loose mu-plugins" in section 8. Never put a volume-only edit into an
+image-owned file; if a change cannot go through the image, use a new file name or a subfolder.
+
+In the commands, `<name>` is the mu-plugin file name (for example `gdc-iframe-embed.php`) and
+`<gwb>` is your local gend-web-builder checkout, freshly fetched (`git -C <gwb> fetch origin`).
+
+1. The change is merged to gend-web-builder `master`. Note the merge commit sha.
+
+2. The "Build WordPress Base Image" run for that merge commit succeeded:
+
+       "/c/Program Files/GitHub CLI/gh.exe" run list -R gend-me/gend-web-builder --workflow build-wp-base-image.yml --limit 5
+
+   The run whose head sha is the merge commit must show `completed` / `success`. If it failed
+   or is still running, stop and wait.
+
+3. Pull the live file and diff it against the PREVIOUS `master` blob (the first parent of the
+   merge):
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- cat /var/www/html/wp-content/mu-plugins/<name> > live-<name>
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- md5sum /var/www/html/wp-content/mu-plugins/<name>
+       git -C <gwb> show <merge-sha>^1:build/wp-content-template/mu-plugins/<name> | diff -u --strip-trailing-cr live-<name> -
+
+   **STOP if live differs from the previous `master` blob.** Somebody hand-edited the live file;
+   fold their change into the repo first. Keep `live-<name>` as the rollback copy.
+
+4. Upload the new `master` blob as `.new`, check it and lint it:
+
+       git -C <gwb> show origin/master:build/wp-content-template/mu-plugins/<name> > new-<name>
+       git -C <gwb> show origin/master:build/wp-content-template/mu-plugins/<name> | md5sum
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec -i deploy/wordpress -c wordpress -- sh -c 'cat > /var/www/html/wp-content/mu-plugins/<name>.new' < new-<name>
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- md5sum /var/www/html/wp-content/mu-plugins/<name>.new
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- php -l /var/www/html/wp-content/mu-plugins/<name>.new
+
+   The `.new` md5 must equal the `git show ... | md5sum` value (the blob itself, not a
+   CRLF-converted working-tree copy). If not, remove the `.new` file and stop.
+
+5. Re-check the live file's md5 against step 3, then swap:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- md5sum /var/www/html/wp-content/mu-plugins/<name>
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'chown www-data:www-data /var/www/html/wp-content/mu-plugins/<name>.new && mv -f /var/www/html/wp-content/mu-plugins/<name>.new /var/www/html/wp-content/mu-plugins/<name>'
+
+   On a mismatch, remove the `.new` file and restart from step 3.
+
+Rollback: stream `live-<name>` back as `.new` and `mv -f` it into place the same way. The next
+pod start restores the image copy (the new version) anyway, so a lasting rollback needs a
+revert merged to `master` and a new image build.
+
+## 11. Whole-directory swap (prefix rename, Phase 105)
+
+Use this instead of the per-file swap (sections 3-5) when a change touches nearly every file of
+the plugin, so that no request ever runs a mix of old and new files. Section 0 (preconditions,
+including the runtime env gate) and section 6 (verify) still apply unchanged.
+
+In the commands, `<oldver>` is the version currently on live (for example `1.1.6`), `<branch>`
+is the rename branch, and `<stage>` is a local, empty staging directory.
+
+### 11.1 Drift and provenance (replaces section 1 for this deploy)
+
+1. Whole-plugin drift compare, live vs `origin/main` (section 1 step 4). It must report **0
+   non-ignored differences**. Keep `live.md5` from this run; it is the pre-swap manifest.
+2. Prove the branch is `bin/rename.php` applied to `origin/main` plus a listed set of
+   hand-written files: check out a fresh `origin/main` into a scratch directory, run the renamer
+   on it, and `diff -r --strip-trailing-cr` the result against the branch. Every difference must
+   be in the hand-written list recorded in the PR. Anything else: STOP.
+3. List the paths that exist only on live and are covered by `.drift-ignore` (for example
+   `handoff/` files deployed ad hoc). Pull them from live; they are carried into the staged tree
+   so the swap does not delete them.
+
+### 11.2 Build and stage the new tree
+
+1. Build the deployable tree locally:
+
+       git -C <repo> archive --format=tar --prefix=gend-society/ <branch> | tar -C <stage> -xf -
+
+   Delete from `<stage>/gend-society` every path matched by `.drift-ignore`, then copy in the
+   only-live paths pulled in 11.1 step 3. Write the local manifest:
+
+       sh "C:/Desktop Web App Builder/gend-web-builder/scripts/gs-drift-manifest.sh" <stage>/gend-society > staged-local.md5
+
+2. Confirm the private area is not web-reachable:
+
+       curl -s -o /dev/null -w '%{http_code}' https://gend.me/wp-content/gdc-private/
+
+   It must print `403`. Otherwise stage somewhere else outside the docroot (on the same volume)
+   and adjust every path below accordingly.
+
+3. Same-filesystem check (run it now AND again immediately before the swap):
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- stat -c %d /var/www/html/wp-content/gdc-private /var/www/html/wp-content/plugins
+
+   It must print the same device id twice. **STOP if they differ:** `mv` would copy instead of
+   rename, and the swap would not be atomic.
+
+4. Stream the tree to the pod and fix ownership:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- mkdir -p /var/www/html/wp-content/gdc-private/stage-105 /var/www/html/wp-content/gdc-private/rollback-105
+       tar -C <stage> -cf - gend-society | MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec -i deploy/wordpress -c wordpress -- tar -C /var/www/html/wp-content/gdc-private/stage-105 -xf -
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- chown -R www-data:www-data /var/www/html/wp-content/gdc-private/stage-105/gend-society
+
+5. Lint every staged PHP file:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'find /var/www/html/wp-content/gdc-private/stage-105/gend-society -name "*.php" -exec php -l {} \; | grep -v "^No syntax errors"'
+
+   Any output is a failure: STOP.
+
+6. The staged whole-tree manifest must equal the local one (`diff` prints nothing):
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec -i deploy/wordpress -c wordpress -- sh -s -- /var/www/html/wp-content/gdc-private/stage-105/gend-society < "C:/Desktop Web App Builder/gend-web-builder/scripts/gs-drift-manifest.sh" > staged-pod.md5
+       diff staged-local.md5 staged-pod.md5
+
+### 11.3 Pre-swap re-check
+
+1. Re-run the live whole-tree manifest and compare it with `live.md5` from 11.1 step 1:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec -i deploy/wordpress -c wordpress -- sh -s -- /var/www/html/wp-content/plugins/gend-society < "C:/Desktop Web App Builder/gend-web-builder/scripts/gs-drift-manifest.sh" > live-preswap.md5
+       diff live.md5 live-preswap.md5
+
+   **Any change = ABORT.** Somebody deployed in between; restart from 11.1.
+2. Repeat the same-filesystem check (11.2 step 3).
+
+### 11.4 Swap (one `sh -c`)
+
+    MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'mv /var/www/html/wp-content/plugins/gend-society /var/www/html/wp-content/gdc-private/rollback-105/gend-society-<oldver> && mv /var/www/html/wp-content/gdc-private/stage-105/gend-society /var/www/html/wp-content/plugins/gend-society'
+
+Both renames are on the same volume, so each is atomic; the gap between them is milliseconds.
+
+### 11.5 Immediately after the swap
+
+1. Reset opcache in the web SAPI (a CLI `opcache_reset()` does not touch the web server's
+   cache). Locally, pick a random file name `oc-<random>.php` and a random `<token>`, and write
+   a file `oc.php` containing:
+
+       <?php if ( ( $_GET['t'] ?? '' ) !== '<token>' ) { http_response_code( 404 ); exit; } var_dump( opcache_reset() );
+
+   Stream it into the image docroot `/var/www/html/` (not the volume), call it from inside the
+   pod, then delete it:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec -i deploy/wordpress -c wordpress -- sh -c 'cat > /var/www/html/oc-<random>.php' < oc.php
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- curl -s -H 'Host: gend.me' 'http://localhost/oc-<random>.php?t=<token>'
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- rm -f /var/www/html/oc-<random>.php
+
+   The curl must print `bool(true)`. Confirm the file is gone.
+2. Curl the four hub sites; each must return 200.
+3. Run the key-migration pass on every blog (a `wp site list` loop) and read back the flags:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'for u in $(wp --allow-root --path=/var/www/html site list --field=url); do wp --allow-root --path=/var/www/html --url="$u" eval "gend_society_migrate_keys();"; echo "$u $(wp --allow-root --path=/var/www/html --url="$u" option get gend_society_keys_migrated)"; done'
+
+   Use the migration entry point named in the release's PR if it differs. Every blog must report
+   its flag, and the network flag `gend_society_network_keys_migrated` must be set.
+4. Section 6 (verify), including the fatal-log check.
+
+### 11.6 Rollback
+
+1. FIRST, while the new code is still in place, move the renamed cron hooks back:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- wp --allow-root --path=/var/www/html --url=gend.me eval 'gend_society_unmigrate_cron_all_blogs();'
+
+   This moves every renamed-hook cron event back to its old hook with the same timestamp,
+   schedule and args on every blog. Skipping it loses per-booking `gs_booking_send_reminder`
+   events, because the old code does not know the new hook names.
+2. Reverse the swap in one `sh -c`:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'mkdir -p /var/www/html/wp-content/gdc-private/stage-105/failed && mv /var/www/html/wp-content/plugins/gend-society /var/www/html/wp-content/gdc-private/stage-105/failed/gend-society && mv /var/www/html/wp-content/gdc-private/rollback-105/gend-society-<oldver> /var/www/html/wp-content/plugins/gend-society'
+
+3. Delete the migration flags on every blog and the network flag, so a later retry migrates
+   again:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'for u in $(wp --allow-root --path=/var/www/html site list --field=url); do wp --allow-root --path=/var/www/html --url="$u" option delete gend_society_keys_migrated; done; wp --allow-root --path=/var/www/html --url=gend.me site option delete gend_society_network_keys_migrated'
+
+4. Reset opcache again (11.5 step 1).
+
+Old option/meta rows are never deleted by this procedure. They are current, because the compat
+bridges write through to both keys. But values the new version wrote only to the new keys are
+not mirrored back and are lost on rollback; state this in the rollback report.
