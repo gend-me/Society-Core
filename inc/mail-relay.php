@@ -72,12 +72,12 @@ add_filter('pre_wp_mail', function ($return, $atts) {
     $to  = is_array($atts['to']) ? $atts['to'] : array_filter(array_map('trim', explode(',', (string) $atts['to'])));
     $h   = gend_society_mail_relay_headers($atts['headers'] ?? '');
     $msg = (string) ($atts['message'] ?? '');
-    $html = stripos($h['content-type'] ?: (string) apply_filters('wp_mail_content_type', 'text/plain'), 'text/html') !== false
+    $html = stripos($h['content-type'] ?: (string) apply_filters('wp_mail_content_type', 'text/plain'), 'text/html') !== false // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
         || (bool) preg_match('#<(html|body|div|table|p|br|a)\b#i', $msg);
     $from = $h['from'];
     if ($from === '') {
-        $from_email = (string) apply_filters('wp_mail_from', 'no-reply@' . preg_replace('/^www\./', '', (string) wp_parse_url(home_url(), PHP_URL_HOST)));
-        $from_name  = (string) apply_filters('wp_mail_from_name', get_bloginfo('name'));
+        $from_email = (string) apply_filters('wp_mail_from', 'no-reply@' . preg_replace('/^www\./', '', (string) wp_parse_url(home_url(), PHP_URL_HOST))); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
+        $from_name  = (string) apply_filters('wp_mail_from_name', get_bloginfo('name')); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
         $from = ($from_name !== '' ? $from_name . ' ' : '') . '<' . $from_email . '>';
     }
     $attachments = array();
@@ -92,10 +92,10 @@ add_filter('pre_wp_mail', function ($return, $atts) {
     if (is_wp_error($res) || $res[0] < 200 || $res[0] >= 300) {
         $err = is_wp_error($res) ? $res->get_error_message() : ('gend.me mail service: HTTP ' . $res[0] . ' ' . ($res[1]['message'] ?? ''));
         error_log('[gend-society mail] ' . $err);
-        do_action('wp_mail_failed', new WP_Error('gend_mail_relay', $err, array('to' => $to)));
+        do_action('wp_mail_failed', new WP_Error('gend_mail_relay', $err, array('to' => $to))); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
         return false;
     }
-    do_action('wp_mail_succeeded', array('to' => $to, 'subject' => $atts['subject'] ?? '', 'transport' => 'gend-relay'));
+    do_action('wp_mail_succeeded', array('to' => $to, 'subject' => $atts['subject'] ?? '', 'transport' => 'gend-relay')); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
     return true;
 }, 20, 2);
 

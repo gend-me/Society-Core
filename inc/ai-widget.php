@@ -108,7 +108,7 @@ class Gend_Society_AI_Widget {
             );
         $oauth_client_id = (string) ( $oauth['id'] ?? '' );
         $oauth_hub_url   = untrailingslashit( (string) ( $oauth['hub'] ?? self::hub_base() ) );
-        return apply_filters( 'aipa_widget_config', array(
+        return apply_filters( 'aipa_widget_config', array( // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from leo.
             // Local namespace — forwarded to the hub by GS_AI_Proxy.
             'rest'              => esc_url_raw( get_rest_url( null, 'aipa/v1' ) ),
             'rest_url'          => trailingslashit( esc_url_raw( get_rest_url( get_current_blog_id() ) ) ),

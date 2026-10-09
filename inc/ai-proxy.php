@@ -402,7 +402,7 @@ class Gend_Society_AI_Proxy {
                         update_user_meta( $user->ID, 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
                         wp_set_current_user( $user->ID, $user->user_login );
                         wp_set_auth_cookie( $user->ID, true );
-                        do_action( 'wp_login', $user->user_login, $user );
+                        do_action( 'wp_login', $user->user_login, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
                     }
                 }
             }

@@ -505,7 +505,7 @@ class Gend_GS_Collab_Deck {
 		if ( class_exists( 'AIPA_GenD_OAuth' ) && method_exists( 'AIPA_GenD_OAuth', 'hub_url' ) ) {
 			return rtrim( (string) AIPA_GenD_OAuth::hub_url(), '/' );
 		}
-		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' );
+		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from contracts-and-payments.
 	}
 
 	/**

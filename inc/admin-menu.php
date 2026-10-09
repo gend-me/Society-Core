@@ -485,8 +485,8 @@ if (!function_exists('gend_society_get_admin_menu_structure_cached')) {
             // plugin echo/notice can't break JSON responses up the stack.
             ob_start();
             try {
-                do_action('_admin_menu');
-                do_action('admin_menu', '');
+                do_action('_admin_menu'); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
+                do_action('admin_menu', ''); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
             } catch (\Throwable $e) {
                 // Best-effort: keep whatever registered successfully.
             }
