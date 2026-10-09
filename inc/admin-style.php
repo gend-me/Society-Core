@@ -80,6 +80,14 @@ function gs_enqueue_admin_assets()
         // PKCE popup flow as wp-login.php (see oauth-login.php).
         'gendOauthClientId' => function_exists('gs_oauth_client_id') ? gs_oauth_client_id() : '',
         'gendOauthRestUrl'  => esc_url_raw(rest_url('gend-society/v1/oauth/login')),
+        // Header nav-pill backgrounds from the consent-gated gend.me table
+        // (inc/remote-assets.php); '' = render the neutral placeholder.
+        'navPillImages'     => [
+            'digitalBusiness' => function_exists('gend_society_remote_asset_url') ? esc_url_raw(gend_society_remote_asset_url('nav_pill_digital_business')) : '',
+            'buildWithLeo'    => function_exists('gend_society_remote_asset_url') ? esc_url_raw(gend_society_remote_asset_url('nav_pill_build_with_leo')) : '',
+            'contractWallet'  => function_exists('gend_society_remote_asset_url') ? esc_url_raw(gend_society_remote_asset_url('nav_pill_contract_wallet')) : '',
+        ],
+        'remotePlaceholderCss' => function_exists('gend_society_remote_asset_placeholder_css') ? gend_society_remote_asset_placeholder_css() : '',
     ]);
 
     global $pagenow;
@@ -131,7 +139,10 @@ add_action('admin_head', function () {
     echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
 
     if ( ! $skip_bg ) {
-        $bg_url = 'https://gend.me/wp-content/uploads/2026/03/account-background.gif';
+        // gend.me-hosted background; neutral gradient when remote assets
+        // are not allowed (standalone before Connect).
+        $bg_url = function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'account_background' ) : '';
+        $bg_ph  = function_exists( 'gend_society_remote_asset_placeholder_css' ) ? gend_society_remote_asset_placeholder_css() : '';
         // body is made `position: relative` so it acts as the stacking root
         // for the negative-z pseudo-elements below. Pushing the bg + overlay
         // to z-index:-2 / -1 means no other element needs a positive z-index
@@ -145,7 +156,7 @@ add_action('admin_head', function () {
             content: "";
             position: fixed;
             inset: 0;
-            background-image: url("' . esc_url( $bg_url ) . '");
+            ' . ( '' !== $bg_url ? 'background-image: url("' . esc_url( $bg_url ) . '");' : esc_html( $bg_ph ) ) . '
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;

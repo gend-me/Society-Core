@@ -49,6 +49,12 @@ return array(
 			'note'  => 'Bundled GenD Society block theme (registered before setup_theme).',
 		),
 		array(
+			'file'  => 'inc/remote-assets.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Consent-gated gend.me image table (Phase 105).',
+		),
+		array(
 			'file'  => 'inc/admin-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),

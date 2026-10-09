@@ -607,16 +607,22 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
            extracted, inline scripts re-executed, missing assets pulled in)
            with a Back button restoring the hub. Wireframe includes the BP
            panel's generate-first-wireframe flow when none exists yet. */
+        $gs_dv_brain_poster = function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'business_brain' ) : '';
+        $gs_dv_brain_video  = function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'business_brain_video' ) : '';
         ?>
         <div class="gs-dv-brainhub" data-dv-brainhub
              data-rest="<?php echo esc_url( rest_url( 'psoo/v1/business-plan/brain-files' ) ); ?>"
              data-rest-nonce="<?php echo esc_attr( wp_create_nonce( 'wp_rest' ) ); ?>"
              data-gid="<?php echo (int) $group_id; ?>">
             <div class="gs-dv-brainhub-bg" aria-hidden="true">
+                <?php if ( '' !== $gs_dv_brain_video ) : ?>
                 <video autoplay loop muted playsinline preload="auto"
-                       poster="https://gend.me/wp-content/uploads/2026/06/Resized-Business-Brain.png">
-                    <source src="https://gend.me/wp-content/uploads/2026/06/animate_this_ina_looping_anima.mp4" type="video/mp4">
+                       poster="<?php echo esc_url( $gs_dv_brain_poster ); ?>">
+                    <source src="<?php echo esc_url( $gs_dv_brain_video ); ?>" type="video/mp4">
                 </video>
+                <?php else : ?>
+                <div style="position:absolute;inset:0;<?php echo esc_attr( function_exists( 'gend_society_remote_asset_placeholder_css' ) ? gend_society_remote_asset_placeholder_css() : '' ); ?>"></div>
+                <?php endif; ?>
                 <div class="gs-dv-brainhub-veil"></div>
             </div>
             <div class="gs-dv-brainhub-head">
