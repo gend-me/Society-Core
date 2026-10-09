@@ -1,0 +1,14 @@
+{
+	"name": "updater-tier file selected into the wporg build",
+	"exclude": {
+		"wporg": {
+			"tiers": "core,customer,updater"
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "tier-updater"
+		}
+	]
+}

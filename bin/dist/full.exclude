@@ -1,0 +1,26 @@
+# bin/dist/full.exclude -- what bin/build-dist.js leaves out of the full (self-distributed) build.
+#
+# @tiers <list>            manifest tiers whose inc/ PHP files ship in this build
+# <pattern>/               directory prefix, relative to the plugin root
+# <pattern> without "/"    glob on the file's basename, at any depth (e.g. *.md)
+# <a/b.php>                exact path (or glob) relative to the plugin root
+# # allow-unreferenced: <assets/file>   asset no PHP/JS file references, shipped anyway
+#
+# The hub tier never ships in a zip (it runs only on the gend.me hub's raw checkout).
+
+@tiers core,customer,container,updater
+
+# Repo tooling and UAT material: never shipped
+handoff/
+bin/
+.github/
+node_modules/
+vendor/
+dist/
+.cache/
+.*
+*.sh
+package*.json
+composer.*
+phpcs.xml*
+*.md

@@ -1,0 +1,21 @@
+{
+	"name": "hub-tier files selected into both builds",
+	"exclude": {
+		"wporg": {
+			"tiers": "core,customer,hub"
+		},
+		"full": {
+			"tiers": "core,customer,container,updater,hub"
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "tier-hub"
+		},
+		{
+			"variant": "full",
+			"rule": "tier-hub"
+		}
+	]
+}

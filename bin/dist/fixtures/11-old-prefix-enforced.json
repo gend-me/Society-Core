@@ -1,0 +1,16 @@
+{
+	"name": "old-prefix PHP globals fail once enforcement is on (Plan 105-11)",
+	"flags": [
+		"--enforce-old-prefix"
+	],
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "old-prefix"
+		},
+		{
+			"variant": "full",
+			"rule": "old-prefix"
+		}
+	]
+}

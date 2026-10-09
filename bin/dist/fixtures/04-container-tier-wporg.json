@@ -1,0 +1,14 @@
+{
+	"name": "container-tier files selected into the wporg build",
+	"exclude": {
+		"wporg": {
+			"tiers": "core,customer,container"
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "tier-container"
+		}
+	]
+}

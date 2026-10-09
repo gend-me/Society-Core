@@ -1,0 +1,30 @@
+{
+	"name": "handoff/ file reaches both builds when the exclude lists lose handoff/ and *.md",
+	"write": {
+		"handoff/x.md": "# uat\n"
+	},
+	"exclude": {
+		"wporg": {
+			"remove": [
+				"handoff/",
+				"*.md"
+			]
+		},
+		"full": {
+			"remove": [
+				"handoff/",
+				"*.md"
+			]
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "forbidden-path handoff/"
+		},
+		{
+			"variant": "full",
+			"rule": "forbidden-path handoff/"
+		}
+	]
+}

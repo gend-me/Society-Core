@@ -1,0 +1,16 @@
+{
+	"name": "asset no PHP/JS file references",
+	"write": {
+		"assets/zz-orphan.css": ".x{}\n"
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "unreferenced-asset"
+		},
+		{
+			"variant": "full",
+			"rule": "unreferenced-asset"
+		}
+	]
+}
