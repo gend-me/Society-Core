@@ -99,7 +99,7 @@ function gs_gc_early( array $m ): string {
 		. " *  - 1.2.0's own writes to NEW keys are NOT mirrored back to the old names; they are\n"
 		. " *    lost on a rollback to 1.1.x (accepted: rollback re-reads the old rows).\n"
 		. " */\n\n";
-	$o .= "if ( ! defined( 'GEND_SOCIETY_KEY_MAP_VERSION' ) ) {\n\tdefine( 'GEND_SOCIETY_KEY_MAP_VERSION', " . gs_gc_q( $v ) . " );\n}\n\n";
+	$o .= "if ( ! defined( 'GEND_SOCIETY_KEYMAP_VERSION' ) ) {\n\tdefine( 'GEND_SOCIETY_KEYMAP_VERSION', " . gs_gc_q( $v ) . " );\n}\n\n";
 
 	$arr = function ( array $list ) {
 		$s = "array(\n";
@@ -126,9 +126,9 @@ function gs_gc_early( array $m ): string {
  */
 function gend_society_compat_migrated( $network ) {
 	if ( $network ) {
-		return GEND_SOCIETY_KEY_MAP_VERSION === get_site_option( 'gend_society_network_keys_migrated' );
+		return GEND_SOCIETY_KEYMAP_VERSION === get_site_option( 'gend_society_network_keys_migrated' );
 	}
-	return GEND_SOCIETY_KEY_MAP_VERSION === get_option( 'gend_society_keys_migrated' );
+	return GEND_SOCIETY_KEYMAP_VERSION === get_option( 'gend_society_keys_migrated' );
 }
 
 /**
