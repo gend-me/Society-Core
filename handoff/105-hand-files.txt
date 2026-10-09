@@ -1,5 +1,6 @@
 .drift-ignore
 .github/workflows/compliance.yml
+.github/workflows/version-check.yml
 .gitignore
 bin/build-dist.js
 bin/check-manifest.php
@@ -35,12 +36,19 @@ handoff/105-hand-files.txt
 handoff/105-key-inventory.php
 handoff/105-snapshot-normalize.php
 handoff/105-uat-rename.php
+inc/admin-menu.php
 inc/agent-switch.php
+inc/ai-proxy.php
+inc/ai-widget.php
 inc/bootstrap/key-map.php
 inc/bootstrap/key-migration.php
 inc/bootstrap/manifest.php
+inc/collab/class-collab-deck.php
+inc/collab/class-collab-market-mirror.php
+inc/collab/class-collab-sync.php
 inc/compat-aliases.php
 inc/compat-bridges.php
+inc/mail-relay.php
 inc/member-profile-header.php
 inc/member-profile-pages.php
 inc/oauth-login.php
@@ -48,3 +56,6 @@ inc/pages/dashboard.php
 package-lock.json
 package.json
 phpcs.xml.dist
+readme.txt
+themes/gend-society-theme/readme.txt
+themes/gend-society-theme/style.css
