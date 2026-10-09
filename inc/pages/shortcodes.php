@@ -3,12 +3,19 @@
 }
 // Shortcodes page — list all registered shortcodes with inline viewer
 global $shortcode_tags;
+// The "New Shortcode" PHP writer is container tier (gend.me-managed sites
+// only); standalone installs get the read-only list.
+$gend_society_sc_editor = function_exists('gend_society_mode_tiers')
+    && function_exists('gend_society_runtime_mode')
+    && in_array('container', gend_society_mode_tiers(gend_society_runtime_mode()), true)
+    && file_exists(__DIR__ . '/shortcodes-editor.php');
 ?>
 <div class="gs-page">
     <div class="gs-page-header">
         <h1 class="gs-page-title"><span class="gs-gradient-text">
                 <?php esc_html_e('Shortcodes', 'gend-society'); ?>
             </span></h1>
+        <?php if ($gend_society_sc_editor) : ?>
         <div class="gs-header-actions">
             <button type="button" class="gs-btn gs-btn-primary"
                 onclick="document.getElementById('gs-new-shortcode-form').classList.toggle('gs-hidden')">
@@ -16,52 +23,14 @@ global $shortcode_tags;
                 <?php esc_html_e('New Shortcode', 'gend-society'); ?>
             </button>
         </div>
-    </div>
-
-    <!-- New Shortcode Form -->
-    <div class="gs-card gs-hidden" id="gs-new-shortcode-form" style="margin-bottom:24px;">
-        <div class="gs-card-header">
-            <h3>
-                <?php esc_html_e('Create New Shortcode', 'gend-society'); ?>
-            </h3>
-        </div>
-        <div class="gs-card-body">
-            <form method="post" action="">
-                <?php wp_nonce_field('gs_save_shortcode', 'gs_sc_nonce'); ?>
-                <div class="gs-form-row">
-                    <label for="gs-sc-name">
-                        <?php esc_html_e('Tag (e.g. my_shortcode)', 'gend-society'); ?>
-                    </label>
-                    <input type="text" id="gs-sc-name" name="gs_sc_name" class="gs-input" placeholder="my_shortcode"
-                        pattern="[a-z0-9_\-]+" required>
-                </div>
-                <div class="gs-form-row">
-                    <label for="gs-sc-code">
-                        <?php esc_html_e('PHP Code (function body)', 'gend-society'); ?>
-                    </label>
-                    <textarea id="gs-sc-code" name="gs_sc_code" class="gs-textarea gs-code" rows="8"
-                        placeholder="// $atts are your shortcode attributes&#10;ob_start();&#10;// your output here&#10;return ob_get_clean();">
-</textarea>
-                </div>
-                <button type="submit" name="gs_save_sc" class="gs-btn gs-btn-primary">
-                    <?php esc_html_e('Save Shortcode', 'gend-society'); ?>
-                </button>
-            </form>
-        </div>
+        <?php endif; ?>
     </div>
 
     <?php
-    // Handle new shortcode save
-    if (isset($_POST['gs_save_sc']) && check_admin_referer('gs_save_shortcode', 'gs_sc_nonce') && current_user_can('activate_plugins')) {
-        $tag = preg_replace('/[^a-z0-9_\-]/', '', strtolower(sanitize_key(wp_unslash($_POST['gs_sc_name'] ?? ''))));
-        $code = wp_unslash($_POST['gs_sc_code'] ?? '');
-        if ($tag && $code) {
-            $mu_file = WP_CONTENT_DIR . '/mu-plugins/gs-shortcodes.php';
-            $existing = file_exists($mu_file) ? file_get_contents($mu_file) : "<?php\n// GenD Society Custom Shortcodes\n";
-            $snippet = "\n\n// Shortcode: [{$tag}]\nadd_shortcode( '{$tag}', function( \$atts, \$content = '' ) {\n{$code}\n} );\n";
-            file_put_contents($mu_file, $existing . $snippet);
-            echo '<div class="notice notice-success"><p>' . esc_html__('Shortcode saved!', 'gend-society') . '</p></div>';
-        }
+    if ($gend_society_sc_editor) {
+        include __DIR__ . '/shortcodes-editor.php';
+    } else {
+        echo '<p class="gs-muted">' . esc_html__('To add custom shortcodes, use a code-snippets plugin or your child theme.', 'gend-society') . '</p>';
     }
 
     ksort($shortcode_tags);
@@ -70,7 +39,10 @@ global $shortcode_tags;
     <div class="gs-card">
         <div class="gs-card-header">
             <h3>
-                <?php printf(esc_html__('Registered Shortcodes (%d)', 'gend-society'), count($shortcode_tags)); ?>
+                <?php
+                /* translators: %d: number of registered shortcodes. */
+                printf(esc_html__('Registered Shortcodes (%d)', 'gend-society'), count($shortcode_tags));
+                ?>
             </h3>
             <input type="text" class="gs-input gs-search-input"
                 placeholder="<?php esc_attr_e('Search shortcodes…', 'gend-society'); ?>"

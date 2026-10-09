@@ -47,7 +47,7 @@ ALLOWLIST=(
   "inc/ai-widget.php|'2.1.0'"
   # Foreign blog-manager / gend-media-optimizer admin CSS; each file's own
   # mtime is the exact cache signal.
-  "inc/dashboard-hosting.php|'?ver=' . filemtime( \$gmo_css_path )"
+  "inc/dashboard-hosting.php|(string) filemtime( \$gmo_css_path )"
   # projects plugin psoo-bp assets; versioned by the projects plugin's PSOO_VER.
   "inc/dashboard-remote-membership.php|\$gs_bp_ver = PSOO_VER"
 )

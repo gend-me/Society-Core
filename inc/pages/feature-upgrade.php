@@ -149,9 +149,9 @@ function gs_render_feature_upgrade_page() {
         <div class="gs-up-shell">
 
             <?php if ( $required !== '' ) : ?>
-                <span class="gs-up-current">⨯ <?php echo esc_html( sprintf( __( '%s requires an upgrade', 'gend-society' ), gs_feature_area_label( $required ) ) ); ?></span>
+                <span class="gs-up-current">⨯ <?php echo esc_html( sprintf( /* translators: %s: Feature area name. */ __( '%s requires an upgrade', 'gend-society' ), gs_feature_area_label( $required ) ) ); ?></span>
             <?php elseif ( $current_plan !== '' ) : ?>
-                <span class="gs-up-current">● <?php echo esc_html( sprintf( __( 'Current plan: %s', 'gend-society' ), $current_plan ) ); ?></span>
+                <span class="gs-up-current">● <?php echo esc_html( sprintf( /* translators: %s: Current plan name. */ __( 'Current plan: %s', 'gend-society' ), $current_plan ) ); ?></span>
             <?php endif; ?>
 
             <?php if ( $learn_more_url !== '' ) : ?>
@@ -165,6 +165,7 @@ function gs_render_feature_upgrade_page() {
                 <?php
                 if ( $required !== '' ) {
                     echo esc_html( sprintf(
+                        /* translators: %s: Feature area name. */
                         __( 'The %s area is locked on your current plan. Upgrade to a Dashboard tier that includes it and your wp-admin will unlock instantly when checkout completes.', 'gend-society' ),
                         gs_feature_area_label( $required )
                     ) );

@@ -103,7 +103,7 @@ function gs_groups_frontend_background() {
     if ( ! function_exists( 'bp_is_groups_component' ) || ! bp_is_groups_component() ) {
         return;
     }
-    $bg_url = 'https://gend.me/wp-content/uploads/2026/03/account-background.gif';
+    $bg_url = function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'account_background' ) : '';
     ?>
     <style id="gs-groups-bg">
         html { background: transparent !important; }
@@ -112,7 +112,8 @@ function gs_groups_frontend_background() {
             content: "";
             position: fixed;
             inset: 0;
-            background-image: url("<?php echo esc_url( $bg_url ); ?>");
+            <?php echo '' !== $bg_url ? 'background-image: url("' . esc_url( $bg_url ) . '");' : esc_html( function_exists( 'gend_society_remote_asset_placeholder_css' ) ? gend_society_remote_asset_placeholder_css() : '' ); ?>
+
             background-size: cover;
             background-position: center;
             background-repeat: no-repeat;

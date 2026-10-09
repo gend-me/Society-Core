@@ -133,20 +133,31 @@
         var loginBtn = canLogin
             ? '<button type="button" class="gs-login-gend-btn" id="gs-header-login-gend">Login to GenD</button>'
             : '';
+        // Pill backgrounds come from the consent-gated gend.me table
+        // (inc/remote-assets.php via gsAdminData.navPillImages). An empty
+        // URL renders a neutral placeholder instead of requesting gend.me.
+        var pills = data.navPillImages || {};
+        function pillBg(url) {
+            if (url) {
+                return '<img src="' + String(url).replace(/"/g, '&quot;') + '" class="pill-bg" alt="">';
+            }
+            return '<span class="pill-bg" aria-hidden="true" style="display:block;' +
+                String(data.remotePlaceholderCss || '').replace(/"/g, '') + '"></span>';
+        }
 
         return '' +
             loginBtn +
             '<nav class="nav-central">' +
                 '<a href="/app-features" class="nav-pill">' +
-                    '<img src="https://gend.me/wp-content/uploads/2025/12/Web-App-Building-Waiting.gif" class="pill-bg" alt="">' +
+                    pillBg(pills.digitalBusiness) +
                     '<span class="pill-content">Digital Business</span>' +
                 '</a>' +
                 '<a href="/leo" class="nav-pill">' +
-                    '<img src="https://gend.me/wp-content/uploads/2026/03/Untitleddesign1-ezgif.com-video-to-gif-converter.gif" class="pill-bg" alt="">' +
+                    pillBg(pills.buildWithLeo) +
                     '<span class="pill-content">Build with LEO</span>' +
                 '</a>' +
                 '<a href="/smart-wallets" class="nav-pill">' +
-                    '<img src="https://gend.me/wp-content/uploads/2025/11/20251113_1637_New-Video_simple_compose_01k9zjcc05e6tbycty113spf54.gif" class="pill-bg" alt="">' +
+                    pillBg(pills.contractWallet) +
                     '<span class="pill-content">Contract Wallet</span>' +
                 '</a>' +
             '</nav>' +

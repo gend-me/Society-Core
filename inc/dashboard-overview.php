@@ -139,7 +139,7 @@ if (!function_exists('gs_get_account_overview_html')) {
             }
 
             echo '<div style="display: flex; align-items: center; gap: 16px; margin-top: 20px; padding-bottom: 24px; border-bottom: 1px solid rgba(255,255,255,0.05);">';
-            echo '<a href="' . esc_url($profile) . '" target="_blank" rel="noopener" style="border-radius: 50%; overflow: hidden; width: 64px; height: 64px; display: block;">' . $avatar . '</a>';
+            echo '<a href="' . esc_url($profile) . '" target="_blank" rel="noopener" style="border-radius: 50%; overflow: hidden; width: 64px; height: 64px; display: block;">' . $avatar . '</a>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Core/BuddyPress avatar <img> (escaped by get_avatar()/bp_core_fetch_avatar()); kses would strip its srcset/decoding.
             echo '<div>';
             echo '<a href="' . esc_url($profile) . '" target="_blank" rel="noopener" style="display: block; font-size: 1.1rem; font-weight: 600; color: #fff; text-decoration: none;">' . esc_html($name) . '</a>';
             echo '<a class="gs-btn gs-btn-secondary" href="' . esc_url($msg) . '" target="_blank" rel="noopener" style="margin-top: 10px; padding: 4px 12px; font-size: 0.8rem;">' . esc_html__('Message', 'gend-society') . '</a>';
@@ -168,7 +168,7 @@ if (!function_exists('gs_get_account_overview_html')) {
         }
 
         if ($gid) {
-            $name = sprintf(__('Group #%d', 'gend-society'), $gid);
+            $name = sprintf(/* translators: %d: Group ID. */ __('Group #%d', 'gend-society'), $gid);
             $link = '';
             $avatar = '';
             $g = null;
@@ -233,15 +233,18 @@ if (!function_exists('gs_get_account_overview_html')) {
                 $avatar = '<span class="dashicons dashicons-groups" style="font-size:32px; color: var(--gs-muted);"></span>';
             }
 
-            $title_html = $link ? ('<a href="' . esc_url($link) . '" target="_blank" rel="noopener" style="color: #fff; font-weight: 600; text-decoration: none; display: block; margin-bottom: 8px;">' . esc_html($name) . '</a>') : esc_html($name);
             if ($link && !empty($avatar)) {
                 $avatar = '<a href="' . esc_url($link) . '" target="_blank" rel="noopener" style="border-radius: 8px; overflow: hidden; display: block; width: 48px; height: 48px;">' . $avatar . '</a>';
             }
 
             echo '<div style="display: flex; align-items: center; gap: 16px; margin-top: 16px;">';
-            echo $avatar;
+            echo $avatar; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Core/BuddyPress avatar <img> (escaped by get_avatar()/bp_core_fetch_avatar()); kses would strip its srcset/decoding.
             echo '<div>';
-            echo $title_html;
+            if ($link) {
+                echo '<a href="' . esc_url($link) . '" target="_blank" rel="noopener" style="color: #fff; font-weight: 600; text-decoration: none; display: block; margin-bottom: 8px;">' . esc_html($name) . '</a>';
+            } else {
+                echo esc_html($name);
+            }
             if ($link) {
                 echo '<a class="gs-btn gs-btn-secondary" href="' . esc_url($link) . '" target="_blank" rel="noopener" style="padding: 4px 12px; font-size: 0.8rem;">' . esc_html__('Open Group', 'gend-society') . '</a>';
             }

@@ -180,26 +180,25 @@ add_action('wp_head', function () {
         return;
     }
     $seo = gs_seo_current();
-    $tags = array();
+    echo "\n<!-- GenD SEO -->\n";
     if ($seo['description'] !== '') {
-        $tags[] = sprintf('<meta name="description" content="%s">', esc_attr($seo['description']));
+        printf('<meta name="description" content="%s">' . "\n", esc_attr($seo['description']));
     }
-    $tags[] = sprintf('<meta property="og:site_name" content="%s">', esc_attr(get_bloginfo('name')));
-    $tags[] = sprintf('<meta property="og:type" content="%s">', esc_attr($seo['type']));
-    $tags[] = sprintf('<meta property="og:title" content="%s">', esc_attr($seo['title']));
+    printf('<meta property="og:site_name" content="%s">' . "\n", esc_attr(get_bloginfo('name')));
+    printf('<meta property="og:type" content="%s">' . "\n", esc_attr($seo['type']));
+    printf('<meta property="og:title" content="%s">' . "\n", esc_attr($seo['title']));
     if ($seo['description'] !== '') {
-        $tags[] = sprintf('<meta property="og:description" content="%s">', esc_attr($seo['description']));
+        printf('<meta property="og:description" content="%s">' . "\n", esc_attr($seo['description']));
     }
     if ($seo['url'] !== '') {
-        $tags[] = sprintf('<meta property="og:url" content="%s">', esc_url($seo['url']));
+        printf('<meta property="og:url" content="%s">' . "\n", esc_url($seo['url']));
     }
     if ($seo['image'] !== '') {
-        $tags[] = sprintf('<meta property="og:image" content="%s">', esc_url($seo['image']));
+        printf('<meta property="og:image" content="%s">' . "\n", esc_url($seo['image']));
     }
-    $tags[] = sprintf('<meta name="twitter:card" content="%s">', $seo['image'] !== '' ? 'summary_large_image' : 'summary');
-    $tags[] = sprintf('<meta name="twitter:title" content="%s">', esc_attr($seo['title']));
+    printf('<meta name="twitter:card" content="%s">' . "\n", esc_attr($seo['image'] !== '' ? 'summary_large_image' : 'summary'));
+    printf('<meta name="twitter:title" content="%s">' . "\n", esc_attr($seo['title']));
     if ($seo['description'] !== '') {
-        $tags[] = sprintf('<meta name="twitter:description" content="%s">', esc_attr($seo['description']));
+        printf('<meta name="twitter:description" content="%s">' . "\n", esc_attr($seo['description']));
     }
-    echo "\n<!-- GenD SEO -->\n" . implode("\n", $tags) . "\n";
 }, 1);

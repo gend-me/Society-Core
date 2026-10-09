@@ -8,6 +8,16 @@ if (!defined('ABSPATH')) {
 }
 
 /**
+ * Feature-card header image (gend.me-hosted, via the consent-gated table in
+ * inc/remote-assets.php). '' when remote assets are not allowed; the card
+ * then renders a neutral placeholder.
+ */
+function gend_society_feature_card_image($slug)
+{
+    return function_exists('gend_society_remote_asset_url') ? gend_society_remote_asset_url('feature_card_' . $slug) : '';
+}
+
+/**
  * Returns hardcoded feature definitions for the GenD Society dashboard.
  */
 function gs_get_feature_definitions()
@@ -17,63 +27,63 @@ function gs_get_feature_definitions()
             'name' => __('Theme Builder', 'gend-society'),
             'description' => __('Generate high-fidelity UI maps and backend login flows instantly using LEO’s generation engine.', 'gend-society'),
             'plugin' => 'gend-society/gend-society.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Wireframe-Generation.png',
+            'image' => gend_society_feature_card_image('wireframe'),
             'link' => 'https://gend.me/wireframe-generation/'
         ),
         'blog' => array(
             'name' => __('Content Campaigns', 'gend-society'),
             'description' => __('Turn your content into a community hub with integrated social sharing and engagement tools.', 'gend-society'),
             'plugin' => 'blog-manager/blog-manager.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Social-Blogs.png',
+            'image' => gend_society_feature_card_image('blog'),
             'link' => 'https://gend.me/social-blogs/'
         ),
         'email' => array(
             'name' => __('Talk Flows', 'gend-society'),
             'description' => __('Automate high-touch communication and keep your users engaged with targeted community updates.', 'gend-society'),
             'plugin' => 'email-manager/email-manager.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Email-Nurturing.png',
+            'image' => gend_society_feature_card_image('email'),
             'link' => 'https://gend.me/community-emails/'
         ),
         'store' => array(
             'name' => __('Store Management', 'gend-society'),
             'description' => __('Centralize your inventory, orders, and fulfillment in one intuitive dashboard.', 'gend-society'),
             'plugin' => 'online-store/online-store.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Store-Management.png',
+            'image' => gend_society_feature_card_image('store'),
             'link' => 'https://gend.me/store-management/'
         ),
         'sales' => array(
             'name' => __('Sales Team', 'gend-society'),
             'description' => __('Empower your sales team with real-time tracking, lead management, and performance analytics.', 'gend-society'),
             'plugin' => 'sales-team/advanced-affiliate-system.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Sales-Team.png',
+            'image' => gend_society_feature_card_image('sales'),
             'link' => 'https://gend.me/sales-team/'
         ),
         'projects' => array(
             'name' => __('Project Services', 'gend-society'),
             'description' => __('Coordinate global teams and track deliverables with integrated project management for store owners.', 'gend-society'),
             'plugin' => 'projects/project-service-orders.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Remote-Projects.png',
+            'image' => gend_society_feature_card_image('projects'),
             'link' => 'https://gend.me/remote-projects/'
         ),
         'social' => array(
             'name' => __('Social Profiles', 'gend-society'),
             'description' => __('Allow users to create rich, customizable profiles that drive identity and connection.', 'gend-society'),
             'plugin' => 'social-network/social-network.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Social-Profiles.png',
+            'image' => gend_society_feature_card_image('social'),
             'link' => 'https://gend.me/social-profiles/'
         ),
         'membership' => array(
             'name' => __('Contracts & Payments', 'gend-society'),
             'description' => __('Total control over tiers, permissions, and access for your exclusive community.', 'gend-society'),
             'plugin' => 'contracts-and-payments/contracts-and-payments.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Membership-Management.png',
+            'image' => gend_society_feature_card_image('membership'),
             'link' => 'https://gend.me/membership-management/'
         ),
         'rewards' => array(
             'name' => __('Point Bank', 'gend-society'),
             'description' => __('Incentivize loyalty and engagement with automated points, badges, and perks.', 'gend-society'),
             'plugin' => 'reward-programs/reward-programs.php',
-            'image' => 'https://gend.me/wp-content/uploads/2026/02/Member-Rewards.png',
+            'image' => gend_society_feature_card_image('rewards'),
             'link' => 'https://gend.me/member-rewards/'
         )
     );
@@ -169,7 +179,11 @@ function gs_render_feature_cards_widget($show_sizes = false)
 
         // Image Header
         echo '<div class="gs-fc-media">';
-        echo '<img src="' . esc_url($feature['image']) . '" alt="' . esc_attr($feature['name']) . '" class="gs-fc-img" loading="lazy" />';
+        if ('' !== $feature['image']) {
+            echo '<img src="' . esc_url($feature['image']) . '" alt="' . esc_attr($feature['name']) . '" class="gs-fc-img" loading="lazy" />';
+        } else {
+            echo '<div class="gs-fc-img" role="img" aria-label="' . esc_attr($feature['name']) . '" style="' . esc_attr(function_exists('gend_society_remote_asset_placeholder_css') ? gend_society_remote_asset_placeholder_css() : '') . '"></div>';
+        }
 
         // Update Button - overlaid bottom-right of the image/header section.
         if ($has_update) {
@@ -178,7 +192,7 @@ function gs_render_feature_cards_widget($show_sizes = false)
             echo '<span class="gs-fc-badge">!</span>';
             echo '</button>';
         } else {
-            echo '<a href="' . admin_url('update-core.php') . '" class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update" title="Check Updates">';
+            echo '<a href="' . esc_url(admin_url('update-core.php')) . '" class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update" title="Check Updates">';
             echo '<span class="dashicons dashicons-update"></span>';
             echo '</a>';
         }
@@ -198,7 +212,7 @@ function gs_render_feature_cards_widget($show_sizes = false)
 
         // Main Action Button (Manage or Activate)
         if ($is_active) {
-            echo '<a href="' . admin_url('plugins.php') . '" class="gs-btn gs-btn-secondary gs-fc-btn">' . esc_html__('Manage Plugin', 'gend-society') . '</a>';
+            echo '<a href="' . esc_url(admin_url('plugins.php')) . '" class="gs-btn gs-btn-secondary gs-fc-btn">' . esc_html__('Manage Plugin', 'gend-society') . '</a>';
         } else {
             echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';
         }
@@ -348,7 +362,7 @@ function gs_ajax_upload_plugin() {
         // wp_handle_upload() moves the ZIP into uploads/; install() reads it
         // from there but doesn't clean it up itself.
         if (file_exists($uploaded['file'])) {
-            @unlink($uploaded['file']);
+            wp_delete_file($uploaded['file']);
         }
 
         if (is_wp_error($install_result)) {
