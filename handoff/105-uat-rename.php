@@ -9,7 +9,9 @@
  *   wp --allow-root --path=/var/www/html [--url=<site>] eval-file /tmp/105-uat-rename.php
  *
  * 105-key-inventory.php must sit next to this file (it is loaded as a library).
- * Prints PASS / FAIL / SKIP / INFO lines and ends with "ALL PASS" or "FAILED: <n>".
+ * Prints PASS / FAIL / SKIP / INFO lines and ends with "ALL PASS" or "FAILED: <n>"
+ * (exit status 1 on FAILED). A foreign row changed by its owner is INFO, not FAIL:
+ * see gs105u_foreign_class().
  *
  * Writes: none, except
  *  - update_option( 'gs_gend_pubkey', <its current value> ) to prove the bridge
@@ -30,6 +32,75 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 define( 'GS105_INVENTORY_LIB', true );
 require_once __DIR__ . '/105-key-inventory.php';
+
+if ( ! function_exists( 'gs105u_foreign_class' ) ) {
+	/**
+	 * Classify one foreign inventory row ("<kind>:<name>") for the BEFORE/AFTER comparison.
+	 *
+	 * 'foreign': the rename map lists it with new:null and an owner other than gend-society,
+	 * gend-society code never writes or deletes it, and the key map cannot reach it. A change
+	 * to such a row was made by its owner, never by the migration.
+	 * 'strict': everything else (a change is a FAIL).
+	 *
+	 * @param string     $fk     Inventory key, e.g. "user_meta:_gs_gdrive_access_token".
+	 * @param array|null $map    Decoded bin/rename-map.json.
+	 * @param array|null $keymap Loaded inc/bootstrap/key-map.php (gs105_inv_keymap()).
+	 * @return array{class:string, owner:string, why:string}
+	 */
+	function gs105u_foreign_class( $fk, $map, $keymap ) {
+		$parts = explode( ':', (string) $fk, 2 );
+		if ( 2 !== count( $parts ) ) {
+			return array( 'class' => 'strict', 'owner' => '', 'why' => 'malformed inventory key' );
+		}
+		list( $kind, $name ) = $parts;
+		if ( ! is_array( $keymap ) ) {
+			return array( 'class' => 'strict', 'owner' => '', 'why' => 'key map not loaded' );
+		}
+		// 1. Can the migration reach this name? It only writes names taken from the key map.
+		foreach ( $keymap as $section => $pairs ) {
+			if ( ! is_array( $pairs ) ) {
+				continue;
+			}
+			$is_prefix = '_prefix' === substr( (string) $section, -7 );
+			foreach ( $pairs as $old => $new ) {
+				foreach ( array( (string) $old, (string) $new ) as $n ) {
+					if ( '' === $n ) {
+						continue;
+					}
+					if ( $n === $name || ( $is_prefix && 0 === strpos( $name, $n ) ) ) {
+						return array( 'class' => 'strict', 'owner' => '', 'why' => "key map $section reaches it ($n)" );
+					}
+				}
+			}
+		}
+		// 2. Who owns it? Only the rename map says.
+		if ( ! is_array( $map ) || empty( $map['entries'] ) ) {
+			return array( 'class' => 'strict', 'owner' => '', 'why' => 'no rename map' );
+		}
+		foreach ( $map['entries'] as $e ) {
+			if ( ! isset( $e['old'], $e['kind'] ) || $e['old'] !== $name || $e['kind'] !== $kind ) {
+				continue;
+			}
+			$owner = isset( $e['owner'] ) ? (string) $e['owner'] : '';
+			if ( ! empty( $e['new'] ) ) {
+				return array( 'class' => 'strict', 'owner' => $owner, 'why' => 'renamed by the map (new ' . $e['new'] . ')' );
+			}
+			if ( '' === $owner || false !== stripos( $owner, 'gend-society' ) ) {
+				return array( 'class' => 'strict', 'owner' => $owner, 'why' => 'owner is gend-society or unknown' );
+			}
+			foreach ( (array) ( isset( $e['at'] ) ? $e['at'] : array() ) as $at ) {
+				if ( preg_match( '/\s(write|delete)$/', (string) $at ) ) {
+					return array( 'class' => 'strict', 'owner' => $owner, 'why' => 'gend-society code writes it (' . $at . ')' );
+				}
+			}
+			return array( 'class' => 'foreign', 'owner' => $owner, 'why' => 'new:null in the rename map, not in the key map' );
+		}
+		return array( 'class' => 'strict', 'owner' => '', 'why' => "not in the rename map as $kind" );
+	}
+}
+if ( defined( 'GS105U_CLASSIFY_ONLY' ) ) {
+	return; // Library use: only gs105u_foreign_class() (read-only classification report).
+}
 
 $gs105u_fails   = 0;
 $gs105u_section = (string) getenv( 'GS105_SECTION' );
@@ -138,8 +209,29 @@ if ( $gs105u_before ) {
 		$n = isset( $gs105u_now['site_option'][ $old ] ) ? $gs105u_now['site_option'][ $old ] : null;
 		$gs105u_cmp( 'site_option', $old, $b['old_row'] ? $b['old_row']['md5'] : null, $n && $n['new_row'] ? $n['new_row']['md5'] : null, $n && $n['old_row'] );
 	}
+	// Foreign rows. The migration's promise is that it never WRITES another plugin's rows,
+	// not that their owners stop writing them (gend-media-optimizer refreshes a Drive token
+	// hourly). A changed foreign row is INFO only when all of these hold:
+	// - the rename map (GS105_MAP) lists it with new:null and an owner other than
+	// gend-society, and no gend-society code path writes or deletes it;
+	// - the loaded key map (the migration's only source of names to write) cannot reach it,
+	// neither as an old/new name nor through a prefix.
+	// Anything else (unmapped, gend-society-owned, written by gend-society, reachable from the
+	// key map) stays a strict FAIL.
+	$gs105u_km = gs105_inv_keymap();
 	foreach ( (array) $gs105u_before['foreign'] as $k => $md5 ) {
-		$gs105u_ok( array_key_exists( $k, $gs105u_now['foreign'] ) && $gs105u_now['foreign'][ $k ] === $md5, "foreign row $k unchanged" );
+		$now_md5 = array_key_exists( $k, $gs105u_now['foreign'] ) ? $gs105u_now['foreign'][ $k ] : false;
+		if ( false !== $now_md5 && $now_md5 === $md5 ) {
+			$gs105u_ok( true, "foreign row $k unchanged" );
+			continue;
+		}
+		$cls = gs105u_foreign_class( $k, $gs105u_map, $gs105u_km );
+		$chg = ( null === $md5 ? 'absent' : $md5 ) . ' -> ' . ( false === $now_md5 ? 'not inventoried' : ( null === $now_md5 ? 'absent' : $now_md5 ) );
+		if ( 'foreign' === $cls['class'] && false !== $now_md5 ) {
+			echo "INFO foreign row $k changed by its owner ({$cls['owner']}): md5 $chg; the migration cannot write it ({$cls['why']})\n";
+		} else {
+			$gs105u_ok( false, "foreign row $k unchanged", 'changed: ' . $chg . '; strict: ' . $cls['why'] );
+		}
 	}
 	// Cron: same number of events and the same schedule/args set per renamed hook; no old-hook events.
 	foreach ( (array) $gs105u_before['cron'] as $old => $b ) {
@@ -307,3 +399,6 @@ if ( 'container' === $gs105u_section ) {
 }
 
 echo 0 === $gs105u_fails ? "ALL PASS\n" : "FAILED: {$gs105u_fails}\n";
+if ( 0 !== $gs105u_fails ) {
+	exit( 1 );
+}
