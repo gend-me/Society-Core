@@ -260,7 +260,8 @@ if ( ! function_exists( 'gend_society_admin_experience_header_link' ) ) {
 			return;
 		}
 		$config = array(
-			'href'  => esc_url_raw( gend_society_admin_experience_switch_url( 'native' ) ),
+			// wp_nonce_url() returns an HTML-escaped URL (&amp;); a.href is set from JS, so decode it first.
+			'href'  => esc_url_raw( wp_specialchars_decode( gend_society_admin_experience_switch_url( 'native' ) ) ),
 			'label' => __( 'Switch back to native WordPress admin', 'gend-society' ),
 		);
 		$js = '(function(c){'
