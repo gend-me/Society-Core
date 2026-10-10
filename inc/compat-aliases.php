@@ -382,7 +382,7 @@ function gend_society_compat_mirror_actions() {
 }
 add_action( 'admin_init', 'gend_society_compat_mirror_actions', PHP_INT_MAX );
 // Hooks other plugins fire (old name -> new listeners) or listen to (new fire -> old listeners).
-/* listened to by contracts-and-payments */
+/* listened to by contracts-and-payments, mu:gend-privacy-controls.php */
 add_filter(
 	'gend_society_profile_header_balances',
 	static function ( $value = null, ...$args ) {

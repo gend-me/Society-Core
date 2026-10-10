@@ -8228,18 +8228,26 @@
                 "inc/member-profile-header.php:740"
             ],
             "external": [
-                "contracts-and-payments"
+                "contracts-and-payments",
+                "mu:gend-privacy-controls.php"
             ],
-            "note": "C&P listens (priority 99) to hide the DGEN top-up while purchases are disabled; compat must apply old-name listeners when the new hook fires",
+            "note": "C&P listens (priority 99) to hide the DGEN top-up while purchases are disabled; compat must apply old-name listeners when the new hook fires; mu-plugin gend-privacy-controls.php (live-only, 105-13 re-audit) listens on both names at priority 999 (idempotent privacy filter)",
             "external_manual": [
-                "contracts-and-payments"
+                "contracts-and-payments",
+                "mu:gend-privacy-controls.php"
             ],
             "external_roles": {
                 "listen": [
-                    "contracts-and-payments"
+                    "contracts-and-payments",
+                    "mu:gend-privacy-controls.php"
                 ]
             },
-            "reviewed": true
+            "reviewed": true,
+            "external_at": {
+                "mu:gend-privacy-controls.php": [
+                    "live:mu-plugins/gend-privacy-controls.php:30"
+                ]
+            }
         },
         {
             "old": "gdc_profile_linked_app",
@@ -9387,6 +9395,7 @@
                 "inc/dashboard-remote-membership.php:138 read"
             ],
             "external": [
+                "blog-manager",
                 "electron-e2e",
                 "gend-media-optimizer"
             ],
@@ -9400,6 +9409,9 @@
                 "electron-e2e": [
                     "repo:electron/site-tests/php/e2e.php:789",
                     "repo:electron/site-tests/php/e2e.php:819"
+                ],
+                "blog-manager": [
+                    "live:plugins/blog-manager/inc/social/class-bm-social-poster.php:433"
                 ]
             }
         },
@@ -10582,12 +10594,16 @@
                 "inc/pages/feature-access.php:28 write"
             ],
             "external": [
+                "blog-manager",
                 "email-manager"
             ],
             "external_at": {
                 "email-manager": [
                     "repo:plugins/email-manager/inc/postings.php:1226",
                     "live:plugins/email-manager/inc/postings.php:1226"
+                ],
+                "blog-manager": [
+                    "live:plugins/blog-manager/inc/class-bm-access.php:59"
                 ]
             }
         },
