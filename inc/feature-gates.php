@@ -126,6 +126,11 @@ function gend_society_features_always_allowed() {
         'gs-feature-upgrade',
     );
 
+    // Standalone (RUN-01): the plugin's own GenD page is never gated.
+    if ( function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() ) {
+        $allowed[] = 'gend-society';
+    }
+
     $is_paired       = (string) get_option( 'gend_society_install_token', '' ) !== '';
     $is_super_admin  = is_multisite() && current_user_can( 'manage_network' );
     if ( $is_paired || $is_super_admin ) {
@@ -285,6 +290,13 @@ function gend_society_features_enforce_redirect() {
     }
     if ( $page === '' ) return;
 
+    // Standalone (RUN-01): a paired plain-WordPress site never loses its
+    // core WordPress screens to the upgrade redirect. Hub/container unchanged.
+    if ( function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode()
+        && in_array( $page, array( 'plugins.php', 'update-core.php', 'options-general.php', 'users.php', 'themes.php', 'index.php', 'profile.php' ), true ) ) {
+        return;
+    }
+
     // Always-allowed slugs (Dashboard, Users, Connect, etc.).
     if ( in_array( $page, gend_society_features_always_allowed(), true ) ) return;
 
@@ -376,6 +388,9 @@ function gend_society_features_get_cached() {
  * One-shot fetch from gend.me /install/{install_id}/features.
  */
 function gend_society_features_fetch_remote() {
+
+    // RUN-01: no gend.me request before the owner consented (always true on hub/container).
+    if ( function_exists( 'gend_society_remote_allowed' ) && ! gend_society_remote_allowed( 'features' ) ) return null;
 
     $install_id    = (string) get_option( 'gend_society_install_id', '' );
     $install_token = (string) get_option( 'gend_society_install_token', '' );

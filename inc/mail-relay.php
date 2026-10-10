@@ -40,6 +40,8 @@ function gend_society_mail_relay_active() {
 
 /** POST to a gend.me mail-service route. Returns [status, data] or WP_Error. */
 function gend_society_mail_relay_call($route, array $body, $timeout = 30) {
+    // RUN-01: no gend.me request before the owner consented (always true on hub/container).
+    if (function_exists('gend_society_remote_allowed') && !gend_society_remote_allowed('mail')) return new WP_Error('not_consented', 'This site has not been connected to gend.me yet.');
     $c = gend_society_mail_relay_creds();
     if (!$c) return new WP_Error('not_paired', 'This install is not paired with gend.me.');
     $resp = wp_remote_post($c['base'] . '/wp-json/gend-mail/v1/' . ltrim($route, '/'), array(

@@ -87,6 +87,8 @@ function gend_society_remote_membership_get_cached() {
 }
 
 function gend_society_remote_membership_fetch() {
+    // RUN-01: no gend.me request before the owner consented (always true on hub/container).
+    if ( function_exists( 'gend_society_remote_allowed' ) && ! gend_society_remote_allowed( 'membership' ) ) return null;
     $install_id    = (string) get_option( 'gend_society_install_id', '' );
     $install_token = (string) get_option( 'gend_society_install_token', '' );
     $gend_base     = (string) get_option( 'gend_society_gend_base_url', '' );
@@ -133,6 +135,10 @@ add_action( 'gs_remote_membership_invalidate', 'gend_society_remote_membership_i
  * @return array|\WP_Error
  */
 function gend_society_remote_membership_call( string $path, array $body = array(), string $method = 'POST' ) {
+    // RUN-01: no gend.me request before the owner consented (always true on hub/container).
+    if ( function_exists( 'gend_society_remote_allowed' ) && ! gend_society_remote_allowed( 'membership' ) ) {
+        return new WP_Error( 'not_consented', __( 'This site has not been connected to gend.me yet. Press Connect first.', 'gend-society' ) );
+    }
     $install_id    = (string) get_option( 'gend_society_install_id', '' );
     $install_token = (string) get_option( 'gend_society_install_token', '' );
     $gend_base     = (string) get_option( 'gend_society_gend_base_url', '' );
@@ -1831,9 +1837,12 @@ function gend_society_render_membership_panel( $payload = null ) {
                                 <?php esc_html_e( '2. Open Expo Go and scan the QR code below.', 'gend-society' ); ?><br>
                                 <?php esc_html_e( '3. Sign in with this account and enable Gas Station mode to register your phone.', 'gend-society' ); ?>
                             </p>
+                            <?php // RUN-01: the third-party QR image (api.qrserver.com) only loads once the site is connected; the link below always works. ?>
+                            <?php if ( ! function_exists( 'gend_society_remote_allowed' ) || gend_society_remote_allowed( 'qr' ) ) : ?>
                             <div style="display: flex; justify-content: center; padding: 16px 0;">
                                 <img src="<?php echo esc_url( 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=' . rawurlencode( 'https://gend.me/gas-station/mobile/' ) ); ?>" alt="<?php esc_attr_e( 'Scan to open the GenD mobile app', 'gend-society' ); ?>" width="220" height="220" style="border-radius: 12px; background: #fff; padding: 8px;">
                             </div>
+                            <?php endif; ?>
                             <p style="text-align: center;">
                                 <a href="https://gend.me/gas-station/mobile/" target="_blank" rel="noopener" style="color: #8ab4f8; font-size: 0.82rem;"><?php esc_html_e( 'Or open gend.me/gas-station/mobile on this device', 'gend-society' ); ?></a>
                             </p>
