@@ -6,7 +6,7 @@ if (!defined('ABSPATH')) {
 /**
  * Helper: check if a plugin is active (works on multisite too).
  */
-function gs_plugin_active($slug)
+function gend_society_plugin_active($slug)
 {
     if (!function_exists('is_plugin_active')) {
         require_once ABSPATH . 'wp-admin/includes/plugin.php';
@@ -17,8 +17,8 @@ function gs_plugin_active($slug)
 /**
  * Remove the default WP menus and register the GenD Society menu.
  */
-add_action('admin_menu', 'gs_register_admin_menu', 5);
-function gs_register_admin_menu()
+add_action('admin_menu', 'gend_society_register_admin_menu', 5);
+function gend_society_register_admin_menu()
 {
     // Remove default WP top-level menus we are replacing
     remove_menu_page('index.php');                   // Dashboard
@@ -50,7 +50,7 @@ function gs_register_admin_menu()
     //    (?page=gs-feature-access) is kept registered as a hidden submenu
     //    so any existing deep links continue to resolve.
     add_submenu_page(null, __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'list_users', 'gs-feature-access', function () {
-        require GS_DIR . 'inc/pages/feature-access.php';
+        require GEND_SOCIETY_DIR . 'inc/pages/feature-access.php';
     });
 
     // ── APP (was "Write", was "Content") ──────────────────────────────────────
@@ -91,7 +91,7 @@ function gs_register_admin_menu()
     // Content Campaigns under gs-content itself (gs_move_plugin_submenus_to_content).
 
     // ── STORE (conditional) ───────────────────────────────────────────────────
-    $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/advanced-affiliate-system.php') || gs_plugin_active('projects/project-service-orders.php');
+    $has_store_apps = gend_society_plugin_active('online-store/online-store.php') || gend_society_plugin_active('sales-team/advanced-affiliate-system.php') || gend_society_plugin_active('projects/project-service-orders.php');
     if ($has_store_apps) {
         add_menu_page(
             __('Store', 'gend-society'),
@@ -99,14 +99,14 @@ function gs_register_admin_menu()
             'manage_options', // Use lower capability so it shows up for sales/project managers even if they aren't shop managers
             'gs-store',
             function () {
-                require apply_filters('gs_store_dashboard_path', GS_DIR . 'inc/pages/store.php');
+                require apply_filters('gend_society_store_dashboard_path', GEND_SOCIETY_DIR . 'inc/pages/store.php');
             },
             'none',
             6
         );
 
         // Mirror online-store submenus if active
-        if (gs_plugin_active('online-store/online-store.php')) {
+        if (gend_society_plugin_active('online-store/online-store.php')) {
             add_submenu_page('gs-store', __('Store Management', 'gend-society'), __('Store Management', 'gend-society'), 'manage_options', 'gdc-store-settings', 'gdc_render_store_settings_page');
             add_submenu_page(null, __('Store Reports', 'gend-society'), __('Store Reports', 'gend-society'), 'manage_options', 'gdc-store-reports', 'gdc_render_store_reports_page');
         }
@@ -115,7 +115,7 @@ function gs_register_admin_menu()
     }
 
     // ── SOCIAL (conditional) ──────────────────────────────────────────────────
-    if (gs_plugin_active('social-network/social-network.php')) {
+    if (gend_society_plugin_active('social-network/social-network.php')) {
         add_menu_page(
             __('Social', 'gend-society'),
             '<span class="gs-menu-icon dashicons dashicons-share"></span><span class="gs-menu-label">' . __('Social', 'gend-society') . '</span>',
@@ -130,7 +130,7 @@ function gs_register_admin_menu()
         remove_submenu_page('gs-social', 'gs-social');
     }
 
-    if (gs_plugin_active('reward-programs/reward-programs.php')) {
+    if (gend_society_plugin_active('reward-programs/reward-programs.php')) {
         add_submenu_page(
             'gs-social',
             __('Point Bank', 'gend-society'),
@@ -149,13 +149,13 @@ function gs_register_admin_menu()
         'activate_plugins',
         'gs-features',
         function () {
-            require GS_DIR . 'inc/pages/features.php';
+            require GEND_SOCIETY_DIR . 'inc/pages/features.php';
         },
         'none',
         8
     );
     add_submenu_page('gs-features', __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'activate_plugins', 'gs-shortcodes', function () {
-        require GS_DIR . 'inc/pages/shortcodes.php';
+        require GEND_SOCIETY_DIR . 'inc/pages/shortcodes.php';
     });
     add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'activate_plugins', 'plugins.php', '');
     add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'update_core', 'update-core.php', '');
@@ -166,7 +166,7 @@ function gs_register_admin_menu()
 
     // Prevent redundant submenus from being added inside the Dashboard rendering engine by removing them late in another hook
     remove_submenu_page('gs-features', 'gs-features');
-    if (gs_plugin_active('online-store/online-store.php')) {
+    if (gend_society_plugin_active('online-store/online-store.php')) {
         remove_submenu_page('gs-store', 'gs-store');
     }
     remove_submenu_page('gs-social', 'gs-social');
@@ -188,8 +188,8 @@ function gs_register_admin_menu()
 /**
  * Register network admin menus for Multisite.
  */
-add_action('network_admin_menu', 'gs_register_network_admin_menu', 5);
-function gs_register_network_admin_menu()
+add_action('network_admin_menu', 'gend_society_register_network_admin_menu', 5);
+function gend_society_register_network_admin_menu()
 {
     // Remove default WP menus we are replacing
     remove_menu_page('users.php');                   // Users
@@ -200,7 +200,7 @@ function gs_register_network_admin_menu()
     //    dashboard membership card. Standalone gs-feature-access URL stays
     //    registered (hidden) so deep links keep working.
     add_submenu_page(null, __('Feature Access', 'gend-society'), __('Feature Access', 'gend-society'), 'manage_network_users', 'gs-feature-access', function () {
-        require GS_DIR . 'inc/pages/feature-access.php';
+        require GEND_SOCIETY_DIR . 'inc/pages/feature-access.php';
     });
 
     // ── FEATURES ──────────────────────────────────────────────────────────────
@@ -210,13 +210,13 @@ function gs_register_network_admin_menu()
         'manage_network_plugins',
         'gs-features',
         function () {
-            require GS_DIR . 'inc/pages/features.php';
+            require GEND_SOCIETY_DIR . 'inc/pages/features.php';
         },
         'none',
         8
     );
     add_submenu_page('gs-features', __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'manage_network_plugins', 'gs-shortcodes', function () {
-        require GS_DIR . 'inc/pages/shortcodes.php';
+        require GEND_SOCIETY_DIR . 'inc/pages/shortcodes.php';
     });
     add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'manage_network_plugins', 'plugins.php', '');
     add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'manage_network_plugins', 'update-core.php', '');
@@ -228,11 +228,11 @@ function gs_register_network_admin_menu()
  * Move Blog Manager and Email Manager submenus to Content if active.
  * Must run after their registration (1100).
  */
-add_action('admin_menu', 'gs_move_plugin_submenus_to_content', 1200);
-function gs_move_plugin_submenus_to_content()
+add_action('admin_menu', 'gend_society_move_plugin_submenus_to_content', 1200);
+function gend_society_move_plugin_submenus_to_content()
 {
     // Blog Manager
-    if (gs_plugin_active('blog-manager/blog-manager.php')) {
+    if (gend_society_plugin_active('blog-manager/blog-manager.php')) {
         $bm_slug = (defined('BM_ADMIN_SLUG') ? BM_ADMIN_SLUG : 'blog-manager');
         remove_submenu_page('gs-app', $bm_slug);
         add_submenu_page(
@@ -246,7 +246,7 @@ function gs_move_plugin_submenus_to_content()
     }
 
     // Email Manager
-    if (gs_plugin_active('email-manager/email-manager.php')) {
+    if (gend_society_plugin_active('email-manager/email-manager.php')) {
         remove_submenu_page('gs-app', 'email-manager');
         add_submenu_page(
             'gs-content',
@@ -263,8 +263,8 @@ function gs_move_plugin_submenus_to_content()
     // isn't active. When social is active, we relocate it under Social
     // regardless of which path the plugin took, so we have to clear BOTH
     // possible registration sites before re-adding it.
-    if (gs_plugin_active('contracts-and-payments/contracts-and-payments.php')
-        && gs_plugin_active('social-network/social-network.php')) {
+    if (gend_society_plugin_active('contracts-and-payments/contracts-and-payments.php')
+        && gend_society_plugin_active('social-network/social-network.php')) {
         remove_submenu_page('gdc-store', 'gend-contracts-payments');
         remove_menu_page('gend-contracts-payments');
         if (class_exists('Gend_CP_Admin_Page')) {
@@ -283,15 +283,15 @@ function gs_move_plugin_submenus_to_content()
 /**
  * Hook into menu_order to suppress menus AFTER all plugins (even late ones) have registered theirs
  */
-add_filter('menu_order', 'gs_suppress_plugin_menus_via_filter', 99999);
-function gs_suppress_plugin_menus_via_filter($menu_ord)
+add_filter('menu_order', 'gend_society_suppress_plugin_menus_via_filter', 99999);
+function gend_society_suppress_plugin_menus_via_filter($menu_ord)
 {
-    gs_suppress_plugin_menus();
+    gend_society_suppress_plugin_menus();
     return $menu_ord;
 }
 
 
-function gs_suppress_plugin_menus()
+function gend_society_suppress_plugin_menus()
 {
     global $menu;
     if (!is_array($menu)) {
@@ -383,7 +383,7 @@ function gs_suppress_plugin_menus()
         // Get current user and their allowed features. Super admins bypass this.
         $current_user_id = get_current_user_id();
         if (!is_super_admin($current_user_id) && !current_user_can('manage_network')) { // site-admin check, not a hub signal (104 audit)
-            $allowed_features = get_user_meta($current_user_id, 'gs_feature_access', true);
+            $allowed_features = get_user_meta($current_user_id, 'gend_society_feature_access', true);
             if (!is_array($allowed_features)) {
                 $allowed_features = []; // Default: No access if never set
             }
@@ -467,8 +467,8 @@ function gs_suppress_plugin_menus()
  * page once — that path falls through to the real $menu / $submenu globals
  * directly without touching the transient.
  */
-if (!function_exists('gs_get_admin_menu_structure_cached')) {
-    function gs_get_admin_menu_structure_cached($force_rebuild = false) {
+if (!function_exists('gend_society_get_admin_menu_structure_cached')) {
+    function gend_society_get_admin_menu_structure_cached($force_rebuild = false) {
         $cache_key = 'gs_admin_menu_structure_v1';
         if (!$force_rebuild) {
             $cached = get_transient($cache_key);
@@ -485,8 +485,8 @@ if (!function_exists('gs_get_admin_menu_structure_cached')) {
             // plugin echo/notice can't break JSON responses up the stack.
             ob_start();
             try {
-                do_action('_admin_menu');
-                do_action('admin_menu', '');
+                do_action('_admin_menu'); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
+                do_action('admin_menu', ''); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
             } catch (\Throwable $e) {
                 // Best-effort: keep whatever registered successfully.
             }
@@ -529,9 +529,9 @@ add_action('deactivated_plugin', function () { delete_transient('gs_admin_menu_s
 add_action('upgrader_process_complete', function () { delete_transient('gs_admin_menu_structure_v1'); });
 add_action('switch_theme',       function () { delete_transient('gs_admin_menu_structure_v1'); });
 
-if (!function_exists('gs_render_menu_access_checkboxes')) {
-    function gs_render_menu_access_checkboxes($target_user_id) {
-        $saved_access = get_user_meta($target_user_id, 'gs_feature_access', true);
+if (!function_exists('gend_society_render_menu_access_checkboxes')) {
+    function gend_society_render_menu_access_checkboxes($target_user_id) {
+        $saved_access = get_user_meta($target_user_id, 'gend_society_feature_access', true);
         if (!is_array($saved_access)) {
             $saved_access = [];
         }
@@ -539,7 +539,7 @@ if (!function_exists('gs_render_menu_access_checkboxes')) {
         // O(n²) on installs with hundreds of menu items.
         $saved_lookup = array_flip($saved_access);
 
-        $items = gs_get_admin_menu_structure_cached();
+        $items = gend_society_get_admin_menu_structure_cached();
 
         $html = '<div class="gs-grid gs-grid-2">';
         foreach ($items as $item) {
@@ -570,8 +570,8 @@ if (!function_exists('gs_render_menu_access_checkboxes')) {
  * AJAX: return the checkbox grid HTML + user label for a given user_id.
  * Powers the Manage Access modal in the User Access tab.
  */
-add_action('wp_ajax_gs_feature_access_form', 'gs_ajax_feature_access_form');
-function gs_ajax_feature_access_form() {
+add_action('wp_ajax_gend_society_feature_access_form', 'gend_society_ajax_feature_access_form');
+function gend_society_ajax_feature_access_form() {
     if (!current_user_can('list_users')) {
         wp_send_json_error(array('message' => __('Insufficient permissions.', 'gend-society')), 403);
     }
@@ -596,15 +596,15 @@ function gs_ajax_feature_access_form() {
     wp_send_json_success(array(
         'user_id'    => $user_id,
         'user_label' => $label,
-        'html'       => gs_render_menu_access_checkboxes($user_id),
+        'html'       => gend_society_render_menu_access_checkboxes($user_id),
     ));
 }
 
 /**
  * AJAX: save the per-user feature access selections.
  */
-add_action('wp_ajax_gs_feature_access_save', 'gs_ajax_feature_access_save');
-function gs_ajax_feature_access_save() {
+add_action('wp_ajax_gend_society_feature_access_save', 'gend_society_ajax_feature_access_save');
+function gend_society_ajax_feature_access_save() {
     if (!current_user_can('list_users')) {
         wp_send_json_error(array('message' => __('Insufficient permissions.', 'gend-society')), 403);
     }
@@ -618,7 +618,7 @@ function gs_ajax_feature_access_save() {
     $allowed_slugs = isset($_POST['gs_allowed_menus']) && is_array($_POST['gs_allowed_menus'])
         ? array_map('sanitize_text_field', wp_unslash($_POST['gs_allowed_menus']))
         : [];
-    update_user_meta($user_id, 'gs_feature_access', $allowed_slugs);
+    update_user_meta($user_id, 'gend_society_feature_access', $allowed_slugs);
 
     wp_send_json_success(array(
         'user_id' => $user_id,

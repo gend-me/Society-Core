@@ -48,14 +48,14 @@ add_filter( 'gdc_hosting_tabs', function ( $tabs ) {
 	}
 	$tabs['chain-gas-rates'] = array(
 		'label'    => __( 'Chain Gas Rates', 'gend-society' ),
-		'callback' => 'gs_fiat_gas_rates_render',
+		'callback' => 'gend_society_fiat_gas_rates_render',
 		'cap'      => 'manage_network_options',
 	);
 	return $tabs;
 } );
 
 // Option 2 — existing gdc_hosting_tab_render_{slug} action hook.
-add_action( 'gdc_hosting_tab_render_chain-gas-rates', 'gs_fiat_gas_rates_render' );
+add_action( 'gdc_hosting_tab_render_chain-gas-rates', 'gend_society_fiat_gas_rates_render' );
 
 // Option 3 — fallback submenu (parent=null hides from nav but keeps the
 // URL routable at /wp-admin/admin.php?page=gs-chain-gas-rates). Matches
@@ -71,7 +71,7 @@ add_action( 'admin_menu', function () {
 		__( 'Chain Gas Rates', 'gend-society' ),
 		'manage_network_options',
 		'gs-chain-gas-rates',
-		'gs_fiat_gas_rates_render'
+		'gend_society_fiat_gas_rates_render'
 	);
 } );
 
@@ -87,7 +87,7 @@ add_action( 'network_admin_menu', function () {
 		__( 'Chain Gas Rates', 'gend-society' ),
 		'manage_network_options',
 		'gs-chain-gas-rates',
-		'gs_fiat_gas_rates_render'
+		'gend_society_fiat_gas_rates_render'
 	);
 } );
 
@@ -95,8 +95,8 @@ add_action( 'network_admin_menu', function () {
    Render function — editable table + add-custom-rail form
    ============================================================ */
 
-if ( ! function_exists( 'gs_fiat_gas_rates_render' ) ) {
-	function gs_fiat_gas_rates_render() {
+if ( ! function_exists( 'gend_society_fiat_gas_rates_render' ) ) {
+	function gend_society_fiat_gas_rates_render() {
 		if ( ! gend_society_is_hub_operator() || ! current_user_can( 'manage_network_options' ) ) {
 			wp_die( esc_html__( 'You do not have permission to view this page.', 'gend-society' ), 403 );
 		}
@@ -149,7 +149,7 @@ if ( ! function_exists( 'gs_fiat_gas_rates_render' ) ) {
 							<td colspan="8" class="gs-fiat-gas-rates-cell-edit">
 								<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="gs-fiat-gas-rates-form">
 									<?php wp_nonce_field( 'gs_fiat_gas_rate_save_' . $rail ); ?>
-									<input type="hidden" name="action" value="gs_fiat_gas_rate_save" />
+									<input type="hidden" name="action" value="gend_society_fiat_gas_rate_save" />
 									<input type="hidden" name="rail" value="<?php echo esc_attr( $rail ); ?>" />
 									<span class="gs-fiat-gas-rates-inline-grid">
 										<label class="gs-fiat-gas-rates-inline-field">
@@ -191,7 +191,7 @@ if ( ! function_exists( 'gs_fiat_gas_rates_render' ) ) {
 								<?php if ( $active ) : ?>
 									<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="gs-fiat-gas-rates-form-deactivate">
 										<?php wp_nonce_field( 'gs_fiat_gas_rate_deactivate_' . $rail ); ?>
-										<input type="hidden" name="action" value="gs_fiat_gas_rate_deactivate" />
+										<input type="hidden" name="action" value="gend_society_fiat_gas_rate_deactivate" />
 										<input type="hidden" name="rail" value="<?php echo esc_attr( $rail ); ?>" />
 										<button type="submit" class="button button-secondary gs-fiat-gas-rates-deactivate"
 											onclick="return confirm('<?php echo esc_js( __( 'Deactivate this rail? Future payments via this rail will not record gas events.', 'gend-society' ) ); ?>');">
@@ -208,7 +208,7 @@ if ( ! function_exists( 'gs_fiat_gas_rates_render' ) ) {
 			<h2 class="gs-fiat-gas-rates-add-heading"><?php esc_html_e( 'Add / Replace rail', 'gend-society' ); ?></h2>
 			<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>" class="gs-fiat-gas-rates-add-form">
 				<?php wp_nonce_field( 'gs_fiat_gas_rate_save_new' ); ?>
-				<input type="hidden" name="action" value="gs_fiat_gas_rate_save" />
+				<input type="hidden" name="action" value="gend_society_fiat_gas_rate_save" />
 				<label><?php esc_html_e( 'Rail', 'gend-society' ); ?>
 					<select name="rail" required>
 						<?php foreach ( $rails as $r ) : ?>
@@ -242,11 +242,11 @@ if ( ! function_exists( 'gs_fiat_gas_rates_render' ) ) {
    per-rail nonce + rail whitelist (GEND_CP_FIAT_GAS_RAILS).
    ============================================================ */
 
-add_action( 'admin_post_gs_fiat_gas_rate_save', 'gs_fiat_gas_rate_save_handler' );
-add_action( 'admin_post_gs_fiat_gas_rate_deactivate', 'gs_fiat_gas_rate_deactivate_handler' );
+add_action( 'admin_post_gend_society_fiat_gas_rate_save', 'gend_society_fiat_gas_rate_save_handler' );
+add_action( 'admin_post_gend_society_fiat_gas_rate_deactivate', 'gend_society_fiat_gas_rate_deactivate_handler' );
 
-if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
-	function gs_fiat_gas_rate_save_handler() {
+if ( ! function_exists( 'gend_society_fiat_gas_rate_save_handler' ) ) {
+	function gend_society_fiat_gas_rate_save_handler() {
 		if ( ! gend_society_is_hub_operator() || ! current_user_can( 'manage_network_options' ) ) {
 			wp_die( esc_html__( 'Forbidden.', 'gend-society' ), 403 );
 		}
@@ -259,7 +259,7 @@ if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
 			wp_die( esc_html__( 'Bad nonce.', 'gend-society' ), 403 );
 		}
 		if ( ! in_array( $rail, $rails, true ) ) {
-			gs_fiat_gas_rates_set_notice( 'error', __( 'Invalid rail.', 'gend-society' ) );
+			gend_society_fiat_gas_rates_set_notice( 'error', __( 'Invalid rail.', 'gend-society' ) );
 			wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=gs-chain-gas-rates' ) );
 			exit;
 		}
@@ -277,7 +277,7 @@ if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
 			get_current_user_id()
 		);
 		if ( ! empty( $result['ok'] ) ) {
-			gs_fiat_gas_rates_set_notice(
+			gend_society_fiat_gas_rates_set_notice(
 				'success',
 				sprintf(
 					/* translators: %s: rail slug just saved */
@@ -286,7 +286,7 @@ if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
 				)
 			);
 		} else {
-			gs_fiat_gas_rates_set_notice(
+			gend_society_fiat_gas_rates_set_notice(
 				'error',
 				sprintf(
 					/* translators: %s: failure reason from set_rate */
@@ -300,8 +300,8 @@ if ( ! function_exists( 'gs_fiat_gas_rate_save_handler' ) ) {
 	}
 }
 
-if ( ! function_exists( 'gs_fiat_gas_rate_deactivate_handler' ) ) {
-	function gs_fiat_gas_rate_deactivate_handler() {
+if ( ! function_exists( 'gend_society_fiat_gas_rate_deactivate_handler' ) ) {
+	function gend_society_fiat_gas_rate_deactivate_handler() {
 		if ( ! gend_society_is_hub_operator() || ! current_user_can( 'manage_network_options' ) ) {
 			wp_die( esc_html__( 'Forbidden.', 'gend-society' ), 403 );
 		}
@@ -309,13 +309,13 @@ if ( ! function_exists( 'gs_fiat_gas_rate_deactivate_handler' ) ) {
 		check_admin_referer( 'gs_fiat_gas_rate_deactivate_' . $rail );
 		$rails = defined( 'GEND_CP_FIAT_GAS_RAILS' ) ? GEND_CP_FIAT_GAS_RAILS : array();
 		if ( ! in_array( $rail, $rails, true ) ) {
-			gs_fiat_gas_rates_set_notice( 'error', __( 'Invalid rail.', 'gend-society' ) );
+			gend_society_fiat_gas_rates_set_notice( 'error', __( 'Invalid rail.', 'gend-society' ) );
 			wp_safe_redirect( wp_get_referer() ?: admin_url( 'admin.php?page=gs-chain-gas-rates' ) );
 			exit;
 		}
 		$result = Gend_CP_Fiat_Gas_Charger::deactivate_rate( $rail, get_current_user_id() );
 		if ( ! empty( $result['ok'] ) ) {
-			gs_fiat_gas_rates_set_notice(
+			gend_society_fiat_gas_rates_set_notice(
 				'success',
 				sprintf(
 					/* translators: %s: rail slug just deactivated */
@@ -324,7 +324,7 @@ if ( ! function_exists( 'gs_fiat_gas_rate_deactivate_handler' ) ) {
 				)
 			);
 		} else {
-			gs_fiat_gas_rates_set_notice(
+			gend_society_fiat_gas_rates_set_notice(
 				'error',
 				sprintf(
 					/* translators: %s: failure reason from deactivate_rate */
@@ -342,14 +342,14 @@ if ( ! function_exists( 'gs_fiat_gas_rate_deactivate_handler' ) ) {
    admin_notices — render the per-user transient set by handlers
    ============================================================ */
 
-if ( ! function_exists( 'gs_fiat_gas_rates_set_notice' ) ) {
-	function gs_fiat_gas_rates_set_notice( $type, $msg ) {
+if ( ! function_exists( 'gend_society_fiat_gas_rates_set_notice' ) ) {
+	function gend_society_fiat_gas_rates_set_notice( $type, $msg ) {
 		$uid = (int) get_current_user_id();
 		if ( $uid <= 0 ) {
 			return;
 		}
 		set_transient(
-			'gs_fiat_gas_admin_notice_' . $uid,
+			'gend_society_fiat_gas_admin_notice_' . $uid,
 			array(
 				'type' => (string) $type,
 				'msg'  => (string) $msg,
@@ -364,11 +364,11 @@ add_action( 'admin_notices', function () {
 	if ( $uid <= 0 ) {
 		return;
 	}
-	$notice = get_transient( 'gs_fiat_gas_admin_notice_' . $uid );
+	$notice = get_transient( 'gend_society_fiat_gas_admin_notice_' . $uid );
 	if ( ! is_array( $notice ) ) {
 		return;
 	}
-	delete_transient( 'gs_fiat_gas_admin_notice_' . $uid );
+	delete_transient( 'gend_society_fiat_gas_admin_notice_' . $uid );
 	$cls = ( ( $notice['type'] ?? '' ) === 'success' ) ? 'notice-success' : 'notice-error';
 	echo '<div class="notice ' . esc_attr( $cls ) . ' is-dismissible gs-fiat-gas-rates-notice">'
 		. '<p>' . esc_html( (string) ( $notice['msg'] ?? '' ) ) . '</p>'

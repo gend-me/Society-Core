@@ -1,0 +1,12 @@
+{
+	"name": "Update URI in a shipped customer file",
+	"append": {
+		"inc/portal-connect.php": "\n// Update URI: https://example.invalid/gend-society\n"
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "update-uri"
+		}
+	]
+}

@@ -41,7 +41,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  *
  * @return bool
  */
-function gs_markets_is_main_node() {
+function gend_society_markets_is_main_node() {
 	return gend_society_is_hub();
 }
 
@@ -53,15 +53,15 @@ function gs_markets_is_main_node() {
  * CSS-hidden. Hooked at bp_setup_nav priority 100 so it runs after BP core/Youzify have
  * registered their primary nav items (lets us read the live `groups` position).
  */
-add_action( 'bp_setup_nav', 'gs_add_markets_profile_tab', 100 );
-function gs_add_markets_profile_tab() {
+add_action( 'bp_setup_nav', 'gend_society_add_markets_profile_tab', 100 );
+function gend_society_add_markets_profile_tab() {
 	// DARK: no tab when the counsel flag is off (default). The registration below never runs, so
 	// there is NO Collaborations DOM anywhere (route + tab both absent) — GATE-01 discipline.
-	if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC ) {
+	if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC ) {
 		return;
 	}
 	// HUB-only: the LMSR engine + DGEN + positions live on the hub; on a container the tab is absent.
-	if ( ! gs_markets_is_main_node() ) {
+	if ( ! gend_society_markets_is_main_node() ) {
 		return;
 	}
 	if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
@@ -83,7 +83,7 @@ function gs_add_markets_profile_tab() {
 	bp_core_new_nav_item( array(
 		'name'                    => __( 'Collaborations', 'gend-society' ),
 		'slug'                    => 'collab-markets',
-		'screen_function'         => 'gs_markets_profile_screen',
+		'screen_function'         => 'gend_society_markets_profile_screen',
 		'position'                => $pos,
 		'item_css_id'             => 'collab-markets',
 		// Own-profile-only surface (GATE-02 privacy): the tab shows only on the viewer's own
@@ -96,10 +96,10 @@ function gs_add_markets_profile_tab() {
  * Screen callback for the Collaborations tab — loads the BP plugins template and routes its
  * content to our handler.
  */
-function gs_markets_profile_screen() {
+function gend_society_markets_profile_screen() {
 	if ( function_exists( 'add_action' ) ) {
 		add_action( 'bp_template_title', '__return_empty_string' );
-		add_action( 'bp_template_content', 'gs_markets_profile_screen_content' );
+		add_action( 'bp_template_content', 'gend_society_markets_profile_screen_content' );
 	}
 	if ( function_exists( 'bp_core_load_template' ) ) {
 		bp_core_load_template( 'members/single/plugins' );
@@ -114,7 +114,7 @@ function gs_markets_profile_screen() {
  * the glassmorphic CSS, and the shared Chart.js handle (enqueue-if-absent so gend-society does not
  * depend on contracts-and-payments being on the page). Localizes the REST root + a wp_rest nonce.
  */
-function gs_markets_profile_screen_content() {
+function gend_society_markets_profile_screen_content() {
 	// GATE-02 privacy: a member sees ONLY their own Collaborations/portfolio, on their own profile.
 	if ( function_exists( 'bp_is_my_profile' ) && ! bp_is_my_profile() ) {
 		echo '<p>' . esc_html__( 'This view is private.', 'gend-society' ) . '</p>';
@@ -145,17 +145,17 @@ function gs_markets_profile_screen_content() {
 
 	// Per-tab asset enqueue (only on this screen). filemtime-busted single-version idiom
 	// (admin-style.php); file_exists-guard the filemtime so a missing asset degrades to no warning.
-	$css_path = GS_DIR . 'assets/collab-markets.css';
-	$js_path  = GS_DIR . 'assets/collab-markets.js';
-	$css_ver  = GS_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
-	$js_ver   = GS_VERSION . ( file_exists( $js_path ) ? '.' . filemtime( $js_path ) : '' );
+	$css_path = GEND_SOCIETY_DIR . 'assets/collab-markets.css';
+	$js_path  = GEND_SOCIETY_DIR . 'assets/collab-markets.js';
+	$css_ver  = GEND_SOCIETY_VERSION . ( file_exists( $css_path ) ? '.' . filemtime( $css_path ) : '' );
+	$js_ver   = GEND_SOCIETY_VERSION . ( file_exists( $js_path ) ? '.' . filemtime( $js_path ) : '' );
 
 	if ( function_exists( 'wp_enqueue_style' ) ) {
-		wp_enqueue_style( 'gs-collab-markets', GS_URL . 'assets/collab-markets.css', array(), $css_ver );
+		wp_enqueue_style( 'gs-collab-markets', GEND_SOCIETY_URL . 'assets/collab-markets.css', array(), $css_ver );
 	}
 	if ( function_exists( 'wp_enqueue_script' ) ) {
 		// Depend on chartjs so the controller can render the P/L chart via window.Chart.
-		wp_enqueue_script( 'gs-collab-markets', GS_URL . 'assets/collab-markets.js', array( 'chartjs' ), $js_ver, true );
+		wp_enqueue_script( 'gs-collab-markets', GEND_SOCIETY_URL . 'assets/collab-markets.js', array( 'chartjs' ), $js_ver, true );
 	}
 
 	// Feed the JS the REST base + a wp_rest nonce (cookie-authed own portfolio/bet => X-WP-Nonce).

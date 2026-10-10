@@ -271,7 +271,7 @@
         renderLoading();
         // Defensive re-check: if state.zoneId was cleared (modal closed mid-flight), abort.
         if (!state.zoneId) { return; }
-        ajaxCall('gs_membership_domain_records',
+        ajaxCall('gend_society_membership_domain_records',
             { zone_id: state.zoneId, zone_host: state.zoneHost, include_last_change: 1 },
             function (data) {
                 // Defense-in-depth against foreign-install data leak: server IS
@@ -540,7 +540,7 @@
             body.record_id = record.id;
             submitUpdate(body, formErr, false);
         } else {
-            ajaxCall('gs_membership_domain_record_create', body,
+            ajaxCall('gend_society_membership_domain_record_create', body,
                 function () { fetchRecords(); },
                 function (err) {
                     if (formErr) { formErr.textContent = mapErrorMessage(err); formErr.hidden = false; }
@@ -551,7 +551,7 @@
 
     function submitUpdate(body, formErr, force) {
         if (force) { body.force = 1; }
-        ajaxCall('gs_membership_domain_record_update', body,
+        ajaxCall('gend_society_membership_domain_record_update', body,
             function () { fetchRecords(); },
             function (err, status) {
                 // 409 destructive warning — show Proceed anyway button that retries with force=true.
@@ -596,7 +596,7 @@
             record_id: recordId,
         };
         if (force) { body.force = 1; }
-        ajaxCall('gs_membership_domain_record_delete', body,
+        ajaxCall('gend_society_membership_domain_record_delete', body,
             function () {
                 state.pendingDeleteRecord = null;
                 state.pendingDeleteWarning = null;
@@ -658,7 +658,7 @@
     function handleProxyToggle(recordId, proxied) {
         var rec = state.records.find(function (r) { return String(r.id) === String(recordId); });
         if (!rec) return;
-        ajaxCall('gs_membership_domain_record_update',
+        ajaxCall('gend_society_membership_domain_record_update',
             {
                 zone_id: state.zoneId,
                 zone_host: state.zoneHost,
@@ -692,7 +692,7 @@
 
     function handleUndo() {
         if (!state.lastChange || !state.lastChange.audit_id) { return; }
-        ajaxCall('gs_membership_domain_record_undo',
+        ajaxCall('gend_society_membership_domain_record_undo',
             { zone_id: state.zoneId, zone_host: state.zoneHost, audit_id: state.lastChange.audit_id },
             function () { fetchRecords(); },
             function (err) {
@@ -742,7 +742,7 @@
 
     function submitPointAtApp(force) {
         state.pointAtAppInFlight = true;
-        ajaxCall('gs_membership_domain_point_to_app',
+        ajaxCall('gend_society_membership_domain_point_to_app',
             { host: state.zoneHost, force: force ? 1 : 0 },
             function (json) {
                 state.pointAtAppInFlight = false;
@@ -769,7 +769,7 @@
 
     function fetchSslStatus() {
         if (!state.zoneHost) { return; }
-        ajaxCall('gs_membership_domain_ssl_status',
+        ajaxCall('gend_society_membership_domain_ssl_status',
             { host: state.zoneHost },
             function (json) {
                 state.sslStatus = (json && typeof json === 'object') ? json : { overall: 'unknown' };
@@ -895,7 +895,7 @@
     }
 
     function submitSslModeSet(mode, force) {
-        ajaxCall('gs_membership_domain_ssl_mode_set',
+        ajaxCall('gend_society_membership_domain_ssl_mode_set',
             { host: state.zoneHost, mode: mode, force: force ? 1 : 0 },
             function () {
                 showToast(i18n.pointAtAppSuccess || 'SSL mode change queued.');
@@ -950,7 +950,7 @@
     }
 
     function fetchPresetCatalog() {
-        ajaxCall('gs_membership_domain_email_preset_list',
+        ajaxCall('gend_society_membership_domain_email_preset_list',
             { host: state.zoneHost },
             function (data) {
                 // Catalog shape per Phase 75-01 route_list_email_presets:
@@ -1125,7 +1125,7 @@
         }
         if (ov.spf_replace)    { body.spf_replace   = 1; }
 
-        ajaxCall('gs_membership_domain_email_preset_apply', body,
+        ajaxCall('gend_society_membership_domain_email_preset_apply', body,
             function (data) {
                 state.presetInFlight = false;
                 var apb2 = $('#gs-records-editor-apply-preset');

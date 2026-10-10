@@ -1,0 +1,12 @@
+{
+	"name": "cdn.jsdelivr.net URL in a shipped customer file",
+	"append": {
+		"inc/portal-connect.php": "\n// https://cdn.jsdelivr.net/npm/example@1.0.0/example.min.js\n"
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "cdn-host cdn.jsdelivr.net"
+		}
+	]
+}

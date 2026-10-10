@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class GS_AI_Proxy {
+class Gend_Society_AI_Proxy {
 
     const NS = 'gs/v1';
 
@@ -46,11 +46,11 @@ class GS_AI_Proxy {
      * filterable for staging installs.
      */
     public static function hub_base() {
-        $base = get_option( 'gs_gend_base_url' );
+        $base = get_option( 'gend_society_gend_base_url' );
         if ( ! $base ) {
             $base = 'https://gend.me';
         }
-        return untrailingslashit( apply_filters( 'gs_ai_hub_base', $base ) );
+        return untrailingslashit( apply_filters( 'gend_society_ai_hub_base', $base ) );
     }
 
     public static function register_routes() {
@@ -218,13 +218,13 @@ class GS_AI_Proxy {
     protected static function aipa_client() {
         $id     = (string) get_site_option( 'aipa_oauth_client_id', '' );
         $secret = (string) get_site_option( 'aipa_oauth_client_secret', '' );
-        if ( $id === '' && function_exists( 'gs_oauth_client_id' ) ) {
-            $id     = gs_oauth_client_id();
-            $secret = function_exists( 'gs_oauth_client_secret' ) ? gs_oauth_client_secret() : '';
+        if ( $id === '' && function_exists( 'gend_society_oauth_client_id' ) ) {
+            $id     = gend_society_oauth_client_id();
+            $secret = function_exists( 'gend_society_oauth_client_secret' ) ? gend_society_oauth_client_secret() : '';
         }
         $hub = (string) get_site_option( 'aipa_central_hub_url', '' );
         if ( $hub === '' ) {
-            $hub = function_exists( 'gs_oauth_hub_url' ) ? gs_oauth_hub_url() : self::hub_base();
+            $hub = function_exists( 'gend_society_oauth_hub_url' ) ? gend_society_oauth_hub_url() : self::hub_base();
         }
         return array(
             'id'     => $id,
@@ -282,7 +282,7 @@ class GS_AI_Proxy {
      * in, and returns the shape LEO's widget expects.
      */
     public static function route_oauth_exchange( WP_REST_Request $request ) {
-        if ( ! function_exists( 'gs_oauth_hub_url' ) || ! function_exists( 'gs_oauth_client_id' ) ) {
+        if ( ! function_exists( 'gend_society_oauth_hub_url' ) || ! function_exists( 'gend_society_oauth_client_id' ) ) {
             return new WP_REST_Response( array( 'error' => 'oauth_unavailable', 'message' => 'gend-society OAuth not loaded.' ), 503 );
         }
 
@@ -402,7 +402,7 @@ class GS_AI_Proxy {
                         update_user_meta( $user->ID, 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
                         wp_set_current_user( $user->ID, $user->user_login );
                         wp_set_auth_cookie( $user->ID, true );
-                        do_action( 'wp_login', $user->user_login, $user );
+                        do_action( 'wp_login', $user->user_login, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
                     }
                 }
             }
@@ -517,4 +517,4 @@ class GS_AI_Proxy {
     }
 }
 
-GS_AI_Proxy::init();
+Gend_Society_AI_Proxy::init();

@@ -1,0 +1,37 @@
+# bin/dist/wporg.exclude -- what bin/build-dist.js leaves out of the wordpress.org build.
+#
+# @tiers <list>            manifest tiers whose inc/ PHP files ship in this build
+# <pattern>/               directory prefix, relative to the plugin root
+# <pattern> without "/"    glob on the file's basename, at any depth (e.g. *.md)
+# <a/b.php>                exact path (or glob) relative to the plugin root
+# # allow-unreferenced: <assets/file>   asset no PHP/JS file references, shipped anyway
+#
+# The build ALSO asserts the result (bin/build-dist.js, ASSERT_RULES): editing this
+# file cannot sneak handoff/, hub/updater/container code, themes/ or an Update URI
+# into the wordpress.org zip -- the assertions fail the build.
+
+@tiers core,customer
+
+# Theme-coupled (core tier, but the bundled theme does not ship on wordpress.org)
+inc/theme-bundle.php
+themes/
+# Old-name compat layer (created by the prefix rename): full build only
+inc/compat-aliases.php
+inc/compat-bridges.php
+# Chat-flow wireframe seed data (read only by the container-tier wireframe store)
+chatflows/
+
+# Repo tooling and UAT material: never shipped
+handoff/
+bin/
+.github/
+node_modules/
+vendor/
+dist/
+.cache/
+.*
+*.sh
+package*.json
+composer.*
+phpcs.xml*
+*.md

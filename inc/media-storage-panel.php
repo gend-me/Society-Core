@@ -25,7 +25,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'bm_admin_render_tab_media', 'gs_media_storage_panel_render', 30 );
+add_action( 'bm_admin_render_tab_media', 'gend_society_media_storage_panel_render', 30 );
 
 /**
  * Render the media-storage plan section at the bottom of the Media tab.
@@ -36,7 +36,7 @@ add_action( 'bm_admin_render_tab_media', 'gs_media_storage_panel_render', 30 );
  * wrapped in try/catch( \Throwable ) so a missing helper can never fatal the
  * Media tab.
  */
-function gs_media_storage_panel_render() {
+function gend_society_media_storage_panel_render() {
 	// Same capability gate as the rest of the Media tab (bm_render_blog_manager
 	// checks edit_posts).
 	if ( ! current_user_can( 'edit_posts' ) ) {
@@ -45,8 +45,8 @@ function gs_media_storage_panel_render() {
 
 	try {
 		// ── Resolve membership payload (cache only — no second network path) ──
-		$payload = function_exists( 'gs_remote_membership_get_cached' )
-			? gs_remote_membership_get_cached()
+		$payload = function_exists( 'gend_society_remote_membership_get_cached' )
+			? gend_society_remote_membership_get_cached()
 			: null;
 
 		// GRACEFUL DEGRADATION: not paired / no resolvable vendor plan → neutral
@@ -73,8 +73,8 @@ function gs_media_storage_panel_render() {
 			$plan_label = (string) $hosting_plan['media_label'];
 		} elseif ( ! empty( $hosting_plan['label'] ) ) {
 			$plan_label = (string) $hosting_plan['label'];
-		} elseif ( function_exists( 'gs_hosting_plan_label' ) ) {
-			$plan_label = (string) gs_hosting_plan_label( isset( $payload['billing'] ) && is_array( $payload['billing'] ) ? $payload['billing'] : array() );
+		} elseif ( function_exists( 'gend_society_hosting_plan_label' ) ) {
+			$plan_label = (string) gend_society_hosting_plan_label( isset( $payload['billing'] ) && is_array( $payload['billing'] ) ? $payload['billing'] : array() );
 		} else {
 			$plan_label = __( 'Default', 'gend-society' );
 		}
@@ -83,10 +83,10 @@ function gs_media_storage_panel_render() {
 		$member_url = (string) ( $payload['membership_url'] ?? '' );
 
 		// ── Usage (reuse the existing recursive scan + quota helpers) ──
-		$media = function_exists( 'gs_hosting_collect_media' ) ? gs_hosting_collect_media() : array();
+		$media = function_exists( 'gend_society_hosting_collect_media' ) ? gend_society_hosting_collect_media() : array();
 		$used  = (int) ( $media['bytes_used'] ?? 0 );
-		$cap   = (int) ( $media['plan_bytes'] ?? ( function_exists( 'gs_hosting_media_plan_bytes' ) ? gs_hosting_media_plan_bytes() : 0 ) );
-		$pct   = function_exists( 'gs_hosting_pct' ) ? gs_hosting_pct( $used, $cap ) : 0;
+		$cap   = (int) ( $media['plan_bytes'] ?? ( function_exists( 'gend_society_hosting_media_plan_bytes' ) ? gend_society_hosting_media_plan_bytes() : 0 ) );
+		$pct   = function_exists( 'gend_society_hosting_pct' ) ? gend_society_hosting_pct( $used, $cap ) : 0;
 		$warn  = $pct >= 80;
 
 		$used_label = size_format( $used, 2 );
@@ -163,7 +163,7 @@ function gs_media_storage_panel_render() {
 	}
 }
 
-add_action( 'admin_enqueue_scripts', 'gs_media_storage_panel_enqueue' );
+add_action( 'admin_enqueue_scripts', 'gend_society_media_storage_panel_enqueue' );
 
 /**
  * Enqueue a self-contained, screen-scoped (blog-manager only) popup handler.
@@ -175,7 +175,7 @@ add_action( 'admin_enqueue_scripts', 'gs_media_storage_panel_enqueue' );
  *
  * @param string $hook_suffix Current admin page hook.
  */
-function gs_media_storage_panel_enqueue( $hook_suffix ) {
+function gend_society_media_storage_panel_enqueue( $hook_suffix ) {
 	// Screen gate IDENTICAL to GMO (class-gmo-admin-subtab.php:44-50).
 	$is_bm = is_string( $hook_suffix )
 		&& ( strpos( $hook_suffix, 'blog-manager' ) !== false || strpos( $hook_suffix, 'content-campaigns' ) !== false
@@ -187,7 +187,7 @@ function gs_media_storage_panel_enqueue( $hook_suffix ) {
 		return;
 	}
 
-	$ver = GS_VERSION;
+	$ver = GEND_SOCIETY_VERSION;
 
 	wp_register_script( 'gs-media-storage-panel', false, array(), $ver, true );
 	wp_localize_script(
@@ -199,7 +199,7 @@ function gs_media_storage_panel_enqueue( $hook_suffix ) {
 			'nonce'   => wp_create_nonce( 'gs_membership_action' ),
 		)
 	);
-	wp_add_inline_script( 'gs-media-storage-panel', gs_media_storage_panel_inline_js() );
+	wp_add_inline_script( 'gs-media-storage-panel', gend_society_media_storage_panel_inline_js() );
 	wp_enqueue_script( 'gs-media-storage-panel' );
 }
 
@@ -209,7 +209,7 @@ function gs_media_storage_panel_enqueue( $hook_suffix ) {
  *
  * @return string
  */
-function gs_media_storage_panel_inline_js() {
+function gend_society_media_storage_panel_inline_js() {
 	return <<<'JS'
 (function () {
 	function refreshAndReload() {
@@ -219,7 +219,7 @@ function gs_media_storage_panel_inline_js() {
 			method: 'POST',
 			credentials: 'same-origin',
 			headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-			body: 'action=gs_membership_refresh&nonce=' + encodeURIComponent(cfg.nonce || '')
+			body: 'action=gend_society_membership_refresh&nonce=' + encodeURIComponent(cfg.nonce || '')
 		}).then(function () {
 			setTimeout(function () { location.reload(); }, 600);
 		}).catch(function () {

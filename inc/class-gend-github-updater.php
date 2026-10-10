@@ -5,9 +5,9 @@
  * Simple class to enable GitHub-based updates for WordPress plugins.
  */
 
-if (!class_exists('GenD_GitHub_Updater')) {
+if (!class_exists('Gend_Society_GitHub_Updater')) {
 
-    class GenD_GitHub_Updater
+    class Gend_Society_GitHub_Updater
     {
         private $plugin_file;
         private $github_repo;

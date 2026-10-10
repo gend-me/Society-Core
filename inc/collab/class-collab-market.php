@@ -713,7 +713,7 @@ if ( ! class_exists( 'Gend_GS_Collab_Market' ) ) {
 		 * @return void
 		 */
 		public static function on_contracted( $match_id, $task_id = 0 ) : void {
-			if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC ) {
+			if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC ) {
 				return; // dark: no market, no subsidy.
 			}
 			self::create_market( (int) $match_id ); // idempotent; return value ignored.

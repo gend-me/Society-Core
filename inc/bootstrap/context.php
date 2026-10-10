@@ -298,7 +298,7 @@ if ( ! function_exists( 'gend_society_module_needs_met' ) ) {
 					$met = $managed || gend_society_plugin_basename_active( GEND_SOCIETY_WU_PLUGIN_BASENAMES );
 					break;
 				case 'paired':
-					$met = $managed || '' !== (string) get_option( 'gs_install_token', '' );
+					$met = $managed || '' !== (string) get_option( 'gend_society_install_token', '' );
 					break;
 				case 'skin':
 					$met = true; // Phase 106 makes the admin skin opt-in on standalone.

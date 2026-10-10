@@ -91,7 +91,7 @@ $gs104(
 );
 
 // ── Manifest tier map ──
-$gs104_manifest = require GS_DIR . 'inc/bootstrap/manifest.php';
+$gs104_manifest = require GEND_SOCIETY_DIR . 'inc/bootstrap/manifest.php';
 $gs104_tier     = array(); // file => tier (modules + group members)
 $gs104_needs    = array(); // file => needs
 foreach ( $gs104_manifest['modules'] as $e ) {
@@ -127,7 +127,7 @@ $gs104_prefixed = function ( $prefix ) use ( $gs104_routes ) {
 };
 
 if ( 'standalone' === $gs104_mode ) {
-	$gs104_inc_dir = wp_normalize_path( GS_DIR );
+	$gs104_inc_dir = wp_normalize_path( GEND_SOCIETY_DIR );
 	$gs104_leak    = array();
 	foreach ( get_included_files() as $inc ) {
 		$inc = wp_normalize_path( $inc );
@@ -153,7 +153,7 @@ if ( 'hub' === $gs104_mode ) {
 			continue;
 		}
 		$is_module = isset( $gs104_needs[ $f ] );
-		if ( ! $is_module || ! file_exists( GS_DIR . $f ) ) {
+		if ( ! $is_module || ! file_exists( GEND_SOCIETY_DIR . $f ) ) {
 			continue; // partials are not loader-owned; absent files are an allowed skip.
 		}
 		if ( in_array( $f, $gs104_state['loaded'], true ) ) {
@@ -201,8 +201,8 @@ foreach ( $gs104_methods as $cm ) {
 		$gs104( false, "{$class}::{$method}() reflectable", $e->getMessage() );
 	}
 }
-if ( function_exists( 'gs_markets_is_main_node' ) ) {
-	$val = (bool) gs_markets_is_main_node();
+if ( function_exists( 'gend_society_markets_is_main_node' ) ) {
+	$val = (bool) gend_society_markets_is_main_node();
 	$gs104( $val === $gs104_hub, 'gs_markets_is_main_node() === gend_society_is_hub()', 'fn=' . var_export( $val, true ) );
 	$gs104_checked++;
 } else {

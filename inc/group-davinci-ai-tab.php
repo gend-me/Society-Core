@@ -36,7 +36,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * All WP user IDs that belong to the group (admins, mods, members) —
  * including AI-agent members. De-duplicated.
  */
-function gs_davinci_group_member_ids( $group_id ) {
+function gend_society_davinci_group_member_ids( $group_id ) {
     $group_id = (int) $group_id;
     $ids = array();
     if ( $group_id && function_exists( 'groups_get_group_members' ) ) {
@@ -60,7 +60,7 @@ function gs_davinci_group_member_ids( $group_id ) {
  * container agent provisioning model (role ai_agent / meta _aipa_is_agent /
  * _aipa_agent_slug).
  */
-function gs_davinci_user_is_agent( $user_id ) {
+function gend_society_davinci_user_is_agent( $user_id ) {
     $user_id = (int) $user_id;
     if ( ! $user_id ) return false;
 
@@ -87,7 +87,7 @@ function gs_davinci_user_is_agent( $user_id ) {
  * Returns map keyed by user_id => array( tokens, usd, calls ). Empty when
  * the usage table or AIPA_Usage helper isn't present.
  */
-function gs_davinci_usage_map( array $user_ids, $since ) {
+function gend_society_davinci_usage_map( array $user_ids, $since ) {
     $out = array();
     $user_ids = array_values( array_filter( array_map( 'intval', $user_ids ) ) );
     if ( empty( $user_ids ) || ! class_exists( 'AIPA_Usage' ) ) return $out;
@@ -115,7 +115,7 @@ function gs_davinci_usage_map( array $user_ids, $since ) {
 }
 
 /** Current Leo token-currency symbol/label (defaults USD). */
-function gs_davinci_currency() {
+function gend_society_davinci_currency() {
     if ( class_exists( 'AIPA_Usage' ) && method_exists( 'AIPA_Usage', 'get_token_pricing_settings' ) ) {
         $s = AIPA_Usage::get_token_pricing_settings();
         return isset( $s['currency'] ) ? (string) $s['currency'] : 'USD';
@@ -124,12 +124,12 @@ function gs_davinci_currency() {
 }
 
 /** Format a USD amount as a money string. */
-function gs_davinci_money( $amount ) {
+function gend_society_davinci_money( $amount ) {
     return '$' . number_format( (float) $amount, 2 );
 }
 
 /** Sanitize + normalize the stored API-integration cost rows. */
-function gs_davinci_sanitize_api_costs( $raw ) {
+function gend_society_davinci_sanitize_api_costs( $raw ) {
     $out = array();
     if ( ! is_array( $raw ) ) return $out;
     foreach ( $raw as $row ) {
@@ -147,7 +147,7 @@ function gs_davinci_sanitize_api_costs( $raw ) {
 }
 
 /** Monthly-equivalent total of the API integration costs (yearly /12, one-time excluded). */
-function gs_davinci_api_costs_monthly( array $rows ) {
+function gend_society_davinci_api_costs_monthly( array $rows ) {
     $total = 0.0;
     foreach ( $rows as $r ) {
         $amt = (float) ( $r['amount'] ?? 0 );
@@ -162,8 +162,8 @@ function gs_davinci_api_costs_monthly( array $rows ) {
 
 /* ───────────────────── AJAX: save API integration costs ───────────────────── */
 
-add_action( 'wp_ajax_gs_davinci_save_api_costs', 'gs_davinci_save_api_costs_ajax' );
-function gs_davinci_save_api_costs_ajax() {
+add_action( 'wp_ajax_gend_society_davinci_save_api_costs', 'gend_society_davinci_save_api_costs_ajax' );
+function gend_society_davinci_save_api_costs_ajax() {
     if ( ! is_user_logged_in() ) wp_send_json_error( array( 'message' => 'auth' ), 403 );
     check_ajax_referer( 'gs_davinci_api_costs', 'nonce' );
 
@@ -177,12 +177,12 @@ function gs_davinci_save_api_costs_ajax() {
     if ( ! $allowed ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
 
     $raw = isset( $_POST['rows'] ) ? json_decode( wp_unslash( $_POST['rows'] ), true ) : array();
-    $clean = gs_davinci_sanitize_api_costs( $raw );
-    groups_update_groupmeta( $group_id, '_gs_davinci_api_costs', $clean );
+    $clean = gend_society_davinci_sanitize_api_costs( $raw );
+    groups_update_groupmeta( $group_id, '_gend_society_davinci_api_costs', $clean );
 
     wp_send_json_success( array(
         'rows'          => $clean,
-        'monthly_label' => gs_davinci_money( gs_davinci_api_costs_monthly( $clean ) ),
+        'monthly_label' => gend_society_davinci_money( gend_society_davinci_api_costs_monthly( $clean ) ),
     ) );
 }
 
@@ -193,7 +193,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
     /**
      * Davinci AI — AI-spend command centre for the web app owner.
      */
-    class GS_Group_Tab_Davinci_AI extends BP_Group_Extension {
+    class Gend_Society_Group_Tab_Davinci_AI extends BP_Group_Extension {
         public function __construct() {
             parent::init( array(
                 'slug'              => 'davinci-ai',
@@ -233,30 +233,30 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
          * for business-plan.
          */
         public static function render_legacy_content( $group_id ) {
-            if ( ! function_exists( 'gs_group_tabs_user_has_access' ) || ! gs_group_tabs_user_has_access() ) return;
-            gs_group_render_davinci_ai_suite( (int) $group_id );
+            if ( ! function_exists( 'gend_society_group_tabs_user_has_access' ) || ! gend_society_group_tabs_user_has_access() ) return;
+            gend_society_group_render_davinci_ai_suite( (int) $group_id );
         }
     }
 
     // Register on bp_init (BP nav must exist). Separate from the
     // group-app-tabs.php registration so this file stays self-contained.
-    add_action( 'bp_init', 'gs_register_davinci_ai_tab', 10 );
-    function gs_register_davinci_ai_tab() {
+    add_action( 'bp_init', 'gend_society_register_davinci_ai_tab', 10 );
+    function gend_society_register_davinci_ai_tab() {
         if ( ! function_exists( 'bp_register_group_extension' ) ) return;
-        bp_register_group_extension( 'GS_Group_Tab_Davinci_AI' );
+        bp_register_group_extension( 'Gend_Society_Group_Tab_Davinci_AI' );
     }
 
     // Show the tab in the native BP nav only for group/site admins.
-    add_filter( 'bp_group_extension_nav_show_for_user', 'gs_davinci_ai_nav_visibility', 99, 3 );
-    function gs_davinci_ai_nav_visibility( $show, $slug, $group_id ) {
+    add_filter( 'bp_group_extension_nav_show_for_user', 'gend_society_davinci_ai_nav_visibility', 99, 3 );
+    function gend_society_davinci_ai_nav_visibility( $show, $slug, $group_id ) {
         if ( $slug !== 'davinci-ai' ) return $show;
-        return function_exists( 'gs_group_tabs_user_has_access' ) ? gs_group_tabs_user_has_access() : $show;
+        return function_exists( 'gend_society_group_tabs_user_has_access' ) ? gend_society_group_tabs_user_has_access() : $show;
     }
 
 endif; // BP_Group_Extension
 
 add_filter( 'gdc_gs_endpoint_content_callbacks', function ( $callbacks ) {
-    $callbacks['davinci-ai'] = array( 'GS_Group_Tab_Davinci_AI', 'render_legacy_content' );
+    $callbacks['davinci-ai'] = array( 'Gend_Society_Group_Tab_Davinci_AI', 'render_legacy_content' );
     return $callbacks;
 } );
 
@@ -276,8 +276,8 @@ add_filter( 'gdc_gs_endpoints', function ( $endpoints ) {
  * gdc_gs_seed_hosting_and_members_hub_defaults() in
  * projects/includes/group-members-screen.php exactly.
  */
-add_action( 'init', 'gdc_gs_davinci_ai_seed_default_page', 30 );
-function gdc_gs_davinci_ai_seed_default_page() {
+add_action( 'init', 'gend_society_gs_davinci_ai_seed_default_page', 30 );
+function gend_society_gs_davinci_ai_seed_default_page() {
     if ( ! function_exists( 'gdc_gs_get_site_default_page_id' ) ) return;
     $post_id = gdc_gs_get_site_default_page_id( 'davinci-ai' );
     if ( ! $post_id ) return; // Bootstrap hasn't created it yet -- self-heals next load.
@@ -291,20 +291,20 @@ function gdc_gs_davinci_ai_seed_default_page() {
 
 /* ──────────────────────────── renderer ──────────────────────────── */
 
-function gs_group_render_davinci_ai_suite( $group_id ) {
+function gend_society_group_render_davinci_ai_suite( $group_id ) {
     $group_id = (int) $group_id;
     $uid      = get_current_user_id();
-    $currency = gs_davinci_currency();
+    $currency = gend_society_davinci_currency();
 
     // ── Gather membership + usage ──────────────────────────────────
-    $member_ids = gs_davinci_group_member_ids( $group_id );
+    $member_ids = gend_society_davinci_group_member_ids( $group_id );
     $agent_ids  = array();
     $human_ids  = array();
     foreach ( $member_ids as $mid ) {
-        if ( gs_davinci_user_is_agent( $mid ) ) $agent_ids[] = $mid; else $human_ids[] = $mid;
+        if ( gend_society_davinci_user_is_agent( $mid ) ) $agent_ids[] = $mid; else $human_ids[] = $mid;
     }
     $since   = current_time( 'Y-m-01 00:00:00' ); // start of this calendar month
-    $usage   = gs_davinci_usage_map( $member_ids, $since );
+    $usage   = gend_society_davinci_usage_map( $member_ids, $since );
 
     $leo_usd = 0.0; $leo_tokens = 0;
     foreach ( $human_ids as $hid ) { if ( isset( $usage[ $hid ] ) ) { $leo_usd += $usage[ $hid ]['usd']; $leo_tokens += $usage[ $hid ]['tokens']; } }
@@ -312,11 +312,11 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
     foreach ( $agent_ids as $aid ) { if ( isset( $usage[ $aid ] ) ) { $agent_usd += $usage[ $aid ]['usd']; $agent_tokens += $usage[ $aid ]['tokens']; } }
 
     // ── API integration costs (owner-entered) ─────────────────────
-    $api_costs   = function_exists( 'groups_get_groupmeta' ) ? gs_davinci_sanitize_api_costs( groups_get_groupmeta( $group_id, '_gs_davinci_api_costs', true ) ) : array();
-    $api_monthly = gs_davinci_api_costs_monthly( $api_costs );
+    $api_costs   = function_exists( 'groups_get_groupmeta' ) ? gend_society_davinci_sanitize_api_costs( groups_get_groupmeta( $group_id, '_gend_society_davinci_api_costs', true ) ) : array();
+    $api_monthly = gend_society_davinci_api_costs_monthly( $api_costs );
 
     // ── Compute gas gate (reuses the Compute Gas resolver) ─────────
-    $cg_state = function_exists( 'gs_compute_gas_resolve_state' ) ? gs_compute_gas_resolve_state( $group_id, $uid ) : array();
+    $cg_state = function_exists( 'gend_society_compute_gas_resolve_state' ) ? gend_society_compute_gas_resolve_state( $group_id, $uid ) : array();
     $compute_active = ! empty( $cg_state['compute_active'] );
     $compute_plan_url = isset( $cg_state['compute_plan_url'] ) ? (string) $cg_state['compute_plan_url'] : '';
 
@@ -958,22 +958,22 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
         <div class="gs-dv-summary">
             <div class="gs-dv-sumcard" style="--accent:var(--dv-blue);">
                 <p class="gs-dv-sum-label"><?php esc_html_e( 'Leo Content Tokens', 'gend-society' ); ?></p>
-                <div class="gs-dv-sum-value"><?php echo esc_html( gs_davinci_money( $leo_usd ) ); ?></div>
+                <div class="gs-dv-sum-value"><?php echo esc_html( gend_society_davinci_money( $leo_usd ) ); ?></div>
                 <p class="gs-dv-sum-foot"><?php echo esc_html( number_format( $leo_tokens ) . ' ' . __( 'tokens this month', 'gend-society' ) ); ?></p>
             </div>
             <div class="gs-dv-sumcard" style="--accent:var(--dv-magenta);">
                 <p class="gs-dv-sum-label"><?php esc_html_e( 'Agent Costs', 'gend-society' ); ?></p>
-                <div class="gs-dv-sum-value"><?php echo esc_html( gs_davinci_money( $agent_usd ) ); ?></div>
+                <div class="gs-dv-sum-value"><?php echo esc_html( gend_society_davinci_money( $agent_usd ) ); ?></div>
                 <p class="gs-dv-sum-foot"><?php echo esc_html( count( $agent_ids ) . ' ' . _n( 'connected agent', 'connected agents', count( $agent_ids ), 'gend-society' ) ); ?></p>
             </div>
             <div class="gs-dv-sumcard" style="--accent:var(--dv-gold);">
                 <p class="gs-dv-sum-label"><?php esc_html_e( 'API Integrations', 'gend-society' ); ?></p>
-                <div class="gs-dv-sum-value" data-gs-dv-api-monthly><?php echo esc_html( gs_davinci_money( $api_monthly ) ); ?></div>
+                <div class="gs-dv-sum-value" data-gs-dv-api-monthly><?php echo esc_html( gend_society_davinci_money( $api_monthly ) ); ?></div>
                 <p class="gs-dv-sum-foot"><?php esc_html_e( 'per month, owner-entered', 'gend-society' ); ?></p>
             </div>
             <div class="gs-dv-sumcard is-total" style="--accent:var(--dv-green);">
                 <p class="gs-dv-sum-label"><?php esc_html_e( 'Total AI Spend / mo', 'gend-society' ); ?></p>
-                <div class="gs-dv-sum-value" data-gs-dv-total><?php echo esc_html( gs_davinci_money( $known_monthly ) ); ?></div>
+                <div class="gs-dv-sum-value" data-gs-dv-total><?php echo esc_html( gend_society_davinci_money( $known_monthly ) ); ?></div>
                 <p class="gs-dv-sum-foot"><?php esc_html_e( 'incl. compute gas once synced', 'gend-society' ); ?></p>
             </div>
         </div>
@@ -1424,7 +1424,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
 
                         <label class="gs-dvm-cmodal-field">💠 <?php esc_html_e( 'Token package', 'gend-society' ); ?>
                             <select class="gs-dvm-sel" data-dvm-cpackage>
-                                <?php foreach ( gs_dv_leo_packages() as $gs_dvc_pk ) : ?>
+                                <?php foreach ( gend_society_dv_leo_packages() as $gs_dvc_pk ) : ?>
                                     <option value="<?php echo esc_attr( $gs_dvc_pk['id'] ); ?>"><?php echo esc_html( $gs_dvc_pk['name'] . ' — ' . number_format_i18n( $gs_dvc_pk['tokens'] ) . ' Leo · $' . number_format_i18n( $gs_dvc_pk['price'], 2 ) ); ?></option>
                                 <?php endforeach; ?>
                             </select>
@@ -1478,7 +1478,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
             <div class="gs-dv-stat-row">
                 <div class="gs-dv-stat">
                     <p class="k"><?php esc_html_e( 'Leo Spend (this month)', 'gend-society' ); ?></p>
-                    <div class="v"><?php echo esc_html( gs_davinci_money( $leo_usd ) ); ?></div>
+                    <div class="v"><?php echo esc_html( gend_society_davinci_money( $leo_usd ) ); ?></div>
                 </div>
                 <div class="gs-dv-stat">
                     <p class="k"><?php esc_html_e( 'Tokens Consumed', 'gend-society' ); ?></p>
@@ -1538,7 +1538,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                             <td><span class="gs-dv-pill"><?php echo esc_html( $role ); ?></span></td>
                             <td class="num"><?php echo esc_html( number_format( $bal ) ); ?></td>
                             <td class="num"><?php echo esc_html( number_format( (int) $row['tokens'] ) ); ?></td>
-                            <td class="num"><?php echo esc_html( gs_davinci_money( $row['usd'] ) ); ?></td>
+                            <td class="num"><?php echo esc_html( gend_society_davinci_money( $row['usd'] ) ); ?></td>
                         </tr>
                         <?php
                     }
@@ -1566,7 +1566,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                 </div>
                 <div class="gs-dv-stat" style="min-width:170px;">
                     <p class="k"><?php esc_html_e( 'Agent Spend / mo', 'gend-society' ); ?></p>
-                    <div class="v"><?php echo esc_html( gs_davinci_money( $agent_usd ) ); ?></div>
+                    <div class="v"><?php echo esc_html( gend_society_davinci_money( $agent_usd ) ); ?></div>
                 </div>
             </div>
 
@@ -1596,7 +1596,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                             <td><span class="gs-dv-pill is-agent"><?php esc_html_e( 'Agent', 'gend-society' ); ?></span></td>
                             <td class="num"><?php echo esc_html( number_format( (int) ( $row['calls'] ?? 0 ) ) ); ?></td>
                             <td class="num"><?php echo esc_html( number_format( (int) $row['tokens'] ) ); ?></td>
-                            <td class="num"><?php echo esc_html( gs_davinci_money( $row['usd'] ) ); ?></td>
+                            <td class="num"><?php echo esc_html( gend_society_davinci_money( $row['usd'] ) ); ?></td>
                         </tr>
                         <?php
                     }
@@ -1618,7 +1618,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                         <p class="lede"><?php esc_html_e( 'Every sequence synced to gend.me from this group, with the estimated AI cost of one full run. Steps routed to a connected device or the Claude terminal run on member hardware / personal licenses (no gend.me metering); steps on the gend.me Compute Network are estimated from each prompt at current Leo Token pricing.', 'gend-society' ); ?></p>
                     </div>
                 </div>
-                <?php $gs_dv_sq = gs_dv_sequences_cost( $group_id ); ?>
+                <?php $gs_dv_sq = gend_society_dv_sequences_cost( $group_id ); ?>
                 <?php if ( empty( $gs_dv_sq['rows'] ) ) : ?>
                     <p class="gs-dv-empty"><?php esc_html_e( 'No sequences synced from the desktop app yet — build one in the desktop Sequences tab (or the chat widget) and it appears here with its run cost.', 'gend-society' ); ?></p>
                     <button type="button" class="gs-dv-btn gs-dv-btn--sm" data-gs-dv-seq-new style="margin-top:10px;"><?php esc_html_e( '＋ Add Sequence', 'gend-society' ); ?></button>
@@ -1630,7 +1630,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                         </div>
                         <div class="gs-dv-stat">
                             <p class="k"><?php esc_html_e( 'Est. Cost — Run All Once', 'gend-society' ); ?></p>
-                            <div class="v"><?php echo esc_html( gs_davinci_money( $gs_dv_sq['totalUsd'] ) ); ?></div>
+                            <div class="v"><?php echo esc_html( gend_society_davinci_money( $gs_dv_sq['totalUsd'] ) ); ?></div>
                         </div>
                         <div class="gs-dv-stat">
                             <p class="k"><?php esc_html_e( 'Est. Leo Tokens / Run All', 'gend-society' ); ?></p>
@@ -1664,7 +1664,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                                     <td><?php echo esc_html( number_format_i18n( $sq['steps'] ) ); ?></td>
                                     <td><?php echo esc_html( number_format_i18n( $sq['ai'] ) ); ?></td>
                                     <td><?php echo esc_html( number_format_i18n( $sq['free'] ) ); ?></td>
-                                    <td><span class="gs-dvm-bal"><?php echo esc_html( gs_davinci_money( $sq['usd'] ) ); ?></span></td>
+                                    <td><span class="gs-dvm-bal"><?php echo esc_html( gend_society_davinci_money( $sq['usd'] ) ); ?></span></td>
                                     <td><?php echo esc_html( number_format_i18n( round( $sq['tokens'] ) ) ); ?></td>
                                     <td><button type="button" class="gs-dvm-pill is-on" data-gs-dv-seq-edit="<?php echo esc_attr( $sq['id'] ); ?>">✎ <?php esc_html_e( 'Edit', 'gend-society' ); ?></button></td>
                                 </tr>
@@ -1712,7 +1712,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                 </div>
                 <div class="gs-dv-stat" style="min-width:170px;">
                     <p class="k"><?php esc_html_e( 'Logged / mo', 'gend-society' ); ?></p>
-                    <div class="v" data-gs-dv-api-monthly2><?php echo esc_html( gs_davinci_money( $api_monthly ) ); ?></div>
+                    <div class="v" data-gs-dv-api-monthly2><?php echo esc_html( gend_society_davinci_money( $api_monthly ) ); ?></div>
                 </div>
             </div>
 
@@ -1864,7 +1864,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                 var rows = collect();
                 status.textContent = '<?php echo esc_js( __( 'Saving…', 'gend-society' ) ); ?>';
                 status.className = 'gs-dv-save-status';
-                var b = new URLSearchParams({ action:'gs_davinci_save_api_costs', nonce:apiNonce, group_id:groupId, rows:JSON.stringify(rows) });
+                var b = new URLSearchParams({ action:'gend_society_davinci_save_api_costs', nonce:apiNonce, group_id:groupId, rows:JSON.stringify(rows) });
                 fetch(ajax,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b.toString()})
                     .then(function(r){return r.json();})
                     .then(function(resp){
@@ -1893,7 +1893,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
             };
             if (!cells.gas && !cells.total) return; // gated state — nothing to fetch
             if (cgBtn){ cgBtn.disabled = true; }
-            var b = new URLSearchParams({ action:'gs_hosting_compute_gas', nonce:cgNonce });
+            var b = new URLSearchParams({ action:'gend_society_hosting_compute_gas', nonce:cgNonce });
             fetch(ajax,{method:'POST',credentials:'same-origin',headers:{'Content-Type':'application/x-www-form-urlencoded'},body:b.toString()})
                 .then(function(r){return r.json();})
                 .then(function(resp){
@@ -2017,7 +2017,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
             }
             var loadTimer = null;
             function loadMembers(q){
-                post('gs_dv_leo_members', { q: q||'' }).then(function(resp){
+                post('gend_society_dv_leo_members', { q: q||'' }).then(function(resp){
                     if (!resp || !resp.success){
                         var msg = (resp && resp.data && resp.data.message) || '<?php echo esc_js( __( 'Could not load members.', 'gend-society' ) ); ?>';
                         console.error('[gs-dv] members load failed:', resp);
@@ -2051,7 +2051,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                 if (!pk || !m) return;
                 if (!window.confirm('<?php echo esc_js( __( 'Buy', 'gend-society' ) ); ?> ' + pk.name + ' <?php echo esc_js( __( 'for', 'gend-society' ) ); ?> ' + m.name + ' — ' + fmtN(pk.price) + ' DGEN <?php echo esc_js( __( 'from your wallet?', 'gend-society' ) ); ?>')) return;
                 btn.disabled = true;
-                post('gs_dv_leo_buy', { member_id: mid, package_id: pk.id }).then(function(resp){
+                post('gend_society_dv_leo_buy', { member_id: mid, package_id: pk.id }).then(function(resp){
                     btn.disabled = false;
                     if (!resp || !resp.success){ say(statusEl, (resp && resp.data && resp.data.message) || '<?php echo esc_js( __( 'Purchase failed.', 'gend-society' ) ); ?>', false); return; }
                     var d = resp.data||{};
@@ -2172,7 +2172,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                         if (!cmResults) return;
                         cmResults.removeAttribute('hidden');
                         cmResults.innerHTML = '<div class="gs-dvm-result-muted"><?php echo esc_js( __( 'Searching…', 'gend-society' ) ); ?></div>';
-                        post('gs_dv_leo_members', { q: q }).then(function(resp){
+                        post('gend_society_dv_leo_members', { q: q }).then(function(resp){
                             var rows = (resp && resp.success && resp.data && resp.data.members) || [];
                             if (!rows.length){ cmResults.innerHTML = '<div class="gs-dvm-result-muted"><?php echo esc_js( __( 'No members match.', 'gend-society' ) ); ?></div>'; return; }
                             cmResults.innerHTML = rows.slice(0, 20).map(function(m){
@@ -2191,7 +2191,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                 if (targetType === 'members' && !memberIds.length){ say(cmStatus, '<?php echo esc_js( __( 'Pick at least one member.', 'gend-society' ) ); ?>', false); return; }
                 if (targetType === 'role' && !cmRoles.length){ say(cmStatus, '<?php echo esc_js( __( 'Pick at least one role.', 'gend-society' ) ); ?>', false); return; }
                 cmSave.disabled = true;
-                post('gs_dv_leo_contract', {
+                post('gend_society_dv_leo_contract', {
                     op: 'save', contract_id: cmEditId,
                     target_type: targetType,
                     role: cmRoles[0] || '',
@@ -2220,7 +2220,7 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
                 var op = e.target.closest('[data-cdel]') ? 'delete' : (e.target.closest('[data-ctoggle]') ? 'toggle' : '');
                 if (!op) return;
                 if (op==='delete' && !window.confirm('<?php echo esc_js( __( 'Delete this purchase contract?', 'gend-society' ) ); ?>')) return;
-                post('gs_dv_leo_contract', { op: op, contract_id: cid }).then(function(resp){
+                post('gend_society_dv_leo_contract', { op: op, contract_id: cid }).then(function(resp){
                     if (!resp || !resp.success){ say(cStatus, '<?php echo esc_js( __( 'Update failed.', 'gend-society' ) ); ?>', false); return; }
                     contracts = (resp.data && resp.data.contracts) || [];
                     renderContracts(); say(cStatus, '');
@@ -2262,14 +2262,14 @@ function gs_group_render_davinci_ai_suite( $group_id ) {
 // the cron never scans groupmeta.
 // ─────────────────────────────────────────────────────────────────────────────
 
-function gs_dv_leo_admin_ok( $group_id ) {
+function gend_society_dv_leo_admin_ok( $group_id ) {
     if ( ! is_user_logged_in() ) return false;
     if ( current_user_can( 'manage_options' ) || is_super_admin() ) return true; // site-admin check, not a hub signal (104 audit)
     return function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( get_current_user_id(), (int) $group_id );
 }
 
 /** Published Leo Token package products (hub main site). */
-function gs_dv_leo_packages() {
+function gend_society_dv_leo_packages() {
     global $wpdb;
     $rows = $wpdb->get_results(
         "SELECT p.ID, p.post_title, m.meta_value AS tokens, pr.meta_value AS price
@@ -2291,14 +2291,14 @@ function gs_dv_leo_packages() {
     return $out;
 }
 
-function gs_dv_leo_balance( $uid ) {
+function gend_society_dv_leo_balance( $uid ) {
     if ( class_exists( 'AIPA_Usage' ) && method_exists( 'AIPA_Usage', 'get_balance' ) ) {
         return (float) AIPA_Usage::get_balance( (int) $uid );
     }
     return (float) get_user_meta( (int) $uid, 'aipa_credits', true );
 }
 
-function gs_dv_leo_credit( $uid, $tokens ) {
+function gend_society_dv_leo_credit( $uid, $tokens ) {
     if ( class_exists( 'AIPA_Usage' ) && method_exists( 'AIPA_Usage', 'add_credits' ) ) {
         AIPA_Usage::add_credits( (int) $uid, (float) $tokens );
         return;
@@ -2307,7 +2307,7 @@ function gs_dv_leo_credit( $uid, $tokens ) {
     update_user_meta( (int) $uid, 'aipa_credits', $cur + (float) $tokens );
 }
 
-function gs_dv_leo_dgen_balance( $uid ) {
+function gend_society_dv_leo_dgen_balance( $uid ) {
     return function_exists( 'mycred_get_users_balance' )
         ? (float) mycred_get_users_balance( (int) $uid, 'transact' )
         : 0.0;
@@ -2318,13 +2318,13 @@ function gs_dv_leo_dgen_balance( $uid ) {
  * Returns true on success, WP_Error otherwise. Balance-checked first so a
  * short wallet never goes negative.
  */
-function gs_dv_leo_charge( $payer, $amount, $member_id, $pkg_name ) {
+function gend_society_dv_leo_charge( $payer, $amount, $member_id, $pkg_name ) {
     $amount = (float) $amount;
     if ( $amount <= 0 ) return true; // free package — nothing to charge
     if ( ! function_exists( 'mycred_add' ) ) {
         return new WP_Error( 'no_wallet', __( 'The DGEN wallet system is unavailable.', 'gend-society' ) );
     }
-    if ( gs_dv_leo_dgen_balance( $payer ) < $amount ) {
+    if ( gend_society_dv_leo_dgen_balance( $payer ) < $amount ) {
         return new WP_Error( 'insufficient', __( 'Not enough DGEN in your wallet — top up and try again.', 'gend-society' ) );
     }
     $member = get_userdata( (int) $member_id );
@@ -2342,11 +2342,11 @@ function gs_dv_leo_charge( $payer, $amount, $member_id, $pkg_name ) {
 }
 
 // ── AJAX: members + packages + roles + contracts bootstrap ──
-add_action( 'wp_ajax_gs_dv_leo_members', 'gs_dv_leo_members_ajax' );
-function gs_dv_leo_members_ajax() {
+add_action( 'wp_ajax_gend_society_dv_leo_members', 'gend_society_dv_leo_members_ajax' );
+function gend_society_dv_leo_members_ajax() {
     check_ajax_referer( 'gs_dv_leo', 'nonce' );
     $group_id = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
-    if ( ! $group_id || ! gs_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+    if ( ! $group_id || ! gend_society_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
 
     $site_id = function_exists( 'groups_get_groupmeta' ) ? (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true ) : 0;
     if ( $site_id <= 0 ) $site_id = get_current_blog_id();
@@ -2373,7 +2373,7 @@ function gs_dv_leo_members_ajax() {
             'email'   => (string) $u->user_email,
             'avatar'  => get_avatar_url( $u->ID, array( 'size' => 68 ) ),
             'roles'   => array_map( 'strval', array_values( (array) $u->roles ) ),
-            'balance' => gs_dv_leo_balance( $u->ID ),
+            'balance' => gend_society_dv_leo_balance( $u->ID ),
         );
     }
 
@@ -2385,45 +2385,45 @@ function gs_dv_leo_members_ajax() {
     wp_send_json_success( array(
         'members'   => $members,
         'roles'     => $roles,
-        'packages'  => gs_dv_leo_packages(),
-        'contracts' => gs_dv_leo_contracts_for_group( $group_id ),
-        'adminDgen' => gs_dv_leo_dgen_balance( get_current_user_id() ),
+        'packages'  => gend_society_dv_leo_packages(),
+        'contracts' => gend_society_dv_leo_contracts_for_group( $group_id ),
+        'adminDgen' => gend_society_dv_leo_dgen_balance( get_current_user_id() ),
     ) );
 }
 
 // ── AJAX: buy a package for one member ──
-add_action( 'wp_ajax_gs_dv_leo_buy', 'gs_dv_leo_buy_ajax' );
-function gs_dv_leo_buy_ajax() {
+add_action( 'wp_ajax_gend_society_dv_leo_buy', 'gend_society_dv_leo_buy_ajax' );
+function gend_society_dv_leo_buy_ajax() {
     check_ajax_referer( 'gs_dv_leo', 'nonce' );
     $group_id  = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
     $member_id = isset( $_POST['member_id'] ) ? (int) $_POST['member_id'] : 0;
     $pkg_id    = isset( $_POST['package_id'] ) ? (int) $_POST['package_id'] : 0;
-    if ( ! $group_id || ! gs_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+    if ( ! $group_id || ! gend_society_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
     if ( ! $member_id || ! get_userdata( $member_id ) ) wp_send_json_error( array( 'message' => __( 'Member not found.', 'gend-society' ) ), 404 );
 
     $pkg = null;
-    foreach ( gs_dv_leo_packages() as $cand ) { if ( $cand['id'] === $pkg_id ) { $pkg = $cand; break; } }
+    foreach ( gend_society_dv_leo_packages() as $cand ) { if ( $cand['id'] === $pkg_id ) { $pkg = $cand; break; } }
     if ( ! $pkg ) wp_send_json_error( array( 'message' => __( 'Token package not found.', 'gend-society' ) ), 404 );
 
-    $charged = gs_dv_leo_charge( get_current_user_id(), $pkg['price'], $member_id, $pkg['name'] );
+    $charged = gend_society_dv_leo_charge( get_current_user_id(), $pkg['price'], $member_id, $pkg['name'] );
     if ( is_wp_error( $charged ) ) wp_send_json_error( array( 'message' => $charged->get_error_message() ), 402 );
 
-    gs_dv_leo_credit( $member_id, $pkg['tokens'] );
+    gend_society_dv_leo_credit( $member_id, $pkg['tokens'] );
 
     wp_send_json_success( array(
         'tokens'    => $pkg['tokens'],
-        'balance'   => gs_dv_leo_balance( $member_id ),
-        'adminDgen' => gs_dv_leo_dgen_balance( get_current_user_id() ),
+        'balance'   => gend_society_dv_leo_balance( $member_id ),
+        'adminDgen' => gend_society_dv_leo_dgen_balance( get_current_user_id() ),
     ) );
 }
 
 // ── Contract store: ONE network-visible option keyed by group id ──
-function gs_dv_leo_contracts_all() {
-    $all = get_site_option( 'gs_leo_purchase_contracts', array() );
+function gend_society_dv_leo_contracts_all() {
+    $all = get_site_option( 'gend_society_leo_purchase_contracts', array() );
     return is_array( $all ) ? $all : array();
 }
-function gs_dv_leo_contracts_for_group( $group_id ) {
-    $all = gs_dv_leo_contracts_all();
+function gend_society_dv_leo_contracts_for_group( $group_id ) {
+    $all = gend_society_dv_leo_contracts_all();
     $list = isset( $all[ (int) $group_id ] ) && is_array( $all[ (int) $group_id ] ) ? array_values( $all[ (int) $group_id ] ) : array();
     // Resolve member display names for the UI.
     foreach ( $list as $i => $c ) {
@@ -2436,29 +2436,29 @@ function gs_dv_leo_contracts_for_group( $group_id ) {
     }
     return $list;
 }
-function gs_dv_leo_contracts_save_group( $group_id, $list ) {
-    $all = gs_dv_leo_contracts_all();
+function gend_society_dv_leo_contracts_save_group( $group_id, $list ) {
+    $all = gend_society_dv_leo_contracts_all();
     $list = array_values( array_filter( (array) $list, 'is_array' ) );
     if ( empty( $list ) ) unset( $all[ (int) $group_id ] );
     else $all[ (int) $group_id ] = $list;
-    update_site_option( 'gs_leo_purchase_contracts', $all );
+    update_site_option( 'gend_society_leo_purchase_contracts', $all );
 }
-function gs_dv_leo_cadence_seconds( $cadence ) {
+function gend_society_dv_leo_cadence_seconds( $cadence ) {
     if ( 'daily' === $cadence ) return DAY_IN_SECONDS;
     if ( 'weekly' === $cadence ) return WEEK_IN_SECONDS;
     return 30 * DAY_IN_SECONDS;
 }
 
 // ── AJAX: contract save / toggle / delete ──
-add_action( 'wp_ajax_gs_dv_leo_contract', 'gs_dv_leo_contract_ajax' );
-function gs_dv_leo_contract_ajax() {
+add_action( 'wp_ajax_gend_society_dv_leo_contract', 'gend_society_dv_leo_contract_ajax' );
+function gend_society_dv_leo_contract_ajax() {
     check_ajax_referer( 'gs_dv_leo', 'nonce' );
     $group_id = isset( $_POST['group_id'] ) ? (int) $_POST['group_id'] : 0;
-    if ( ! $group_id || ! gs_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
+    if ( ! $group_id || ! gend_society_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
 
     $op   = isset( $_POST['op'] ) ? sanitize_key( (string) $_POST['op'] ) : '';
     $list = array();
-    foreach ( gs_dv_leo_contracts_for_group( $group_id ) as $c ) { unset( $c['memberNames'] ); $list[] = $c; }
+    foreach ( gend_society_dv_leo_contracts_for_group( $group_id ) as $c ) { unset( $c['memberNames'] ); $list[] = $c; }
 
     if ( 'save' === $op ) {
         $target = ( isset( $_POST['target_type'] ) && 'role' === $_POST['target_type'] ) ? 'role' : 'members';
@@ -2469,7 +2469,7 @@ function gs_dv_leo_contract_ajax() {
         if ( 'members' === $target && empty( $ids ) ) wp_send_json_error( array( 'message' => __( 'Pick at least one member.', 'gend-society' ) ), 400 );
         if ( 'role' === $target && '' === $role && '' === trim( (string) ( $_POST['roles'] ?? '' ) ) ) wp_send_json_error( array( 'message' => __( 'Pick at least one role.', 'gend-society' ) ), 400 );
         $pkg = null;
-        foreach ( gs_dv_leo_packages() as $cand ) { if ( $cand['id'] === $pkg_id ) { $pkg = $cand; break; } }
+        foreach ( gend_society_dv_leo_packages() as $cand ) { if ( $cand['id'] === $pkg_id ) { $pkg = $cand; break; } }
         if ( ! $pkg ) wp_send_json_error( array( 'message' => __( 'Token package not found.', 'gend-society' ) ), 404 );
         $roles_multi = array_values( array_filter( array_map( 'sanitize_key', explode( ',', (string) ( $_POST['roles'] ?? '' ) ) ) ) );
         if ( empty( $roles_multi ) && $role !== '' ) $roles_multi = array( $role );
@@ -2516,21 +2516,21 @@ function gs_dv_leo_contract_ajax() {
         wp_send_json_error( array( 'message' => 'bad_op' ), 400 );
     }
 
-    gs_dv_leo_contracts_save_group( $group_id, $list );
-    wp_send_json_success( array( 'contracts' => gs_dv_leo_contracts_for_group( $group_id ) ) );
+    gend_society_dv_leo_contracts_save_group( $group_id, $list );
+    wp_send_json_success( array( 'contracts' => gend_society_dv_leo_contracts_for_group( $group_id ) ) );
 }
 
 // ── Hourly cron: process due contracts ──
 add_action( 'init', function () {
     if ( ! is_main_site() ) return;
-    if ( ! wp_next_scheduled( 'gs_dv_leo_contracts_tick' ) ) {
-        wp_schedule_event( time() + 300, 'hourly', 'gs_dv_leo_contracts_tick' );
+    if ( ! wp_next_scheduled( 'gend_society_dv_leo_contracts_tick' ) ) {
+        wp_schedule_event( time() + 300, 'hourly', 'gend_society_dv_leo_contracts_tick' );
     }
 } );
 
-add_action( 'gs_dv_leo_contracts_tick', 'gs_dv_leo_contracts_run' );
-function gs_dv_leo_contracts_run() {
-    $all = gs_dv_leo_contracts_all();
+add_action( 'gend_society_dv_leo_contracts_tick', 'gend_society_dv_leo_contracts_run' );
+function gend_society_dv_leo_contracts_run() {
+    $all = gend_society_dv_leo_contracts_all();
     if ( empty( $all ) ) return;
     $now = time();
     $dirty = false;
@@ -2541,7 +2541,7 @@ function gs_dv_leo_contracts_run() {
             if ( (int) ( $c['nextRunAt'] ?? 0 ) > $now ) continue;
 
             $pkg = null;
-            foreach ( gs_dv_leo_packages() as $cand ) { if ( $cand['id'] === (int) ( $c['packageId'] ?? 0 ) ) { $pkg = $cand; break; } }
+            foreach ( gend_society_dv_leo_packages() as $cand ) { if ( $cand['id'] === (int) ( $c['packageId'] ?? 0 ) ) { $pkg = $cand; break; } }
             if ( ! $pkg ) {
                 $all[ $group_id ][ $i ]['lastNote'] = 'package missing — paused';
                 $all[ $group_id ][ $i ]['active']   = false;
@@ -2569,19 +2569,19 @@ function gs_dv_leo_contracts_run() {
             $ok = 0; $skip = 0;
             foreach ( $ids as $mid ) {
                 if ( ! get_userdata( $mid ) ) { $skip++; continue; }
-                $charged = gs_dv_leo_charge( $payer, $pkg['price'], $mid, $pkg['name'] );
+                $charged = gend_society_dv_leo_charge( $payer, $pkg['price'], $mid, $pkg['name'] );
                 if ( is_wp_error( $charged ) ) { $skip++; continue; }
-                gs_dv_leo_credit( $mid, $pkg['tokens'] );
+                gend_society_dv_leo_credit( $mid, $pkg['tokens'] );
                 $ok++;
             }
 
             $all[ $group_id ][ $i ]['lastRunAt'] = $now;
-            $all[ $group_id ][ $i ]['nextRunAt'] = $now + gs_dv_leo_cadence_seconds( (string) ( $c['cadence'] ?? 'monthly' ) );
+            $all[ $group_id ][ $i ]['nextRunAt'] = $now + gend_society_dv_leo_cadence_seconds( (string) ( $c['cadence'] ?? 'monthly' ) );
             $all[ $group_id ][ $i ]['lastNote']  = sprintf( '%d purchased%s', $ok, $skip ? ( ', ' . $skip . ' skipped (wallet short / missing)' ) : '' );
             $dirty = true;
         }
     }
-    if ( $dirty ) update_site_option( 'gs_leo_purchase_contracts', $all );
+    if ( $dirty ) update_site_option( 'gend_society_leo_purchase_contracts', $all );
 }
 
 
@@ -2593,7 +2593,7 @@ function gs_dv_leo_contracts_run() {
  * tokens through the leo plugin's own pricing (calculate_cost +
  * usd_to_tokens), with a flash-tier fallback rate when leo is unavailable.
  */
-function gs_dv_sequences_cost( $group_id ) {
+function gend_society_dv_sequences_cost( $group_id ) {
     $out = array( 'rows' => array(), 'totalUsd' => 0.0, 'totalTokens' => 0.0, 'freeSteps' => 0, 'aiSteps' => 0 );
 
     // The SEQUENCES are the desktop Sequences-tab workspaces

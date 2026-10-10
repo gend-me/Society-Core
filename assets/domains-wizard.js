@@ -124,7 +124,7 @@
             return;
         }
         state.domain = domain;
-        ajaxCall('gs_membership_domain_connect', { domain: domain }, function (data) {
+        ajaxCall('gend_society_membership_domain_connect', { domain: domain }, function (data) {
             state.zoneId = data.id || data.zone_id || null;
             state.nameservers = (data.name_servers && Array.isArray(data.name_servers)) ? data.name_servers : [];
             if (!state.zoneId) {
@@ -146,9 +146,9 @@
         var confirmBtn = $('gs-domains-wizard-step2-confirm');
         if (confirmBtn) confirmBtn.disabled = true;
 
-        ajaxCall('gs_membership_domain_import_records', { zone_id: state.zoneId }, function () {
+        ajaxCall('gend_society_membership_domain_import_records', { zone_id: state.zoneId }, function () {
             // After import, fetch the records list.
-            ajaxCall('gs_membership_domain_records', { zone_id: state.zoneId }, function (records) {
+            ajaxCall('gend_society_membership_domain_records', { zone_id: state.zoneId }, function (records) {
                 hide($('gs-domains-wizard-records-loading'));
                 state.importedRecords = Array.isArray(records) ? records : [];
                 var tbody = document.querySelector('#gs-domains-wizard-records-table tbody');
@@ -198,7 +198,7 @@
     // Step 3: Fetch nameservers (server enforces import_review_required guard)
     function runStep3GetNameservers() {
         clearError('gs-domains-wizard-step3-error');
-        ajaxCall('gs_membership_domain_get_nameservers', { zone_id: state.zoneId }, function (data) {
+        ajaxCall('gend_society_membership_domain_get_nameservers', { zone_id: state.zoneId }, function (data) {
             var ns = (data && data.name_servers && Array.isArray(data.name_servers)) ? data.name_servers : [];
             state.nameservers = ns;
             var list = $('gs-domains-wizard-ns-list');
@@ -280,7 +280,7 @@
 
     function runStep4PollStatus() {
         state.pollTimeoutId = null;
-        ajaxCall('gs_membership_domain_get_status', { zone_id: state.zoneId }, function (data) {
+        ajaxCall('gend_society_membership_domain_get_status', { zone_id: state.zoneId }, function (data) {
             var status = (data && data.status) ? String(data.status) : 'pending';
             var lastPolled = (data && data.last_polled_at) ? new Date(data.last_polled_at * 1000) : new Date();
             setText($('gs-domains-wizard-status-last'), 'Last checked: ' + lastPolled.toLocaleTimeString());
@@ -300,7 +300,7 @@
 
     // Connected-domains list refresh (DCON-05)
     function refreshConnectedList() {
-        ajaxCall('gs_membership_domain_list', {}, function (rows) {
+        ajaxCall('gend_society_membership_domain_list', {}, function (rows) {
             var tbody = $('gs-domains-wizard-connected-tbody');
             if (!tbody) return;
             if (!Array.isArray(rows) || rows.length === 0) {
@@ -369,7 +369,7 @@
             (function (el) {
                 var host = el.getAttribute('data-zone-host');
                 if (!host) { return; }
-                ajaxCall('gs_membership_domain_ssl_status', { host: host }, function (data) {
+                ajaxCall('gend_society_membership_domain_ssl_status', { host: host }, function (data) {
                     var d = (data && typeof data === 'object') ? data : {};
                     var overall = d.overall ? String(d.overall) : 'unknown';
                     el.setAttribute('data-state', overall);

@@ -24,7 +24,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class GS_Chatflows_Router {
+class Gend_Society_Chatflows_Router {
 
     const NS = 'gs/v1';
     const CACHE_TTL = 5 * MINUTE_IN_SECONDS; // subsite-side transient cache for forwarded reads
@@ -102,7 +102,7 @@ class GS_Chatflows_Router {
             ), 402 );
         }
 
-        $cache_key = 'gs_chatflow_' . md5( $slug . ':' . $uid );
+        $cache_key = 'gend_society_chatflow_' . md5( $slug . ':' . $uid );
         $cached    = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return new WP_REST_Response( $cached, 200 );
@@ -141,12 +141,12 @@ class GS_Chatflows_Router {
     }
 
     protected static function hub_base() {
-        if ( class_exists( 'GS_AI_Proxy' ) && method_exists( 'GS_AI_Proxy', 'hub_base' ) ) {
-            return untrailingslashit( GS_AI_Proxy::hub_base() );
+        if ( class_exists( 'Gend_Society_AI_Proxy' ) && method_exists( 'Gend_Society_AI_Proxy', 'hub_base' ) ) {
+            return untrailingslashit( Gend_Society_AI_Proxy::hub_base() );
         }
-        $base = get_option( 'gs_gend_base_url', 'https://gend.me' );
+        $base = get_option( 'gend_society_gend_base_url', 'https://gend.me' );
         return untrailingslashit( $base );
     }
 }
 
-GS_Chatflows_Router::init();
+Gend_Society_Chatflows_Router::init();

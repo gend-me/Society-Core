@@ -29,7 +29,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * Group. Use that to look up the membership's primary site, then read
  * the site's gdc_install_id meta. Returns '' on unpaired groups.
  */
-function gs_group_get_linked_install_id( $group_id ) {
+function gend_society_group_get_linked_install_id( $group_id ) {
     $group_id = (int) $group_id;
     if ( ! $group_id || ! function_exists( 'groups_get_groupmeta' ) ) return '';
     $membership_id = (int) groups_get_groupmeta( $group_id, 'gdc_membership_id' );
@@ -48,7 +48,7 @@ function gs_group_get_linked_install_id( $group_id ) {
  * Falls back to false on non-group contexts so the extension just
  * doesn't render.
  */
-function gs_group_tabs_user_has_access() {
+function gend_society_group_tabs_user_has_access() {
     if ( ! is_user_logged_in() ) return false;
     if ( current_user_can( 'manage_options' ) ) return true;
     if ( ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) return false;
@@ -62,8 +62,8 @@ function gs_group_tabs_user_has_access() {
  * treatment defined in frontend-bar.php (.gs-group-tab-panel) and
  * shows the linked install URL when one is known.
  */
-function gs_group_tab_open( $title, $intro, $group_id ) {
-    $install_id = gs_group_get_linked_install_id( $group_id );
+function gend_society_group_tab_open( $title, $intro, $group_id ) {
+    $install_id = gend_society_group_get_linked_install_id( $group_id );
     $app_link = '';
     if ( function_exists( 'wu_get_membership' ) && function_exists( 'groups_get_groupmeta' ) ) {
         $mid = (int) groups_get_groupmeta( $group_id, 'gdc_membership_id' );
@@ -95,7 +95,7 @@ function gs_group_tab_open( $title, $intro, $group_id ) {
         <div class="gs-group-tab-body">
     <?php
 }
-function gs_group_tab_close() {
+function gend_society_group_tab_close() {
     echo '</div></div>';
 }
 
@@ -105,7 +105,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
      * Feature Suite — the plugin / feature-cards grid the customer sees
      * on wp-admin → Feature Suite.
      */
-    class GS_Group_Tab_Feature_Suite extends BP_Group_Extension {
+    class Gend_Society_Group_Tab_Feature_Suite extends BP_Group_Extension {
         public function __construct() {
             parent::init( array(
                 'slug'              => 'feature-suite',
@@ -142,23 +142,23 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
          * fix for why.
          */
         public static function render_legacy_content( $group_id ) {
-            if ( ! gs_group_tabs_user_has_access() ) return;
+            if ( ! gend_society_group_tabs_user_has_access() ) return;
             // No gs_group_tab_open() wrapper — gs_render_group_feature_suite()
             // ships its own scoped chrome (plan badge hero + filter bar) so
             // the wrapper's small title strip would only duplicate it.
-            if ( function_exists( 'gs_render_group_feature_suite' ) ) {
-                gs_render_group_feature_suite( $group_id );
-            } elseif ( function_exists( 'gs_render_feature_cards_widget' ) ) {
+            if ( function_exists( 'gend_society_render_group_feature_suite' ) ) {
+                gend_society_render_group_feature_suite( $group_id );
+            } elseif ( function_exists( 'gend_society_render_feature_cards_widget' ) ) {
                 // Legacy fallback: hub-local plugin grid. Only fires if the
                 // vendor-app-manager catalog helpers didn't load (defensive —
                 // wouldn't ship on a healthy install).
-                gs_group_tab_open(
+                gend_society_group_tab_open(
                     __( 'Feature Suite', 'gend-society' ),
                     __( 'Plugins and features available to this web app.', 'gend-society' ),
                     $group_id
                 );
-                gs_render_feature_cards_widget();
-                gs_group_tab_close();
+                gend_society_render_feature_cards_widget();
+                gend_society_group_tab_close();
             } else {
                 echo '<p style="color:rgba(203,213,245,0.7);">Feature suite module is not available on this install.</p>';
             }
@@ -175,7 +175,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
      * Backups. Reuses gs_render_hosting_tab() so the sidebar nav and
      * every sub-panel render identically to the dashboard surface.
      */
-    class GS_Group_Tab_Hosting extends BP_Group_Extension {
+    class Gend_Society_Group_Tab_Hosting extends BP_Group_Extension {
         public function __construct() {
             parent::init( array(
                 'slug'              => 'hosting',
@@ -210,11 +210,11 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
          * re-invoke display().
          */
         public static function render_legacy_content( $group_id ) {
-            if ( ! gs_group_tabs_user_has_access() ) return;
+            if ( ! gend_society_group_tabs_user_has_access() ) return;
             // No gs_group_tab_open() wrapper — the new suite header below
             // is the only chrome we need. (Same fix that landed on the
             // Compute Gas tab — the wrapper rendered a duplicate title.)
-            gs_group_render_hosting_suite( $group_id );
+            gend_society_group_render_hosting_suite( $group_id );
         }
     }
 
@@ -224,9 +224,9 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
      * /groups/{slug}/hosting/ still resolves for backward-compat (extension
      * stays registered), but the header nav no longer surfaces the tab.
      */
-    add_filter( 'psoo_bridge_header_nav_whitelist', 'gs_hide_hosting_from_bridge_header_nav', 100, 2 );
-    if ( ! function_exists( 'gs_hide_hosting_from_bridge_header_nav' ) ) {
-        function gs_hide_hosting_from_bridge_header_nav( $whitelist, $group = null ) {
+    add_filter( 'psoo_bridge_header_nav_whitelist', 'gend_society_hide_hosting_from_bridge_header_nav', 100, 2 );
+    if ( ! function_exists( 'gend_society_hide_hosting_from_bridge_header_nav' ) ) {
+        function gend_society_hide_hosting_from_bridge_header_nav( $whitelist, $group = null ) {
             if ( ! is_array( $whitelist ) ) return $whitelist;
             return array_values( array_diff( $whitelist, array( 'hosting' ) ) );
         }
@@ -250,7 +250,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
      * URLs returned alongside each gate so the rendering function
      * doesn't need to re-resolve them.
      */
-    function gs_compute_gas_resolve_state( $group_id, $uid ) {
+    function gend_society_compute_gas_resolve_state( $group_id, $uid ) {
         $group = function_exists( 'groups_get_group' ) ? groups_get_group( (int) $group_id ) : null;
         $group_link = ( $group && function_exists( 'bp_get_group_permalink' ) ) ? trailingslashit( bp_get_group_permalink( $group ) ) : '';
 
@@ -302,7 +302,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
      * Pure presentational + AJAX-fetched stats; works the same in a
      * group context as on wp-admin.
      */
-    class GS_Group_Tab_Compute_Gas extends BP_Group_Extension {
+    class Gend_Society_Group_Tab_Compute_Gas extends BP_Group_Extension {
         public function __construct() {
             parent::init( array(
                 'slug'              => 'compute-gas',
@@ -315,7 +315,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             ) );
         }
         public static function render_legacy_content( $group_id, $forced_tab = '' ) {
-            if ( ! gs_group_tabs_user_has_access() ) return;
+            if ( ! gend_society_group_tabs_user_has_access() ) return;
             $group_id = $group_id ?: bp_get_current_group_id();
             // No gs_group_tab_open() wrapper here — the new design's two
             // glass panels already provide their own chrome, and the
@@ -457,9 +457,9 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     // only (compute is here). Live compute reporting is wired to
                     // the hub; values populate once the install's metrics
                     // endpoint is provisioned.
-                    $cg_compute_cap = (int) apply_filters( 'gs_hosting_compute_plan_minutes', 60 * 24 * 30 );
+                    $cg_compute_cap = (int) apply_filters( 'gend_society_hosting_compute_plan_minutes', 60 * 24 * 30 );
                     $cg_compute_used = 0;
-                    $cg_compute_pct = (int) apply_filters( 'gs_hosting_compute_pct', 0 );
+                    $cg_compute_pct = (int) apply_filters( 'gend_society_hosting_compute_pct', 0 );
                     ?>
                     <style>
                         [data-cg-panel="power"] .gs-cg-compute-hero {
@@ -916,7 +916,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     </div>
                 </section>
 
-                <?php $st = gs_compute_gas_resolve_state( (int) $group_id, get_current_user_id() ); ?>
+                <?php $st = gend_society_compute_gas_resolve_state( (int) $group_id, get_current_user_id() ); ?>
                 <section class="gs-cg-panel gs-cg-stagger b6">
                     <div class="gs-cg-usage-head">
                         <div>
@@ -1010,7 +1010,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                          buttons in the Gas Station gated card flip [data-gs-cg-active]
                          on the modal to show the matching panel. Each panel walks the
                          user through provisioning that device class as a node. */ ?>
-                <?php $release = gs_get_desktop_release_info(); ?>
+                <?php $release = gend_society_get_desktop_release_info(); ?>
                 <div class="gs-cg-modal" data-gs-cg-modal hidden role="dialog" aria-modal="true" aria-labelledby="gs-cg-modal-title-<?php echo esc_attr( $uid ); ?>">
                     <div class="gs-cg-modal-backdrop" data-gs-cg-modal-close></div>
                     <div class="gs-cg-modal-dialog">
@@ -1210,7 +1210,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         btn.textContent = '<?php echo esc_js( __( 'Syncing…', 'gend-society' ) ); ?>';
                         btn.dataset.prev = prev;
                     }
-                    var body = new URLSearchParams({ action: 'gs_hosting_compute_gas', nonce: nonce });
+                    var body = new URLSearchParams({ action: 'gend_society_hosting_compute_gas', nonce: nonce });
                     fetch(ajax, { method:'POST', credentials:'same-origin', headers:{'Content-Type':'application/x-www-form-urlencoded'}, body: body.toString() })
                         .then(function(r){ return r.json(); })
                         .then(function(resp){
@@ -1291,7 +1291,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                         if (!emailEl || !emailEl.value) return;
                         if (status) { status.className = 'gs-cg-waitlist-status'; status.textContent = '<?php echo esc_js( __( 'Sending…', 'gend-society' ) ); ?>'; }
                         var body = new URLSearchParams({
-                            action: 'gs_cg_mobile_waitlist',
+                            action: 'gend_society_cg_mobile_waitlist',
                             nonce:  nonce,
                             email:  emailEl.value,
                             platform: platformEl ? platformEl.value : 'both'
@@ -1322,8 +1322,8 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     // call, so nothing about the Dashboard / Domains / Logs /
                     // Tables / Containers / Backups side-nav changes — it
                     // just lives under Compute Gas → Storage now.
-                    if ( function_exists( 'gs_group_render_hosting_suite' ) ) {
-                        gs_group_render_hosting_suite( (int) $group_id );
+                    if ( function_exists( 'gend_society_group_render_hosting_suite' ) ) {
+                        gend_society_group_render_hosting_suite( (int) $group_id );
                     }
                     ?>
                 </div><!-- /.gs-cg-tabpanel[data-cg-panel="storage"] -->
@@ -2325,9 +2325,9 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
 endif; // class_exists( 'BP_Group_Extension' )
 
 add_filter( 'gdc_gs_endpoint_content_callbacks', function ( $callbacks ) {
-    $callbacks['feature-suite'] = array( 'GS_Group_Tab_Feature_Suite', 'render_legacy_content' );
-    $callbacks['hosting']       = array( 'GS_Group_Tab_Hosting', 'render_legacy_content' );
-    $callbacks['compute-gas']   = array( 'GS_Group_Tab_Compute_Gas', 'render_legacy_content' );
+    $callbacks['feature-suite'] = array( 'Gend_Society_Group_Tab_Feature_Suite', 'render_legacy_content' );
+    $callbacks['hosting']       = array( 'Gend_Society_Group_Tab_Hosting', 'render_legacy_content' );
+    $callbacks['compute-gas']   = array( 'Gend_Society_Group_Tab_Compute_Gas', 'render_legacy_content' );
     return $callbacks;
 } );
 
@@ -2349,8 +2349,8 @@ add_filter( 'gdc_gs_endpoints', function ( $endpoints ) {
  * deliberately excluded -- its default page already has real content
  * from Phase 97-05; only its content-callback's owning plugin changed.
  */
-add_action( 'init', 'gdc_gs_feature_suite_and_compute_gas_seed_defaults', 30 );
-function gdc_gs_feature_suite_and_compute_gas_seed_defaults() {
+add_action( 'init', 'gend_society_gs_feature_suite_and_compute_gas_seed_defaults', 30 );
+function gend_society_gs_feature_suite_and_compute_gas_seed_defaults() {
     if ( ! function_exists( 'gdc_gs_get_site_default_page_id' ) ) return;
     $seeds = array(
         'feature-suite' => '<!-- wp:gdc-blocks/endpoint-panel {"slug":"feature-suite"} /-->',
@@ -2376,8 +2376,8 @@ function gdc_gs_feature_suite_and_compute_gas_seed_defaults() {
 // because the iterate-and-instantiate pass already completed. Default
 // priority 10 matches the projects-plugin pattern used by every
 // PSOO_*_Group_Extension and is the canonical "register before init" slot.
-add_action( 'bp_init', 'gs_register_group_app_tabs', 10 );
-function gs_register_group_app_tabs() {
+add_action( 'bp_init', 'gend_society_register_group_app_tabs', 10 );
+function gend_society_register_group_app_tabs() {
     if ( ! class_exists( 'BP_Group_Extension' ) ) return;
     if ( ! function_exists( 'bp_register_group_extension' ) ) return;
 
@@ -2385,9 +2385,9 @@ function gs_register_group_app_tabs() {
     // these tabs out of the nav for regular members. The extension
     // still loads; access() just returns false so nothing renders for
     // non-admins who hit the URL directly.
-    bp_register_group_extension( 'GS_Group_Tab_Feature_Suite' );
-    bp_register_group_extension( 'GS_Group_Tab_Hosting' );
-    bp_register_group_extension( 'GS_Group_Tab_Compute_Gas' );
+    bp_register_group_extension( 'Gend_Society_Group_Tab_Feature_Suite' );
+    bp_register_group_extension( 'Gend_Society_Group_Tab_Hosting' );
+    bp_register_group_extension( 'Gend_Society_Group_Tab_Compute_Gas' );
 }
 
 /**
@@ -2398,12 +2398,12 @@ function gs_register_group_app_tabs() {
  * Hooked late (priority 99) so BP's own enable_nav_item logic runs
  * first and we override only when our gate passes.
  */
-add_filter( 'bp_group_extension_nav_show_for_user', 'gs_group_app_tabs_nav_visibility', 99, 3 );
-function gs_group_app_tabs_nav_visibility( $show, $slug, $group_id ) {
+add_filter( 'bp_group_extension_nav_show_for_user', 'gend_society_group_app_tabs_nav_visibility', 99, 3 );
+function gend_society_group_app_tabs_nav_visibility( $show, $slug, $group_id ) {
     if ( ! in_array( $slug, array( 'feature-suite', 'hosting', 'compute-gas' ), true ) ) {
         return $show;
     }
-    return gs_group_tabs_user_has_access();
+    return gend_society_group_tabs_user_has_access();
 }
 
 /**
@@ -2418,10 +2418,10 @@ function gs_group_app_tabs_nav_visibility( $show, $slug, $group_id ) {
  * were leaking into the table styling. Same Manage Access modal and AJAX
  * endpoints; only the wrapper changed.
  */
-add_action( 'psoo_group_members_after_render', 'gs_group_render_user_access_below_members' );
-function gs_group_render_user_access_below_members() {
-    if ( ! gs_group_tabs_user_has_access() ) return;
-    if ( ! defined( 'GS_DIR' ) || ! file_exists( GS_DIR . 'inc/pages/feature-access.php' ) ) return;
+add_action( 'psoo_group_members_after_render', 'gend_society_group_render_user_access_below_members' );
+function gend_society_group_render_user_access_below_members() {
+    if ( ! gend_society_group_tabs_user_has_access() ) return;
+    if ( ! defined( 'GEND_SOCIETY_DIR' ) || ! file_exists( GEND_SOCIETY_DIR . 'inc/pages/feature-access.php' ) ) return;
 
     // Ensure wp_editor assets are present for the invite modal.
     if ( function_exists( 'wp_enqueue_editor' ) ) {
@@ -2588,7 +2588,7 @@ function gs_group_render_user_access_below_members() {
             <h2 style="margin: 0 0 6px; color: #fff; font-size: 1.25rem; font-weight: 700;"><?php esc_html_e( 'User Access', 'gend-society' ); ?></h2>
             <p style="margin: 0; color: #cbd5f5; font-size: 0.92rem;"><?php esc_html_e( 'Decide which menu items and dashboard features each user can reach.', 'gend-society' ); ?></p>
         </header>
-        <?php require GS_DIR . 'inc/pages/feature-access.php'; ?>
+        <?php require GEND_SOCIETY_DIR . 'inc/pages/feature-access.php'; ?>
     </section>
     <?php
 }
@@ -2612,10 +2612,10 @@ function gs_group_render_user_access_below_members() {
  *   - media:    Object Storage Standard ($0.020 / GB / mo)
  *   - database: SSD PD ($0.170 / GB / mo)
  */
-function gs_gcp_storage_cost_per_gb( $storage_type = 'media' ) {
+function gend_society_gcp_storage_cost_per_gb( $storage_type = 'media' ) {
     $rates = array( 'code' => 0.04, 'media' => 0.02, 'database' => 0.17 );
     $rate  = isset( $rates[ $storage_type ] ) ? (float) $rates[ $storage_type ] : 0.02;
-    return (float) apply_filters( 'gs_gcp_storage_cost_per_gb', $rate, $storage_type );
+    return (float) apply_filters( 'gend_society_gcp_storage_cost_per_gb', $rate, $storage_type );
 }
 
 /**
@@ -2624,11 +2624,11 @@ function gs_gcp_storage_cost_per_gb( $storage_type = 'media' ) {
  * is 5× (recovers infra + provisioning + support overhead) and is filterable
  * via `gs_container_plan_markup`. Returns cents-precise float in USD.
  */
-function gs_compute_container_plan_price( $size_gb, $storage_type ) {
+function gend_society_compute_container_plan_price( $size_gb, $storage_type ) {
     $size_gb = (float) $size_gb;
     if ( $size_gb <= 0 ) return 0.0;
-    $base   = gs_gcp_storage_cost_per_gb( $storage_type ) * $size_gb;
-    $markup = (float) apply_filters( 'gs_container_plan_markup', 5.0, $storage_type );
+    $base   = gend_society_gcp_storage_cost_per_gb( $storage_type ) * $size_gb;
+    $markup = (float) apply_filters( 'gend_society_container_plan_markup', 5.0, $storage_type );
     return round( $base * $markup, 2 );
 }
 
@@ -2642,7 +2642,7 @@ function gs_compute_container_plan_price( $size_gb, $storage_type ) {
  * @param string $resource Frontend resource slug: 'media' | 'database' | 'codebase'
  * @return array List of plans: [{ id, name, size_gb, size_label, price, price_label, is_default }]
  */
-function gs_get_container_plans_for_resource( $resource ) {
+function gend_society_get_container_plans_for_resource( $resource ) {
     $storage_type_map = array(
         'media'    => 'media',
         'database' => 'database',
@@ -2665,7 +2665,7 @@ function gs_get_container_plans_for_resource( $resource ) {
             if ( $size_gb <= 0 ) continue;
             $price = method_exists( $p, 'get_amount' ) ? (float) $p->get_amount() : 0.0;
             if ( $price <= 0 ) {
-                $price = gs_compute_container_plan_price( $size_gb, $storage_type );
+                $price = gend_society_compute_container_plan_price( $size_gb, $storage_type );
             }
             $out[] = array(
                 'id'          => method_exists( $p, 'get_id' ) ? (int) $p->get_id() : 0,
@@ -2675,7 +2675,7 @@ function gs_get_container_plans_for_resource( $resource ) {
                 'price'       => (float) $price,
                 'price_label' => '$' . number_format( (float) $price, 2 ) . ' / mo',
                 'is_default'  => false,
-                'gcp_base'    => round( gs_gcp_storage_cost_per_gb( $storage_type ) * $size_gb, 2 ),
+                'gcp_base'    => round( gend_society_gcp_storage_cost_per_gb( $storage_type ) * $size_gb, 2 ),
             );
         }
     }
@@ -2694,7 +2694,7 @@ function gs_get_container_plans_for_resource( $resource ) {
         $tiers = isset( $defaults[ $resource ] ) ? $defaults[ $resource ] : array( 10, 50, 250 );
         $names = array( __( 'Standard', 'gend-society' ), __( 'Pro', 'gend-society' ), __( 'Enterprise', 'gend-society' ) );
         foreach ( $tiers as $i => $gb ) {
-            $price = gs_compute_container_plan_price( $gb, $storage_type );
+            $price = gend_society_compute_container_plan_price( $gb, $storage_type );
             $out[] = array(
                 'id'          => 0,
                 'name'        => $names[ $i ] ?? sprintf( __( 'Tier %d', 'gend-society' ), $i + 1 ),
@@ -2703,14 +2703,14 @@ function gs_get_container_plans_for_resource( $resource ) {
                 'price'       => (float) $price,
                 'price_label' => '$' . number_format( $price, 2 ) . ' / mo',
                 'is_default'  => $i === 1,
-                'gcp_base'    => round( gs_gcp_storage_cost_per_gb( $storage_type ) * $gb, 2 ),
+                'gcp_base'    => round( gend_society_gcp_storage_cost_per_gb( $storage_type ) * $gb, 2 ),
             );
         }
     }
     return $out;
 }
 
-function gs_group_render_hosting_suite( $group_id ) {
+function gend_society_group_render_hosting_suite( $group_id ) {
     $group_id  = (int) $group_id;
     $ajax_url  = admin_url( 'admin-ajax.php' );
     $nonce     = wp_create_nonce( 'gs_membership_action' );
@@ -2735,10 +2735,10 @@ function gs_group_render_hosting_suite( $group_id ) {
     if ( $hosting_site_ok ) {
         switch_to_blog( $hosting_site_id );
     }
-    $tables_data = function_exists( 'gs_hosting_collect_tables' ) ? gs_hosting_collect_tables() : array();
-    $media_data  = function_exists( 'gs_hosting_collect_media' )  ? gs_hosting_collect_media()  : array();
-    $resources   = function_exists( 'gs_hosting_collect_container_resources' )
-        ? gs_hosting_collect_container_resources( $media_data, $tables_data )
+    $tables_data = function_exists( 'gend_society_hosting_collect_tables' ) ? gend_society_hosting_collect_tables() : array();
+    $media_data  = function_exists( 'gend_society_hosting_collect_media' )  ? gend_society_hosting_collect_media()  : array();
+    $resources   = function_exists( 'gend_society_hosting_collect_container_resources' )
+        ? gend_society_hosting_collect_container_resources( $media_data, $tables_data )
         : array();
     if ( $hosting_site_ok ) {
         restore_current_blog();
@@ -2747,8 +2747,8 @@ function gs_group_render_hosting_suite( $group_id ) {
     // Domains / backups from the remote membership payload (best-effort).
     $domains_list = array();
     $backups_list = array();
-    if ( function_exists( 'gs_remote_membership_get_cached' ) ) {
-        $payload = gs_remote_membership_get_cached();
+    if ( function_exists( 'gend_society_remote_membership_get_cached' ) ) {
+        $payload = gend_society_remote_membership_get_cached();
         if ( is_array( $payload ) ) {
             if ( ! empty( $payload['domains'] ) && is_array( $payload['domains'] ) ) {
                 $domains_list = $payload['domains'];
@@ -3287,7 +3287,7 @@ function gs_group_render_hosting_suite( $group_id ) {
                     // shared helper).
                     $gs_ct_can_upgrade = current_user_can( 'manage_options' )
                         || is_super_admin() // site-admin check, not a hub signal (104 audit)
-                        || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
+                        || ( function_exists( 'gend_society_group_tabs_user_has_access' ) && gend_society_group_tabs_user_has_access() );
                     ?>
                     <style>
                         [data-gs-host-view="containers"] .linear-meter-row { position: relative; }
@@ -3493,9 +3493,9 @@ function gs_group_render_hosting_suite( $group_id ) {
                     // markup (both filterable) so provisioning cost is
                     // tracked and passed through automatically.
                     $gs_plans_payload = array(
-                        'media'    => gs_get_container_plans_for_resource( 'media' ),
-                        'database' => gs_get_container_plans_for_resource( 'database' ),
-                        'codebase' => gs_get_container_plans_for_resource( 'codebase' ),
+                        'media'    => gend_society_get_container_plans_for_resource( 'media' ),
+                        'database' => gend_society_get_container_plans_for_resource( 'database' ),
+                        'codebase' => gend_society_get_container_plans_for_resource( 'codebase' ),
                     );
                     ?>
                     <div class="gs-upg-modal" data-gs-upg-modal
@@ -3804,20 +3804,20 @@ function gs_group_render_hosting_suite( $group_id ) {
             var bid    = btn.getAttribute('data-backup-id') || '';
 
             switch (action) {
-                case 'cache-page':       fire('gs_hosting_cache_page',       null, btn); break;
-                case 'cache-object':     fire('gs_hosting_cache_object',     null, btn); break;
-                case 'template-reset':   fire('gs_hosting_template_reset',   null, btn); break;
+                case 'cache-page':       fire('gend_society_hosting_cache_page',       null, btn); break;
+                case 'cache-object':     fire('gend_society_hosting_cache_object',     null, btn); break;
+                case 'template-reset':   fire('gend_society_hosting_template_reset',   null, btn); break;
                 case 'logs-refresh':     refreshLogs(btn); break;
-                case 'media-rescan':     fire('gs_hosting_media_rescan',     { group_id: <?php echo (int) $group_id; ?> }, btn); break;
-                case 'backup-now':       fire('gs_membership_backup_now',    null, btn, 'backups'); break;
+                case 'media-rescan':     fire('gend_society_hosting_media_rescan',     { group_id: <?php echo (int) $group_id; ?> }, btn); break;
+                case 'backup-now':       fire('gend_society_membership_backup_now',    null, btn, 'backups'); break;
                 case 'backup-restore':
                     if (!confirm('<?php echo esc_js( __( 'Restore this snapshot? The container will be overwritten with its contents.', 'gend-society' ) ); ?>')) return;
-                    fire('gs_membership_backup_restore', { backup_id: bid }, btn, 'backups');
+                    fire('gend_society_membership_backup_restore', { backup_id: bid }, btn, 'backups');
                     break;
-                case 'domain-verify':    fire('gs_membership_domain_verify', { domain: domain }, btn, 'domains'); break;
+                case 'domain-verify':    fire('gend_society_membership_domain_verify', { domain: domain }, btn, 'domains'); break;
                 case 'domain-remove':
                     if (!confirm('<?php echo esc_js( __( 'Remove this domain mapping?', 'gend-society' ) ); ?>')) return;
-                    fire('gs_membership_domain_remove', { domain: domain }, btn, 'domains', true);
+                    fire('gend_society_membership_domain_remove', { domain: domain }, btn, 'domains', true);
                     break;
             }
         });
@@ -3853,7 +3853,7 @@ function gs_group_render_hosting_suite( $group_id ) {
                 if (!val) return;
                 var btn = domainForm.querySelector('button[type="submit"]');
                 busy(btn, true);
-                post('gs_membership_domain_add', { domain: val }).then(function(resp){
+                post('gend_society_membership_domain_add', { domain: val }).then(function(resp){
                     busy(btn, false);
                     if (!resp || !resp.success) {
                         showError('domains', (resp && resp.data && resp.data.message) ? resp.data.message : '<?php echo esc_js( __( 'Could not add the domain.', 'gend-society' ) ); ?>');
@@ -3892,7 +3892,7 @@ function gs_group_render_hosting_suite( $group_id ) {
             busy(btn, true);
             var out = root.querySelector('[data-gs-host-log-out]');
             if (out) out.innerHTML = '<p style="opacity:0.55; margin:0;">' + '<?php echo esc_js( __( 'Loading…', 'gend-society' ) ); ?>' + '</p>';
-            post('gs_hosting_logs').then(function(resp){
+            post('gend_society_hosting_logs').then(function(resp){
                 busy(btn, false);
                 if (!resp || !resp.success) {
                     showError('logs', (resp && resp.data && resp.data.message) ? resp.data.message : '<?php echo esc_js( __( 'Could not read the logs.', 'gend-society' ) ); ?>');
@@ -3934,7 +3934,7 @@ function gs_group_render_hosting_suite( $group_id ) {
  * embed the wp-admin renderer directly. Left intact to avoid breaking
  * any callers that may still reach for it.
  */
-function gs_group_render_hosting_scope_styles() {
+function gend_society_group_render_hosting_scope_styles() {
     static $printed = false;
     if ( $printed ) return;
     $printed = true;
@@ -4149,10 +4149,10 @@ function gs_group_render_hosting_scope_styles() {
    the popup never renders broken even on a clean install.
    ════════════════════════════════════════════════════════════════════ */
 
-if ( ! function_exists( 'gs_get_desktop_release_info' ) ) {
+if ( ! function_exists( 'gend_society_get_desktop_release_info' ) ) {
 
-    function gs_get_desktop_release_info() {
-        $stored = get_site_option( 'gs_desktop_release', array() );
+    function gend_society_get_desktop_release_info() {
+        $stored = get_site_option( 'gend_society_desktop_release', array() );
         if ( ! is_array( $stored ) ) $stored = array();
         $defaults = array(
             // Default to the version the build pipeline last shipped — bump
@@ -4170,13 +4170,13 @@ if ( ! function_exists( 'gs_get_desktop_release_info' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_desktop_release_register_rest' ) ) {
+if ( ! function_exists( 'gend_society_desktop_release_register_rest' ) ) {
 
-    function gs_desktop_release_register_rest() {
+    function gend_society_desktop_release_register_rest() {
         register_rest_route( 'gs/v1', '/desktop/info', array(
             'methods'             => 'GET',
             'callback'            => function () {
-                return rest_ensure_response( gs_get_desktop_release_info() );
+                return rest_ensure_response( gend_society_get_desktop_release_info() );
             },
             'permission_callback' => '__return_true',
         ) );
@@ -4188,7 +4188,7 @@ if ( ! function_exists( 'gs_desktop_release_register_rest' ) ) {
         register_rest_route( 'gs/v1', '/desktop/latest', array(
             'methods'             => 'GET',
             'callback'            => function ( WP_REST_Request $req ) {
-                $info = gs_get_desktop_release_info();
+                $info = gend_society_get_desktop_release_info();
                 $platform = strtolower( (string) $req->get_param( 'platform' ) );
                 if ( $platform === '' ) {
                     $ua = strtolower( (string) ( $_SERVER['HTTP_USER_AGENT'] ?? '' ) );
@@ -4223,17 +4223,17 @@ if ( ! function_exists( 'gs_desktop_release_register_rest' ) ) {
                     }
                 }
                 if ( empty( $clean ) ) return new WP_Error( 'no_payload', 'Nothing to update.', array( 'status' => 400 ) );
-                $cur = get_site_option( 'gs_desktop_release', array() );
+                $cur = get_site_option( 'gend_society_desktop_release', array() );
                 if ( ! is_array( $cur ) ) $cur = array();
-                update_site_option( 'gs_desktop_release', array_merge( $cur, $clean ) );
-                return rest_ensure_response( gs_get_desktop_release_info() );
+                update_site_option( 'gend_society_desktop_release', array_merge( $cur, $clean ) );
+                return rest_ensure_response( gend_society_get_desktop_release_info() );
             },
             'permission_callback' => function () {
                 return current_user_can( 'manage_network' );
             },
         ) );
     }
-    add_action( 'rest_api_init', 'gs_desktop_release_register_rest' );
+    add_action( 'rest_api_init', 'gend_society_desktop_release_register_rest' );
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -4243,9 +4243,9 @@ if ( ! function_exists( 'gs_desktop_release_register_rest' ) ) {
    broadcast a "your beta is open" notification later without re-asking.
    ════════════════════════════════════════════════════════════════════ */
 
-if ( ! function_exists( 'gs_cg_mobile_waitlist_ajax' ) ) {
+if ( ! function_exists( 'gend_society_cg_mobile_waitlist_ajax' ) ) {
 
-    function gs_cg_mobile_waitlist_ajax() {
+    function gend_society_cg_mobile_waitlist_ajax() {
         check_ajax_referer( 'gs_membership_action', 'nonce' );
         $email = isset( $_POST['email'] ) ? sanitize_email( wp_unslash( $_POST['email'] ) ) : '';
         $platform = isset( $_POST['platform'] ) ? sanitize_text_field( wp_unslash( $_POST['platform'] ) ) : 'both';
@@ -4254,7 +4254,7 @@ if ( ! function_exists( 'gs_cg_mobile_waitlist_ajax' ) ) {
         }
         if ( ! in_array( $platform, array( 'ios', 'android', 'both' ), true ) ) $platform = 'both';
 
-        $list = get_site_option( 'gs_mobile_waitlist', array() );
+        $list = get_site_option( 'gend_society_mobile_waitlist', array() );
         if ( ! is_array( $list ) ) $list = array();
         $entry = array(
             'email'      => $email,
@@ -4276,16 +4276,16 @@ if ( ! function_exists( 'gs_cg_mobile_waitlist_ajax' ) ) {
         } else {
             $list[] = $entry;
         }
-        update_site_option( 'gs_mobile_waitlist', $list );
+        update_site_option( 'gend_society_mobile_waitlist', $list );
         if ( get_current_user_id() > 0 ) {
-            update_user_meta( get_current_user_id(), '_gs_mobile_waitlist', $entry );
+            update_user_meta( get_current_user_id(), '_gend_society_mobile_waitlist', $entry );
         }
         wp_send_json_success( array( 'queued' => true, 'platform' => $platform ) );
     }
-    add_action( 'wp_ajax_gs_cg_mobile_waitlist', 'gs_cg_mobile_waitlist_ajax' );
+    add_action( 'wp_ajax_gend_society_cg_mobile_waitlist', 'gend_society_cg_mobile_waitlist_ajax' );
     // Also allow logged-out signups (popular email-capture pattern) —
     // they still need the nonce, which non-logged users won't have
     // without a wp_create_nonce call from a public-rendered page; the
     // tab itself is admin-gated, so in practice the user IS logged in.
-    add_action( 'wp_ajax_nopriv_gs_cg_mobile_waitlist', 'gs_cg_mobile_waitlist_ajax' );
+    add_action( 'wp_ajax_nopriv_gend_society_cg_mobile_waitlist', 'gend_society_cg_mobile_waitlist_ajax' );
 }

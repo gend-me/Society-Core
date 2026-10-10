@@ -53,14 +53,14 @@ class Gend_GS_Collab_Resolver {
 
 	/** Cron interval slug + hook name. */
 	const CRON_INTERVAL = 'gs_fifteen_min';
-	const CRON_HOOK     = 'gs_collab_resolve_sweep';
+	const CRON_HOOK     = 'gend_society_collab_resolve_sweep';
 
 	/**
 	 * Container-side outbox-drain hook (Phase 89-02, FED-01). Reuses the EXISTING
 	 * gs_fifteen_min interval — NO new cron interval. init() (hub) drains nothing here;
 	 * this is a SEPARATE hook because sweep() is hub-only (early-returns on a container).
 	 */
-	const OUTBOX_HOOK = 'gs_collab_outbox_drain';
+	const OUTBOX_HOOK = 'gend_society_collab_outbox_drain';
 
 	/**
 	 * Wire hooks + the 15-min cron. Hub-only (is_hub()); NOT gated on the
@@ -344,7 +344,7 @@ class Gend_GS_Collab_Resolver {
 				// the on_contracted hook gate): if the flag is on and a contracted match has
 				// NO market yet (a missed hook), create one now. create_market is idempotent
 				// via UNIQUE(match_id); while dark this branch never runs (no market, no subsidy).
-				if ( defined( 'GS_COLLAB_MARKET_PUBLIC' ) && GS_COLLAB_MARKET_PUBLIC && $mid > 0 ) {
+				if ( defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) && GEND_SOCIETY_COLLAB_MARKET_PUBLIC && $mid > 0 ) {
 					Gend_GS_Collab_Market::on_contracted( $mid, $tid );
 				}
 

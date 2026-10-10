@@ -31,7 +31,7 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-add_action( 'wp_ajax_gs_compute_gas_devices', function () {
+add_action( 'wp_ajax_gend_society_compute_gas_devices', function () {
     check_ajax_referer( 'gs_membership_action' );
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => __( 'You are not authorized to view connected devices.', 'gend-society' ) ), 403 );
@@ -61,35 +61,35 @@ add_action( 'wp_ajax_gs_compute_gas_devices', function () {
     wp_send_json_success( array( 'devices' => array_values( $devices ) ) );
 } );
 
-const GS_REMOTE_MEMBERSHIP_CACHE_OPTION         = 'gs_remote_membership_cache';
-const GS_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION = 'gs_remote_membership_cache_expires';
-const GS_REMOTE_MEMBERSHIP_DEFAULT_TTL          = 5 * MINUTE_IN_SECONDS;
+const GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_OPTION         = 'gend_society_remote_membership_cache';
+const GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION = 'gend_society_remote_membership_cache_expires';
+const GEND_SOCIETY_REMOTE_MEMBERSHIP_DEFAULT_TTL          = 5 * MINUTE_IN_SECONDS;
 
 // ────────────────────────────────────────────────────────────────────────
 // Remote fetch + caching
 // ────────────────────────────────────────────────────────────────────────
 
-function gs_remote_membership_get_cached() {
-    $expires = (int) get_option( GS_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION, 0 );
+function gend_society_remote_membership_get_cached() {
+    $expires = (int) get_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION, 0 );
     if ( $expires > time() ) {
-        $cached = get_option( GS_REMOTE_MEMBERSHIP_CACHE_OPTION, null );
+        $cached = get_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_OPTION, null );
         if ( is_array( $cached ) ) return $cached;
     }
-    $fresh = gs_remote_membership_fetch();
+    $fresh = gend_society_remote_membership_fetch();
     if ( is_array( $fresh ) ) {
-        $ttl = isset( $fresh['cache_seconds'] ) ? max( 60, (int) $fresh['cache_seconds'] ) : GS_REMOTE_MEMBERSHIP_DEFAULT_TTL;
-        update_option( GS_REMOTE_MEMBERSHIP_CACHE_OPTION, $fresh, false );
-        update_option( GS_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION, time() + $ttl, false );
+        $ttl = isset( $fresh['cache_seconds'] ) ? max( 60, (int) $fresh['cache_seconds'] ) : GEND_SOCIETY_REMOTE_MEMBERSHIP_DEFAULT_TTL;
+        update_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_OPTION, $fresh, false );
+        update_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION, time() + $ttl, false );
         return $fresh;
     }
-    $cached = get_option( GS_REMOTE_MEMBERSHIP_CACHE_OPTION, null );
+    $cached = get_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_OPTION, null );
     return is_array( $cached ) ? $cached : null;
 }
 
-function gs_remote_membership_fetch() {
-    $install_id    = (string) get_option( 'gs_install_id', '' );
-    $install_token = (string) get_option( 'gs_install_token', '' );
-    $gend_base     = (string) get_option( 'gs_gend_base_url', '' );
+function gend_society_remote_membership_fetch() {
+    $install_id    = (string) get_option( 'gend_society_install_id', '' );
+    $install_token = (string) get_option( 'gend_society_install_token', '' );
+    $gend_base     = (string) get_option( 'gend_society_gend_base_url', '' );
     if ( $install_id === '' || $install_token === '' || $gend_base === '' ) return null;
 
     $endpoint = trailingslashit( $gend_base ) . 'wp-json/gdc-app-manager/v1/install/' . rawurlencode( $install_id ) . '/membership';
@@ -111,11 +111,11 @@ function gs_remote_membership_fetch() {
     return is_array( $data ) ? $data : null;
 }
 
-function gs_remote_membership_invalidate() {
-    delete_option( GS_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION );
+function gend_society_remote_membership_invalidate() {
+    delete_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION );
 }
-add_action( 'wp_login', 'gs_remote_membership_invalidate' );
-add_action( 'gs_remote_membership_invalidate', 'gs_remote_membership_invalidate' );
+add_action( 'wp_login', 'gend_society_remote_membership_invalidate' );
+add_action( 'gs_remote_membership_invalidate', 'gend_society_remote_membership_invalidate' );
 
 // ────────────────────────────────────────────────────────────────────────
 // Container-side AJAX proxies → gend.me install-token REST endpoints
@@ -132,10 +132,10 @@ add_action( 'gs_remote_membership_invalidate', 'gs_remote_membership_invalidate'
  * @param string $method "POST" or "GET"
  * @return array|\WP_Error
  */
-function gs_remote_membership_call( string $path, array $body = array(), string $method = 'POST' ) {
-    $install_id    = (string) get_option( 'gs_install_id', '' );
-    $install_token = (string) get_option( 'gs_install_token', '' );
-    $gend_base     = (string) get_option( 'gs_gend_base_url', '' );
+function gend_society_remote_membership_call( string $path, array $body = array(), string $method = 'POST' ) {
+    $install_id    = (string) get_option( 'gend_society_install_id', '' );
+    $install_token = (string) get_option( 'gend_society_install_token', '' );
+    $gend_base     = (string) get_option( 'gend_society_gend_base_url', '' );
     if ( $install_id === '' || $install_token === '' || $gend_base === '' ) {
         return new WP_Error( 'not_paired', __( 'This install is not paired with gend.me. Sign in via OAuth first.', 'gend-society' ) );
     }
@@ -172,56 +172,56 @@ function gs_remote_membership_call( string $path, array $body = array(), string 
     return is_array( $data ) ? $data : array();
 }
 
-function gs_membership_ajax_authorize() {
+function gend_society_membership_ajax_authorize() {
     if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
     }
     check_ajax_referer( 'gs_membership_action', 'nonce' );
 }
 
-add_action( 'wp_ajax_gs_membership_backup_now', function () {
-    gs_membership_ajax_authorize();
-    $r = gs_remote_membership_call( 'backups/now' );
+add_action( 'wp_ajax_gend_society_membership_backup_now', function () {
+    gend_society_membership_ajax_authorize();
+    $r = gend_society_remote_membership_call( 'backups/now' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_backup_restore', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_backup_restore', function () {
+    gend_society_membership_ajax_authorize();
     $bid = isset( $_POST['backup_id'] ) ? (int) $_POST['backup_id'] : 0;
     if ( $bid <= 0 ) wp_send_json_error( array( 'message' => __( 'backup_id required.', 'gend-society' ) ) );
-    $r = gs_remote_membership_call( 'backups/restore', array( 'backup_id' => $bid ) );
+    $r = gend_society_remote_membership_call( 'backups/restore', array( 'backup_id' => $bid ) );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_add', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_add', function () {
+    gend_society_membership_ajax_authorize();
     $domain = isset( $_POST['domain'] ) ? strtolower( trim( wp_unslash( (string) $_POST['domain'] ) ) ) : '';
     if ( $domain === '' ) wp_send_json_error( array( 'message' => __( 'Domain required.', 'gend-society' ) ) );
-    $r = gs_remote_membership_call( 'domains/add', array( 'domain' => $domain ) );
+    $r = gend_society_remote_membership_call( 'domains/add', array( 'domain' => $domain ) );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
-    gs_remote_membership_invalidate();
+    gend_society_remote_membership_invalidate();
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_verify', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_verify', function () {
+    gend_society_membership_ajax_authorize();
     $domain = isset( $_POST['domain'] ) ? strtolower( trim( wp_unslash( (string) $_POST['domain'] ) ) ) : '';
     if ( $domain === '' ) wp_send_json_error( array( 'message' => __( 'Domain required.', 'gend-society' ) ) );
-    $r = gs_remote_membership_call( 'domains/verify', array( 'domain' => $domain ) );
+    $r = gend_society_remote_membership_call( 'domains/verify', array( 'domain' => $domain ) );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
-    gs_remote_membership_invalidate();
+    gend_society_remote_membership_invalidate();
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_remove', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_remove', function () {
+    gend_society_membership_ajax_authorize();
     $domain = isset( $_POST['domain'] ) ? strtolower( trim( wp_unslash( (string) $_POST['domain'] ) ) ) : '';
     if ( $domain === '' ) wp_send_json_error( array( 'message' => __( 'Domain required.', 'gend-society' ) ) );
-    $r = gs_remote_membership_call( 'domains/remove', array( 'domain' => $domain ) );
+    $r = gend_society_remote_membership_call( 'domains/remove', array( 'domain' => $domain ) );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
-    gs_remote_membership_invalidate();
+    gend_society_remote_membership_invalidate();
     wp_send_json_success( $r );
 } );
 
@@ -234,22 +234,22 @@ add_action( 'wp_ajax_gs_membership_domain_remove', function () {
 // gdc_self_hosted_rest_plan_options() on the hub). Replaces the old
 // popup-window + embedded-iframe checkout, which blanked because a
 // cross-origin iframe can't carry gend.me's session cookie.
-add_action( 'wp_ajax_gs_membership_plan_options', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_plan_options', function () {
+    gend_society_membership_ajax_authorize();
     $resource = isset( $_POST['resource'] ) ? sanitize_key( wp_unslash( $_POST['resource'] ) ) : '';
     $params   = $resource !== '' ? array( 'resource' => $resource ) : array();
-    $r = gs_remote_membership_call( 'membership/plan-options', $params, 'GET' );
+    $r = gend_society_remote_membership_call( 'membership/plan-options', $params, 'GET' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_change_plan', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_change_plan', function () {
+    gend_society_membership_ajax_authorize();
     $plan_id = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
     if ( ! $plan_id ) wp_send_json_error( array( 'message' => __( 'Please select a plan.', 'gend-society' ) ) );
-    $r = gs_remote_membership_call( 'membership/change-plan', array( 'plan_id' => $plan_id ), 'POST' );
+    $r = gend_society_remote_membership_call( 'membership/change-plan', array( 'plan_id' => $plan_id ), 'POST' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
-    gs_remote_membership_invalidate();
+    gend_society_remote_membership_invalidate();
     wp_send_json_success( $r );
 } );
 
@@ -258,29 +258,29 @@ add_action( 'wp_ajax_gs_membership_change_plan', function () {
 // routes from Phase 72-01. Error responses preserve code+status so wizard JS can
 // distinguish e.g. 409 import_review_required from generic 500.
 
-add_action( 'wp_ajax_gs_membership_domain_connect', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_connect', function () {
+    gend_society_membership_ajax_authorize();
     $domain = isset( $_POST['domain'] ) ? strtolower( trim( wp_unslash( (string) $_POST['domain'] ) ) ) : '';
     if ( $domain === '' ) {
         wp_send_json_error( array( 'message' => __( 'Domain required.', 'gend-society' ), 'code' => 'missing_domain' ), 400 );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/connect', array( 'host' => $domain ), 'POST' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/connect', array( 'host' => $domain ), 'POST' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
         wp_send_json_error( array( 'message' => $r->get_error_message(), 'code' => $r->get_error_code() ), $status );
     }
-    gs_remote_membership_invalidate();
+    gend_society_remote_membership_invalidate();
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_import_records', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_import_records', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     if ( $zone_id <= 0 ) {
         wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/import-records', array(), 'POST' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/import-records', array(), 'POST' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -289,13 +289,13 @@ add_action( 'wp_ajax_gs_membership_domain_import_records', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_records', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_records', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     if ( $zone_id <= 0 ) {
         wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records', array(), 'GET' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/records', array(), 'GET' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -309,7 +309,7 @@ add_action( 'wp_ajax_gs_membership_domain_records', function () {
     if ( ! empty( $_POST['include_last_change'] ) && is_array( $r ) ) {
         global $wpdb;
         $audit_table = $wpdb->base_prefix . 'gend_domain_audit';
-        $install_id  = (string) get_option( 'gs_install_id', '' );
+        $install_id  = (string) get_option( 'gend_society_install_id', '' );
         $zone_host   = isset( $_POST['zone_host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['zone_host'] ) ) : '';
         $last_change = null;
         if ( $install_id !== '' && $zone_host !== '' ) {
@@ -339,13 +339,13 @@ add_action( 'wp_ajax_gs_membership_domain_records', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_get_nameservers', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_get_nameservers', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     if ( $zone_id <= 0 ) {
         wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/nameservers', array(), 'GET' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/nameservers', array(), 'GET' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -355,13 +355,13 @@ add_action( 'wp_ajax_gs_membership_domain_get_nameservers', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_get_status', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_get_status', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     if ( $zone_id <= 0 ) {
         wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/status', array(), 'GET' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/status', array(), 'GET' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -370,9 +370,9 @@ add_action( 'wp_ajax_gs_membership_domain_get_status', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_list', function () {
-    gs_membership_ajax_authorize();
-    $r = gs_remote_membership_call( 'hosting/domains', array(), 'GET' );
+add_action( 'wp_ajax_gend_society_membership_domain_list', function () {
+    gend_society_membership_ajax_authorize();
+    $r = gend_society_remote_membership_call( 'hosting/domains', array(), 'GET' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -399,8 +399,8 @@ add_action( 'wp_ajax_gs_membership_domain_list', function () {
 //   cf_network / cf_api_error                                 → 502
 //   not_found                                                 → 404 (IDOR OR missing record/audit)
 
-add_action( 'wp_ajax_gs_membership_domain_record_create', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_record_create', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     if ( $zone_id <= 0 ) {
         wp_send_json_error( array( 'message' => __( 'zone_id required.', 'gend-society' ), 'code' => 'missing_zone_id' ), 400 );
@@ -418,7 +418,7 @@ add_action( 'wp_ajax_gs_membership_domain_record_create', function () {
     if ( isset( $_POST['data'] ) && is_array( $_POST['data'] ) ) {
         $body['data'] = array_map( 'sanitize_text_field', wp_unslash( $_POST['data'] ) );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records', $body, 'POST' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/records', $body, 'POST' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -427,8 +427,8 @@ add_action( 'wp_ajax_gs_membership_domain_record_create', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_record_update', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_record_update', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id   = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     $record_id = isset( $_POST['record_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['record_id'] ) ) : '';
     if ( $zone_id <= 0 || $record_id === '' ) {
@@ -450,7 +450,7 @@ add_action( 'wp_ajax_gs_membership_domain_record_update', function () {
     if ( ! empty( $_POST['force'] ) ) {
         $body['force'] = true;
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records/' . rawurlencode( $record_id ), $body, 'PUT' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/records/' . rawurlencode( $record_id ), $body, 'PUT' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -459,8 +459,8 @@ add_action( 'wp_ajax_gs_membership_domain_record_update', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_record_delete', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_record_delete', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id   = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     $record_id = isset( $_POST['record_id'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['record_id'] ) ) : '';
     if ( $zone_id <= 0 || $record_id === '' ) {
@@ -471,7 +471,7 @@ add_action( 'wp_ajax_gs_membership_domain_record_delete', function () {
     if ( ! empty( $_POST['force'] ) ) {
         $path .= '?force=true';
     }
-    $r = gs_remote_membership_call( $path, array(), 'DELETE' );
+    $r = gend_society_remote_membership_call( $path, array(), 'DELETE' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -480,14 +480,14 @@ add_action( 'wp_ajax_gs_membership_domain_record_delete', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_record_undo', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_record_undo', function () {
+    gend_society_membership_ajax_authorize();
     $zone_id  = isset( $_POST['zone_id'] ) ? (int) $_POST['zone_id'] : 0;
     $audit_id = isset( $_POST['audit_id'] ) ? (int) $_POST['audit_id'] : 0;
     if ( $zone_id <= 0 || $audit_id <= 0 ) {
         wp_send_json_error( array( 'message' => __( 'zone_id or audit_id missing.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
     }
-    $r = gs_remote_membership_call( 'hosting/domains/' . $zone_id . '/records/undo/' . $audit_id, array(), 'POST' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . $zone_id . '/records/undo/' . $audit_id, array(), 'POST' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -510,14 +510,14 @@ add_action( 'wp_ajax_gs_membership_domain_record_undo', function () {
 // auto-injected from get_option('gs_install_id') inside the helper.
 // ────────────────────────────────────────────────────────────────────────
 
-add_action( 'wp_ajax_gs_membership_domain_point_to_app', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_point_to_app', function () {
+    gend_society_membership_ajax_authorize();
     $host  = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
     $force = ! empty( $_POST['force'] );
     if ( $host === '' ) {
         wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
     }
-    $r = gs_remote_membership_call(
+    $r = gend_society_remote_membership_call(
         'hosting/domains/' . rawurlencode( $host ) . '/point-to-app',
         array( 'force' => $force ),
         'POST'
@@ -530,14 +530,14 @@ add_action( 'wp_ajax_gs_membership_domain_point_to_app', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_ssl_status', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_ssl_status', function () {
+    gend_society_membership_ajax_authorize();
     $host = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
     if ( $host === '' ) {
         wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
     }
     // GET — body is ignored by wp_remote_get; pass empty array().
-    $r = gs_remote_membership_call( 'hosting/domains/' . rawurlencode( $host ) . '/ssl-status', array(), 'GET' );
+    $r = gend_society_remote_membership_call( 'hosting/domains/' . rawurlencode( $host ) . '/ssl-status', array(), 'GET' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 500;
@@ -546,8 +546,8 @@ add_action( 'wp_ajax_gs_membership_domain_ssl_status', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_ssl_mode_set', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_ssl_mode_set', function () {
+    gend_society_membership_ajax_authorize();
     $host  = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
     $mode  = isset( $_POST['mode'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['mode'] ) ) : '';
     $force = ! empty( $_POST['force'] );
@@ -577,7 +577,7 @@ add_action( 'wp_ajax_gs_membership_domain_ssl_mode_set', function () {
         'mode'          => $mode,
         'force'         => $force,
     );
-    $r = gs_remote_membership_call(
+    $r = gend_society_remote_membership_call(
         'hosting/domains/' . rawurlencode( $host ) . '/point-to-app',
         $body,
         'POST'
@@ -602,8 +602,8 @@ add_action( 'wp_ajax_gs_membership_domain_ssl_mode_set', function () {
 // can render per-code UX).
 // ────────────────────────────────────────────────────────────────────────
 
-add_action( 'wp_ajax_gs_membership_domain_email_preset_apply', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_email_preset_apply', function () {
+    gend_society_membership_ajax_authorize();
 
     $host = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
     if ( $host === '' ) {
@@ -630,7 +630,7 @@ add_action( 'wp_ajax_gs_membership_domain_email_preset_apply', function () {
         $body['spf_replace'] = ! empty( $_POST['spf_replace'] );
     }
 
-    $r = gs_remote_membership_call(
+    $r = gend_society_remote_membership_call(
         'hosting/domains/' . rawurlencode( $host ) . '/email-preset',
         $body,
         'POST'
@@ -643,13 +643,13 @@ add_action( 'wp_ajax_gs_membership_domain_email_preset_apply', function () {
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_membership_domain_email_preset_list', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_membership_domain_email_preset_list', function () {
+    gend_society_membership_ajax_authorize();
     $host = isset( $_POST['host'] ) ? sanitize_text_field( wp_unslash( (string) $_POST['host'] ) ) : '';
     if ( $host === '' ) {
         wp_send_json_error( array( 'message' => __( 'host required.', 'gend-society' ), 'code' => 'missing_params' ), 400 );
     }
-    $r = gs_remote_membership_call(
+    $r = gend_society_remote_membership_call(
         'hosting/domains/' . rawurlencode( $host ) . '/email-presets',
         array(),
         'GET'
@@ -667,11 +667,11 @@ add_action( 'wp_ajax_gs_membership_domain_email_preset_list', function () {
 // side, via the same option-cache shape gs_remote_membership_get_cached
 // uses) since pricing/tiers change rarely — avoids a remote round trip
 // on every Media tab page load.
-add_action( 'wp_ajax_gs_get_media_storage_plans', function () {
-    gs_membership_ajax_authorize();
+add_action( 'wp_ajax_gend_society_get_media_storage_plans', function () {
+    gend_society_membership_ajax_authorize();
 
-    $cache_key     = 'gs_media_storage_plans_cache';
-    $cache_expires = 'gs_media_storage_plans_cache_expires';
+    $cache_key     = 'gend_society_media_storage_plans_cache';
+    $cache_expires = 'gend_society_media_storage_plans_cache_expires';
     $expires       = (int) get_option( $cache_expires, 0 );
     if ( $expires > time() ) {
         $cached = get_option( $cache_key, null );
@@ -680,7 +680,7 @@ add_action( 'wp_ajax_gs_get_media_storage_plans', function () {
         }
     }
 
-    $r = gs_remote_membership_call( 'media-storage-plans', array(), 'GET' );
+    $r = gend_society_remote_membership_call( 'media-storage-plans', array(), 'GET' );
     if ( is_wp_error( $r ) ) {
         $data   = $r->get_error_data();
         $status = ( is_array( $data ) && isset( $data['status'] ) ) ? (int) $data['status'] : 502;
@@ -700,10 +700,10 @@ add_action( 'wp_ajax_gs_get_media_storage_plans', function () {
 
 // Refresh-cache hook — used after the plan-upgrade popup closes so
 // the new plan appears immediately without waiting out the TTL.
-add_action( 'wp_ajax_gs_membership_refresh', function () {
-    gs_membership_ajax_authorize();
-    gs_remote_membership_invalidate();
-    $fresh = gs_remote_membership_get_cached();
+add_action( 'wp_ajax_gend_society_membership_refresh', function () {
+    gend_society_membership_ajax_authorize();
+    gend_society_remote_membership_invalidate();
+    $fresh = gend_society_remote_membership_get_cached();
     wp_send_json_success( array( 'data' => $fresh ) );
 } );
 
@@ -719,10 +719,10 @@ add_action( 'wp_ajax_gs_membership_refresh', function () {
  * @param array|null $payload Remote membership payload, or null to use cache.
  * @return string
  */
-function gs_render_membership_panel( $payload = null ) {
+function gend_society_render_membership_panel( $payload = null ) {
 
     if ( ! is_array( $payload ) ) {
-        $payload = gs_remote_membership_get_cached();
+        $payload = gend_society_remote_membership_get_cached();
     }
     if ( ! is_array( $payload ) ) {
         return '<div class="notice notice-warning gs-membership-not-paired" style="padding:16px; background:rgba(255,255,255,0.04); border-radius:12px; color:var(--gs-muted);"><p>' .
@@ -1215,8 +1215,8 @@ function gs_render_membership_panel( $payload = null ) {
                      for Server Costs. ── -->
                 <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
                     <?php
-                    $gs_gas_data   = function_exists( 'gs_hosting_compute_gas_real_data' ) ? gs_hosting_compute_gas_real_data() : array();
-                    $gs_gas_earned = function_exists( 'gs_hosting_gas_earned_summary' ) ? gs_hosting_gas_earned_summary( get_current_user_id() ) : array();
+                    $gs_gas_data   = function_exists( 'gend_society_hosting_compute_gas_real_data' ) ? gend_society_hosting_compute_gas_real_data() : array();
+                    $gs_gas_earned = function_exists( 'gend_society_hosting_gas_earned_summary' ) ? gend_society_hosting_gas_earned_summary( get_current_user_id() ) : array();
 
                     $gs_gas_pending_payment = null;
                     foreach ( (array) ( $gs_gas_data['payments'] ?? array() ) as $gs_gp ) {
@@ -1226,8 +1226,8 @@ function gs_render_membership_panel( $payload = null ) {
                         }
                     }
 
-                    $gs_server_price_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
-                    $gs_server_price = function_exists( 'gs_hosting_server_price' ) ? gs_hosting_server_price( $gs_server_price_membership ) : array( 'current' => null, 'starting' => null );
+                    $gs_server_price_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+                    $gs_server_price = function_exists( 'gend_society_hosting_server_price' ) ? gend_society_hosting_server_price( $gs_server_price_membership ) : array( 'current' => null, 'starting' => null );
                     $gs_server_count_label = '';
                     if ( ! empty( $gs_server_price['current']['label'] ) ) {
                         $gs_server_price_label = $gs_server_price['current']['label'] . ( ! empty( $gs_server_price['current']['unit'] ) ? ' / ' . $gs_server_price['current']['unit'] : '' );
@@ -1245,7 +1245,7 @@ function gs_render_membership_panel( $payload = null ) {
                     // Real this-month-vs-last-month GAS consumption trend, off
                     // the same real gdc_gas_ledger table gs_gas_data totals
                     // all-time - see gs_hosting_gas_month_over_month().
-                    $gs_bcg_mom = function_exists( 'gs_hosting_gas_month_over_month' ) ? gs_hosting_gas_month_over_month() : array( 'direction' => 'flat', 'change_label' => __( 'No usage yet', 'gend-society' ) );
+                    $gs_bcg_mom = function_exists( 'gend_society_hosting_gas_month_over_month' ) ? gend_society_hosting_gas_month_over_month() : array( 'direction' => 'flat', 'change_label' => __( 'No usage yet', 'gend-society' ) );
                     $gs_bcg_mom_dir = (string) ( $gs_bcg_mom['direction'] ?? 'flat' );
                     $gs_bcg_mom_accent = array( 'up' => '#ef4444', 'down' => '#22c55e', 'new' => '#4eaaff', 'flat' => '#94a3b8' )[ $gs_bcg_mom_dir ] ?? '#94a3b8';
                     $gs_bcg_mom_icon   = array( 'up' => 'dashicons-arrow-up-alt', 'down' => 'dashicons-arrow-down-alt', 'new' => 'dashicons-chart-line', 'flat' => 'dashicons-minus' )[ $gs_bcg_mom_dir ] ?? 'dashicons-minus';
@@ -1258,9 +1258,9 @@ function gs_render_membership_panel( $payload = null ) {
                     // attributes - no new modal/JS required).
                     $gs_server_can_upgrade = current_user_can( 'manage_options' )
                         || is_super_admin() // site-admin check, not a hub signal (104 audit)
-                        || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
-                    $gs_server_upgrade_attrs = ( $gs_server_can_upgrade && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
-                        ? gs_hosting_resource_upgrade_data_attrs( 'server' )
+                        || ( function_exists( 'gend_society_group_tabs_user_has_access' ) && gend_society_group_tabs_user_has_access() );
+                    $gs_server_upgrade_attrs = ( $gs_server_can_upgrade && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
+                        ? gend_society_hosting_resource_upgrade_data_attrs( 'server' )
                         : '';
                     // Raw same-origin embed URL for the Gas Station "Add a
                     // Device" modal's always-on inline Server-tab iframe
@@ -1270,7 +1270,7 @@ function gs_render_membership_panel( $payload = null ) {
                     // its existing "not available" message rather than
                     // trying to drive an always-on iframe through the
                     // click-triggered proxy/picker flow.
-                    $gs_server_same_origin = function_exists( 'gs_oauth_is_hub_site' ) ? gs_oauth_is_hub_site() : true;
+                    $gs_server_same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
                     $gs_server_embed_url = ( $gs_server_can_upgrade && $gs_server_same_origin && function_exists( 'gdc_plan_attach_resource_embed_url' ) )
                         ? gdc_plan_attach_resource_embed_url( 'server' )
                         : '';
@@ -1369,7 +1369,7 @@ function gs_render_membership_panel( $payload = null ) {
                     // gs_hosting_server_price() uses for Server Costs above, so an
                     // already-purchased tier reads as "Current Plan" rather than
                     // just another Upgrade button.
-                    $gs_backup_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+                    $gs_backup_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
                     // A membership can hold a backup STORAGE plan and a backup
                     // FREQUENCY add-on at the same time, so collect every
                     // backups-subgroup product, not just the first.
@@ -1403,8 +1403,8 @@ function gs_render_membership_panel( $payload = null ) {
                             // ONE button opening the backups plan picker (storage
                             // tiers + frequency add-ons, current plan marked) -
                             // not one button per product.
-                            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
-                                ? gs_hosting_resource_upgrade_data_attrs( 'backups' )
+                            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
+                                ? gend_society_hosting_resource_upgrade_data_attrs( 'backups' )
                                 : '';
                             if ( $gs_bk_upgrade_attrs !== '' ) : ?>
                                 <button type="button"
@@ -1427,12 +1427,12 @@ function gs_render_membership_panel( $payload = null ) {
                      Storage. Same function the Hosting tab itself calls for
                      the section_group=all (BuddyPress group) case, so this
                      stays in sync automatically. ── -->
-                <?php if ( function_exists( 'gs_hosting_render_storage_resource_cards' ) ) : ?>
+                <?php if ( function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) : ?>
                 <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
                     <?php
-                    $gs_top_media_data  = function_exists( 'gs_hosting_collect_media' )  ? gs_hosting_collect_media()  : array();
-                    $gs_top_tables_data = function_exists( 'gs_hosting_collect_tables' ) ? gs_hosting_collect_tables() : array();
-                    gs_hosting_render_storage_resource_cards( $gs_top_media_data, $gs_top_tables_data, $billing, array(
+                    $gs_top_media_data  = function_exists( 'gend_society_hosting_collect_media' )  ? gend_society_hosting_collect_media()  : array();
+                    $gs_top_tables_data = function_exists( 'gend_society_hosting_collect_tables' ) ? gend_society_hosting_collect_tables() : array();
+                    gend_society_hosting_render_storage_resource_cards( $gs_top_media_data, $gs_top_tables_data, $billing, array(
                         'media'    => 'media-library',
                         'database' => 'tables',
                         'codebase' => 'codebase',
@@ -1507,8 +1507,8 @@ function gs_render_membership_panel( $payload = null ) {
             <!-- App tab (Dashboard [App Settings on top] / Domains / Permalinks / Logs) -->
             <div class="gs-mship-tab-panel<?php echo 'app' === $gs_default_tab ? ' is-active' : ''; ?>" data-panel="app" role="tabpanel">
                 <?php
-                if ( function_exists( 'gs_render_hosting_tab' ) ) {
-                    gs_render_hosting_tab( $payload, array(
+                if ( function_exists( 'gend_society_render_hosting_tab' ) ) {
+                    gend_society_render_hosting_tab( $payload, array(
                         'with_settings'    => true,
                         'with_permalinks'  => true,
                         'active_section'   => $gs_hosting_section,
@@ -1521,8 +1521,8 @@ function gs_render_membership_panel( $payload = null ) {
             <!-- Hosting tab (Compute Gas / Servers / Storage / Tables) -->
             <div class="gs-mship-tab-panel<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-panel="hosting" role="tabpanel">
                 <?php
-                if ( function_exists( 'gs_render_hosting_tab' ) ) {
-                    gs_render_hosting_tab( $payload, array(
+                if ( function_exists( 'gend_society_render_hosting_tab' ) ) {
+                    gend_society_render_hosting_tab( $payload, array(
                         'with_compute_gas' => true,
                         'section_group'    => 'hosting',
                     ) );
@@ -1649,9 +1649,9 @@ function gs_render_membership_panel( $payload = null ) {
                 <span><?php esc_html_e( 'User Access', 'gend-society' ); ?></span>
                 <div data-gs-pc-user-access-body>
                     <?php
-                    if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'inc/pages/feature-access.php' ) ) {
+                    if ( defined( 'GEND_SOCIETY_DIR' ) && file_exists( GEND_SOCIETY_DIR . 'inc/pages/feature-access.php' ) ) {
                         ( static function () {
-                            require GS_DIR . 'inc/pages/feature-access.php';
+                            require GEND_SOCIETY_DIR . 'inc/pages/feature-access.php';
                         } )();
                     }
                     ?>
@@ -1737,7 +1737,7 @@ function gs_render_membership_panel( $payload = null ) {
                             <button type="button" class="gs-gas-filter" data-gs-gas-filter="used"><?php esc_html_e( 'Used', 'gend-society' ); ?></button>
                             <button type="button" class="gs-gas-filter" data-gs-gas-filter="earned"><?php esc_html_e( 'Earned', 'gend-society' ); ?></button>
                         </div>
-                        <?php $gs_gas_history = function_exists( 'gs_hosting_gas_history_rows' ) ? gs_hosting_gas_history_rows( 100 ) : array(); ?>
+                        <?php $gs_gas_history = function_exists( 'gend_society_hosting_gas_history_rows' ) ? gend_society_hosting_gas_history_rows( 100 ) : array(); ?>
                         <?php if ( empty( $gs_gas_history ) ) : ?>
                             <p style="color: var(--gs-muted, #94a3b8); font-style: italic; text-align: center; padding: 24px 0;"><?php esc_html_e( 'No GAS activity recorded yet.', 'gend-society' ); ?></p>
                         <?php else : ?>
@@ -1950,7 +1950,7 @@ function gs_render_membership_panel( $payload = null ) {
             var body = root.querySelector('[data-gs-compute-gas-body]');
             if (!body) return;
             body.innerHTML = '<div style="color: var(--gs-muted, #94a3b8); font-style: italic; padding: 18px; text-align: center;">Loading cost breakdown…</div>';
-            var form = new URLSearchParams({ action: 'gs_hosting_compute_gas', nonce: nonce });
+            var form = new URLSearchParams({ action: 'gend_society_hosting_compute_gas', nonce: nonce });
             fetch(ajax, { method: 'POST', credentials: 'same-origin', headers: { 'Content-Type': 'application/x-www-form-urlencoded' }, body: form.toString() })
                 .then(function(r){ return r.json(); })
                 .then(function(resp){
@@ -2115,7 +2115,7 @@ function gs_render_membership_panel( $payload = null ) {
         }
         function loadCgAdminDevices() {
             if (!cgAdminDevices) return;
-            var deviceForm = new URLSearchParams({ action: 'gs_compute_gas_devices', _ajax_nonce: nonce, group_id: String(cgAdminGroupId || '') });
+            var deviceForm = new URLSearchParams({ action: 'gend_society_compute_gas_devices', _ajax_nonce: nonce, group_id: String(cgAdminGroupId || '') });
             fetch(<?php echo wp_json_encode( esc_url_raw( admin_url( 'admin-ajax.php' ) ) ); ?>, {
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2255,7 +2255,7 @@ function gs_render_membership_panel( $payload = null ) {
                         grid.querySelectorAll('.gs-plan-picker__card').forEach(function (c) { c.disabled = true; });
                         var origText = right.textContent;
                         right.textContent = 'Working...';
-                        ajaxAction('gs_membership_change_plan', { plan_id: p.id }).then(function (data) {
+                        ajaxAction('gend_society_membership_change_plan', { plan_id: p.id }).then(function (data) {
                             if (!data || !data.checkout_url) { throw new Error('No checkout URL returned.'); }
                             window.location.href = data.checkout_url;
                         }).catch(function (e) {
@@ -2285,7 +2285,7 @@ function gs_render_membership_panel( $payload = null ) {
                 status.className = 'gs-plan-picker__status';
                 status.textContent = 'Loading plans...';
                 picker.appendChild(status);
-                ajaxAction('gs_membership_plan_options', planParams).then(function (data) {
+                ajaxAction('gend_society_membership_plan_options', planParams).then(function (data) {
                     if (!data || !data.plans || !data.plans.length) {
                         picker.innerHTML = '';
                         var empty = document.createElement('div');
@@ -2314,7 +2314,7 @@ function gs_render_membership_panel( $payload = null ) {
                 var input = addForm.querySelector('input[name="domain"]');
                 var domain = (input.value || '').trim().toLowerCase();
                 if (!domain) return;
-                ajaxAction('gs_membership_domain_add', { domain: domain }, addForm.querySelector('button'))
+                ajaxAction('gend_society_membership_domain_add', { domain: domain }, addForm.querySelector('button'))
                     .then(function () { toast('Domain added.', 'success'); setTimeout(function(){ location.reload(); }, 800); })
                     .catch(function (e) { toast(e.message, 'error'); });
             });
@@ -2327,21 +2327,21 @@ function gs_render_membership_panel( $payload = null ) {
             var act = b.dataset.gsMship;
 
             if (act === 'verify-domain') {
-                ajaxAction('gs_membership_domain_verify', { domain: b.dataset.domain }, b)
+                ajaxAction('gend_society_membership_domain_verify', { domain: b.dataset.domain }, b)
                     .then(function (d) { toast('Verify: ' + (d.stage || 'ok'), 'success'); })
                     .catch(function (e) { toast(e.message, 'error'); });
             } else if (act === 'remove-domain') {
                 if (!confirm('Remove ' + b.dataset.domain + '?')) return;
-                ajaxAction('gs_membership_domain_remove', { domain: b.dataset.domain }, b)
+                ajaxAction('gend_society_membership_domain_remove', { domain: b.dataset.domain }, b)
                     .then(function () { var li = b.closest('li'); if (li) li.remove(); toast('Domain removed.', 'success'); })
                     .catch(function (e) { toast(e.message, 'error'); });
             } else if (act === 'backup-now') {
-                ajaxAction('gs_membership_backup_now', {}, b)
+                ajaxAction('gend_society_membership_backup_now', {}, b)
                     .then(function () { toast('Backup started. Reload in ~2 minutes.', 'success'); })
                     .catch(function (e) { toast(e.message, 'error'); });
             } else if (act === 'restore-backup') {
                 if (!confirm('Restore this backup? The site will rebuild from this snapshot.')) return;
-                ajaxAction('gs_membership_backup_restore', { backup_id: b.dataset.id }, b)
+                ajaxAction('gend_society_membership_backup_restore', { backup_id: b.dataset.id }, b)
                     .then(function () { toast('Restore started. Site will rebuild in 1-3 minutes.', 'success'); })
                     .catch(function (e) { toast(e.message, 'error'); });
             }
@@ -2390,7 +2390,7 @@ function gs_render_membership_panel( $payload = null ) {
             gasDevicesLoading = true;
             statsEl.innerHTML = '<p style="color: var(--gs-muted, #94a3b8); font-style: italic;">Loading devices…</p>';
             listEl.innerHTML = '';
-            var form = new URLSearchParams({ action: 'gs_compute_gas_devices', _ajax_nonce: <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>, group_id: String(groupId || '') });
+            var form = new URLSearchParams({ action: 'gend_society_compute_gas_devices', _ajax_nonce: <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>, group_id: String(groupId || '') });
             fetch(ajax, {
                 method: 'POST', credentials: 'same-origin',
                 headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
@@ -2507,8 +2507,8 @@ function gs_render_membership_panel( $payload = null ) {
  * @param array $remote /install/{id}/membership payload.
  * @return string
  */
-function gs_get_remote_account_overview_html( array $remote ) {
-    return gs_render_membership_panel( $remote );
+function gend_society_get_remote_account_overview_html( array $remote ) {
+    return gend_society_render_membership_panel( $remote );
 }
 
 // ────────────────────────────────────────────────────────────────────────
@@ -2537,7 +2537,7 @@ function gs_get_remote_account_overview_html( array $remote ) {
  *
  * @return array{avatar:string,cover:string}
  */
-function gs_group_avatar_and_cover( $gid ) {
+function gend_society_group_avatar_and_cover( $gid ) {
     $gid    = (int) $gid;
     $avatar = '';
     $cover  = '';
@@ -2574,7 +2574,7 @@ function gs_group_avatar_and_cover( $gid ) {
     return array( 'avatar' => $avatar, 'cover' => $cover );
 }
 
-function gs_membership_payload_from_local( $membership ) {
+function gend_society_membership_payload_from_local( $membership ) {
 
     if ( ! $membership || ! is_object( $membership ) || ! method_exists( $membership, 'get_id' ) ) {
         return null;
@@ -2667,7 +2667,7 @@ function gs_membership_payload_from_local( $membership ) {
             if ( ! empty( $row->name ) ) $g_name = (string) $row->name;
             if ( ! empty( $row->slug ) ) $g_slug = (string) $row->slug;
         }
-        $art          = gs_group_avatar_and_cover( $gid );
+        $art          = gend_society_group_avatar_and_cover( $gid );
         $group_payload = array(
             'id'             => $gid,
             'name'           => $g_name,
@@ -2760,7 +2760,7 @@ function gs_membership_payload_from_local( $membership ) {
  *
  * @return array|null
  */
-function gs_membership_payload_group_only() {
+function gend_society_membership_payload_group_only() {
     $blog_id = get_current_blog_id();
 
     $gid = 0;
@@ -2819,7 +2819,7 @@ function gs_membership_payload_group_only() {
                 'files_count'    => 0,
                 'messages_count' => 0,
             ),
-            gs_group_avatar_and_cover( $gid )
+            gend_society_group_avatar_and_cover( $gid )
         ),
         'orders'         => array(),
         'backups'        => array(),

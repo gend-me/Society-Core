@@ -22,19 +22,19 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('GS_THEME_SLUG', 'gend-society-theme');
-define('GS_THEME_ROOT', GS_DIR . 'themes');
+define('GEND_SOCIETY_THEME_SLUG', 'gend-society-theme');
+define('GEND_SOCIETY_THEME_ROOT', GEND_SOCIETY_DIR . 'themes');
 
-register_theme_directory(GS_THEME_ROOT);
+register_theme_directory(GEND_SOCIETY_THEME_ROOT);
 
 // Never offer a WordPress.org "update" for our slug (in case one is ever published there).
 add_filter('site_transient_update_themes', function ($value) {
     if (is_object($value)) {
-        if (isset($value->response[GS_THEME_SLUG])) {
-            unset($value->response[GS_THEME_SLUG]);
+        if (isset($value->response[GEND_SOCIETY_THEME_SLUG])) {
+            unset($value->response[GEND_SOCIETY_THEME_SLUG]);
         }
-        if (isset($value->no_update[GS_THEME_SLUG])) {
-            unset($value->no_update[GS_THEME_SLUG]);
+        if (isset($value->no_update[GEND_SOCIETY_THEME_SLUG])) {
+            unset($value->no_update[GEND_SOCIETY_THEME_SLUG]);
         }
     }
     return $value;
@@ -46,8 +46,8 @@ add_filter('http_request_args', function ($args, $url) {
         return $args;
     }
     $themes = json_decode($args['body']['themes'], true);
-    if (is_array($themes) && isset($themes['themes'][GS_THEME_SLUG])) {
-        unset($themes['themes'][GS_THEME_SLUG]);
+    if (is_array($themes) && isset($themes['themes'][GEND_SOCIETY_THEME_SLUG])) {
+        unset($themes['themes'][GEND_SOCIETY_THEME_SLUG]);
         $args['body']['themes'] = wp_json_encode($themes);
     }
     return $args;
@@ -55,32 +55,32 @@ add_filter('http_request_args', function ($args, $url) {
 
 // Multisite: always network-enabled.
 add_filter('allowed_themes', function ($themes) {
-    $themes[GS_THEME_SLUG] = true;
+    $themes[GEND_SOCIETY_THEME_SLUG] = true;
     return $themes;
 });
 
 /**
  * Whether the GenD Society theme is the active theme (or the parent of it).
  */
-function gs_theme_is_active() {
-    return get_stylesheet() === GS_THEME_SLUG || get_template() === GS_THEME_SLUG;
+function gend_society_theme_is_active() {
+    return get_stylesheet() === GEND_SOCIETY_THEME_SLUG || get_template() === GEND_SOCIETY_THEME_SLUG;
 }
 
 // Single sites (connected installs): opt-in activation notice.
 add_action('admin_notices', function () {
-    if (is_multisite() || gs_theme_is_active() || !current_user_can('switch_themes')) {
+    if (is_multisite() || gend_society_theme_is_active() || !current_user_can('switch_themes')) {
         return;
     }
-    if (get_user_meta(get_current_user_id(), 'gs_theme_notice_dismissed', true)) {
+    if (get_user_meta(get_current_user_id(), 'gend_society_theme_notice_dismissed', true)) {
         return;
     }
-    $theme = wp_get_theme(GS_THEME_SLUG);
+    $theme = wp_get_theme(GEND_SOCIETY_THEME_SLUG);
     if (!$theme->exists()) {
         return;
     }
     $activate = wp_nonce_url(
-        admin_url('themes.php?action=activate&stylesheet=' . rawurlencode(GS_THEME_SLUG)),
-        'switch-theme_' . GS_THEME_SLUG
+        admin_url('themes.php?action=activate&stylesheet=' . rawurlencode(GEND_SOCIETY_THEME_SLUG)),
+        'switch-theme_' . GEND_SOCIETY_THEME_SLUG
     );
     $dismiss = wp_nonce_url(add_query_arg('gs_dismiss_theme_notice', '1'), 'gs_dismiss_theme_notice');
     printf(
@@ -98,7 +98,7 @@ add_action('admin_init', function () {
         return;
     }
     check_admin_referer('gs_dismiss_theme_notice');
-    update_user_meta(get_current_user_id(), 'gs_theme_notice_dismissed', 1);
+    update_user_meta(get_current_user_id(), 'gend_society_theme_notice_dismissed', 1);
     wp_safe_redirect(remove_query_arg(array('gs_dismiss_theme_notice', '_wpnonce')));
     exit;
 });

@@ -65,7 +65,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // payments page's own group). The functions below are kept only because
 // gs_collab_profile_can_act_for_group() is reused by the launcher's gate.
 // add_action( 'bp_setup_nav', 'gs_add_collab_profile_tab', 100 );
-function gs_add_collab_profile_tab() {
+function gend_society_add_collab_profile_tab() {
 	if ( ! function_exists( 'bp_core_new_nav_item' ) ) {
 		return;
 	}
@@ -86,7 +86,7 @@ function gs_add_collab_profile_tab() {
 	bp_core_new_nav_item( array(
 		'name'                    => __( 'Match', 'gend-society' ),
 		'slug'                    => 'collab',
-		'screen_function'         => 'gs_collab_profile_screen',
+		'screen_function'         => 'gend_society_collab_profile_screen',
 		'position'                => $pos,
 		'item_css_id'             => 'collab-profile',
 		// Own-profile-only surface: only the viewing member's own businesses
@@ -101,11 +101,11 @@ function gs_add_collab_profile_tab() {
  * template and routes its content to our handler. Mirrors
  * gs_markets_profile_screen() exactly.
  */
-function gs_collab_profile_screen() {
+function gend_society_collab_profile_screen() {
 	if ( function_exists( 'add_action' ) ) {
 		// render_panel() already emits its own "Match" <h3> — don't double it.
 		add_action( 'bp_template_title', '__return_empty_string' );
-		add_action( 'bp_template_content', 'gs_collab_profile_screen_content' );
+		add_action( 'bp_template_content', 'gend_society_collab_profile_screen_content' );
 	}
 	if ( function_exists( 'bp_core_load_template' ) ) {
 		bp_core_load_template( 'members/single/plugins' );
@@ -123,7 +123,7 @@ function gs_collab_profile_screen() {
  * @param int $gid Group id being checked.
  * @return bool
  */
-function gs_collab_profile_can_act_for_group( $uid, $gid ) {
+function gend_society_collab_profile_can_act_for_group( $uid, $gid ) {
 	$uid = (int) $uid;
 	$gid = (int) $gid;
 	if ( $uid <= 0 || $gid <= 0 ) {
@@ -143,7 +143,7 @@ function gs_collab_profile_can_act_for_group( $uid, $gid ) {
  * delegates ALL actual deck/matches rendering to
  * GS_Group_Tab_Collab::render_panel( $selected_group_id ).
  */
-function gs_collab_profile_screen_content() {
+function gend_society_collab_profile_screen_content() {
 	// Privacy: own-profile-only (defense-in-depth — show_for_displayed_user
 	// => false already prevents BP from linking this tab on other profiles).
 	if ( function_exists( 'bp_is_my_profile' ) && ! bp_is_my_profile() ) {
@@ -164,7 +164,7 @@ function gs_collab_profile_screen_content() {
 		}
 	}
 	foreach ( array_unique( $gids ) as $gid ) {
-		if ( ! gs_collab_profile_can_act_for_group( $uid, $gid ) ) {
+		if ( ! gend_society_collab_profile_can_act_for_group( $uid, $gid ) ) {
 			continue;
 		}
 		$name = '';
@@ -267,8 +267,8 @@ function gs_collab_profile_screen_content() {
 	// Delegate ALL actual rendering (asset enqueue + deck/matches markup) to
 	// the shared, already-authorized-for-this-group_id render body. Guarded
 	// fallback for a partial/out-of-order deploy.
-	if ( class_exists( 'GS_Group_Tab_Collab' ) && method_exists( 'GS_Group_Tab_Collab', 'render_panel' ) ) {
-		GS_Group_Tab_Collab::render_panel( $selected_group_id );
+	if ( class_exists( 'Gend_Society_Group_Tab_Collab' ) && method_exists( 'Gend_Society_Group_Tab_Collab', 'render_panel' ) ) {
+		Gend_Society_Group_Tab_Collab::render_panel( $selected_group_id );
 	} else {
 		echo '<p style="color:rgba(203,213,245,0.75);">' . esc_html__( 'GenD Match is temporarily unavailable.', 'gend-society' ) . '</p>';
 	}

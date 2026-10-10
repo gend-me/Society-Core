@@ -24,9 +24,9 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'gs_ws_sites_register_rest' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_register_rest' ) ) {
 
-    function gs_ws_sites_register_rest() {
+    function gend_society_ws_sites_register_rest() {
         $args_id = array(
             'id' => array(
                 'required' => true,
@@ -37,47 +37,47 @@ if ( ! function_exists( 'gs_ws_sites_register_rest' ) ) {
 
         register_rest_route( 'gs/v1', '/web-shell/sites/(?P<id>\d+)/status', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_ws_sites_rest_status',
-            'permission_callback' => 'gs_ws_sites_can_view',
+            'callback'            => 'gend_society_ws_sites_rest_status',
+            'permission_callback' => 'gend_society_ws_sites_can_view',
             'args'                => $args_id,
         ) );
 
         register_rest_route( 'gs/v1', '/web-shell/sites/(?P<id>\d+)/clone', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_ws_sites_rest_clone',
-            'permission_callback' => 'gs_ws_sites_can_write',
+            'callback'            => 'gend_society_ws_sites_rest_clone',
+            'permission_callback' => 'gend_society_ws_sites_can_write',
             'args'                => $args_id,
         ) );
 
         register_rest_route( 'gs/v1', '/web-shell/sites/(?P<id>\d+)/promote', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_ws_sites_rest_promote',
-            'permission_callback' => 'gs_ws_sites_can_write',
+            'callback'            => 'gend_society_ws_sites_rest_promote',
+            'permission_callback' => 'gend_society_ws_sites_can_write',
             'args'                => $args_id,
         ) );
 
         register_rest_route( 'gs/v1', '/web-shell/sites/(?P<id>\d+)/restart', array(
             'methods'             => 'POST',
-            'callback'            => 'gs_ws_sites_rest_restart',
-            'permission_callback' => 'gs_ws_sites_can_write',
+            'callback'            => 'gend_society_ws_sites_rest_restart',
+            'permission_callback' => 'gend_society_ws_sites_can_write',
             'args'                => $args_id,
         ) );
 
         register_rest_route( 'gs/v1', '/web-shell/sites/(?P<id>\d+)/staging', array(
             'methods'             => 'DELETE',
-            'callback'            => 'gs_ws_sites_rest_staging_delete',
-            'permission_callback' => 'gs_ws_sites_can_write',
+            'callback'            => 'gend_society_ws_sites_rest_staging_delete',
+            'permission_callback' => 'gend_society_ws_sites_can_write',
             'args'                => $args_id,
         ) );
     }
-    add_action( 'rest_api_init', 'gs_ws_sites_register_rest' );
+    add_action( 'rest_api_init', 'gend_society_ws_sites_register_rest' );
 }
 
 /* ────────────────── auth helpers ────────────────── */
 
-if ( ! function_exists( 'gs_ws_sites_resolve' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_resolve' ) ) {
 
-    function gs_ws_sites_resolve( $req ) {
+    function gend_society_ws_sites_resolve( $req ) {
         if ( ! is_user_logged_in() ) return null;
         $id = (int) ( is_object( $req ) ? $req->get_param( 'id' ) : $req );
         if ( $id <= 0 || ! function_exists( 'wu_get_site' ) ) return null;
@@ -85,11 +85,11 @@ if ( ! function_exists( 'gs_ws_sites_resolve' ) ) {
         return $site ?: null;
     }
 
-    function gs_ws_sites_can_view( $req ) {
+    function gend_society_ws_sites_can_view( $req ) {
         $uid = get_current_user_id();
         if ( $uid <= 0 ) return false;
         if ( gend_society_is_hub_operator( $uid ) || user_can( $uid, 'manage_network' ) ) return true;
-        $site = gs_ws_sites_resolve( $req );
+        $site = gend_society_ws_sites_resolve( $req );
         if ( ! $site ) return false;
         // Customer match
         if ( method_exists( $site, 'get_customer_id' ) ) {
@@ -115,15 +115,15 @@ if ( ! function_exists( 'gs_ws_sites_resolve' ) ) {
 
     // Write perms are the same as view perms today — once we get
     // multi-tier roles (e.g. "deploy" capability), this is the seam.
-    function gs_ws_sites_can_write( $req ) { return gs_ws_sites_can_view( $req ); }
+    function gend_society_ws_sites_can_write( $req ) { return gend_society_ws_sites_can_view( $req ); }
 }
 
 /* ────────────────── status ────────────────── */
 
-if ( ! function_exists( 'gs_ws_sites_rest_status' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_rest_status' ) ) {
 
-    function gs_ws_sites_rest_status( WP_REST_Request $req ) {
-        $site = gs_ws_sites_resolve( $req );
+    function gend_society_ws_sites_rest_status( WP_REST_Request $req ) {
+        $site = gend_society_ws_sites_resolve( $req );
         if ( ! $site ) return new WP_Error( 'no_site', 'Site not found.', array( 'status' => 404 ) );
 
         $hostname = method_exists( $site, 'get_meta' ) ? (string) $site->get_meta( 'gdc_container_hostname', '' ) : '';
@@ -165,10 +165,10 @@ if ( ! function_exists( 'gs_ws_sites_rest_status' ) ) {
 
 /* ────────────────── clone (scaffolded) ────────────────── */
 
-if ( ! function_exists( 'gs_ws_sites_rest_clone' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_rest_clone' ) ) {
 
-    function gs_ws_sites_rest_clone( WP_REST_Request $req ) {
-        $site = gs_ws_sites_resolve( $req );
+    function gend_society_ws_sites_rest_clone( WP_REST_Request $req ) {
+        $site = gend_society_ws_sites_resolve( $req );
         if ( ! $site ) return new WP_Error( 'no_site', 'Site not found.', array( 'status' => 404 ) );
 
         $existing = method_exists( $site, 'get_meta' ) ? (int) $site->get_meta( 'gdc_staging_site_id', 0 ) : 0;
@@ -201,10 +201,10 @@ if ( ! function_exists( 'gs_ws_sites_rest_clone' ) ) {
 
 /* ────────────────── promote (scaffolded) ────────────────── */
 
-if ( ! function_exists( 'gs_ws_sites_rest_promote' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_rest_promote' ) ) {
 
-    function gs_ws_sites_rest_promote( WP_REST_Request $req ) {
-        $site = gs_ws_sites_resolve( $req );
+    function gend_society_ws_sites_rest_promote( WP_REST_Request $req ) {
+        $site = gend_society_ws_sites_resolve( $req );
         if ( ! $site ) return new WP_Error( 'no_site', 'Site not found.', array( 'status' => 404 ) );
         $is_staging = method_exists( $site, 'get_meta' ) ? (int) $site->get_meta( 'gdc_staging_of', 0 ) : 0;
         if ( $is_staging <= 0 ) {
@@ -220,10 +220,10 @@ if ( ! function_exists( 'gs_ws_sites_rest_promote' ) ) {
 
 /* ────────────────── restart (scaffolded with hook) ────────────────── */
 
-if ( ! function_exists( 'gs_ws_sites_rest_restart' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_rest_restart' ) ) {
 
-    function gs_ws_sites_rest_restart( WP_REST_Request $req ) {
-        $site = gs_ws_sites_resolve( $req );
+    function gend_society_ws_sites_rest_restart( WP_REST_Request $req ) {
+        $site = gend_society_ws_sites_resolve( $req );
         if ( ! $site ) return new WP_Error( 'no_site', 'Site not found.', array( 'status' => 404 ) );
         $hostname = method_exists( $site, 'get_meta' ) ? (string) $site->get_meta( 'gdc_container_hostname', '' ) : '';
         if ( $hostname === '' ) {
@@ -236,7 +236,7 @@ if ( ! function_exists( 'gs_ws_sites_rest_restart' ) ) {
         // through. Default behavior is to enqueue a "restart-requested"
         // event in site_option `gs_ws_site_restart_queue` for a cron
         // job (or the PTY service) to pick up.
-        $queue = (array) get_site_option( 'gs_ws_site_restart_queue', array() );
+        $queue = (array) get_site_option( 'gend_society_ws_site_restart_queue', array() );
         $queue[] = array(
             'site_id'      => method_exists( $site, 'get_id' ) ? (int) $site->get_id() : 0,
             'hostname'     => $hostname,
@@ -246,23 +246,23 @@ if ( ! function_exists( 'gs_ws_sites_rest_restart' ) ) {
         // Cap queue at 200 — older entries roll off so a misbehaving UI
         // can't infinitely grow the option.
         if ( count( $queue ) > 200 ) $queue = array_slice( $queue, -200 );
-        update_site_option( 'gs_ws_site_restart_queue', $queue );
+        update_site_option( 'gend_society_ws_site_restart_queue', $queue );
 
         $result = array(
             'status'   => 'queued',
             'message'  => 'Restart enqueued — a worker will bounce the container on its next tick. Hook gs_ws_site_restart filter to execute immediately.',
             'queue_at' => gmdate( 'c' ),
         );
-        return apply_filters( 'gs_ws_site_restart', $result, $site, $req );
+        return apply_filters( 'gend_society_ws_site_restart', $result, $site, $req );
     }
 }
 
 /* ────────────────── staging teardown (real) ────────────────── */
 
-if ( ! function_exists( 'gs_ws_sites_rest_staging_delete' ) ) {
+if ( ! function_exists( 'gend_society_ws_sites_rest_staging_delete' ) ) {
 
-    function gs_ws_sites_rest_staging_delete( WP_REST_Request $req ) {
-        $site = gs_ws_sites_resolve( $req );
+    function gend_society_ws_sites_rest_staging_delete( WP_REST_Request $req ) {
+        $site = gend_society_ws_sites_resolve( $req );
         if ( ! $site ) return new WP_Error( 'no_site', 'Site not found.', array( 'status' => 404 ) );
 
         // Two valid call shapes — the user might call it from the LIVE

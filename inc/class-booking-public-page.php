@@ -145,9 +145,9 @@ class Gend_GS_Booking_Public_Page {
 				'meetingTypes'   => $meeting_type_options,
 			);
 
-			$js_url  = plugins_url( 'assets/booking-public.js', GS_DIR . 'gend-society.php' );
-			$css_url = plugins_url( 'assets/booking-public.css', GS_DIR . 'gend-society.php' );
-			$ver     = GS_VERSION;
+			$js_url  = plugins_url( 'assets/booking-public.js', GEND_SOCIETY_DIR . 'gend-society.php' );
+			$css_url = plugins_url( 'assets/booking-public.css', GEND_SOCIETY_DIR . 'gend-society.php' );
+			$ver     = GEND_SOCIETY_VERSION;
 
 			status_header( 200 );
 			nocache_headers();

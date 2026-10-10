@@ -27,7 +27,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *                          Defaults to home_url('/').
  * @return string
  */
-function gs_invite_get_affiliate_url( $user_id, $base_url = '' ) {
+function gend_society_invite_get_affiliate_url( $user_id, $base_url = '' ) {
     $param = get_option( 'aas_tracking_url_param', 'ref' );
     $base  = $base_url ?: home_url( '/' );
     $sep   = ( strpos( $base, '?' ) !== false ) ? '&' : '?';
@@ -38,7 +38,7 @@ function gs_invite_get_affiliate_url( $user_id, $base_url = '' ) {
  * Default invite email template. Placeholders are replaced per-recipient in
  * gs_invite_render_template(). Stored as user meta when the sender edits it.
  */
-function gs_invite_default_template() {
+function gend_society_invite_default_template() {
     return array(
         'subject' => __( '{sender_name} invited you to join gend.me', 'gend-society' ),
         'body'    => __(
@@ -58,7 +58,7 @@ function gs_invite_default_template() {
  * new members). {invite_link} carries the shared-post URL + the sender's
  * affiliate tracking param.
  */
-function gs_invite_share_template( $title = '' ) {
+function gend_society_invite_share_template( $title = '' ) {
     $what = $title !== '' ? $title : __( 'a post', 'gend-society' );
     return array(
         /* translators: %s: shared post title */
@@ -80,15 +80,15 @@ function gs_invite_share_template( $title = '' ) {
  * @param int $user_id
  * @return array { subject, body }
  */
-function gs_invite_get_template( $user_id ) {
-    $saved = get_user_meta( $user_id, 'gs_invite_template', true );
+function gend_society_invite_get_template( $user_id ) {
+    $saved = get_user_meta( $user_id, 'gend_society_invite_template', true );
     if ( is_array( $saved ) && ! empty( $saved['subject'] ) && ! empty( $saved['body'] ) ) {
         return array(
             'subject' => (string) $saved['subject'],
             'body'    => (string) $saved['body'],
         );
     }
-    return gs_invite_default_template();
+    return gend_society_invite_default_template();
 }
 
 /**
@@ -98,7 +98,7 @@ function gs_invite_get_template( $user_id ) {
  * @param array  $vars         { name, sender_name, sender_email, invite_link }
  * @return string
  */
-function gs_invite_render_template( $template, $vars ) {
+function gend_society_invite_render_template( $template, $vars ) {
     $vars = wp_parse_args( $vars, array(
         'name'         => '',
         'sender_name'  => '',
@@ -118,13 +118,13 @@ function gs_invite_render_template( $template, $vars ) {
  * HMAC-signed token round-tripped through email tracking pixels and
  * reminder URLs. Payload {sender_id, log_id, kind} packed base64.
  */
-function gs_invite_make_token( $sender_id, $log_id, $kind = 'open' ) {
+function gend_society_invite_make_token( $sender_id, $log_id, $kind = 'open' ) {
     $payload = array( 'u' => (int) $sender_id, 'l' => (string) $log_id, 'k' => (string) $kind );
     $b64 = rtrim( strtr( base64_encode( wp_json_encode( $payload ) ), '+/', '-_' ), '=' );
     $sig = hash_hmac( 'sha256', $b64, wp_salt( 'auth' ) );
     return $b64 . '.' . substr( $sig, 0, 32 );
 }
-function gs_invite_verify_token( $token ) {
+function gend_society_invite_verify_token( $token ) {
     if ( ! is_string( $token ) || strpos( $token, '.' ) === false ) return null;
     list( $b64, $sig ) = explode( '.', $token, 2 );
     $expect = substr( hash_hmac( 'sha256', $b64, wp_salt( 'auth' ) ), 0, 32 );
@@ -138,31 +138,31 @@ function gs_invite_verify_token( $token ) {
  * the user_register hook to mark log entries as registered. Stored in
  * wp_options because it's keyed by recipient email, not sender.
  */
-function gs_invite_index_add( $email, $sender_id, $log_id ) {
+function gend_society_invite_index_add( $email, $sender_id, $log_id ) {
     $email = strtolower( trim( (string) $email ) );
     if ( ! $email ) return;
-    $index = get_option( 'gs_invite_pending', array() );
+    $index = get_option( 'gend_society_invite_pending', array() );
     if ( ! is_array( $index ) ) $index = array();
     if ( ! isset( $index[ $email ] ) ) $index[ $email ] = array();
     $index[ $email ][] = array( 'u' => (int) $sender_id, 'l' => (string) $log_id );
     // Cap each email's pending list at 10 senders to keep option bounded.
     if ( count( $index[ $email ] ) > 10 ) $index[ $email ] = array_slice( $index[ $email ], -10 );
-    update_option( 'gs_invite_pending', $index, false );
+    update_option( 'gend_society_invite_pending', $index, false );
 }
 
 /**
  * On registration, mark every log entry pointing at the new user's email
  * as registered, then drop them from the pending index.
  */
-add_action( 'user_register', 'gs_invite_handle_user_register' );
-function gs_invite_handle_user_register( $user_id ) {
+add_action( 'user_register', 'gend_society_invite_handle_user_register' );
+function gend_society_invite_handle_user_register( $user_id ) {
     $user = get_userdata( $user_id );
     if ( ! $user || empty( $user->user_email ) ) return;
     $email = strtolower( trim( $user->user_email ) );
-    $index = get_option( 'gs_invite_pending', array() );
+    $index = get_option( 'gend_society_invite_pending', array() );
     if ( empty( $index[ $email ] ) ) return;
     foreach ( $index[ $email ] as $ref ) {
-        $log = get_user_meta( $ref['u'], 'gs_invite_log', true );
+        $log = get_user_meta( $ref['u'], 'gend_society_invite_log', true );
         if ( ! is_array( $log ) ) continue;
         foreach ( $log as &$entry ) {
             if ( isset( $entry['id'] ) && $entry['id'] === $ref['l'] && empty( $entry['registered_at'] ) ) {
@@ -171,10 +171,10 @@ function gs_invite_handle_user_register( $user_id ) {
             }
         }
         unset( $entry );
-        update_user_meta( $ref['u'], 'gs_invite_log', $log );
+        update_user_meta( $ref['u'], 'gend_society_invite_log', $log );
     }
     unset( $index[ $email ] );
-    update_option( 'gs_invite_pending', $index, false );
+    update_option( 'gend_society_invite_pending', $index, false );
 }
 
 /**
@@ -182,8 +182,8 @@ function gs_invite_handle_user_register( $user_id ) {
  * redirect so we can record opens + clicks. Idempotent — only operates
  * on HTML bodies and only if no tracking elements already present.
  */
-function gs_invite_inject_tracking( $html_body, $sender_id, $log_id ) {
-    $token = gs_invite_make_token( $sender_id, $log_id, 'open' );
+function gend_society_invite_inject_tracking( $html_body, $sender_id, $log_id ) {
+    $token = gend_society_invite_make_token( $sender_id, $log_id, 'open' );
     $pixel_url = esc_url_raw( rest_url( 'gs/v1/invite/open?t=' . rawurlencode( $token ) ) );
     $pixel = '<img src="' . esc_attr( $pixel_url ) . '" width="1" height="1" alt="" style="display:none !important;width:1px;height:1px;">';
     // Append before </body> if present, otherwise at end of body.
@@ -198,8 +198,8 @@ function gs_invite_inject_tracking( $html_body, $sender_id, $log_id ) {
  * BuddyPress profile page where our Invite tab lives. wp_editor() requires
  * these to be loaded; on the frontend they aren't enqueued by default.
  */
-add_action( 'wp_enqueue_scripts', 'gs_invite_enqueue_editor_assets', 5 );
-function gs_invite_enqueue_editor_assets() {
+add_action( 'wp_enqueue_scripts', 'gend_society_invite_enqueue_editor_assets', 5 );
+function gend_society_invite_enqueue_editor_assets() {
     if ( ! function_exists( 'bp_is_user_friends' ) || ! bp_is_user_friends() ) return;
     if ( function_exists( 'wp_enqueue_editor' ) ) wp_enqueue_editor();
 }
@@ -208,7 +208,7 @@ function gs_invite_enqueue_editor_assets() {
  * Render the Invite panel HTML. Called from the connections-tabs close hook
  * inside member-profile-pages.php.
  */
-function gs_invite_render_panel( $share = array() ) {
+function gend_society_invite_render_panel( $share = array() ) {
     if ( ! is_user_logged_in() ) {
         echo '<p class="psoo-pm-empty">' . esc_html__( 'Please log in to invite members.', 'gend-society' ) . '</p>';
         return;
@@ -220,8 +220,8 @@ function gs_invite_render_panel( $share = array() ) {
     // sender's tracking param appended by gs_invite_get_affiliate_url).
     $is_share     = is_array( $share ) && ! empty( $share['url'] );
     $share_title  = $is_share ? (string) ( $share['title'] ?? '' ) : '';
-    $template     = $is_share ? gs_invite_share_template( $share_title ) : gs_invite_get_template( $user_id );
-    $invite_url   = gs_invite_get_affiliate_url( $user_id, $is_share ? (string) $share['url'] : '' );
+    $template     = $is_share ? gend_society_invite_share_template( $share_title ) : gend_society_invite_get_template( $user_id );
+    $invite_url   = gend_society_invite_get_affiliate_url( $user_id, $is_share ? (string) $share['url'] : '' );
     $rest_root    = esc_url_raw( rest_url( 'gs/v1/invite' ) );
     $rest_nonce   = wp_create_nonce( 'wp_rest' );
     // Per-render unique ID so the inline IIFE can find its own wrap by id —
@@ -1754,8 +1754,8 @@ function gs_invite_render_panel( $share = array() ) {
 /**
  * REST routes — template save/get + send invites.
  */
-add_action( 'rest_api_init', 'gs_invite_register_routes' );
-function gs_invite_register_routes() {
+add_action( 'rest_api_init', 'gend_society_invite_register_routes' );
+function gend_society_invite_register_routes() {
     $auth = function () {
         return is_user_logged_in()
             ? true
@@ -1765,60 +1765,60 @@ function gs_invite_register_routes() {
     register_rest_route( 'gs/v1', '/invite/template', array(
         array(
             'methods'             => WP_REST_Server::READABLE,
-            'callback'            => 'gs_invite_rest_get_template',
+            'callback'            => 'gend_society_invite_rest_get_template',
             'permission_callback' => $auth,
         ),
         array(
             'methods'             => WP_REST_Server::CREATABLE,
-            'callback'            => 'gs_invite_rest_save_template',
+            'callback'            => 'gend_society_invite_rest_save_template',
             'permission_callback' => $auth,
         ),
     ) );
 
     register_rest_route( 'gs/v1', '/invite/send', array(
         'methods'             => WP_REST_Server::CREATABLE,
-        'callback'            => 'gs_invite_rest_send',
+        'callback'            => 'gend_society_invite_rest_send',
         'permission_callback' => $auth,
     ) );
 
     register_rest_route( 'gs/v1', '/invite/send-test', array(
         'methods'             => WP_REST_Server::CREATABLE,
-        'callback'            => 'gs_invite_rest_send_test',
+        'callback'            => 'gend_society_invite_rest_send_test',
         'permission_callback' => $auth,
     ) );
 
     register_rest_route( 'gs/v1', '/invite/log', array(
         'methods'             => WP_REST_Server::READABLE,
-        'callback'            => 'gs_invite_rest_log',
+        'callback'            => 'gend_society_invite_rest_log',
         'permission_callback' => $auth,
     ) );
 
     register_rest_route( 'gs/v1', '/invite/remind', array(
         'methods'             => WP_REST_Server::CREATABLE,
-        'callback'            => 'gs_invite_rest_remind',
+        'callback'            => 'gend_society_invite_rest_remind',
         'permission_callback' => $auth,
     ) );
 
     // Tracking pixel — anyone can hit this; the HMAC token validates it.
     register_rest_route( 'gs/v1', '/invite/open', array(
         'methods'             => WP_REST_Server::READABLE,
-        'callback'            => 'gs_invite_rest_open',
+        'callback'            => 'gend_society_invite_rest_open',
         'permission_callback' => '__return_true',
     ) );
 }
 
-function gs_invite_rest_get_template( WP_REST_Request $req ) {
-    $tpl = gs_invite_get_template( get_current_user_id() );
+function gend_society_invite_rest_get_template( WP_REST_Request $req ) {
+    $tpl = gend_society_invite_get_template( get_current_user_id() );
     return rest_ensure_response( array( 'ok' => true ) + $tpl );
 }
 
-function gs_invite_rest_save_template( WP_REST_Request $req ) {
+function gend_society_invite_rest_save_template( WP_REST_Request $req ) {
     $user_id = get_current_user_id();
     $params  = $req->get_json_params();
 
     if ( ! empty( $params['reset'] ) ) {
-        delete_user_meta( $user_id, 'gs_invite_template' );
-        $tpl = gs_invite_default_template();
+        delete_user_meta( $user_id, 'gend_society_invite_template' );
+        $tpl = gend_society_invite_default_template();
         return rest_ensure_response( array( 'ok' => true ) + $tpl );
     }
 
@@ -1827,7 +1827,7 @@ function gs_invite_rest_save_template( WP_REST_Request $req ) {
     if ( $subject === '' || $body === '' ) {
         return new WP_Error( 'gs_invite_template', __( 'Subject and body are required.', 'gend-society' ), array( 'status' => 400 ) );
     }
-    update_user_meta( $user_id, 'gs_invite_template', array(
+    update_user_meta( $user_id, 'gend_society_invite_template', array(
         'subject' => $subject,
         'body'    => $body,
     ) );
@@ -1838,22 +1838,22 @@ function gs_invite_rest_save_template( WP_REST_Request $req ) {
  * Send a single invite email, append a log entry with tracking metadata,
  * and update the pending-email index. Returns array { ok, log_id }.
  */
-function gs_invite_send_one( $sender, $email, $name, $subject_tpl, $body_tpl, $skip_member_check = false ) {
+function gend_society_invite_send_one( $sender, $email, $name, $subject_tpl, $body_tpl, $skip_member_check = false ) {
     $email = sanitize_email( $email );
     if ( ! $email || ! is_email( $email ) ) return array( 'ok' => false, 'reason' => 'invalid' );
     if ( ! $skip_member_check && email_exists( $email ) ) return array( 'ok' => false, 'reason' => 'exists' );
 
     $log_id      = wp_generate_password( 12, false );
-    $invite_link = gs_invite_get_affiliate_url( $sender->ID );
+    $invite_link = gend_society_invite_get_affiliate_url( $sender->ID );
     $vars = array(
         'name'         => $name,
         'sender_name'  => $sender->display_name,
         'sender_email' => $sender->user_email,
         'invite_link'  => $invite_link,
     );
-    $subject = gs_invite_render_template( $subject_tpl, $vars );
-    $body    = gs_invite_render_template( $body_tpl,    $vars );
-    $body    = gs_invite_inject_tracking( $body, $sender->ID, $log_id );
+    $subject = gend_society_invite_render_template( $subject_tpl, $vars );
+    $body    = gend_society_invite_render_template( $body_tpl,    $vars );
+    $body    = gend_society_invite_inject_tracking( $body, $sender->ID, $log_id );
 
     $headers = array(
         'Content-Type: text/html; charset=UTF-8',
@@ -1866,7 +1866,7 @@ function gs_invite_send_one( $sender, $email, $name, $subject_tpl, $body_tpl, $s
     // Persist log entry on the sender. Skip logging for "test" sends to the
     // sender's own address — we don't want our own test mail in the history.
     if ( ! $skip_member_check ) {
-        $log = get_user_meta( $sender->ID, 'gs_invite_log', true );
+        $log = get_user_meta( $sender->ID, 'gend_society_invite_log', true );
         if ( ! is_array( $log ) ) $log = array();
         $log[] = array(
             'id'             => $log_id,
@@ -1878,14 +1878,14 @@ function gs_invite_send_one( $sender, $email, $name, $subject_tpl, $body_tpl, $s
             'reminders'      => 0,
         );
         if ( count( $log ) > 500 ) $log = array_slice( $log, -500 );
-        update_user_meta( $sender->ID, 'gs_invite_log', $log );
-        gs_invite_index_add( $email, $sender->ID, $log_id );
+        update_user_meta( $sender->ID, 'gend_society_invite_log', $log );
+        gend_society_invite_index_add( $email, $sender->ID, $log_id );
     }
 
     return array( 'ok' => true, 'log_id' => $log_id );
 }
 
-function gs_invite_rest_send( WP_REST_Request $req ) {
+function gend_society_invite_rest_send( WP_REST_Request $req ) {
     $sender   = wp_get_current_user();
     $params   = $req->get_json_params();
 
@@ -1897,19 +1897,19 @@ function gs_invite_rest_send( WP_REST_Request $req ) {
     $subject_tpl = isset( $params['subject'] ) ? wp_unslash( $params['subject'] ) : '';
     $body_tpl    = isset( $params['body'] )    ? wp_unslash( $params['body'] )    : '';
     if ( ! $subject_tpl || ! $body_tpl ) {
-        $tpl         = gs_invite_get_template( $sender->ID );
+        $tpl         = gend_society_invite_get_template( $sender->ID );
         $subject_tpl = $subject_tpl ?: $tpl['subject'];
         $body_tpl    = $body_tpl    ?: $tpl['body'];
     }
 
     $sent = 0; $failed = array(); $skipped = array();
-    $cap = (int) apply_filters( 'gs_invite_max_per_batch', 100 );
+    $cap = (int) apply_filters( 'gend_society_invite_max_per_batch', 100 );
     $recipients = array_slice( $recipients, 0, $cap );
 
     foreach ( $recipients as $row ) {
         $email = isset( $row['email'] ) ? $row['email'] : '';
         $name  = isset( $row['name'] )  ? sanitize_text_field( $row['name'] ) : '';
-        $r = gs_invite_send_one( $sender, $email, $name, $subject_tpl, $body_tpl );
+        $r = gend_society_invite_send_one( $sender, $email, $name, $subject_tpl, $body_tpl );
         if ( $r['ok'] ) $sent++;
         else if ( $r['reason'] === 'exists' || $r['reason'] === 'invalid' ) $skipped[] = $email;
         else $failed[] = $email;
@@ -1924,7 +1924,7 @@ function gs_invite_rest_send( WP_REST_Request $req ) {
     ) );
 }
 
-function gs_invite_rest_send_test( WP_REST_Request $req ) {
+function gend_society_invite_rest_send_test( WP_REST_Request $req ) {
     $sender = wp_get_current_user();
     $params = $req->get_json_params();
     $email  = isset( $params['email'] ) ? sanitize_email( $params['email'] ) : '';
@@ -1934,21 +1934,21 @@ function gs_invite_rest_send_test( WP_REST_Request $req ) {
     $subject_tpl = isset( $params['subject'] ) ? wp_unslash( $params['subject'] ) : '';
     $body_tpl    = isset( $params['body'] )    ? wp_unslash( $params['body'] )    : '';
     if ( ! $subject_tpl || ! $body_tpl ) {
-        $tpl         = gs_invite_get_template( $sender->ID );
+        $tpl         = gend_society_invite_get_template( $sender->ID );
         $subject_tpl = $subject_tpl ?: $tpl['subject'];
         $body_tpl    = $body_tpl    ?: $tpl['body'];
     }
     // Test sends bypass the email_exists check (so you can test against your
     // own address) and don't write to the log.
-    $r = gs_invite_send_one( $sender, $email, '', $subject_tpl, $body_tpl, true );
+    $r = gend_society_invite_send_one( $sender, $email, '', $subject_tpl, $body_tpl, true );
     if ( ! $r['ok'] ) {
         return new WP_Error( 'gs_invite_test_send', __( 'Test send failed.', 'gend-society' ), array( 'status' => 500 ) );
     }
     return rest_ensure_response( array( 'ok' => true ) );
 }
 
-function gs_invite_rest_log( WP_REST_Request $req ) {
-    $log = get_user_meta( get_current_user_id(), 'gs_invite_log', true );
+function gend_society_invite_rest_log( WP_REST_Request $req ) {
+    $log = get_user_meta( get_current_user_id(), 'gend_society_invite_log', true );
     if ( ! is_array( $log ) ) $log = array();
     // Backfill missing fields on legacy entries that only had {email,name,ts}.
     $log = array_map( function ( $e ) {
@@ -1962,7 +1962,7 @@ function gs_invite_rest_log( WP_REST_Request $req ) {
     return rest_ensure_response( array( 'ok' => true, 'entries' => array_values( $log ) ) );
 }
 
-function gs_invite_rest_remind( WP_REST_Request $req ) {
+function gend_society_invite_rest_remind( WP_REST_Request $req ) {
     $sender = wp_get_current_user();
     $params = $req->get_json_params();
     $email  = isset( $params['email'] )   ? sanitize_email( $params['email'] ) : '';
@@ -1974,12 +1974,12 @@ function gs_invite_rest_remind( WP_REST_Request $req ) {
     if ( email_exists( $email ) ) {
         return new WP_Error( 'gs_invite_remind_exists', __( 'That user is already a member.', 'gend-society' ), array( 'status' => 400 ) );
     }
-    $r = gs_invite_send_one( $sender, $email, '', $subject_tpl, $body_tpl );
+    $r = gend_society_invite_send_one( $sender, $email, '', $subject_tpl, $body_tpl );
     if ( ! $r['ok'] ) {
         return new WP_Error( 'gs_invite_remind_send', __( 'Reminder send failed.', 'gend-society' ), array( 'status' => 500 ) );
     }
     // Increment reminder count on the most recent matching log entry.
-    $log = get_user_meta( $sender->ID, 'gs_invite_log', true );
+    $log = get_user_meta( $sender->ID, 'gend_society_invite_log', true );
     if ( is_array( $log ) ) {
         for ( $i = count( $log ) - 1; $i >= 0; $i-- ) {
             if ( isset( $log[ $i ]['email'] ) && strtolower( $log[ $i ]['email'] ) === strtolower( $email ) ) {
@@ -1988,7 +1988,7 @@ function gs_invite_rest_remind( WP_REST_Request $req ) {
                 break;
             }
         }
-        update_user_meta( $sender->ID, 'gs_invite_log', $log );
+        update_user_meta( $sender->ID, 'gend_society_invite_log', $log );
     }
     return rest_ensure_response( array( 'ok' => true ) );
 }
@@ -1998,13 +1998,13 @@ function gs_invite_rest_remind( WP_REST_Request $req ) {
  * We mark the corresponding log entry as opened (only the first time, so
  * later reloads don't churn user meta) and return a 1×1 transparent GIF.
  */
-function gs_invite_rest_open( WP_REST_Request $req ) {
+function gend_society_invite_rest_open( WP_REST_Request $req ) {
     $token = (string) $req->get_param( 't' );
-    $data  = gs_invite_verify_token( $token );
+    $data  = gend_society_invite_verify_token( $token );
     if ( $data && ! empty( $data['u'] ) && ! empty( $data['l'] ) ) {
         $sender_id = (int) $data['u'];
         $log_id    = (string) $data['l'];
-        $log = get_user_meta( $sender_id, 'gs_invite_log', true );
+        $log = get_user_meta( $sender_id, 'gend_society_invite_log', true );
         if ( is_array( $log ) ) {
             $changed = false;
             foreach ( $log as &$entry ) {
@@ -2015,7 +2015,7 @@ function gs_invite_rest_open( WP_REST_Request $req ) {
                 }
             }
             unset( $entry );
-            if ( $changed ) update_user_meta( $sender_id, 'gs_invite_log', $log );
+            if ( $changed ) update_user_meta( $sender_id, 'gend_society_invite_log', $log );
         }
     }
     // Return a 1x1 transparent GIF (43 bytes) regardless of token validity
@@ -2036,8 +2036,8 @@ function gs_invite_rest_open( WP_REST_Request $req ) {
  * and the email-body editor degrades to a plain textarea when the host page
  * has no TinyMCE — both by design, see gs_invite_render_panel()).
  */
-add_action( 'wp_ajax_gs_invite_panel_fragment', 'gs_invite_ajax_panel_fragment' );
-function gs_invite_ajax_panel_fragment() {
+add_action( 'wp_ajax_gend_society_invite_panel_fragment', 'gend_society_invite_ajax_panel_fragment' );
+function gend_society_invite_ajax_panel_fragment() {
     if ( ! is_user_logged_in() ) {
         status_header( 401 );
         exit;
@@ -2056,6 +2056,6 @@ function gs_invite_ajax_panel_fragment() {
         }
     }
     header( 'Content-Type: text/html; charset=utf-8' );
-    gs_invite_render_panel( $share );
+    gend_society_invite_render_panel( $share );
     exit;
 }

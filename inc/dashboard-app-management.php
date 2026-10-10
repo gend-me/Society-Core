@@ -25,7 +25,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-if (!function_exists('gs_dashboard_hub_url')) {
+if (!function_exists('gend_society_dashboard_hub_url')) {
 
     /**
      * Resolve the gend.me hub URL for deep-linking from a customer's
@@ -45,13 +45,13 @@ if (!function_exists('gs_dashboard_hub_url')) {
      * site URL — producing "Manage Domains" / "Change Plan" buttons
      * that pointed at https://customer.gend.me/my-account/... 404s.
      */
-    function gs_dashboard_hub_url() {
+    function gend_society_dashboard_hub_url() {
 
-        if (function_exists('gs_oauth_hub_url') && function_exists('gs_oauth_is_hub_site')) {
-            $hub = (string) gs_oauth_hub_url();
+        if (function_exists('gend_society_oauth_hub_url') && function_exists('gend_society_oauth_is_hub_site')) {
+            $hub = (string) gend_society_oauth_hub_url();
             // Use the OAuth hub URL when we're NOT the hub. On the hub
             // itself, fall through so links remain local.
-            if ($hub !== '' && !gs_oauth_is_hub_site()) {
+            if ($hub !== '' && !gend_society_oauth_is_hub_site()) {
                 return trailingslashit($hub);
             }
         }
@@ -75,7 +75,7 @@ if (!function_exists('gs_dashboard_hub_url')) {
     }
 }
 
-if (!function_exists('gs_get_app_management_html')) {
+if (!function_exists('gend_society_get_app_management_html')) {
 
     /**
      * Render the App Management block (Domain + Plan upgrade/migrate).
@@ -85,9 +85,9 @@ if (!function_exists('gs_get_app_management_html')) {
      *                          container site.
      * @return string
      */
-    function gs_get_app_management_html($membership = null) {
+    function gend_society_get_app_management_html($membership = null) {
 
-        $network_home = gs_dashboard_hub_url();
+        $network_home = gend_society_dashboard_hub_url();
 
         // Pick the customer's container site (where applicable). We need
         // its site_id to deep-link to its Site Edit page on gend.me.
@@ -156,8 +156,8 @@ if (!function_exists('gs_get_app_management_html')) {
         $manage_plan_url    = '';
         $migrate_url        = '';
         $remote_mid         = 0;
-        if (!$membership && function_exists('gs_remote_membership_get_cached')) {
-            $remote = gs_remote_membership_get_cached();
+        if (!$membership && function_exists('gend_society_remote_membership_get_cached')) {
+            $remote = gend_society_remote_membership_get_cached();
             if (is_array($remote) && !empty($remote['membership_id'])) {
                 $remote_mid = (int) $remote['membership_id'];
             }

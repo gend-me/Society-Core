@@ -1,0 +1,6 @@
+{
+	"name": "clean copy of the repo",
+	"expect": "clean",
+	"knownBaseline_note": "Emptied in Plan 105-11: the clean copy must build with exit 0 (old-prefix enforced, no hot-linked gend.me uploads outside inc/remote-assets.php).",
+	"knownBaseline": []
+}

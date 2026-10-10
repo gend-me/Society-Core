@@ -45,8 +45,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'wp_footer', 'gs_collab_payments_match_launcher', 9 );
-function gs_collab_payments_match_launcher() {
+add_action( 'wp_footer', 'gend_society_collab_payments_match_launcher', 9 );
+function gend_society_collab_payments_match_launcher() {
 	// Retired from the Organization page by request -- same pattern as this feature's earlier homes
 	// (Phase 82's group nav tab, Phase 102's profile tab): disable rendering here rather than delete the
 	// code, in case GenD Match needs relocating again later. The code below (render_panel() call, modal
@@ -69,8 +69,8 @@ function gs_collab_payments_match_launcher() {
 	}
 
 	$uid = (int) get_current_user_id();
-	if ( function_exists( 'gs_collab_profile_can_act_for_group' ) ) {
-		$can_act = gs_collab_profile_can_act_for_group( $uid, $group_id );
+	if ( function_exists( 'gend_society_collab_profile_can_act_for_group' ) ) {
+		$can_act = gend_society_collab_profile_can_act_for_group( $uid, $group_id );
 	} else {
 		// Verbatim mirror of the collab access predicate (super-admin OR
 		// group admin OR group mod) for a partial/out-of-order deploy.
@@ -82,7 +82,7 @@ function gs_collab_payments_match_launcher() {
 		return;
 	}
 
-	if ( ! class_exists( 'GS_Group_Tab_Collab' ) || ! method_exists( 'GS_Group_Tab_Collab', 'render_panel' ) ) {
+	if ( ! class_exists( 'Gend_Society_Group_Tab_Collab' ) || ! method_exists( 'Gend_Society_Group_Tab_Collab', 'render_panel' ) ) {
 		return;
 	}
 	?>
@@ -116,7 +116,7 @@ function gs_collab_payments_match_launcher() {
 				</button>
 			</div>
 			<div class="gs-match-modal__body">
-				<?php GS_Group_Tab_Collab::render_panel( $group_id ); ?>
+				<?php Gend_Society_Group_Tab_Collab::render_panel( $group_id ); ?>
 			</div>
 		</div>
 	</div>

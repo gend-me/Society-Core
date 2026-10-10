@@ -74,7 +74,7 @@ if ( ! function_exists( 'gend_society_remote_assets_allowed' ) ) {
 		if ( 'hub' === $mode || 'container' === $mode ) {
 			$allowed = true;
 		} else {
-			$allowed = '' !== (string) get_option( 'gs_install_token', '' )
+			$allowed = '' !== (string) get_option( 'gend_society_install_token', '' )
 				|| (bool) get_option( 'gend_society_remote_consent', false );
 		}
 

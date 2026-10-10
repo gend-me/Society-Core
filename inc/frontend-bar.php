@@ -5,11 +5,11 @@ if (!defined('ABSPATH')) {
 
 // Cached admin-mirror nav for the current request. Used by both the gate and
 // the renderer so we don't rebuild it three times per page.
-function gs_frontend_bar_admin_nav()
+function gend_society_frontend_bar_admin_nav()
 {
   static $cache = null;
   if ($cache === null) {
-    $cache = is_user_logged_in() ? gs_build_frontend_nav() : [];
+    $cache = is_user_logged_in() ? gend_society_build_frontend_nav() : [];
   }
   return $cache;
 }
@@ -18,7 +18,7 @@ function gs_frontend_bar_admin_nav()
 // (rendered by [psoo_group] from the projects plugin). In that case the
 // parent host page is already painting the gend-society chrome — we
 // must not duplicate it inside the iframe.
-function gs_is_embed_request()
+function gend_society_is_embed_request()
 {
   static $cached = null;
   if ($cached !== null) return $cached;
@@ -30,48 +30,48 @@ function gs_is_embed_request()
 // items OR social plugin is active so we can use the profile-mirror nav).
 // Suppressed entirely on iframed embed requests so the parent page's
 // chrome isn't duplicated inside the iframe.
-function gs_frontend_bar_should_show()
+function gend_society_frontend_bar_should_show()
 {
-  if (gs_is_embed_request()) {
+  if (gend_society_is_embed_request()) {
     return false;
   }
   if (!is_user_logged_in()) {
     return false;
   }
-  if (!empty(gs_frontend_bar_admin_nav())) {
+  if (!empty(gend_society_frontend_bar_admin_nav())) {
     return true;
   }
-  return gs_plugin_active('social-network/social-network.php');
+  return gend_society_plugin_active('social-network/social-network.php');
 }
 
 // Profile-mirror mode kicks in whenever the admin-mirror nav is empty AND
 // the social plugin is active — covers BOTH "user lacks edit_posts" and
 // "user has edit_posts but no gs_feature_access entries" (the symptom is the
 // same: a logged-in user with no accessible WP-admin menus).
-function gs_frontend_bar_is_profile_mode()
+function gend_society_frontend_bar_is_profile_mode()
 {
   if (!is_user_logged_in()) {
     return false;
   }
-  if (!gs_plugin_active('social-network/social-network.php')) {
+  if (!gend_society_plugin_active('social-network/social-network.php')) {
     return false;
   }
-  return empty(gs_frontend_bar_admin_nav());
+  return empty(gend_society_frontend_bar_admin_nav());
 }
 
 // Enqueue frontend assets for the sidebar.
-add_action('wp_enqueue_scripts', 'gs_enqueue_frontend_assets');
-function gs_enqueue_frontend_assets()
+add_action('wp_enqueue_scripts', 'gend_society_enqueue_frontend_assets');
+function gend_society_enqueue_frontend_assets()
 {
-  if (!gs_frontend_bar_should_show()) {
+  if (!gend_society_frontend_bar_should_show()) {
     return;
   }
-  $v = GS_VERSION . '.' . filemtime(GS_DIR . 'assets/frontend-bar.css');
-  wp_enqueue_style('gs-frontend-bar', GS_URL . 'assets/frontend-bar.css', ['dashicons'], $v);
-  wp_enqueue_script('gs-frontend-bar-js', GS_URL . 'assets/frontend-bar.js', [], $v, true);
+  $v = GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/frontend-bar.css');
+  wp_enqueue_style('gs-frontend-bar', GEND_SOCIETY_URL . 'assets/frontend-bar.css', ['dashicons'], $v);
+  wp_enqueue_script('gs-frontend-bar-js', GEND_SOCIETY_URL . 'assets/frontend-bar.js', [], $v, true);
 
   // Enqueue chat modal
-  wp_enqueue_script('gs-template-modal', GS_URL . 'assets/gs-template-modal.js', ['jquery'], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/gs-template-modal.js'), true);
+  wp_enqueue_script('gs-template-modal', GEND_SOCIETY_URL . 'assets/gs-template-modal.js', ['jquery'], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/gs-template-modal.js'), true);
   wp_localize_script('gs-template-modal', 'GS_TEMPLATE_MODAL', [
     'rest_url' => esc_url_raw(rest_url()),
     'nonce' => wp_create_nonce('wp_rest')
@@ -95,8 +95,8 @@ function gs_enqueue_frontend_assets()
  * Scoped to any /groups/* URL (directory, single group, user's groups tab)
  * by bp_is_groups_component(). All other frontend pages render normally.
  */
-add_action('wp_head', 'gs_groups_frontend_background', 99);
-function gs_groups_frontend_background() {
+add_action('wp_head', 'gend_society_groups_frontend_background', 99);
+function gend_society_groups_frontend_background() {
     if ( is_admin() ) {
         return;
     }
@@ -307,14 +307,14 @@ function gs_groups_frontend_background() {
 }
 
 // Enqueue global site branding and animation utilities for ALL visitors
-add_action('wp_enqueue_scripts', 'gs_enqueue_global_frontend_assets');
-function gs_enqueue_global_frontend_assets()
+add_action('wp_enqueue_scripts', 'gend_society_enqueue_global_frontend_assets');
+function gend_society_enqueue_global_frontend_assets()
 {
     // Animations
-    wp_enqueue_style('gs-animation-utilities', GS_URL . 'assets/animation-utilities.css', [], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/animation-utilities.css'));
+    wp_enqueue_style('gs-animation-utilities', GEND_SOCIETY_URL . 'assets/animation-utilities.css', [], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/animation-utilities.css'));
 
     // Site Header & Footer Branding
-    wp_enqueue_style('gs-site-header-footer', GS_URL . 'assets/site-header-footer.css', [], GS_VERSION . '.' . filemtime(GS_DIR . 'assets/site-header-footer.css'));
+    wp_enqueue_style('gs-site-header-footer', GEND_SOCIETY_URL . 'assets/site-header-footer.css', [], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/site-header-footer.css'));
 }
 
 
@@ -327,10 +327,10 @@ function gs_enqueue_global_frontend_assets()
 // image-button layout. Removed — admin-style.php is the single source.
 
 // Inject the sidebar into wp_footer for logged-in users
-add_action('wp_footer', 'gs_render_frontend_bar', 5);
-function gs_render_frontend_bar()
+add_action('wp_footer', 'gend_society_render_frontend_bar', 5);
+function gend_society_render_frontend_bar()
 {
-  if (!gs_frontend_bar_should_show()) {
+  if (!gend_society_frontend_bar_should_show()) {
     return;
   }
 
@@ -375,9 +375,9 @@ function gs_render_frontend_bar()
   $edit_agent_group_id = 0;
   if ( function_exists( 'bp_is_user' ) && bp_is_user()
        && ( is_super_admin( $user->ID ) || current_user_can( 'manage_options' ) ) // site-admin check, not a hub signal (104 audit)
-       && function_exists( 'gs_user_is_agent' ) ) {
+       && function_exists( 'gend_society_user_is_agent' ) ) {
     $edit_agent_displayed_id = function_exists( 'bp_displayed_user_id' ) ? (int) bp_displayed_user_id() : 0;
-    if ( $edit_agent_displayed_id && gs_user_is_agent( $edit_agent_displayed_id ) ) {
+    if ( $edit_agent_displayed_id && gend_society_user_is_agent( $edit_agent_displayed_id ) ) {
       $edit_agent_slug = (string) get_user_meta( $edit_agent_displayed_id, '_aipa_agent_slug', true );
       // Resolve the group this agent belongs to — prefer the bookkeeping meta
       // (newer agents), fall back to actual BP group membership (older agents
@@ -400,9 +400,9 @@ function gs_render_frontend_bar()
   // - If the admin-mirror nav has items → render those (existing behaviour).
   // - Otherwise (no accessible WP-admin menus) and social plugin active →
   //   render the profile-mirror nav.
-  $nav_items = gs_frontend_bar_admin_nav();
-  if (empty($nav_items) && gs_frontend_bar_is_profile_mode()) {
-    $nav_items = gs_build_frontend_profile_nav();
+  $nav_items = gend_society_frontend_bar_admin_nav();
+  if (empty($nav_items) && gend_society_frontend_bar_is_profile_mode()) {
+    $nav_items = gend_society_build_frontend_profile_nav();
   }
   $cart_count = 0;
   if (function_exists('WC') && WC() && WC()->cart) {
@@ -607,7 +607,7 @@ function gs_render_frontend_bar()
 /**
  * Build frontend nav from the current user's accessible admin menu.
  */
-function gs_build_frontend_nav()
+function gend_society_build_frontend_nav()
 {
   $items = [];
 
@@ -638,10 +638,10 @@ function gs_build_frontend_nav()
   if (current_user_can('edit_theme_options')) {
     $content_children[] = ['label' => __('Theme Editor', 'gend-society'), 'url' => admin_url('site-editor.php')];
   }
-  if (gs_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
+  if (gend_society_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
     $content_children[] = ['label' => __('Content Campaigns', 'gend-society'), 'url' => admin_url('admin.php?page=' . (defined('BM_ADMIN_SLUG') ? BM_ADMIN_SLUG : 'blog-manager'))];
   }
-  if (gs_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
+  if (gend_society_plugin_active('email-manager/email-manager.php') && current_user_can('manage_options')) {
     $content_children[] = ['label' => __('Talk Flows', 'gend-society'), 'url' => admin_url('admin.php?page=talk-flows')];
   }
 
@@ -654,19 +654,19 @@ function gs_build_frontend_nav()
   ];
 
   // Conditionally add Store
-  $has_store_apps = gs_plugin_active('online-store/online-store.php') || gs_plugin_active('sales-team/advanced-affiliate-system.php') || gs_plugin_active('projects/project-service-orders.php');
+  $has_store_apps = gend_society_plugin_active('online-store/online-store.php') || gend_society_plugin_active('sales-team/advanced-affiliate-system.php') || gend_society_plugin_active('projects/project-service-orders.php');
   if ($has_store_apps) {
     $store_children = [];
 
     // Add Online Store submenus if active
-    if (gs_plugin_active('online-store/online-store.php') && current_user_can('manage_woocommerce')) {
+    if (gend_society_plugin_active('online-store/online-store.php') && current_user_can('manage_woocommerce')) {
       $store_children[] = ['label' => __('Store Management', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-store-settings')];
     }
 
-    if (gs_plugin_active('sales-team/advanced-affiliate-system.php') && current_user_can('manage_options')) {
+    if (gend_society_plugin_active('sales-team/advanced-affiliate-system.php') && current_user_can('manage_options')) {
       $store_children[] = ['label' => __('Sales Team', 'gend-society'), 'url' => admin_url('admin.php?page=st_sales_team')];
     }
-    if (gs_plugin_active('projects/project-service-orders.php') && current_user_can('manage_options')) {
+    if (gend_society_plugin_active('projects/project-service-orders.php') && current_user_can('manage_options')) {
       $store_children[] = ['label' => __('Project Services', 'gend-society'), 'url' => admin_url('admin.php?page=psoo-projects')];
     }
 
@@ -680,14 +680,14 @@ function gs_build_frontend_nav()
   }
 
   // Conditionally add Social
-  if (gs_plugin_active('social-network/social-network.php') && current_user_can('manage_options')) {
+  if (gend_society_plugin_active('social-network/social-network.php') && current_user_can('manage_options')) {
     $social_children = [
       ['label' => __('Social Profiles', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-network-settings')],
     ];
-    if (gs_plugin_active('reward-programs/reward-programs.php')) {
+    if (gend_society_plugin_active('reward-programs/reward-programs.php')) {
       $social_children[] = ['label' => __('Point Bank', 'gend-society'), 'url' => admin_url('admin.php?page=gs-rewards')];
     }
-    if (gs_plugin_active('contracts-and-payments/contracts-and-payments.php')) {
+    if (gend_society_plugin_active('contracts-and-payments/contracts-and-payments.php')) {
       $social_children[] = ['label' => __('Contracts & Payments', 'gend-society'), 'url' => admin_url('admin.php?page=gend-contracts-payments')];
     }
     $items[] = [
@@ -717,7 +717,7 @@ function gs_build_frontend_nav()
   $final_items = [];
   $current_user_id = get_current_user_id();
   $is_super = is_super_admin($current_user_id) || current_user_can('manage_network'); // site-admin check, not a hub signal (104 audit)
-  $allowed_features = get_user_meta($current_user_id, 'gs_feature_access', true);
+  $allowed_features = get_user_meta($current_user_id, 'gend_society_feature_access', true);
   if (!is_array($allowed_features)) {
     $allowed_features = [];
   }
@@ -788,7 +788,7 @@ function gs_build_frontend_nav()
  * profile — hidden on their own profile (redundant) and on non-profile pages
  * (per the explicit "shown only when viewing other profiles" rule).
  */
-function gs_build_frontend_profile_nav()
+function gend_society_build_frontend_profile_nav()
 {
   $base = function_exists('bp_loggedin_user_domain') ? bp_loggedin_user_domain() : '';
   if (!$base) {
@@ -878,10 +878,10 @@ function gs_build_frontend_profile_nav()
  * of template) and injects the mini-cart button + drawer into .nav-actions-right
  * via JavaScript.
  */
-add_action( 'wp_footer', 'gs_inject_mini_cart', 20 );
-function gs_inject_mini_cart() {
+add_action( 'wp_footer', 'gend_society_inject_mini_cart', 20 );
+function gend_society_inject_mini_cart() {
     // Skip on iframed embeds — the host page already renders one.
-    if ( gs_is_embed_request() ) {
+    if ( gend_society_is_embed_request() ) {
         return;
     }
     // Only run if WooCommerce is active
@@ -995,8 +995,8 @@ function gs_inject_mini_cart() {
 /**
  * Enqueue mini-cart styles for the GS injected cart.
  */
-add_action( 'wp_enqueue_scripts', 'gs_enqueue_mini_cart_styles' );
-function gs_enqueue_mini_cart_styles() {
+add_action( 'wp_enqueue_scripts', 'gend_society_enqueue_mini_cart_styles' );
+function gend_society_enqueue_mini_cart_styles() {
     if ( ! function_exists( 'WC' ) ) {
         return;
     }

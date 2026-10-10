@@ -41,7 +41,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @param int $user_id
  * @return bool
  */
-function gs_user_is_agent( $user_id ) {
+function gend_society_user_is_agent( $user_id ) {
 	$user_id = (int) $user_id;
 	if ( $user_id <= 0 ) {
 		return false;
@@ -62,7 +62,7 @@ function gs_user_is_agent( $user_id ) {
  *                        ->subject, ->message, ->recipients[]->user_id).
  * @return void
  */
-function gs_agent_chat_maybe_reply( $message ) {
+function gend_society_agent_chat_maybe_reply( $message ) {
 
 	// Basic validity needed to even read the sender.
 	if ( ! is_object( $message ) ) {
@@ -75,7 +75,7 @@ function gs_agent_chat_maybe_reply( $message ) {
 	// The reply we post below ALSO fires messages_message_sent with the agent
 	// as sender. If the sender is an agent, this is our own reply re-entering
 	// the hook — bail immediately. Without this: infinite message loop.
-	if ( gs_user_is_agent( $sender_id ) ) {
+	if ( gend_society_user_is_agent( $sender_id ) ) {
 		return;
 	}
 
@@ -83,7 +83,7 @@ function gs_agent_chat_maybe_reply( $message ) {
 	// which sends the next question / the thank-you itself -- an auto-reply here would talk over it. Flagged by
 	// gs_agent_chat_note_chatflow_reply() below, before the flow clears its state on the final answer.
 	$thread_for_flow = (int) ( isset( $message->thread_id ) ? $message->thread_id : 0 );
-	if ( $thread_for_flow && ! empty( $GLOBALS['gs_agent_chat_chatflow_threads'][ $thread_for_flow ] ) ) {
+	if ( $thread_for_flow && ! empty( $GLOBALS['gend_society_agent_chat_chatflow_threads'][ $thread_for_flow ] ) ) {
 		return;
 	}
 
@@ -105,7 +105,7 @@ function gs_agent_chat_maybe_reply( $message ) {
 			continue;
 		}
 		// Recipient must be an agent.
-		if ( ! gs_user_is_agent( $agent_id ) ) {
+		if ( ! gend_society_user_is_agent( $agent_id ) ) {
 			continue;
 		}
 		// Deactivated agent -> silent no-reply (MAIL-03 parity).
@@ -114,7 +114,7 @@ function gs_agent_chat_maybe_reply( $message ) {
 		}
 
 		$persona = (string) get_user_meta( $agent_id, '_aipa_agent_system_prompt', true );
-		$reply   = gs_agent_chat_generate_reply(
+		$reply   = gend_society_agent_chat_generate_reply(
 			$agent_id,
 			$persona,
 			(string) ( isset( $message->message ) ? $message->message : '' ),
@@ -146,7 +146,7 @@ function gs_agent_chat_maybe_reply( $message ) {
 		}
 	}
 }
-add_action( 'messages_message_sent', 'gs_agent_chat_maybe_reply', 30, 1 );
+add_action( 'messages_message_sent', 'gend_society_agent_chat_maybe_reply', 30, 1 );
 
 /**
  * Priority 5 (before email-manager's chatflow handler at 10, which deletes its state on the last answer): note
@@ -156,16 +156,16 @@ add_action( 'messages_message_sent', 'gs_agent_chat_maybe_reply', 30, 1 );
  * @param object $message BP_Messages_Message.
  * @return void
  */
-function gs_agent_chat_note_chatflow_reply( $message ) {
+function gend_society_agent_chat_note_chatflow_reply( $message ) {
 	if ( ! is_object( $message ) || empty( $message->thread_id ) ) {
 		return;
 	}
 	$state = get_site_option( 'em_cf_msgflow_' . (int) $message->thread_id );
 	if ( is_array( $state ) && ! empty( $state['qs'] ) && (int) ( $state['user_id'] ?? 0 ) === (int) ( $message->sender_id ?? 0 ) ) {
-		$GLOBALS['gs_agent_chat_chatflow_threads'][ (int) $message->thread_id ] = true;
+		$GLOBALS['gend_society_agent_chat_chatflow_threads'][ (int) $message->thread_id ] = true;
 	}
 }
-add_action( 'messages_message_sent', 'gs_agent_chat_note_chatflow_reply', 5, 1 );
+add_action( 'messages_message_sent', 'gend_society_agent_chat_note_chatflow_reply', 5, 1 );
 
 /**
  * Generate the agent's reply text via the hub LEO proxy.
@@ -181,7 +181,7 @@ add_action( 'messages_message_sent', 'gs_agent_chat_note_chatflow_reply', 5, 1 )
  * @param int    $thread_id   Thread id (unused in single-turn; kept for parity).
  * @return string Reply text, or '' on any error / no bearer / empty reply.
  */
-function gs_agent_chat_generate_reply( $agent_id, $persona, $member_text, $thread_id ) {
+function gend_society_agent_chat_generate_reply( $agent_id, $persona, $member_text, $thread_id ) {
 
 	// The hook runs inside the MEMBER's message-send request, so resolve the
 	// member's gend.me bearer (same source as GS_AI_Proxy::bearer()). Guarded:
@@ -203,7 +203,7 @@ function gs_agent_chat_generate_reply( $agent_id, $persona, $member_text, $threa
 	$messages[] = array( 'role' => 'user', 'content' => $member_text );
 
 	// Resolve hub base via the proven GS_AI_Proxy helper when present.
-	$hub = class_exists( 'GS_AI_Proxy' ) ? GS_AI_Proxy::hub_base() : 'https://gend.me';
+	$hub = class_exists( 'Gend_Society_AI_Proxy' ) ? Gend_Society_AI_Proxy::hub_base() : 'https://gend.me';
 
 	$r = wp_remote_post( $hub . '/wp-json/aipa/v1/ai-proxy', array(
 		'timeout' => 60,

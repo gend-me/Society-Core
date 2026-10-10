@@ -20,8 +20,8 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
-add_action( 'wp_footer', 'gs_group_mobile_menu_render', 12 );
-function gs_group_mobile_menu_render() {
+add_action( 'wp_footer', 'gend_society_group_mobile_menu_render', 12 );
+function gend_society_group_mobile_menu_render() {
 	if ( ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) {
 		return;
 	}

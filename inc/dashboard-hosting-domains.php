@@ -31,7 +31,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 // dashboard-hosting.php loads first and defines its own gs_render_hosting_domains_panel()
 // (guarded). Without this guard a full repo-tree install fatals with "Cannot redeclare";
 // the gend.me hub never ships this file, so the hub copy is already the one in use.
-if ( ! function_exists( 'gs_render_hosting_domains_panel' ) ) :
+if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) :
 
 
 /**
@@ -42,7 +42,7 @@ if ( ! function_exists( 'gs_render_hosting_domains_panel' ) ) :
  * @param array $payload Membership payload (passed through from gs_render_hosting_tab).
  * @return void
  */
-function gs_render_hosting_domains_panel( $payload = array() ) {
+function gend_society_render_hosting_domains_panel( $payload = array() ) {
     if ( ! current_user_can( 'manage_options' ) ) {
         echo '<p style="color: var(--gs-muted);">' . esc_html__( 'You do not have permission to manage domains.', 'gend-society' ) . '</p>';
         return;
@@ -51,16 +51,16 @@ function gs_render_hosting_domains_panel( $payload = array() ) {
     // Enqueue wizard assets — GS_VERSION + filemtime cache-buster (one bump
     // per project_social_membership_assets convention; the plugin Version:
     // header is bumped in 72-02 Task 1 which cascades to GS_VERSION).
-    $js_ver  = defined( 'GS_VERSION' ) ? GS_VERSION : '0';
+    $js_ver  = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '0';
     $css_ver = $js_ver;
-    if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'assets/domains-wizard.js' ) ) {
-        $js_ver = $js_ver . '.' . filemtime( GS_DIR . 'assets/domains-wizard.js' );
+    if ( defined( 'GEND_SOCIETY_DIR' ) && file_exists( GEND_SOCIETY_DIR . 'assets/domains-wizard.js' ) ) {
+        $js_ver = $js_ver . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/domains-wizard.js' );
     }
-    if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'assets/domains-wizard.css' ) ) {
-        $css_ver = $css_ver . '.' . filemtime( GS_DIR . 'assets/domains-wizard.css' );
+    if ( defined( 'GEND_SOCIETY_DIR' ) && file_exists( GEND_SOCIETY_DIR . 'assets/domains-wizard.css' ) ) {
+        $css_ver = $css_ver . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/domains-wizard.css' );
     }
-    wp_enqueue_style( 'gs-domains-wizard', GS_URL . 'assets/domains-wizard.css', array(), $css_ver );
-    wp_enqueue_script( 'gs-domains-wizard', GS_URL . 'assets/domains-wizard.js', array(), $js_ver, true );
+    wp_enqueue_style( 'gs-domains-wizard', GEND_SOCIETY_URL . 'assets/domains-wizard.css', array(), $css_ver );
+    wp_enqueue_script( 'gs-domains-wizard', GEND_SOCIETY_URL . 'assets/domains-wizard.js', array(), $js_ver, true );
     wp_localize_script(
         'gs-domains-wizard',
         'gsDomainsWizard',
@@ -189,8 +189,8 @@ function gs_render_hosting_domains_panel( $payload = array() ) {
     // function_exists guard for the hub PVC .no-plugin-sync partial-deploy
     // race (Phase 71-02 pattern): if the sibling include is missing, the
     // wizard still renders — the Edit-records button just becomes a no-op.
-    if ( function_exists( 'gs_render_hosting_records_modal' ) ) {
-        gs_render_hosting_records_modal( $payload );
+    if ( function_exists( 'gend_society_render_hosting_records_modal' ) ) {
+        gend_society_render_hosting_records_modal( $payload );
     }
 }
 endif;

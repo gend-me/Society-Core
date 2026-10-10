@@ -36,16 +36,16 @@
         </div>
         <div class="gs-card-body">
             <?php
-            $counts = count_users();
+            $gend_society_counts = count_users();
             echo '<div class="gs-grid gs-grid-3">';
-            foreach ($counts['avail_roles'] as $role => $count) {
-                if (!$count) {
+            foreach ($gend_society_counts['avail_roles'] as $gend_society_role => $gend_society_count) {
+                if (!$gend_society_count) {
                     continue;
                 }
                 printf(
                     '<div class="gs-card gs-card-stat"><div class="gs-card-icon gs-icon-magenta"><span class="dashicons dashicons-admin-users"></span></div><div class="gs-card-body"><div class="gs-stat-number">%d</div><div class="gs-stat-label">%s</div></div></div>',
-                    intval($count),
-                    esc_html(ucwords(str_replace(['_', '-'], ' ', $role)))
+                    intval($gend_society_count),
+                    esc_html(ucwords(str_replace(['_', '-'], ' ', $gend_society_role)))
                 );
             }
             echo '</div>';

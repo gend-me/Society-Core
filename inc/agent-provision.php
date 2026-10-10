@@ -31,10 +31,10 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-const GS_AGENT_REPLAY_TTL = 5 * MINUTE_IN_SECONDS;
+const GEND_SOCIETY_AGENT_REPLAY_TTL = 5 * MINUTE_IN_SECONDS;
 
-add_action('init', 'gs_agent_register_role');
-add_action('rest_api_init', 'gs_agent_register_routes');
+add_action('init', 'gend_society_agent_register_role');
+add_action('rest_api_init', 'gend_society_agent_register_routes');
 
 /**
  * Register a container-side `ai_agent` role on EVERY request (idempotent).
@@ -46,47 +46,47 @@ add_action('rest_api_init', 'gs_agent_register_routes');
  * containers that never re-activated the plugin, and em_inbox_provision_user()'s
  * get_role('ai_agent') validation would then fail.
  */
-function gs_agent_register_role() {
+function gend_society_agent_register_role() {
     if (!get_role('ai_agent')) {
         add_role('ai_agent', __('AI Agent', 'gend-society'), array('read' => true));
     }
 }
 
-function gs_agent_register_routes() {
+function gend_society_agent_register_routes() {
 
     register_rest_route('gs/v1', '/agent/provision', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_provision',
+        'callback'            => 'gend_society_agent_provision',
         'permission_callback' => '__return_true',
     ));
 
     register_rest_route('gs/v1', '/agent/deactivate', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_deactivate',
+        'callback'            => 'gend_society_agent_deactivate',
         'permission_callback' => '__return_true',
     ));
 
     register_rest_route('gs/v1', '/agent/send', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_send',
+        'callback'            => 'gend_society_agent_send',
         'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
     ));
 
     register_rest_route('gs/v1', '/agent/run', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_run',
+        'callback'            => 'gend_society_agent_run',
         'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
     ));
 
     register_rest_route('gs/v1', '/agent/credentials', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_credentials',
+        'callback'            => 'gend_society_agent_credentials',
         'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
     ));
 
     register_rest_route('gs/v1', '/agent/avatar', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_agent_avatar_update',
+        'callback'            => 'gend_society_agent_avatar_update',
         'permission_callback' => '__return_true',   // auth IS the Ed25519 signature
     ));
 }
@@ -96,7 +96,7 @@ function gs_agent_register_routes() {
  * Mirrors gs_support_access_verify_signed_request() (support-access.php).
  * Returns the decoded payload array on success, WP_Error on failure.
  */
-function gs_agent_verify_signed_request(\WP_REST_Request $request) {
+function gend_society_agent_verify_signed_request(\WP_REST_Request $request) {
 
     $body      = (string) $request->get_body();
     $signature = (string) $request->get_header('x_gend_signature');
@@ -105,7 +105,7 @@ function gs_agent_verify_signed_request(\WP_REST_Request $request) {
         return new \WP_Error('missing_signature', __('Missing signature header.', 'gend-society'), array('status' => 401));
     }
 
-    $pub_b64 = (string) get_option('gs_gend_pubkey', '');
+    $pub_b64 = (string) get_option('gend_society_gend_pubkey', '');
     if ($pub_b64 === '') {
         return new \WP_Error('not_paired', __('This site has not been paired with gend.me.', 'gend-society'), array('status' => 412));
     }
@@ -136,13 +136,13 @@ function gs_agent_verify_signed_request(\WP_REST_Request $request) {
     // Replay guard: reject payloads issued > 5 minutes ago or in the future.
     $issued_at = isset($payload['issued_at']) ? (int) $payload['issued_at'] : 0;
     $now       = time();
-    if ($issued_at <= 0 || $issued_at > $now + 60 || $issued_at < $now - GS_AGENT_REPLAY_TTL) {
+    if ($issued_at <= 0 || $issued_at > $now + 60 || $issued_at < $now - GEND_SOCIETY_AGENT_REPLAY_TTL) {
         return new \WP_Error('replay', __('Request is outside the accepted issued_at window.', 'gend-society'), array('status' => 401));
     }
 
     // Install ID match check — prevents a signature meant for one container
     // being replayed against another.
-    $expected_install = (string) get_option('gs_install_id', '');
+    $expected_install = (string) get_option('gend_society_install_id', '');
     if (!empty($payload['install_id']) && $expected_install !== '' && (string) $payload['install_id'] !== $expected_install) {
         return new \WP_Error('install_mismatch', __('install_id does not match this site.', 'gend-society'), array('status' => 401));
     }
@@ -155,7 +155,7 @@ function gs_agent_verify_signed_request(\WP_REST_Request $request) {
  * home_url() ONLY when empty (never clobber an operator's deliberate value).
  * Returns the lowercase host, or '' if it can't be resolved.
  */
-function gs_agent_resolve_domain() {
+function gend_society_agent_resolve_domain() {
 
     $domain = function_exists('em_inbox_default_domain') ? (string) em_inbox_default_domain() : (string) get_option('em_inbox_default_domain', '');
 
@@ -177,9 +177,9 @@ function gs_agent_resolve_domain() {
  * agent, keyed on agent-<slug>@<container-domain>, carrying persona meta + the
  * container `ai_agent` role.
  */
-function gs_agent_provision(\WP_REST_Request $request) {
+function gend_society_agent_provision(\WP_REST_Request $request) {
 
-    $payload = gs_agent_verify_signed_request($request);
+    $payload = gend_society_agent_verify_signed_request($request);
     if (is_wp_error($payload)) {
         return $payload;
     }
@@ -189,7 +189,7 @@ function gs_agent_provision(\WP_REST_Request $request) {
         return new \WP_Error('gs_agent_bad_slug', __('slug required', 'gend-society'), array('status' => 400));
     }
 
-    $domain = gs_agent_resolve_domain();
+    $domain = gend_society_agent_resolve_domain();
     if ($domain === '') {
         return new \WP_Error('gs_agent_no_domain', __('container has no resolvable mail domain', 'gend-society'), array('status' => 500));
     }
@@ -252,9 +252,9 @@ function gs_agent_provision(\WP_REST_Request $request) {
  * destroy sessions, set disabled flag) WITHOUT deleting the user, its mailbox
  * (em_inbox_address), or its mail history (wp_gdc_inbox_raw).
  */
-function gs_agent_deactivate(\WP_REST_Request $request) {
+function gend_society_agent_deactivate(\WP_REST_Request $request) {
 
-    $payload = gs_agent_verify_signed_request($request);
+    $payload = gend_society_agent_verify_signed_request($request);
     if (is_wp_error($payload)) {
         return $payload;
     }
@@ -307,9 +307,9 @@ function gs_agent_deactivate(\WP_REST_Request $request) {
  * pushing a new profile photo to a connected Web App lands here, not just
  * agent accounts.
  */
-function gs_agent_avatar_update(\WP_REST_Request $request) {
+function gend_society_agent_avatar_update(\WP_REST_Request $request) {
 
-    $payload = gs_agent_verify_signed_request($request);
+    $payload = gend_society_agent_verify_signed_request($request);
     if (is_wp_error($payload)) {
         return $payload;
     }
@@ -421,9 +421,9 @@ function gs_agent_avatar_update(\WP_REST_Request $request) {
  * app always gets a live credential and old ones don't pile up in the user's
  * Application Passwords list.
  */
-function gs_agent_credentials(\WP_REST_Request $request) {
+function gend_society_agent_credentials(\WP_REST_Request $request) {
 
-    $payload = gs_agent_verify_signed_request($request);
+    $payload = gend_society_agent_verify_signed_request($request);
     if (is_wp_error($payload)) {
         return $payload;
     }
@@ -506,9 +506,9 @@ function gs_agent_credentials(\WP_REST_Request $request) {
  * container plus the email-manager send core (em_inbox_send_as), which is
  * function_exists-guarded so a not-yet-deployed core returns 501, never fatals.
  */
-function gs_agent_send(\WP_REST_Request $request) {
+function gend_society_agent_send(\WP_REST_Request $request) {
 
-    $payload = gs_agent_verify_signed_request($request);
+    $payload = gend_society_agent_verify_signed_request($request);
     if (is_wp_error($payload)) {
         return $payload;
     }
@@ -600,9 +600,9 @@ function gs_agent_send(\WP_REST_Request $request) {
  * core only (get_user_by, get_user_meta, wp_remote_post, get_option,
  * wp_json_encode, rest_ensure_response) plus same-file gs_agent_verify_signed_request.
  */
-function gs_agent_run(\WP_REST_Request $request) {
+function gend_society_agent_run(\WP_REST_Request $request) {
 
-    $payload = gs_agent_verify_signed_request($request);
+    $payload = gend_society_agent_verify_signed_request($request);
     if (is_wp_error($payload)) {
         return $payload;   // 401 on missing/bad signature
     }
@@ -670,9 +670,9 @@ function gs_agent_run(\WP_REST_Request $request) {
     // — bearer()/auth_headers() are protected). Guard GS_AI_Proxy for hub_base;
     // fall back to the stored option then gend.me so this route is self-contained
     // even if GS_AI_Proxy is older/absent on the container.
-    $hub = (class_exists('GS_AI_Proxy') && method_exists('GS_AI_Proxy', 'hub_base'))
-        ? GS_AI_Proxy::hub_base()
-        : untrailingslashit((string) get_option('gs_gend_base_url', 'https://gend.me'));
+    $hub = (class_exists('Gend_Society_AI_Proxy') && method_exists('Gend_Society_AI_Proxy', 'hub_base'))
+        ? Gend_Society_AI_Proxy::hub_base()
+        : untrailingslashit((string) get_option('gend_society_gend_base_url', 'https://gend.me'));
 
     $body = array(
         'messages' => array(array('role' => 'user', 'content' => $prompt)),

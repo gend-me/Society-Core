@@ -44,7 +44,7 @@ class Gend_GS_Collab_Market_Mirror {
 	const CACHE_TTL = 90;
 
 	/** Transient key for the cached hub market list. */
-	const CACHE_KEY = 'gs_collab_market_mirror';
+	const CACHE_KEY = 'gend_society_collab_market_mirror';
 
 	/**
 	 * Wire the container mirror. Self-gates: return unless GS_COLLAB_MARKET_PUBLIC is on AND this
@@ -55,7 +55,7 @@ class Gend_GS_Collab_Market_Mirror {
 	 */
 	public static function init() : void {
 		// DARK: no mirror when the counsel flag is off (default) — DOM-absent, GATE-01.
-		if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC ) {
+		if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC ) {
 			return;
 		}
 		// CONTAINER-only: on the hub, member-markets.php already renders the native tab — no mirror.
@@ -89,7 +89,7 @@ class Gend_GS_Collab_Market_Mirror {
 	 * @return void
 	 */
 	public static function add_mirror_tab() : void {
-		if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC ) {
+		if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC ) {
 			return;
 		}
 		if ( self::is_hub() ) {
@@ -161,7 +161,7 @@ class Gend_GS_Collab_Market_Mirror {
 	 * @return array List of market items (possibly empty).
 	 */
 	public static function fetch_hub_markets() : array {
-		if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC || self::is_hub() ) {
+		if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC || self::is_hub() ) {
 			return array();
 		}
 
@@ -215,7 +215,7 @@ class Gend_GS_Collab_Market_Mirror {
 	 * @return string
 	 */
 	public static function render() : string {
-		if ( ! defined( 'GS_COLLAB_MARKET_PUBLIC' ) || ! GS_COLLAB_MARKET_PUBLIC || self::is_hub() ) {
+		if ( ! defined( 'GEND_SOCIETY_COLLAB_MARKET_PUBLIC' ) || ! GEND_SOCIETY_COLLAB_MARKET_PUBLIC || self::is_hub() ) {
 			return '';
 		}
 
@@ -322,6 +322,6 @@ class Gend_GS_Collab_Market_Mirror {
 		if ( class_exists( 'AIPA_GenD_OAuth' ) && method_exists( 'AIPA_GenD_OAuth', 'hub_url' ) ) {
 			return rtrim( (string) AIPA_GenD_OAuth::hub_url(), '/' );
 		}
-		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' );
+		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from contracts-and-payments.
 	}
 }

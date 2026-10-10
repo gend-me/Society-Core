@@ -14,18 +14,18 @@
 // confirmed live this was wp_die()-ing for every non-super-admin group owner,
 // truncating the rest of the page (including the footer scripts that apply
 // the full-width layout class) and surfacing as a 500 on the whole request.
-if (!current_user_can('list_users') && !(function_exists('gs_group_tabs_user_has_access') && gs_group_tabs_user_has_access())) {
+if (!current_user_can('list_users') && !(function_exists('gend_society_group_tabs_user_has_access') && gend_society_group_tabs_user_has_access())) {
     wp_die(esc_html__('You do not have sufficient permissions to access this page.', 'gend-society'));
 }
 
 // Handle form submission to save feature access
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gs_feature_access_nonce']) && wp_verify_nonce($_POST['gs_feature_access_nonce'], 'gs_save_feature_access')) {
-    $target_user_id = isset($_POST['target_user_id']) ? intval($_POST['target_user_id']) : 0;
+    $gend_society_target_user_id = isset($_POST['target_user_id']) ? intval($_POST['target_user_id']) : 0;
     
-    if ($target_user_id && current_user_can('edit_user', $target_user_id)) {
+    if ($gend_society_target_user_id && current_user_can('edit_user', $gend_society_target_user_id)) {
         // Sanitize and save the array of allowed menu slugs
-        $allowed_slugs = isset($_POST['gs_allowed_menus']) && is_array($_POST['gs_allowed_menus']) ? array_map('sanitize_text_field', wp_unslash($_POST['gs_allowed_menus'])) : [];
-        update_user_meta($target_user_id, 'gs_feature_access', $allowed_slugs);
+        $gend_society_allowed_slugs = isset($_POST['gs_allowed_menus']) && is_array($_POST['gs_allowed_menus']) ? array_map('sanitize_text_field', wp_unslash($_POST['gs_allowed_menus'])) : [];
+        update_user_meta($gend_society_target_user_id, 'gend_society_feature_access', $gend_society_allowed_slugs);
         
         echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__('Feature access updated successfully.', 'gend-society') . '</p></div>';
     } else {
@@ -34,17 +34,17 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['gs_feature_access_non
 }
 
 // Fetch all users that can access the backend (at least edit_posts, adjust as needed)
-$args = array(
+$gend_society_args = array(
     'role__not_in' => array('subscriber', 'customer'), // Exclude purely frontend roles if desired, or allow all depending on use case.
     'orderby'      => 'display_name',
     'order'        => 'ASC',
 );
-$users = get_users($args);
+$gend_society_users = get_users($gend_society_args);
 
 // gs_render_menu_access_checkboxes() now lives in inc/admin-menu.php so
 // the AJAX modal handlers (wp_ajax_gs_feature_access_form / _save) can
 // reuse it without requiring this page file's side effects.
-$gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
+$gend_society_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
 ?>
 
 <div class="gs-page wrap">
@@ -57,23 +57,23 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
 
     <?php 
     // Determine if we are editing a specific user or listing all users
-    $edit_user_id = isset($_GET['edit_user']) ? intval($_GET['edit_user']) : 0;
+    $gend_society_edit_user_id = isset($_GET['edit_user']) ? intval($_GET['edit_user']) : 0;
     
-    if ($edit_user_id && current_user_can('edit_user', $edit_user_id)) {
-        $edit_user_obj = get_userdata($edit_user_id);
-        if ($edit_user_obj) {
+    if ($gend_society_edit_user_id && current_user_can('edit_user', $gend_society_edit_user_id)) {
+        $gend_society_edit_user_obj = get_userdata($gend_society_edit_user_id);
+        if ($gend_society_edit_user_obj) {
             ?>
             <div class="gs-card">
                 <div class="gs-card-header">
-                    <h3><?php printf(/* translators: %s: User display name. */ esc_html__('Editing Access for: %s', 'gend-society'), esc_html($edit_user_obj->display_name)); ?></h3>
+                    <h3><?php printf(/* translators: %s: User display name. */ esc_html__('Editing Access for: %s', 'gend-society'), esc_html($gend_society_edit_user_obj->display_name)); ?></h3>
                     <a href="<?php echo esc_url(admin_url('admin.php?page=gs-feature-access')); ?>" class="button"><?php esc_html_e('&larr; Back to List', 'gend-society'); ?></a>
                 </div>
                 <div class="gs-card-body">
                     <form method="post" action="">
                         <?php wp_nonce_field('gs_save_feature_access', 'gs_feature_access_nonce'); ?>
-                        <input type="hidden" name="target_user_id" value="<?php echo esc_attr($edit_user_id); ?>">
+                        <input type="hidden" name="target_user_id" value="<?php echo esc_attr($gend_society_edit_user_id); ?>">
                         
-                        <?php echo gs_render_menu_access_checkboxes($edit_user_id); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Checkbox form markup built with esc_attr()/esc_html() in gs_render_menu_access_checkboxes(); kses would strip the <input>s. ?>
+                        <?php echo gend_society_render_menu_access_checkboxes($gend_society_edit_user_id); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Checkbox form markup built with esc_attr()/esc_html() in gs_render_menu_access_checkboxes(); kses would strip the <input>s. ?>
                         
                         <p class="submit">
                             <input type="submit" name="submit" id="submit" class="button button-primary" value="<?php esc_attr_e('Save Feature Access', 'gend-society'); ?>">
@@ -188,36 +188,36 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
                 }
             </style>
             <div id="gs-fa-users-table">
-                <?php foreach ($users as $user) :
+                <?php foreach ($gend_society_users as $gend_society_user) :
                     // Stash all searchable fields as lowercase data-search so JS filter is one string compare.
-                    $search_blob = strtolower($user->user_login . ' ' . $user->display_name . ' ' . $user->user_email);
+                    $gend_society_search_blob = strtolower($gend_society_user->user_login . ' ' . $gend_society_user->display_name . ' ' . $gend_society_user->user_email);
                     // Prefer the BuddyPress / Youzify avatar (handles uploaded
                     // custom avatars under wp-content/uploads/avatars/{id}/);
                     // falls back to Gravatar via get_avatar_url() when BP
                     // isn't loaded or the user has no Youzify upload.
                     if ( function_exists( 'bp_core_fetch_avatar' ) ) {
-                        $gs_fa_avatar_url = bp_core_fetch_avatar( array(
-                            'item_id' => $user->ID,
+                        $gend_society_fa_avatar_url = bp_core_fetch_avatar( array(
+                            'item_id' => $gend_society_user->ID,
                             'object'  => 'user',
                             'type'    => 'thumb',
                             'html'    => false,
                         ) );
                     } else {
-                        $gs_fa_avatar_url = get_avatar_url( $user->ID, array( 'size' => 64 ) );
+                        $gend_society_fa_avatar_url = get_avatar_url( $gend_society_user->ID, array( 'size' => 64 ) );
                     }
                 ?>
-                    <div class="gs-fa-usercard" id="user-<?php echo esc_attr($user->ID); ?>" data-search="<?php echo esc_attr($search_blob); ?>">
-                        <img class="gs-fa-usercard__avatar" src="<?php echo esc_url( $gs_fa_avatar_url ); ?>" alt="<?php echo esc_attr( $user->user_login ); ?>" width="52" height="52" loading="lazy">
+                    <div class="gs-fa-usercard" id="user-<?php echo esc_attr($gend_society_user->ID); ?>" data-search="<?php echo esc_attr($gend_society_search_blob); ?>">
+                        <img class="gs-fa-usercard__avatar" src="<?php echo esc_url( $gend_society_fa_avatar_url ); ?>" alt="<?php echo esc_attr( $gend_society_user->user_login ); ?>" width="52" height="52" loading="lazy">
                         <div class="gs-fa-usercard__body">
-                            <div class="gs-fa-usercard__name"><?php echo esc_html($user->display_name); ?></div>
-                            <div class="gs-fa-usercard__email"><a href="mailto:<?php echo esc_attr($user->user_email); ?>"><?php echo esc_html($user->user_email); ?></a></div>
+                            <div class="gs-fa-usercard__name"><?php echo esc_html($gend_society_user->display_name); ?></div>
+                            <div class="gs-fa-usercard__email"><a href="mailto:<?php echo esc_attr($gend_society_user->user_email); ?>"><?php echo esc_html($gend_society_user->user_email); ?></a></div>
                         </div>
                         <div class="gs-fa-usercard__action">
-                            <button type="button" class="button button-small gs-fa-open-modal" data-user-id="<?php echo esc_attr($user->ID); ?>"><?php esc_html_e('Manage Access', 'gend-society'); ?></button>
+                            <button type="button" class="button button-small gs-fa-open-modal" data-user-id="<?php echo esc_attr($gend_society_user->ID); ?>"><?php esc_html_e('Manage Access', 'gend-society'); ?></button>
                         </div>
                     </div>
                 <?php endforeach; ?>
-                <?php if (empty($users)) : ?>
+                <?php if (empty($gend_society_users)) : ?>
                     <p><?php esc_html_e('No eligible users found.', 'gend-society'); ?></p>
                 <?php endif; ?>
             </div>
@@ -262,8 +262,8 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
             </header>
             <div class="gs-fa-modal__body" id="gs-fa-invite-body">
                 <?php
-                if ( function_exists( 'gs_invite_render_panel' ) ) {
-                    gs_invite_render_panel();
+                if ( function_exists( 'gend_society_invite_render_panel' ) ) {
+                    gend_society_invite_render_panel();
                 } else {
                     echo '<p style="color:#fca5a5;">' . esc_html__( 'Invite module not available on this install.', 'gend-society' ) . '</p>';
                 }
@@ -300,7 +300,7 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
     (function($){
         if (!$) { return; }
         var ajaxurl = window.ajaxurl || '<?php echo esc_url(admin_url('admin-ajax.php')); ?>';
-        var nonce   = <?php echo wp_json_encode($gs_feature_access_modal_nonce); ?>;
+        var nonce   = <?php echo wp_json_encode($gend_society_feature_access_modal_nonce); ?>;
         var $modal  = $('#gs-fa-modal');
 
         // Portal to body so position:fixed escapes any positioned ancestor
@@ -356,7 +356,7 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
                 url: ajaxurl,
                 method: 'POST',
                 dataType: 'json',
-                data: { action: 'gs_feature_access_form', nonce: nonce, user_id: userId }
+                data: { action: 'gend_society_feature_access_form', nonce: nonce, user_id: userId }
             }).done(function(resp){
                 if (resp && resp.success && resp.data) {
                     $('#gs-fa-modal-user').text(resp.data.user_label || '');
@@ -432,7 +432,7 @@ $gs_feature_access_modal_nonce = wp_create_nonce('gs_feature_access_modal');
                 method: 'POST',
                 dataType: 'json',
                 traditional: true,
-                data: { action: 'gs_feature_access_save', nonce: nonce, user_id: userId, gs_allowed_menus: slugs }
+                data: { action: 'gend_society_feature_access_save', nonce: nonce, user_id: userId, gs_allowed_menus: slugs }
             }).done(function(resp){
                 if (resp && resp.success) {
                     setFeedback('Saved.', 'success');

@@ -57,10 +57,10 @@ class Gend_GS_Collab_Deck {
 	 * Groupmeta keys — the rule-based tag store TAG-01 seeds. Kept here as the
 	 * single source of truth for the deck query + card assembly + actor_tags().
 	 */
-	const META_OPTIN    = '_gs_collab_optin';
-	const META_CATEGORY = '_gs_collab_category';
-	const META_INDUSTRY = '_gs_collab_industry';
-	const META_LOCATION = '_gs_collab_location';
+	const META_OPTIN    = '_gend_society_collab_optin';
+	const META_CATEGORY = '_gend_society_collab_category';
+	const META_INDUSTRY = '_gend_society_collab_industry';
+	const META_LOCATION = '_gend_society_collab_location';
 
 	/**
 	 * Build the swipe deck for $from_group — the FED-01 (Phase 89) federation-aware
@@ -434,7 +434,7 @@ class Gend_GS_Collab_Deck {
 			return self::build_deck_local( $from_group, $facets, $batch, $offset ); // no hub -> local.
 		}
 
-		$cache_key = 'gs_collab_xdeck_' . (int) $from_group . '_' . md5( wp_json_encode( $facets ) . '|' . (int) $batch . '|' . (int) $offset );
+		$cache_key = 'gend_society_collab_xdeck_' . (int) $from_group . '_' . md5( wp_json_encode( $facets ) . '|' . (int) $batch . '|' . (int) $offset );
 		$cached    = get_transient( $cache_key );
 		if ( is_array( $cached ) ) {
 			return $cached;
@@ -505,7 +505,7 @@ class Gend_GS_Collab_Deck {
 		if ( class_exists( 'AIPA_GenD_OAuth' ) && method_exists( 'AIPA_GenD_OAuth', 'hub_url' ) ) {
 			return rtrim( (string) AIPA_GenD_OAuth::hub_url(), '/' );
 		}
-		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' );
+		return rtrim( (string) apply_filters( 'gend_cp_pm_sync_hub_url', 'https://gend.me' ), '/' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from contracts-and-payments.
 	}
 
 	/**

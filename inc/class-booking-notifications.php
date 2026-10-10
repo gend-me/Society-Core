@@ -53,7 +53,7 @@ class Gend_GS_Booking_Notifications {
 	 * collision with other booking systems (e.g. 'gs_booking_reminder' is
 	 * intentionally NOT used — too generic).
 	 */
-	const REMINDER_HOOK = 'gs_booking_send_reminder';
+	const REMINDER_HOOK = 'gend_society_booking_send_reminder';
 
 	/**
 	 * Lead time in minutes before meeting start when the reminder fires.
@@ -74,9 +74,9 @@ class Gend_GS_Booking_Notifications {
 	 *   add_action('gs_booking_send_reminder', ...) — WP-Cron handler
 	 */
 	public static function init() : void {
-		add_action( 'gs_booking_created',     array( __CLASS__, 'on_created' ),         10, 2 );
-		add_action( 'gs_booking_cancelled',   array( __CLASS__, 'on_cancelled' ),       10, 3 );
-		add_action( 'gs_booking_rescheduled', array( __CLASS__, 'on_rescheduled' ),     10, 3 );
+		add_action( 'gend_society_booking_created',     array( __CLASS__, 'on_created' ),         10, 2 );
+		add_action( 'gend_society_booking_cancelled',   array( __CLASS__, 'on_cancelled' ),       10, 3 );
+		add_action( 'gend_society_booking_rescheduled', array( __CLASS__, 'on_rescheduled' ),     10, 3 );
 		add_action( self::REMINDER_HOOK,      array( __CLASS__, 'handle_reminder_cron' ), 10, 1 );
 	}
 

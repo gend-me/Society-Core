@@ -27,7 +27,7 @@ defined('ABSPATH') || exit;
  *
  * @return array<int, string>
  */
-function gs_feature_state_collect_active_plugins() {
+function gend_society_feature_state_collect_active_plugins() {
     $list = (array) get_option('active_plugins', array());
 
     if (is_multisite() && function_exists('wp_get_active_network_plugins')) {
@@ -54,22 +54,22 @@ function gs_feature_state_collect_active_plugins() {
  *
  * Returns true on a 2xx response, false otherwise.
  */
-function gs_feature_state_report_now() {
-    if (!function_exists('gs_remote_membership_call')) {
+function gend_society_feature_state_report_now() {
+    if (!function_exists('gend_society_remote_membership_call')) {
         return false;
     }
     // Skip on installs that aren't paired yet — gs_remote_membership_call
     // already short-circuits in that case, but checking here lets us
     // avoid logging a "not_paired" warning every plugin (de)activate.
-    if ((string) get_option('gs_install_token', '') === '') {
+    if ((string) get_option('gend_society_install_token', '') === '') {
         return false;
     }
 
     $body = array(
-        'plugins'     => gs_feature_state_collect_active_plugins(),
+        'plugins'     => gend_society_feature_state_collect_active_plugins(),
         'reported_at' => time(),
     );
-    $resp = gs_remote_membership_call('features-state', $body, 'POST');
+    $resp = gend_society_remote_membership_call('features-state', $body, 'POST');
     if (is_wp_error($resp)) {
         if (function_exists('error_log')) {
             error_log('[gend-society] features-state report failed: ' . $resp->get_error_message());
@@ -87,24 +87,24 @@ function gs_feature_state_report_now() {
  * request (e.g. an "Activate selected" bulk action) only fire one POST
  * at shutdown rather than N back-to-back ones.
  */
-function gs_feature_state_schedule_dispatch() {
+function gend_society_feature_state_schedule_dispatch() {
     static $scheduled = false;
     if ($scheduled) return;
     $scheduled = true;
-    add_action('shutdown', 'gs_feature_state_report_now', 99);
+    add_action('shutdown', 'gend_society_feature_state_report_now', 99);
 }
-add_action('activated_plugin',   'gs_feature_state_schedule_dispatch', 99);
-add_action('deactivated_plugin', 'gs_feature_state_schedule_dispatch', 99);
+add_action('activated_plugin',   'gend_society_feature_state_schedule_dispatch', 99);
+add_action('deactivated_plugin', 'gend_society_feature_state_schedule_dispatch', 99);
 
 /**
  * Daily heartbeat — covers manual edits to active_plugins that bypass
  * the activated/deactivated hooks (rare, but possible via direct DB
  * tweaks or WP-CLI shim plugins).
  */
-add_action('gs_feature_state_daily', 'gs_feature_state_report_now');
+add_action('gend_society_feature_state_daily', 'gend_society_feature_state_report_now');
 add_action('init', function () {
-    if (!wp_next_scheduled('gs_feature_state_daily')) {
-        wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'gs_feature_state_daily');
+    if (!wp_next_scheduled('gend_society_feature_state_daily')) {
+        wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'gend_society_feature_state_daily');
     }
 });
 
@@ -118,4 +118,4 @@ add_action('init', function () {
  * successful pairing. Falling back to a one-shot scheduled event keeps
  * this safe if the hook isn't present yet.
  */
-add_action('gs_install_paired', 'gs_feature_state_report_now');
+add_action('gs_install_paired', 'gend_society_feature_state_report_now');

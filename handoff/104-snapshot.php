@@ -11,7 +11,7 @@
  *
  * Output keys:
  *   mode, source            runtime mode + its source (null before 1.1.6)
- *   gs_version              GS_VERSION
+ *   gs_version              GEND_SOCIETY_VERSION (1.2.0+), else GS_VERSION (1.1.x)
  *   rest_routes             sorted route => sorted methods
  *   gs_files                ordered get_included_files() under /plugins/gend-society/,
  *                           relative to the plugin dir
@@ -32,7 +32,7 @@ if ( ! defined( 'ABSPATH' ) ) {
 $gs104s = array(
 	'mode'       => function_exists( 'gend_society_runtime_mode' ) ? gend_society_runtime_mode() : null,
 	'source'     => function_exists( 'gend_society_runtime_mode_source' ) ? gend_society_runtime_mode_source() : null,
-	'gs_version' => defined( 'GS_VERSION' ) ? GS_VERSION : null,
+	'gs_version' => defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : ( defined( 'GS_VERSION' ) ? GS_VERSION : null ),
 	'site'       => home_url( '/' ),
 );
 

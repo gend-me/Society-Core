@@ -64,7 +64,7 @@ add_action('admin_enqueue_scripts', function () {
 // Renderer
 // -------------------------------------------------------------------------
 
-if ( ! function_exists( 'gs_hosting_render_analytics_hero' ) ) {
+if ( ! function_exists( 'gend_society_hosting_render_analytics_hero' ) ) {
     /**
      * A "hero" analytics card matching the visual language of the real
      * gend-media-optimizer Media tab (GMO_Library_Dashboard's Disk Usage
@@ -96,7 +96,7 @@ if ( ! function_exists( 'gs_hosting_render_analytics_hero' ) ) {
      *                      responsible for escaping - this is trusted markup.
      * }
      */
-    function gs_hosting_render_analytics_hero( $args ) {
+    function gend_society_hosting_render_analytics_hero( $args ) {
         $title    = (string) ( $args['title'] ?? '' );
         $sub      = (string) ( $args['sub'] ?? '' );
         $cta      = (string) ( $args['cta'] ?? '' );
@@ -159,7 +159,7 @@ if ( ! function_exists( 'gs_hosting_render_analytics_hero' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) ) {
+if ( ! function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) ) {
     /**
      * data-* attributes for a resource-upgrade button covering a whole
      * gdc_plan_attach_types() $type (server/media/database/codebase) -
@@ -180,15 +180,15 @@ if ( ! function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) ) {
      * @param string $type
      * @return string Empty string when neither mode has anything to offer.
      */
-    function gs_hosting_resource_upgrade_data_attrs( $type ) {
-        $same_origin = function_exists( 'gs_oauth_is_hub_site' ) ? gs_oauth_is_hub_site() : true;
+    function gend_society_hosting_resource_upgrade_data_attrs( $type ) {
+        $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
         // Backups are two choices, not one list: a storage plan, then how
         // often to back up. The membership page's Backups picker presents
         // exactly that (current plans marked, one checkout, plan swapped on
         // payment), so open it in its backups-only mode instead of the
         // generic one-product-per-row plan-attach form.
         if ( $same_origin && $type === 'backups' ) {
-            $gs_bk_m   = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+            $gs_bk_m   = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
             $gs_bk_mid = ( $gs_bk_m && is_object( $gs_bk_m ) && method_exists( $gs_bk_m, 'get_id' ) ) ? (int) $gs_bk_m->get_id() : 0;
             $gs_bk_choose = false;
             if ( ! $gs_bk_mid && function_exists( 'gdc_plan_attach_get_memberships' ) ) {
@@ -218,7 +218,7 @@ if ( ! function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_plan_upgrade_data_attrs' ) ) {
+if ( ! function_exists( 'gend_society_hosting_plan_upgrade_data_attrs' ) ) {
     /**
      * Same branching as gs_hosting_resource_upgrade_data_attrs(), for a
      * single already-known plan_id (e.g. one specific Backups tier)
@@ -228,8 +228,8 @@ if ( ! function_exists( 'gs_hosting_plan_upgrade_data_attrs' ) ) {
      * @param int    $plan_id
      * @return string
      */
-    function gs_hosting_plan_upgrade_data_attrs( $type, $plan_id ) {
-        $same_origin = function_exists( 'gs_oauth_is_hub_site' ) ? gs_oauth_is_hub_site() : true;
+    function gend_society_hosting_plan_upgrade_data_attrs( $type, $plan_id ) {
+        $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
         if ( $same_origin ) {
             $url = function_exists( 'gdc_plan_attach_resource_embed_url' ) ? gdc_plan_attach_resource_embed_url( $type ) : '';
             return $url !== '' ? 'data-embed-url="' . esc_attr( $url ) . '"' : '';
@@ -238,7 +238,7 @@ if ( ! function_exists( 'gs_hosting_plan_upgrade_data_attrs' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
+if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) {
     /**
      * Storage usage cards (Media / Database / Codebase) + the account-wide
      * Upgrade popup they open, plus the "Rescan storage" button's own
@@ -249,9 +249,9 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
      * the tab strip where there is no shared #gs-hosting-root at all - see
      * dashboard-remote-membership.php).
      */
-    function gs_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing, $hosting_jump_map = array() ) {
-        $gs_hosting_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
-        $resources = gs_hosting_collect_container_resources( $media_data, $tables_data, $gs_hosting_membership );
+    function gend_society_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing, $hosting_jump_map = array() ) {
+        $gs_hosting_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+        $resources = gend_society_hosting_collect_container_resources( $media_data, $tables_data, $gs_hosting_membership );
 
         // Container Plan total is the literal sum of whichever of the three
         // resources above have a real container product attached - NOT
@@ -276,7 +276,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
         // see them.
         $gs_can_upgrade = current_user_can( 'manage_options' )
             || is_super_admin() // site-admin check, not a hub signal (104 audit)
-            || ( function_exists( 'gs_group_tabs_user_has_access' ) && gs_group_tabs_user_has_access() );
+            || ( function_exists( 'gend_society_group_tabs_user_has_access' ) && gend_society_group_tabs_user_has_access() );
 
         // No Media/Codebase/Database container plans on this networked site
         // yet: replace the per-card Upgrade buttons with one "Migrate" button
@@ -287,7 +287,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
         $gs_migrate_url = '';
         if ( $gs_can_upgrade && $gs_hosting_membership
             && function_exists( 'gdc_membership_needs_container_migration' ) && function_exists( 'wu_get_site' )
-            && ( ! function_exists( 'gs_oauth_is_hub_site' ) || gs_oauth_is_hub_site() ) ) {
+            && ( ! function_exists( 'gend_society_oauth_is_hub_site' ) || gend_society_oauth_is_hub_site() ) ) {
             $gs_this_site = wu_get_site( get_current_blog_id() );
             if ( $gs_this_site && gdc_membership_needs_container_migration( $gs_hosting_membership, $gs_this_site ) ) {
                 $gs_migrate_url = add_query_arg(
@@ -336,7 +336,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
 
         <div class="gs-hosting__resources-grid">
             <?php foreach ( $resources as $r ) :
-                $pct  = gs_hosting_pct( (int) $r['used'], (int) $r['cap'] );
+                $pct  = gend_society_hosting_pct( (int) $r['used'], (int) $r['cap'] );
                 $warn = $pct >= 80;
             ?>
                 <div class="gs-hosting__resource-card">
@@ -380,8 +380,8 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
                         <p class="gs-hosting__resource-card-meta"><?php echo esc_html( $r['meta'] ); ?></p>
                     <?php endif; ?>
                     <?php
-                    $gs_res_upgrade_attrs = $gs_can_upgrade && $gs_migrate_url === '' && function_exists( 'gs_hosting_resource_upgrade_data_attrs' )
-                        ? gs_hosting_resource_upgrade_data_attrs( $r['slug'] )
+                    $gs_res_upgrade_attrs = $gs_can_upgrade && $gs_migrate_url === '' && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' )
+                        ? gend_society_hosting_resource_upgrade_data_attrs( $r['slug'] )
                         : '';
                     ?>
                     <?php if ( $gs_res_upgrade_attrs !== '' ) : ?>
@@ -521,7 +521,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
             function proxyChangePlan(planId) {
                 showPickerStatus('Preparing checkout…', false);
                 var fd = new FormData();
-                fd.append('action', 'gs_membership_change_plan');
+                fd.append('action', 'gend_society_membership_change_plan');
                 fd.append('nonce', ajaxNonce);
                 fd.append('plan_id', planId);
                 fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
@@ -573,7 +573,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
                 openPicker();
                 showPickerStatus('Loading plans…', false);
                 var fd = new FormData();
-                fd.append('action', 'gs_membership_plan_options');
+                fd.append('action', 'gend_society_membership_plan_options');
                 fd.append('nonce', ajaxNonce);
                 fd.append('resource', resourceType);
                 fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
@@ -640,7 +640,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
                 rescan.textContent = 'Scanning…';
                 feedback('', null);
                 var fd = new FormData();
-                fd.append('action', 'gs_hosting_media_rescan');
+                fd.append('action', 'gend_society_hosting_media_rescan');
                 fd.append('nonce', nonce);
                 fetch(ajax, { method: 'POST', body: fd, credentials: 'same-origin' })
                     .then(function (r) { return r.json(); })
@@ -666,7 +666,7 @@ if ( ! function_exists( 'gs_hosting_render_storage_resource_cards' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_render_hosting_domains_panel' ) ) {
+if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
     /**
      * Real domain mapping — Add / Verify / Remove a custom domain pointed at
      * this install. Reuses the SAME already-working AJAX contract the
@@ -690,7 +690,7 @@ if ( ! function_exists( 'gs_render_hosting_domains_panel' ) ) {
      * instruction already used on the working Mapped Domains panel: point
      * an A record at the hub IP, then register the hostname here to verify.
      */
-    function gs_render_hosting_domains_panel( $payload ) {
+    function gend_society_render_hosting_domains_panel( $payload ) {
         $gs_domains = isset( $payload['domains'] ) && is_array( $payload['domains'] ) ? $payload['domains'] : array();
         ?>
         <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Domains', 'gend-society' ); ?></h4>
@@ -750,7 +750,7 @@ if ( ! function_exists( 'gs_render_hosting_domains_panel' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
+if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
     /**
      * The Backups table (list + Backup now + Restore). Used both inside the
      * combined Storage panel (section_group=all) and as its own "Backups"
@@ -760,7 +760,7 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
      * panel always stays inside #gs-hosting-root*, unlike the storage cards
      * above, so no standalone script is needed here.
      */
-    function gs_hosting_render_backups_section( $backups ) {
+    function gend_society_hosting_render_backups_section( $backups ) {
         // Analytics header — same real ring/stat-pill/bar treatment as the
         // real Media tab (see gs_hosting_render_analytics_hero()), WITH a
         // real ring this time (usage vs gs_hosting_backups_plan_bytes(),
@@ -774,15 +774,15 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
             $gs_bk_bytes += (int) ( $gs_bk_row['bytes'] ?? 0 );
         }
         $gs_bk_latest = ! empty( $backups[0]['created_at'] ) ? (string) $backups[0]['created_at'] : '';
-        $gs_bk_cap    = function_exists( 'gs_hosting_backups_plan_bytes' ) ? gs_hosting_backups_plan_bytes() : ( 10 * 1024 * 1024 * 1024 );
-        $gs_bk_pct    = gs_hosting_pct( $gs_bk_bytes, $gs_bk_cap );
+        $gs_bk_cap    = function_exists( 'gend_society_hosting_backups_plan_bytes' ) ? gend_society_hosting_backups_plan_bytes() : ( 10 * 1024 * 1024 * 1024 );
+        $gs_bk_pct    = gend_society_hosting_pct( $gs_bk_bytes, $gs_bk_cap );
         $gs_bk_warn   = $gs_bk_pct >= 80;
 
         // Real backup plan pricing tiers - same 'backups' plan-attach type
         // (gdc_register_backups_plan_product(), gdc_plan_attach_types())
         // the membership dashboard's Backups card reads.
         $gs_backup_plans     = function_exists( 'gdc_plan_attach_get_plans' ) ? gdc_plan_attach_get_plans( 'backups' ) : array();
-        $gs_backup_membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
+        $gs_backup_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
         // Storage plan + frequency add-on can both be attached: collect all.
         $gs_bk_current = array(); // [ ['name'=>..., 'price'=>...], ... ]
         if ( $gs_backup_membership && is_object( $gs_backup_membership ) && method_exists( $gs_backup_membership, 'get_all_products' ) ) {
@@ -799,7 +799,7 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
             }
         }
 
-        gs_hosting_render_analytics_hero( array(
+        gend_society_hosting_render_analytics_hero( array(
             'title'  => __( 'Backups', 'gend-society' ),
             'sub'    => __( 'Daily automatic snapshots plus on-demand backups. Restore rolls the install back to that snapshot.', 'gend-society' ),
             'pct'    => $gs_bk_pct,
@@ -841,8 +841,8 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
             <?php
             // ONE button opening the backups plan picker (storage tiers +
             // frequency add-ons, current plan marked) - not one per product.
-            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gs_hosting_resource_upgrade_data_attrs' ) )
-                ? gs_hosting_resource_upgrade_data_attrs( 'backups' )
+            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
+                ? gend_society_hosting_resource_upgrade_data_attrs( 'backups' )
                 : '';
             if ( $gs_bk_upgrade_attrs !== '' ) : ?>
                 <button type="button"
@@ -933,7 +933,7 @@ if ( ! function_exists( 'gs_hosting_render_backups_section' ) ) {
  *                       User Access moved to the Feature Suite tab (see
  *                       dashboard-remote-membership.php) - no longer rendered here.
  */
-function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
+function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) {
     if ( ! current_user_can( 'manage_options' ) ) {
         echo '<p style="color: var(--gs-muted);">' . esc_html__( 'You do not have permission to manage hosting.', 'gend-society' ) . '</p>';
         return;
@@ -980,8 +980,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
     // Build initial server-rendered data for the panels that can be filled
     // synchronously (Tables, Media). Logs / Compute Gas / Dashboard toggles
     // fetch via AJAX on first activation to keep the index.php render snappy.
-    $tables_data = gs_hosting_collect_tables();
-    $media_data  = gs_hosting_collect_media();
+    $tables_data = gend_society_hosting_collect_tables();
+    $media_data  = gend_society_hosting_collect_media();
 
     $hosting_assets_url = plugin_dir_url( __FILE__ );
 
@@ -1151,8 +1151,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 <?php if ( $with_settings ) : ?>
                 <!-- ── App Settings (App Title, Tagline, App Icon, Site Logo, Save) ── -->
                 <?php
-                if ( function_exists( 'gs_render_app_settings_form' ) ) {
-                    gs_render_app_settings_form();
+                if ( function_exists( 'gend_society_render_app_settings_form' ) ) {
+                    gend_society_render_app_settings_form();
                 }
                 ?>
                 <?php else : ?>
@@ -1264,8 +1264,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 <!-- Application Passwords — API/mobile sign-in credentials (GenD Mobile). -->
                 <div style="margin-top:36px;padding-top:28px;border-top:1px solid rgba(255,255,255,0.08);">
                     <?php
-                    if ( function_exists( 'gs_render_application_passwords_form' ) ) {
-                        gs_render_application_passwords_form();
+                    if ( function_exists( 'gend_society_render_application_passwords_form' ) ) {
+                        gend_society_render_application_passwords_form();
                     }
                     ?>
                 </div>
@@ -1315,8 +1315,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
             <!-- ── Domains sub-panel (Phase 72-02 — Connect-a-Domain wizard) ─────── -->
             <section class="gs-hosting__panel" data-panel="domains" role="tabpanel">
                 <?php
-                if ( function_exists( 'gs_render_hosting_domains_panel' ) ) {
-                    gs_render_hosting_domains_panel( $payload );
+                if ( function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
+                    gend_society_render_hosting_domains_panel( $payload );
                 } else {
                     echo '<p style="color: var(--gs-muted, #94a3b8); font-style: italic;">' . esc_html__( 'Domains wizard is not yet deployed on this install. Try again shortly.', 'gend-society' ) . '</p>';
                 }
@@ -1542,22 +1542,22 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                  pattern — see gs_hosting_render_analytics_hero()). ── -->
             <section class="gs-hosting__panel" data-panel="tables" role="tabpanel">
                 <?php
-                $gs_tables_pct = gs_hosting_pct( (int) $tables_data['total_bytes'], gs_hosting_db_plan_bytes() );
+                $gs_tables_pct = gend_society_hosting_pct( (int) $tables_data['total_bytes'], gend_society_hosting_db_plan_bytes() );
 
                 // No Upgrade CTA on this hero (removed on request) - same
                 // cta-less call shape the Codebase hero below uses.
-                gs_hosting_render_analytics_hero( array(
+                gend_society_hosting_render_analytics_hero( array(
                     'title' => __( 'Database Tables', 'gend-society' ),
                     'sub'   => __( 'Live row counts and on-disk size for every table on this install.', 'gend-society' ),
                     'pct'   => $gs_tables_pct,
                     'warn'  => $gs_tables_pct > 80,
                     'stats' => array(
                         array( 'k' => __( 'Used', 'gend-society' ), 'v' => size_format( (int) $tables_data['total_bytes'], 2 ) ),
-                        array( 'k' => __( 'Capacity', 'gend-society' ), 'v' => size_format( gs_hosting_db_plan_bytes(), 0 ) ),
+                        array( 'k' => __( 'Capacity', 'gend-society' ), 'v' => size_format( gend_society_hosting_db_plan_bytes(), 0 ) ),
                         array( 'k' => __( 'Tables', 'gend-society' ), 'v' => (string) (int) $tables_data['count'] ),
                         array( 'k' => __( 'Total Rows', 'gend-society' ), 'v' => number_format_i18n( (int) $tables_data['total_rows'] ) ),
                         array( 'k' => __( 'Largest Table', 'gend-society' ), 'v' => $tables_data['largest_name'] ?: '—' ),
-                        array( 'k' => __( 'Plan', 'gend-society' ), 'v' => gs_hosting_plan_label( $billing ) ),
+                        array( 'k' => __( 'Plan', 'gend-society' ), 'v' => gend_society_hosting_plan_label( $billing ) ),
                     ),
                 ) );
                 ?>
@@ -1895,7 +1895,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
             <!-- ── Backups sub-panel (split out of the old combined Storage
                  panel - see gs_hosting_render_backups_section()). ── -->
             <section class="gs-hosting__panel" data-panel="backups" role="tabpanel">
-                <?php gs_hosting_render_backups_section( $backups ); ?>
+                <?php gend_society_hosting_render_backups_section( $backups ); ?>
             </section>
 
             <!-- ── Media sub-panel: the real gend-media-optimizer Media Library
@@ -2026,8 +2026,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                  together in one sub-tab, exactly as before). ── -->
             <section class="gs-hosting__panel" data-panel="media" role="tabpanel">
                 <?php
-                gs_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing );
-                gs_hosting_render_backups_section( $backups );
+                gend_society_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing );
+                gend_society_hosting_render_backups_section( $backups );
                 ?>
             </section>
 
@@ -2071,12 +2071,12 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                     @media (max-width:700px) { .gs-codebase__subtabs { flex-wrap:wrap; } }
                 </style>
                 <?php
-                $gs_codebase_data = function_exists( 'gs_hosting_collect_codebase' ) ? gs_hosting_collect_codebase() : array();
+                $gs_codebase_data = function_exists( 'gend_society_hosting_collect_codebase' ) ? gend_society_hosting_collect_codebase() : array();
                 $gs_codebase_used = (int) ( $gs_codebase_data['bytes_used'] ?? 0 );
-                $gs_codebase_cap  = (int) apply_filters( 'gs_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 );
-                $gs_codebase_pct  = gs_hosting_pct( $gs_codebase_used, $gs_codebase_cap );
+                $gs_codebase_cap  = (int) apply_filters( 'gend_society_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 );
+                $gs_codebase_pct  = gend_society_hosting_pct( $gs_codebase_used, $gs_codebase_cap );
 
-                gs_hosting_render_analytics_hero( array(
+                gend_society_hosting_render_analytics_hero( array(
                     'title' => __( 'Codebase Storage', 'gend-society' ),
                     'sub'   => __( 'Plugins, themes, and mu-plugins on this install, with live usage.', 'gend-society' ),
                     'pct'   => $gs_codebase_pct,
@@ -2101,8 +2101,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                     <h4 class="gs-hosting__section-title"><?php esc_html_e( 'App Feature Access', 'gend-society' ); ?></h4>
                     <p class="gs-hosting__section-sub"><?php esc_html_e( 'Manage which plugins and features are available on this site.', 'gend-society' ); ?></p>
                     <?php
-                    if ( function_exists( 'gs_render_feature_cards_widget' ) ) {
-                        gs_render_feature_cards_widget( true );
+                    if ( function_exists( 'gend_society_render_feature_cards_widget' ) ) {
+                        gend_society_render_feature_cards_widget( true );
                     }
                     ?>
                 </div>
@@ -2119,8 +2119,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                         </button>
                     </div>
                     <?php
-                    if ( function_exists( 'gs_hosting_render_codebase_packages' ) ) {
-                        gs_hosting_render_codebase_packages();
+                    if ( function_exists( 'gend_society_hosting_render_codebase_packages' ) ) {
+                        gend_society_hosting_render_codebase_packages();
                     }
                     ?>
 
@@ -2204,7 +2204,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                         </thead>
                         <tbody>
                             <?php
-                            $gs_codebase_breakdown = function_exists( 'gs_hosting_collect_codebase_breakdown' ) ? gs_hosting_collect_codebase_breakdown() : array();
+                            $gs_codebase_breakdown = function_exists( 'gend_society_hosting_collect_codebase_breakdown' ) ? gend_society_hosting_collect_codebase_breakdown() : array();
                             ?>
                             <?php if ( empty( $gs_codebase_breakdown ) ) : ?>
                                 <tr><td colspan="3" style="color:var(--gs-muted, #94a3b8); font-style:italic; padding:18px 12px;"><?php esc_html_e( 'No plugins, themes, or mu-plugins found.', 'gend-society' ); ?></td></tr>
@@ -2227,8 +2227,8 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                  gs_section=permalinks so this sub-tab reopens. ── -->
             <section class="gs-hosting__panel<?php echo 'permalinks' === $active_section ? ' is-active' : ''; ?>" data-panel="permalinks" role="tabpanel">
                 <?php
-                if ( function_exists( 'gs_render_permalink_settings_form' ) ) {
-                    gs_render_permalink_settings_form();
+                if ( function_exists( 'gend_society_render_permalink_settings_form' ) ) {
+                    gend_society_render_permalink_settings_form();
                 }
                 ?>
             </section>
@@ -2326,13 +2326,13 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 });
             });
         }
-        bindAction('[data-gs-hosting="cache-page"]',     'gs_hosting_cache_page',     { busy: 'Clearing…',  successMsg: 'Page cache cleared.', feedback: 'cache' });
-        bindAction('[data-gs-hosting="cache-object"]',   'gs_hosting_cache_object',   { busy: 'Clearing…',  successMsg: 'Object cache flushed.', feedback: 'cache' });
-        bindAction('[data-gs-hosting="template-reset"]', 'gs_hosting_template_reset', { busy: 'Resetting…', successMsg: 'Reset initiated. Backup running in background.', confirm: 'This will wipe posts, pages, and media on this install. A backup runs first. Continue?', feedback: 'cache' });
+        bindAction('[data-gs-hosting="cache-page"]',     'gend_society_hosting_cache_page',     { busy: 'Clearing…',  successMsg: 'Page cache cleared.', feedback: 'cache' });
+        bindAction('[data-gs-hosting="cache-object"]',   'gend_society_hosting_cache_object',   { busy: 'Clearing…',  successMsg: 'Object cache flushed.', feedback: 'cache' });
+        bindAction('[data-gs-hosting="template-reset"]', 'gend_society_hosting_template_reset', { busy: 'Resetting…', successMsg: 'Reset initiated. Backup running in background.', confirm: 'This will wipe posts, pages, and media on this install. A backup runs first. Continue?', feedback: 'cache' });
 
         // ── Toggle initial load ──
         function refreshToggles() {
-            post('gs_hosting_toggles_get').then(function(resp){
+            post('gend_society_hosting_toggles_get').then(function(resp){
                 if (!resp || !resp.success || !resp.data) {
                     setToggleErr('Could not load toggle state.');
                     return;
@@ -2367,7 +2367,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 var prev = btn.textContent;
                 btn.textContent = 'Saving…';
                 feedback('security', '', null);
-                post('gs_hosting_toggle_set', { feature: name, enabled: want ? 1 : 0 }).then(function(resp){
+                post('gend_society_hosting_toggle_set', { feature: name, enabled: want ? 1 : 0 }).then(function(resp){
                     if (resp && resp.success) {
                         applyToggle(name, !!(resp.data && resp.data.enabled));
                         feedback('security', name.toUpperCase() + ' ' + (resp.data && resp.data.enabled ? 'enabled' : 'disabled') + '.', 'success');
@@ -2397,7 +2397,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 var v = (input.value || '').trim().toLowerCase();
                 if (!v) return;
                 feedback('domains', 'Adding ' + v + '…', null);
-                post('gs_membership_domain_add', { domain: v }).then(function(resp){
+                post('gend_society_membership_domain_add', { domain: v }).then(function(resp){
                     if (resp && resp.success) {
                         feedback('domains', 'Domain added. Reloading…', 'success');
                         setTimeout(function(){ location.reload(); }, 700);
@@ -2412,11 +2412,11 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
         root.addEventListener('click', function(e){
             var btn = e.target.closest('[data-gs-hosting="domain-verify"], [data-gs-hosting="domain-remove"]');
             if (!btn) return;
-            var action = btn.dataset.gsHosting === 'domain-verify' ? 'gs_membership_domain_verify' : 'gs_membership_domain_remove';
+            var action = btn.dataset.gsHosting === 'domain-verify' ? 'gend_society_membership_domain_verify' : 'gend_society_membership_domain_remove';
             var d = btn.dataset.domain;
-            if (action === 'gs_membership_domain_remove' && !confirm('Remove ' + d + '?')) return;
+            if (action === 'gend_society_membership_domain_remove' && !confirm('Remove ' + d + '?')) return;
             btn.disabled = true;
-            feedback('domains', (action === 'gs_membership_domain_verify' ? 'Verifying ' : 'Removing ') + d + '…', null);
+            feedback('domains', (action === 'gend_society_membership_domain_verify' ? 'Verifying ' : 'Removing ') + d + '…', null);
             post(action, { domain: d }).then(function(resp){
                 if (resp && resp.success) {
                     feedback('domains', 'Done. Reloading…', 'success');
@@ -2439,7 +2439,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
             var body = root.querySelector('[data-gs-hosting-panel-body="logs"]');
             if (!body) return;
             body.innerHTML = '<div class="gs-hosting__loading">Loading log tail…</div>';
-            post('gs_hosting_logs').then(function(resp){
+            post('gend_society_hosting_logs').then(function(resp){
                 if (resp && resp.success && resp.data) {
                     logState.entries = resp.data.entries || [];
                     if (resp.data.warning) {
@@ -2560,7 +2560,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 var prevBN = backupNow.textContent;
                 backupNow.textContent = 'Backing up…';
                 feedback('backups', '', null);
-                post('gs_membership_backup_now').then(function(resp){
+                post('gend_society_membership_backup_now').then(function(resp){
                     if (resp && resp.success) {
                         feedback('backups', 'Backup started. Reloading list…', 'success');
                         setTimeout(function(){ location.reload(); }, 900);
@@ -2588,7 +2588,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
                 var prevRS = restore.textContent;
                 restore.textContent = 'Restoring…';
                 feedback('backups', '', null);
-                post('gs_membership_backup_restore', { backup_id: bid }).then(function(resp){
+                post('gend_society_membership_backup_restore', { backup_id: bid }).then(function(resp){
                     if (resp && resp.success) {
                         feedback('backups', 'Restore initiated. The install will reload once complete.', 'success');
                     } else {
@@ -2818,7 +2818,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
             $results.innerHTML = '<div class="is-loading">Running…</div>';
             if ($meta) $meta.textContent = '';
             var t0 = performance.now();
-            post('gs_hosting_query_run', { sql: sql }).then(function(resp){
+            post('gend_society_hosting_query_run', { sql: sql }).then(function(resp){
                 var elapsed = Math.round(performance.now() - t0);
                 if (resp && resp.success && resp.data) {
                     renderQueryResult(resp.data, elapsed);
@@ -3008,7 +3008,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
             var $askMeta = document.getElementById('gs-hosting-ask-meta');
             $results.innerHTML = '<div class="is-loading">Looking up the answer…</div>';
             var t0 = performance.now();
-            post('gs_hosting_query_run', { sql: sql }).then(function(resp){
+            post('gend_society_hosting_query_run', { sql: sql }).then(function(resp){
                 var elapsed = Math.round(performance.now() - t0);
                 if (resp && resp.success && resp.data) {
                     renderQueryResult(resp.data, elapsed, { askText: askText });
@@ -3035,7 +3035,7 @@ function gs_render_hosting_tab( $payload = array(), $opts = array() ) {
  * SHOW TABLE STATUS — returns row count, data/index size per table plus
  * aggregate stats. Cheap on most installs (< 50ms for hundreds of tables).
  */
-function gs_hosting_collect_tables() {
+function gend_society_hosting_collect_tables() {
     global $wpdb;
     $out = array(
         'tables' => array(),
@@ -3082,8 +3082,8 @@ function gs_hosting_collect_tables() {
  * dir scan is slow on installs with thousands of attachments. Rescan via
  * gs_hosting_media_rescan AJAX.
  */
-function gs_hosting_collect_media( $force_rescan = false ) {
-    $key   = 'gs_hosting_media_usage';
+function gend_society_hosting_collect_media( $force_rescan = false ) {
+    $key   = 'gend_society_hosting_media_usage';
     $cache = $force_rescan ? false : get_transient( $key );
     if ( is_array( $cache ) ) {
         return $cache;
@@ -3108,7 +3108,7 @@ function gs_hosting_collect_media( $force_rescan = false ) {
     $data = array(
         'bytes_used' => $bytes,
         'file_count' => $files,
-        'plan_bytes' => gs_hosting_media_plan_bytes(),
+        'plan_bytes' => gend_society_hosting_media_plan_bytes(),
         'scanned_at' => time(),
     );
     set_transient( $key, $data, HOUR_IN_SECONDS );
@@ -3125,25 +3125,25 @@ function gs_hosting_collect_media( $force_rescan = false ) {
  * @param array $tables_data Output of gs_hosting_collect_tables()
  * @return array<int,array{slug:string,label:string,icon:string,hint:string,used:int,cap:int,used_label:string,cap_label:string,meta:string}>
  */
-function gs_hosting_collect_container_resources( $media_data, $tables_data, $membership = null ) {
+function gend_society_hosting_collect_container_resources( $media_data, $tables_data, $membership = null ) {
     $resources = array();
 
-    if ( null === $membership && function_exists( 'gs_dashboard_get_membership' ) ) {
-        $membership = gs_dashboard_get_membership();
+    if ( null === $membership && function_exists( 'gend_society_dashboard_get_membership' ) ) {
+        $membership = gend_society_dashboard_get_membership();
     }
-    $gs_resource_prices = function_exists( 'gs_hosting_container_resource_prices' )
-        ? gs_hosting_container_resource_prices( $membership )
+    $gs_resource_prices = function_exists( 'gend_society_hosting_container_resource_prices' )
+        ? gend_society_hosting_container_resource_prices( $membership )
         : array( 'media' => null, 'database' => null, 'code' => null );
     // Only look up starting prices for whichever resources have nothing
     // attached - avoids the extra gdc_plan_attach_get_plans() calls
     // entirely once a real product is attached for all three.
-    $gs_resource_starting_prices = ( in_array( null, $gs_resource_prices, true ) && function_exists( 'gs_hosting_container_resource_starting_prices' ) )
-        ? gs_hosting_container_resource_starting_prices()
+    $gs_resource_starting_prices = ( in_array( null, $gs_resource_prices, true ) && function_exists( 'gend_society_hosting_container_resource_starting_prices' ) )
+        ? gend_society_hosting_container_resource_starting_prices()
         : array( 'media' => null, 'database' => null, 'code' => null );
 
     // Media storage (uploads PVC)
     $media_used = (int) ( $media_data['bytes_used'] ?? 0 );
-    $media_cap  = (int) ( $media_data['plan_bytes'] ?? gs_hosting_media_plan_bytes() );
+    $media_cap  = (int) ( $media_data['plan_bytes'] ?? gend_society_hosting_media_plan_bytes() );
     $resources[] = array(
         'slug'       => 'media',
         'label'      => __( 'Media Storage', 'gend-society' ),
@@ -3165,7 +3165,7 @@ function gs_hosting_collect_container_resources( $media_data, $tables_data, $mem
 
     // Database storage
     $db_used = (int) ( $tables_data['total_bytes'] ?? 0 );
-    $db_cap  = gs_hosting_db_plan_bytes();
+    $db_cap  = gend_society_hosting_db_plan_bytes();
     $resources[] = array(
         'slug'       => 'database',
         'label'      => __( 'Database Storage', 'gend-society' ),
@@ -3190,9 +3190,9 @@ function gs_hosting_collect_container_resources( $media_data, $tables_data, $mem
     // Codebase storage (plugins / themes / mu-plugins directories under
     // wp-content). Real-time size walk cached for one hour so page loads
     // don't hit the disk.
-    $code_data = gs_hosting_collect_codebase();
+    $code_data = gend_society_hosting_collect_codebase();
     $code_used = (int) ( $code_data['bytes_used'] ?? 0 );
-    $code_cap  = (int) apply_filters( 'gs_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 ); // 2 GB default
+    $code_cap  = (int) apply_filters( 'gend_society_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 ); // 2 GB default
     $resources[] = array(
         'slug'       => 'codebase',
         'label'      => __( 'Codebase Storage', 'gend-society' ),
@@ -3219,25 +3219,25 @@ function gs_hosting_collect_container_resources( $media_data, $tables_data, $mem
      *
      * @param array $resources
      */
-    return (array) apply_filters( 'gs_hosting_container_resources', $resources );
+    return (array) apply_filters( 'gend_society_hosting_container_resources', $resources );
 }
 
-function gs_hosting_db_plan_bytes() {
+function gend_society_hosting_db_plan_bytes() {
     // Default 5 GB. Future: pull from membership payload `plan->db_quota_bytes`.
-    return (int) apply_filters( 'gs_hosting_db_plan_bytes', 5 * 1024 * 1024 * 1024 );
+    return (int) apply_filters( 'gend_society_hosting_db_plan_bytes', 5 * 1024 * 1024 * 1024 );
 }
 
-function gs_hosting_media_plan_bytes() {
+function gend_society_hosting_media_plan_bytes() {
     // Default 20 GB.
-    return (int) apply_filters( 'gs_hosting_media_plan_bytes', 20 * 1024 * 1024 * 1024 );
+    return (int) apply_filters( 'gend_society_hosting_media_plan_bytes', 20 * 1024 * 1024 * 1024 );
 }
 
-function gs_hosting_backups_plan_bytes() {
+function gend_society_hosting_backups_plan_bytes() {
     // Default 10 GB. Same hardcoded-but-filterable idiom as
     // gs_hosting_db_plan_bytes()/gs_hosting_media_plan_bytes() above -
     // none of these three pull a real per-membership quota yet either,
     // this isn't a lower bar than its siblings.
-    return (int) apply_filters( 'gs_hosting_backups_plan_bytes', 10 * 1024 * 1024 * 1024 );
+    return (int) apply_filters( 'gend_society_hosting_backups_plan_bytes', 10 * 1024 * 1024 * 1024 );
 }
 
 /**
@@ -3246,8 +3246,8 @@ function gs_hosting_backups_plan_bytes() {
  * transient for 1 hour so page loads never trigger a live disk walk.
  * @return array{bytes_used:int, plugin_count:int, theme_count:int, scanned_at:int}
  */
-function gs_hosting_collect_codebase() {
-    $cache_key = 'gs_hosting_codebase_v1';
+function gend_society_hosting_collect_codebase() {
+    $cache_key = 'gend_society_hosting_codebase_v1';
     $cached = get_transient( $cache_key );
     if ( is_array( $cached ) && isset( $cached['bytes_used'] ) ) {
         return $cached;
@@ -3292,7 +3292,7 @@ function gs_hosting_collect_codebase() {
     return $out;
 }
 
-if ( ! function_exists( 'gs_hosting_collect_codebase_breakdown' ) ) {
+if ( ! function_exists( 'gend_society_hosting_collect_codebase_breakdown' ) ) {
     /**
      * Per-plugin / per-theme / per-mu-plugin on-disk size breakdown, for the
      * Codebase sub-tab's analytics list - same three directories
@@ -3302,8 +3302,8 @@ if ( ! function_exists( 'gs_hosting_collect_codebase_breakdown' ) ) {
      *
      * @return array<int,array{name:string,type:string,bytes:int}> sorted by bytes desc.
      */
-    function gs_hosting_collect_codebase_breakdown() {
-        $cache_key = 'gs_hosting_codebase_breakdown_v1';
+    function gend_society_hosting_collect_codebase_breakdown() {
+        $cache_key = 'gend_society_hosting_codebase_breakdown_v1';
         $cached = get_transient( $cache_key );
         if ( is_array( $cached ) ) {
             return $cached;
@@ -3357,7 +3357,7 @@ if ( ! function_exists( 'gs_hosting_collect_codebase_breakdown' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_render_codebase_packages' ) ) {
+if ( ! function_exists( 'gend_society_hosting_render_codebase_packages' ) ) {
     /**
      * Every installed plugin that ISN'T one of the curated "Dashboards"
      * feature cards (gs_get_feature_definitions(), feature-cards.php) - a
@@ -3368,15 +3368,15 @@ if ( ! function_exists( 'gs_hosting_render_codebase_packages' ) ) {
      * .gs-ajax-action click delegation already wired in feature-cards.php's
      * admin_footer script - no new JS needed for the update action itself.
      */
-    function gs_hosting_render_codebase_packages() {
+    function gend_society_hosting_render_codebase_packages() {
         if ( ! function_exists( 'get_plugins' ) ) {
             require_once ABSPATH . 'wp-admin/includes/plugin.php';
         }
         $all_plugins = function_exists( 'get_plugins' ) ? get_plugins() : array();
 
         $dashboard_plugin_files = array();
-        if ( function_exists( 'gs_get_feature_definitions' ) ) {
-            foreach ( gs_get_feature_definitions() as $gs_feat ) {
+        if ( function_exists( 'gend_society_get_feature_definitions' ) ) {
+            foreach ( gend_society_get_feature_definitions() as $gs_feat ) {
                 if ( ! empty( $gs_feat['plugin'] ) ) {
                     $dashboard_plugin_files[ $gs_feat['plugin'] ] = true;
                 }
@@ -3438,7 +3438,7 @@ if ( ! function_exists( 'gs_hosting_render_codebase_packages' ) ) {
                 <p class="gs-pkg-empty"><?php esc_html_e( 'No other plugin files found.', 'gend-society' ); ?></p>
             <?php else : foreach ( $packages as $gs_pkg_file => $gs_pkg ) :
                 $gs_pkg_active = function_exists( 'is_plugin_active' ) && is_plugin_active( $gs_pkg_file );
-                $gs_pkg_update = function_exists( 'gs_has_plugin_update' ) && gs_has_plugin_update( $gs_pkg_file );
+                $gs_pkg_update = function_exists( 'gend_society_has_plugin_update' ) && gend_society_has_plugin_update( $gs_pkg_file );
                 $gs_pkg_name   = ! empty( $gs_pkg['Name'] ) ? $gs_pkg['Name'] : $gs_pkg_file;
                 $gs_pkg_row_classes = trim( ( $gs_pkg_update ? ' has-update' : '' ) . ( $gs_pkg_active && ! $gs_pkg_update ? ' is-active' : '' ) );
             ?>
@@ -3466,7 +3466,7 @@ if ( ! function_exists( 'gs_hosting_render_codebase_packages' ) ) {
     }
 }
 
-function gs_hosting_pct( $used, $cap ) {
+function gend_society_hosting_pct( $used, $cap ) {
     if ( $cap <= 0 ) return 0;
     $pct = ( $used / $cap ) * 100;
     if ( $pct < 0 ) return 0;
@@ -3484,7 +3484,7 @@ function gs_hosting_pct( $used, $cap ) {
  * @return array{amount:float,label:string,unit:string}|null Null if no
  *         container product is attached (caller should fall back to $billing).
  */
-function gs_hosting_container_plan_total( $membership ) {
+function gend_society_hosting_container_plan_total( $membership ) {
     if ( ! $membership || ! is_object( $membership ) || ! method_exists( $membership, 'get_all_products' ) ) {
         return null;
     }
@@ -3521,7 +3521,7 @@ function gs_hosting_container_plan_total( $membership ) {
     );
 }
 
-if ( ! function_exists( 'gs_hosting_container_resource_prices' ) ) {
+if ( ! function_exists( 'gend_society_hosting_container_resource_prices' ) ) {
     /**
      * Per-resource (media/database/code) monthly price for whichever real
      * container-subgroup product is attached to this membership - same
@@ -3534,7 +3534,7 @@ if ( ! function_exists( 'gs_hosting_container_resource_prices' ) ) {
      * @param object|null $membership A Vendor App Manager Membership instance.
      * @return array{media:array|null,database:array|null,code:array|null}
      */
-    function gs_hosting_container_resource_prices( $membership ) {
+    function gend_society_hosting_container_resource_prices( $membership ) {
         $out = array( 'media' => null, 'database' => null, 'code' => null );
         if ( ! $membership || ! is_object( $membership ) || ! method_exists( $membership, 'get_all_products' ) ) {
             return $out;
@@ -3575,7 +3575,7 @@ if ( ! function_exists( 'gs_hosting_container_resource_prices' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_container_resource_starting_prices' ) ) {
+if ( ! function_exists( 'gend_society_hosting_container_resource_starting_prices' ) ) {
     /**
      * "From $X / month" - the cheapest AVAILABLE real tier for each
      * resource (media/database/codebase), sourced from the exact same
@@ -3588,7 +3588,7 @@ if ( ! function_exists( 'gs_hosting_container_resource_starting_prices' ) ) {
      *
      * @return array{media:array|null,database:array|null,code:array|null}
      */
-    function gs_hosting_container_resource_starting_prices() {
+    function gend_society_hosting_container_resource_starting_prices() {
         $out = array( 'media' => null, 'database' => null, 'code' => null );
         if ( ! function_exists( 'gdc_plan_attach_get_plans' ) || ! function_exists( 'wu_get_product' ) ) {
             return $out;
@@ -3625,7 +3625,7 @@ if ( ! function_exists( 'gs_hosting_container_resource_starting_prices' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_hosting_server_price' ) ) {
+if ( ! function_exists( 'gend_society_hosting_server_price' ) ) {
     /**
      * Current (summed across every attached server-subgroup product/row,
      * not just the first one found) + starting price for a Server-subgroup
@@ -3641,7 +3641,7 @@ if ( ! function_exists( 'gs_hosting_server_price' ) ) {
      * @param object|null $membership A Vendor App Manager Membership instance.
      * @return array{current:array|null,starting:array|null}
      */
-    function gs_hosting_server_price( $membership ) {
+    function gend_society_hosting_server_price( $membership ) {
         $current = null;
         if ( $membership && is_object( $membership ) && method_exists( $membership, 'get_all_products' ) ) {
             $currency     = method_exists( $membership, 'get_currency' )      ? (string) $membership->get_currency()      : '';
@@ -3691,13 +3691,13 @@ if ( ! function_exists( 'gs_hosting_server_price' ) ) {
     }
 }
 
-function gs_hosting_plan_label( $billing ) {
+function gend_society_hosting_plan_label( $billing ) {
     if ( ! is_array( $billing ) ) return __( 'Default', 'gend-society' );
     if ( ! empty( $billing['label'] ) ) return (string) $billing['label'];
     return __( 'Default', 'gend-society' );
 }
 
-function gs_hosting_render_status_pill( $status ) {
+function gend_society_hosting_render_status_pill( $status ) {
     $status = strtolower( (string) $status );
     if ( in_array( $status, array( 'ok', 'verified', 'active', 'live', 'true', '1' ), true ) ) {
         return '<span class="gs-hosting__pill is-ok">' . esc_html__( 'OK', 'gend-society' ) . '</span>';
@@ -3714,7 +3714,7 @@ function gs_hosting_render_status_pill( $status ) {
  * severity, source, message }. Best-effort — returns what it can read,
  * surfaces warnings for the sources it couldn't.
  */
-function gs_hosting_read_logs( $limit = 200 ) {
+function gend_society_hosting_read_logs( $limit = 200 ) {
     $entries = array();
     $warnings = array();
 
@@ -3747,7 +3747,7 @@ function gs_hosting_read_logs( $limit = 200 ) {
         foreach ( $lines as $line ) {
             $line = trim( $line );
             if ( $line === '' ) continue;
-            $entries[] = gs_hosting_parse_log_line( $line, $s['label'] );
+            $entries[] = gend_society_hosting_parse_log_line( $line, $s['label'] );
         }
     }
 
@@ -3764,7 +3764,7 @@ function gs_hosting_read_logs( $limit = 200 ) {
     );
 }
 
-function gs_hosting_parse_log_line( $line, $source ) {
+function gend_society_hosting_parse_log_line( $line, $source ) {
     $ts = '';
     $msg = $line;
     // Match leading [date time] bracketed prefix.
@@ -3794,8 +3794,8 @@ function gs_hosting_parse_log_line( $line, $source ) {
 // fallbacks where possible.
 // -------------------------------------------------------------------------
 
-if ( ! function_exists( 'gs_hosting_ajax_authorize' ) ) {
-    function gs_hosting_ajax_authorize() {
+if ( ! function_exists( 'gend_society_hosting_ajax_authorize' ) ) {
+    function gend_society_hosting_ajax_authorize() {
         if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
         }
@@ -3808,9 +3808,9 @@ if ( ! function_exists( 'gs_hosting_ajax_authorize' ) ) {
  * route yet, return the local fallback (when provided) or surface the
  * error to the client.
  */
-function gs_hosting_call_or_fallback( $path, $body, $local_fallback = null, $body_method = 'POST' ) {
-    if ( function_exists( 'gs_remote_membership_call' ) ) {
-        $r = gs_remote_membership_call( $path, $body, $body_method );
+function gend_society_hosting_call_or_fallback( $path, $body, $local_fallback = null, $body_method = 'POST' ) {
+    if ( function_exists( 'gend_society_remote_membership_call' ) ) {
+        $r = gend_society_remote_membership_call( $path, $body, $body_method );
         if ( ! is_wp_error( $r ) ) {
             return $r;
         }
@@ -3822,9 +3822,9 @@ function gs_hosting_call_or_fallback( $path, $body, $local_fallback = null, $bod
     return new WP_Error( 'unavailable', __( 'This hosting action is not yet available on this install.', 'gend-society' ) );
 }
 
-add_action( 'wp_ajax_gs_hosting_cache_page', function () {
-    gs_hosting_ajax_authorize();
-    $r = gs_hosting_call_or_fallback( 'hosting/cache-page', array(), function () {
+add_action( 'wp_ajax_gend_society_hosting_cache_page', function () {
+    gend_society_hosting_ajax_authorize();
+    $r = gend_society_hosting_call_or_fallback( 'hosting/cache-page', array(), function () {
         // Local fallback: no real page cache on this install — at least
         // tell the truth so the user doesn't think it ran.
         return new WP_Error( 'no_page_cache', __( 'No edge page cache is bound to this install.', 'gend-society' ) );
@@ -3833,11 +3833,11 @@ add_action( 'wp_ajax_gs_hosting_cache_page', function () {
     wp_send_json_success( is_array( $r ) ? $r : array() );
 } );
 
-add_action( 'wp_ajax_gs_hosting_cache_object', function () {
-    gs_hosting_ajax_authorize();
+add_action( 'wp_ajax_gend_society_hosting_cache_object', function () {
+    gend_society_hosting_ajax_authorize();
     // Local fallback is genuinely useful here: wp_cache_flush() clears
     // whatever object cache backend WP is wired to (Redis/Memcached/etc.).
-    $r = gs_hosting_call_or_fallback( 'hosting/cache-object', array(), function () {
+    $r = gend_society_hosting_call_or_fallback( 'hosting/cache-object', array(), function () {
         if ( function_exists( 'wp_cache_flush' ) ) wp_cache_flush();
         if ( function_exists( 'wp_cache_flush_runtime' ) ) wp_cache_flush_runtime();
         return array( 'message' => __( 'Object cache flushed locally.', 'gend-society' ) );
@@ -3846,40 +3846,40 @@ add_action( 'wp_ajax_gs_hosting_cache_object', function () {
     wp_send_json_success( is_array( $r ) ? $r : array() );
 } );
 
-add_action( 'wp_ajax_gs_hosting_template_reset', function () {
-    gs_hosting_ajax_authorize();
-    $r = gs_hosting_call_or_fallback( 'hosting/template-reset', array(), null );
+add_action( 'wp_ajax_gend_society_hosting_template_reset', function () {
+    gend_society_hosting_ajax_authorize();
+    $r = gend_society_hosting_call_or_fallback( 'hosting/template-reset', array(), null );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     wp_send_json_success( is_array( $r ) ? $r : array() );
 } );
 
-add_action( 'wp_ajax_gs_hosting_toggles_get', function () {
-    gs_hosting_ajax_authorize();
-    $r = gs_hosting_call_or_fallback( 'hosting/toggles', array(), function () {
+add_action( 'wp_ajax_gend_society_hosting_toggles_get', function () {
+    gend_society_hosting_ajax_authorize();
+    $r = gend_society_hosting_call_or_fallback( 'hosting/toggles', array(), function () {
         // Local fallback: use WP options as a stand-in store so the toggles
         // are at least persistent on this side until the hub side ships.
         return array(
-            'waf'      => (bool) get_option( 'gs_hosting_waf_enabled' ),
-            'password' => (bool) get_option( 'gs_hosting_password_enabled' ),
-            'bfa'      => (bool) get_option( 'gs_hosting_bfa_enabled' ),
+            'waf'      => (bool) get_option( 'gend_society_hosting_waf_enabled' ),
+            'password' => (bool) get_option( 'gend_society_hosting_password_enabled' ),
+            'bfa'      => (bool) get_option( 'gend_society_hosting_bfa_enabled' ),
         );
     }, 'GET' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     wp_send_json_success( is_array( $r ) ? $r : array() );
 } );
 
-add_action( 'wp_ajax_gs_hosting_toggle_set', function () {
-    gs_hosting_ajax_authorize();
+add_action( 'wp_ajax_gend_society_hosting_toggle_set', function () {
+    gend_society_hosting_ajax_authorize();
     $feature = isset( $_POST['feature'] ) ? sanitize_key( wp_unslash( $_POST['feature'] ) ) : '';
     $enabled = ! empty( $_POST['enabled'] );
     $allowed = array( 'waf', 'password', 'bfa' );
     if ( ! in_array( $feature, $allowed, true ) ) {
         wp_send_json_error( array( 'message' => __( 'Unknown feature.', 'gend-society' ) ) );
     }
-    $r = gs_hosting_call_or_fallback( 'hosting/toggles/' . $feature, array( 'enabled' => $enabled ? 1 : 0 ), function () use ( $feature, $enabled ) {
+    $r = gend_society_hosting_call_or_fallback( 'hosting/toggles/' . $feature, array( 'enabled' => $enabled ? 1 : 0 ), function () use ( $feature, $enabled ) {
         // Mirror in WP options so the panel reflects state even when the
         // hub-side route isn't there yet.
-        update_option( 'gs_hosting_' . $feature . '_enabled', $enabled ? 1 : 0 );
+        update_option( 'gend_society_hosting_' . $feature . '_enabled', $enabled ? 1 : 0 );
         return array( 'enabled' => $enabled );
     } );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
@@ -3897,7 +3897,7 @@ add_action( 'wp_ajax_gs_hosting_toggle_set', function () {
  *
  * @return array
  */
-function gs_hosting_compute_gas_real_data() {
+function gend_society_hosting_compute_gas_real_data() {
     global $wpdb;
     $site_id = get_current_blog_id();
     $ledger  = $wpdb->base_prefix . 'gdc_gas_ledger';
@@ -3998,7 +3998,7 @@ function gs_hosting_compute_gas_real_data() {
     );
 }
 
-if ( ! function_exists( 'gs_hosting_gas_month_over_month' ) ) {
+if ( ! function_exists( 'gend_society_hosting_gas_month_over_month' ) ) {
     /**
      * This-calendar-month vs previous-calendar-month real GAS consumption
      * (sales_amount) for a site, off the same real gdc_gas_ledger table
@@ -4009,7 +4009,7 @@ if ( ! function_exists( 'gs_hosting_gas_month_over_month' ) ) {
      * @param int|null $site_id Defaults to the current blog.
      * @return array{this_month:float,last_month:float,this_month_label:string,last_month_label:string,change_pct:float|null,change_label:string,direction:string}
      */
-    function gs_hosting_gas_month_over_month( $site_id = null ) {
+    function gend_society_hosting_gas_month_over_month( $site_id = null ) {
         global $wpdb;
         $site_id = null === $site_id ? get_current_blog_id() : (int) $site_id;
         $ledger  = $wpdb->base_prefix . 'gdc_gas_ledger';
@@ -4063,7 +4063,7 @@ if ( ! function_exists( 'gs_hosting_gas_month_over_month' ) ) {
  * by letting their own devices serve OTHER customers' tasks - two
  * different real money flows on the same ledger table, not one balance.
  */
-function gs_hosting_gas_earned_summary( $user_id ) {
+function gend_society_hosting_gas_earned_summary( $user_id ) {
     global $wpdb;
     $ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
     $row    = $wpdb->get_row( $wpdb->prepare(
@@ -4098,7 +4098,7 @@ function gs_hosting_gas_earned_summary( $user_id ) {
  * per-task aggregate breakdown) so the History modal can show a real
  * chronological ledger, filterable client-side by direction.
  */
-function gs_hosting_gas_history_rows( $limit = 100 ) {
+function gend_society_hosting_gas_history_rows( $limit = 100 ) {
     global $wpdb;
     $ledger  = $wpdb->base_prefix . 'gdc_gas_ledger';
     $site_id = get_current_blog_id();
@@ -4148,21 +4148,21 @@ function gs_hosting_gas_history_rows( $limit = 100 ) {
     return array_slice( $out, 0, $limit );
 }
 
-add_action( 'wp_ajax_gs_hosting_compute_gas', function () {
-    gs_hosting_ajax_authorize();
-    $r = gs_hosting_call_or_fallback( 'hosting/compute-gas', array(), 'gs_hosting_compute_gas_real_data', 'GET' );
+add_action( 'wp_ajax_gend_society_hosting_compute_gas', function () {
+    gend_society_hosting_ajax_authorize();
+    $r = gend_society_hosting_call_or_fallback( 'hosting/compute-gas', array(), 'gend_society_hosting_compute_gas_real_data', 'GET' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     wp_send_json_success( is_array( $r ) ? $r : array() );
 } );
 
-add_action( 'wp_ajax_gs_hosting_logs', function () {
-    gs_hosting_ajax_authorize();
+add_action( 'wp_ajax_gend_society_hosting_logs', function () {
+    gend_society_hosting_ajax_authorize();
     // Logs always read locally — the container's logs ARE the local logs.
-    $r = gs_hosting_read_logs( 200 );
+    $r = gend_society_hosting_read_logs( 200 );
     wp_send_json_success( $r );
 } );
 
-add_action( 'wp_ajax_gs_hosting_media_rescan', function () {
+add_action( 'wp_ajax_gend_society_hosting_media_rescan', function () {
     // A group_id in the request means this fired from a group's Hosting
     // tab on the gend.me hub (see group-app-tabs.php's "Rescan now" button)
     // rather than from a vendor's own wp-admin dashboard. Two things differ
@@ -4191,17 +4191,17 @@ add_action( 'wp_ajax_gs_hosting_media_rescan', function () {
             wp_send_json_error( array( 'message' => __( 'No application linked to this group.', 'gend-society' ) ) );
         }
         switch_to_blog( $site_id );
-        delete_transient( 'gs_hosting_media_usage' );
-        $data = gs_hosting_collect_media( true );
+        delete_transient( 'gend_society_hosting_media_usage' );
+        $data = gend_society_hosting_collect_media( true );
         restore_current_blog();
         wp_send_json_success( $data );
     }
 
     // Original behavior — called from the vendor's own wp-admin dashboard,
     // already on the correct site, no group context involved.
-    gs_hosting_ajax_authorize();
-    delete_transient( 'gs_hosting_media_usage' );
-    $data = gs_hosting_collect_media( true );
+    gend_society_hosting_ajax_authorize();
+    delete_transient( 'gend_society_hosting_media_usage' );
+    $data = gend_society_hosting_collect_media( true );
     wp_send_json_success( $data );
 } );
 
@@ -4216,8 +4216,8 @@ add_action( 'wp_ajax_gs_hosting_media_rescan', function () {
  * Result rows cap at 500 so a `SELECT * FROM big_table` doesn't OOM the
  * pod; the SQL is also wrapped in a defensive 200kb length cap.
  */
-add_action( 'wp_ajax_gs_hosting_query_run', function () {
-    gs_hosting_ajax_authorize();
+add_action( 'wp_ajax_gend_society_hosting_query_run', function () {
+    gend_society_hosting_ajax_authorize();
     global $wpdb;
 
     $sql = isset( $_POST['sql'] ) ? (string) wp_unslash( $_POST['sql'] ) : '';

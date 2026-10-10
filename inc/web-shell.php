@@ -31,31 +31,31 @@
 
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-if ( ! function_exists( 'gs_web_shell_register' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_register' ) ) {
 
-    function gs_web_shell_register() {
+    function gend_society_web_shell_register() {
         add_rewrite_rule( '^web-shell/?$',           'index.php?gs_web_shell=1', 'top' );
         add_rewrite_rule( '^web-shell/([^/]+)/?$',   'index.php?gs_web_shell=1&gs_web_shell_tab=$matches[1]', 'top' );
         add_rewrite_tag( '%gs_web_shell%',     '([0-9]+)' );
         add_rewrite_tag( '%gs_web_shell_tab%', '([^/]+)' );
     }
-    add_action( 'init', 'gs_web_shell_register' );
+    add_action( 'init', 'gend_society_web_shell_register' );
 
     // First-load helper: flush rewrites once when the plugin activates
     // so the new rule registers without the admin manually visiting
     // Settings → Permalinks. Cheap idempotent option-flag pattern.
-    function gs_web_shell_flush_once() {
-        if ( get_option( 'gs_web_shell_rewrite_flushed' ) === '1' ) return;
-        gs_web_shell_register();
+    function gend_society_web_shell_flush_once() {
+        if ( get_option( 'gend_society_web_shell_rewrite_flushed' ) === '1' ) return;
+        gend_society_web_shell_register();
         flush_rewrite_rules( false );
-        update_option( 'gs_web_shell_rewrite_flushed', '1', false );
+        update_option( 'gend_society_web_shell_rewrite_flushed', '1', false );
     }
-    add_action( 'init', 'gs_web_shell_flush_once', 20 );
+    add_action( 'init', 'gend_society_web_shell_flush_once', 20 );
 }
 
-if ( ! function_exists( 'gs_web_shell_render' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_render' ) ) {
 
-    function gs_web_shell_render() {
+    function gend_society_web_shell_render() {
         if ( (int) get_query_var( 'gs_web_shell' ) !== 1 ) return;
 
         // Require login. Return URL points back here so a fresh-tab
@@ -508,14 +508,14 @@ window.__WS_BOOT__ = {
 <script src="https://cdn.jsdelivr.net/npm/xterm@5.5.0/lib/xterm.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xterm-addon-fit@0.10.0/lib/xterm-addon-fit.min.js"></script>
 <?php $js_path = dirname( __DIR__ ) . '/assets/web-shell.js'; ?>
-<script src="<?php echo esc_url( plugins_url( 'assets/web-shell.js', dirname( __DIR__ ) . '/gend-society.php' ) ); ?>?v=<?php echo esc_attr( GS_VERSION . '.' . ( file_exists( $js_path ) ? filemtime( $js_path ) : '0' ) ); ?>"></script>
+<script src="<?php echo esc_url( plugins_url( 'assets/web-shell.js', dirname( __DIR__ ) . '/gend-society.php' ) ); ?>?v=<?php echo esc_attr( GEND_SOCIETY_VERSION . '.' . ( file_exists( $js_path ) ? filemtime( $js_path ) : '0' ) ); ?>"></script>
 
 </body>
 </html>
         <?php
         exit;
     }
-    add_action( 'template_redirect', 'gs_web_shell_render', 1 );
+    add_action( 'template_redirect', 'gend_society_web_shell_render', 1 );
 }
 
 /* ════════════════════════════════════════════════════════════════════
@@ -529,9 +529,9 @@ window.__WS_BOOT__ = {
                                  renders a clear "coming soon" banner)
    ════════════════════════════════════════════════════════════════════ */
 
-if ( ! function_exists( 'gs_web_shell_register_rest' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_register_rest' ) ) {
 
-    function gs_web_shell_register_rest() {
+    function gend_society_web_shell_register_rest() {
         register_rest_route( 'gs/v1', '/web-shell/ping', array(
             'methods'             => 'GET',
             'callback'            => function () {
@@ -548,28 +548,28 @@ if ( ! function_exists( 'gs_web_shell_register_rest' ) ) {
 
         register_rest_route( 'gs/v1', '/web-shell/sites', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_web_shell_rest_sites',
+            'callback'            => 'gend_society_web_shell_rest_sites',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
 
         register_rest_route( 'gs/v1', '/web-shell/groups', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_web_shell_rest_groups',
+            'callback'            => 'gend_society_web_shell_rest_groups',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
 
         register_rest_route( 'gs/v1', '/web-shell/terminal', array(
             'methods'             => 'GET',
-            'callback'            => 'gs_web_shell_rest_terminal',
+            'callback'            => 'gend_society_web_shell_rest_terminal',
             'permission_callback' => function () { return is_user_logged_in(); },
         ) );
     }
-    add_action( 'rest_api_init', 'gs_web_shell_register_rest' );
+    add_action( 'rest_api_init', 'gend_society_web_shell_register_rest' );
 }
 
-if ( ! function_exists( 'gs_web_shell_rest_sites' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_rest_sites' ) ) {
 
-    function gs_web_shell_rest_sites() {
+    function gend_society_web_shell_rest_sites() {
         if ( ! function_exists( 'wu_get_customer_by' ) ) return array( 'sites' => array() );
         $user = wp_get_current_user();
         $customer = wu_get_customer_by( 'user_id', (int) $user->ID );
@@ -622,9 +622,9 @@ if ( ! function_exists( 'gs_web_shell_rest_sites' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_web_shell_rest_groups' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_rest_groups' ) ) {
 
-    function gs_web_shell_rest_groups() {
+    function gend_society_web_shell_rest_groups() {
         if ( ! function_exists( 'groups_get_groups' ) ) return array( 'groups' => array() );
         $user_id = get_current_user_id();
         // Pull groups where current user is a group admin OR mod, plus
@@ -664,9 +664,9 @@ if ( ! function_exists( 'gs_web_shell_rest_groups' ) ) {
                                                        client opens the WS.
    ════════════════════════════════════════════════════════════════════ */
 
-if ( ! function_exists( 'gs_web_shell_rest_terminal' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_rest_terminal' ) ) {
 
-    function gs_web_shell_rest_terminal() {
+    function gend_society_web_shell_rest_terminal() {
         $secret  = defined( 'GS_SHELL_JWT_SECRET' ) ? (string) GS_SHELL_JWT_SECRET
                  : ( getenv( 'GS_SHELL_JWT_SECRET' ) ?: '' );
         $wss_url = defined( 'GS_SHELL_PTY_WSS' )    ? (string) GS_SHELL_PTY_WSS
@@ -697,7 +697,7 @@ if ( ! function_exists( 'gs_web_shell_rest_terminal' ) ) {
             'exp'        => $now + 10, // one-shot, 10-second window
             'jti'        => bin2hex( random_bytes( 8 ) ),
         );
-        $token = gs_web_shell_jwt_encode( $payload, $secret );
+        $token = gend_society_web_shell_jwt_encode( $payload, $secret );
         $expires_at = gmdate( 'c', $now + 10 );
 
         return array(
@@ -713,13 +713,13 @@ if ( ! function_exists( 'gs_web_shell_rest_terminal' ) ) {
     }
 }
 
-if ( ! function_exists( 'gs_web_shell_jwt_encode' ) ) {
+if ( ! function_exists( 'gend_society_web_shell_jwt_encode' ) ) {
 
     /**
      * Minimal HS256 JWT encoder — avoids dragging in a Composer dep.
      * The PTY service verifies with the standard `jsonwebtoken` lib.
      */
-    function gs_web_shell_jwt_encode( $payload, $secret ) {
+    function gend_society_web_shell_jwt_encode( $payload, $secret ) {
         $b64 = function ( $s ) { return rtrim( strtr( base64_encode( $s ), '+/', '-_' ), '=' ); };
         $header  = $b64( wp_json_encode( array( 'alg' => 'HS256', 'typ' => 'JWT' ) ) );
         $body    = $b64( wp_json_encode( $payload ) );

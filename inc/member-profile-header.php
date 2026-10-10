@@ -14,22 +14,22 @@ if ( ! defined( 'ABSPATH' ) ) exit;
 
 // ─── Global Youzify dark-terminal styles (all BP pages) ───────────────────────
 
-add_action( 'wp_enqueue_scripts', 'gdc_enqueue_global_youzify_styles' );
-function gdc_enqueue_global_youzify_styles() {
+add_action( 'wp_enqueue_scripts', 'gend_society_enqueue_global_youzify_styles' );
+function gend_society_enqueue_global_youzify_styles() {
     if ( ! function_exists( 'is_buddypress' ) || ! is_buddypress() ) return;
-    wp_register_style( 'gdc-youzify-global', false, [], GS_VERSION );
+    wp_register_style( 'gdc-youzify-global', false, [], GEND_SOCIETY_VERSION );
     wp_enqueue_style( 'gdc-youzify-global' );
-    wp_add_inline_style( 'gdc-youzify-global', gdc_global_youzify_css() );
+    wp_add_inline_style( 'gdc-youzify-global', gend_society_global_youzify_css() );
 }
 
 // ─── Profile-page-only styles (header component + cover) ─────────────────────
 
-add_action( 'wp_enqueue_scripts', 'gdc_enqueue_profile_header_styles' );
-function gdc_enqueue_profile_header_styles() {
+add_action( 'wp_enqueue_scripts', 'gend_society_enqueue_profile_header_styles' );
+function gend_society_enqueue_profile_header_styles() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
-    wp_register_style( 'gdc-profile-header', false, [], GS_VERSION );
+    wp_register_style( 'gdc-profile-header', false, [], GEND_SOCIETY_VERSION );
     wp_enqueue_style( 'gdc-profile-header' );
-    wp_add_inline_style( 'gdc-profile-header', gdc_profile_header_css() );
+    wp_add_inline_style( 'gdc-profile-header', gend_society_profile_header_css() );
 
     // The DGEN top-up popup embeds the live reward-programs wallet card. We render
     // the wallet hidden on this page (see gdc_render_profile_header) so the plugin
@@ -39,10 +39,10 @@ function gdc_enqueue_profile_header_styles() {
     $rp_dir = WP_CONTENT_DIR . '/plugins/reward-programs/assets/';
     $rp_url = content_url( '/plugins/reward-programs/assets/' );
     if ( file_exists( $rp_dir . 'frontend-wallet.css' ) ) {
-        wp_enqueue_style( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.css', [], GS_VERSION . '.' . filemtime( $rp_dir . 'frontend-wallet.css' ) );
+        wp_enqueue_style( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.css', [], GEND_SOCIETY_VERSION . '.' . filemtime( $rp_dir . 'frontend-wallet.css' ) );
     }
     if ( file_exists( $rp_dir . 'frontend-wallet.js' ) ) {
-        wp_enqueue_script( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.js', [ 'jquery' ], GS_VERSION . '.' . filemtime( $rp_dir . 'frontend-wallet.js' ), true );
+        wp_enqueue_script( 'gend-wallet-frontend', $rp_url . 'frontend-wallet.js', [ 'jquery' ], GEND_SOCIETY_VERSION . '.' . filemtime( $rp_dir . 'frontend-wallet.js' ), true );
         wp_localize_script( 'gend-wallet-frontend', 'GEND_WALLET', [
             'ajax'  => admin_url( 'admin-ajax.php' ),
             'nonce' => wp_create_nonce( 'gend_wallet_nonce' ),
@@ -56,8 +56,8 @@ function gdc_enqueue_profile_header_styles() {
 // at init, then the popup relocates this bound node in and out of itself. Done
 // via wp_footer (not the header markup) so it cannot duplicate when Youzify fires
 // its before-header hook more than once, and cannot disturb the header/menu.
-add_action( 'wp_footer', 'gdc_render_wallet_source', 5 );
-function gdc_render_wallet_source() {
+add_action( 'wp_footer', 'gend_society_render_wallet_source', 5 );
+function gend_society_render_wallet_source() {
     static $done = false;
     if ( $done ) return;
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() || ! bp_is_my_profile() ) return;
@@ -77,8 +77,8 @@ function gdc_render_wallet_source() {
 //   tasks → sales-team "Task Credit Top-up" product, qty = credits (grants `tasks`)
 //   ai    → leo aipa-credits product (grants AI Builder Tokens)
 //   dgen  → contracts-and-payments DGEN product (credits `transact` 1:1)
-add_action( 'template_redirect', 'gdc_handle_wallet_topup_purchase' );
-function gdc_handle_wallet_topup_purchase() {
+add_action( 'template_redirect', 'gend_society_handle_wallet_topup_purchase' );
+function gend_society_handle_wallet_topup_purchase() {
     if ( empty( $_GET['gdc_topup'] ) ) return;
     $kind = sanitize_key( wp_unslash( $_GET['gdc_topup'] ) );
     if ( ! in_array( $kind, [ 'tasks', 'ai', 'dgen' ], true ) ) return;
@@ -101,7 +101,7 @@ function gdc_handle_wallet_topup_purchase() {
     WC()->cart->empty_cart();
 
     if ( 'tasks' === $kind ) {
-        $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 );
+        $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from sales-team.
         $n = max( 1, $qty );
         if ( ! $extra_pid ) { wp_safe_redirect( $back ); exit; }
         $rate = 50.0;
@@ -147,8 +147,8 @@ function gdc_handle_wallet_topup_purchase() {
 // strip the theme header/footer/admin-bar/chat-widget so only the checkout
 // payment form shows. Scoped strictly to that query flag — never affects normal
 // page loads.
-add_filter( 'show_admin_bar', 'gdc_topup_embed_hide_admin_bar' );
-function gdc_topup_embed_hide_admin_bar( $show ) {
+add_filter( 'show_admin_bar', 'gend_society_topup_embed_hide_admin_bar' );
+function gend_society_topup_embed_hide_admin_bar( $show ) {
     return empty( $_GET['gend_embed'] ) ? $show : false;
 }
 
@@ -156,8 +156,8 @@ function gdc_topup_embed_hide_admin_bar( $show ) {
 // methods) instead of the React checkout BLOCK — the block hydrates client-side
 // and reliably fails to surface payment gateways inside an iframe. Classic
 // checkout prints every enabled gateway in the HTML and works in the frame.
-add_filter( 'render_block', 'gdc_topup_embed_classic_checkout', 10, 2 );
-function gdc_topup_embed_classic_checkout( $block_content, $block ) {
+add_filter( 'render_block', 'gend_society_topup_embed_classic_checkout', 10, 2 );
+function gend_society_topup_embed_classic_checkout( $block_content, $block ) {
     if ( empty( $_GET['gend_embed'] ) ) return $block_content;
     if ( ! empty( $block['blockName'] ) && 'woocommerce/checkout' === $block['blockName'] ) {
         return do_shortcode( '[woocommerce_checkout]' );
@@ -170,13 +170,13 @@ function gdc_topup_embed_classic_checkout( $block_content, $block ) {
 // frontend bar / template modal, BuddyPress). Keeps everything WooCommerce /
 // payment-gateway / jQuery / WP-core so the classic checkout still works. This
 // is the bulk of the embed's load weight.
-add_action( 'wp_enqueue_scripts', 'gdc_topup_embed_trim_assets', 9999 );
+add_action( 'wp_enqueue_scripts', 'gend_society_topup_embed_trim_assets', 9999 );
 // Also run right before footer scripts/styles print — the Woo blocks bundle is
 // enqueued during block render (the_content), AFTER wp_enqueue_scripts, so the
 // early pass alone misses it. wp_print_footer_scripts (10) prints them; we run
 // at 1 to dequeue first.
-add_action( 'wp_print_footer_scripts', 'gdc_topup_embed_trim_assets', 1 );
-function gdc_topup_embed_trim_assets() {
+add_action( 'wp_print_footer_scripts', 'gend_society_topup_embed_trim_assets', 1 );
+function gend_society_topup_embed_trim_assets() {
     if ( empty( $_GET['gend_embed'] ) ) return;
     $kill = [ 'youzify', 'aipa-widget', 'leo-flow', 'leo-widget', 'gs-frontend-bar', 'gs-template-modal', 'gs-site-editor', 'gs-animation', 'buddypress', 'bp-' ];
     $keep = [ 'woocommerce', 'wc-', 'wc_', 'ppcp', 'paypal', 'jquery', 'wp-', 'select', 'sourcebuster', 'stripe', 'checkout', 'dashicons' ];
@@ -207,8 +207,8 @@ function gdc_topup_embed_trim_assets() {
 // ppcp (PayPal/card), gend_dgen_hub (DGEN), gend_btcpay_hub (BTC/Lightning),
 // gend_evm_hub (USDC/ETH), mycred (Store Credits). Hub-only via gend_society_is_hub();
 // reversible (pure filter — changes no gateway settings).
-add_filter( 'woocommerce_available_payment_gateways', 'gdc_dedupe_hub_payment_gateways', 100 );
-function gdc_dedupe_hub_payment_gateways( $gateways ) {
+add_filter( 'woocommerce_available_payment_gateways', 'gend_society_dedupe_hub_payment_gateways', 100 );
+function gend_society_dedupe_hub_payment_gateways( $gateways ) {
     if ( ! is_array( $gateways ) ) return $gateways;
     $is_hub = gend_society_is_hub();
     if ( ! $is_hub ) return $gateways;
@@ -227,20 +227,20 @@ function gdc_dedupe_hub_payment_gateways( $gateways ) {
 // wp_enqueue_scripts and wp_footer). CSS/DOM removal alone loses to the widget's
 // late re-mount + inline styles, so kill it before it ever loads. Covers both
 // LEO's global functions and the gend-society fallback widget.
-add_action( 'wp', 'gdc_topup_embed_kill_chat_widget' );
-function gdc_topup_embed_kill_chat_widget() {
+add_action( 'wp', 'gend_society_topup_embed_kill_chat_widget' );
+function gend_society_topup_embed_kill_chat_widget() {
     if ( empty( $_GET['gend_embed'] ) ) return;
     remove_action( 'wp_footer', 'aipa_widget_render_footer', 99999 );
     remove_action( 'wp_enqueue_scripts', 'aipa_widget_register_scripts', 5 );
     remove_action( 'wp_enqueue_scripts', 'aipa_widget_load_assets', 10 );
-    if ( class_exists( 'GS_AI_Widget' ) ) {
-        remove_action( 'wp_footer', [ 'GS_AI_Widget', 'render_footer' ], 99999 );
-        remove_action( 'wp_enqueue_scripts', [ 'GS_AI_Widget', 'enqueue' ], 5 );
+    if ( class_exists( 'Gend_Society_AI_Widget' ) ) {
+        remove_action( 'wp_footer', [ 'Gend_Society_AI_Widget', 'render_footer' ], 99999 );
+        remove_action( 'wp_enqueue_scripts', [ 'Gend_Society_AI_Widget', 'enqueue' ], 5 );
     }
 }
 
-add_action( 'wp_enqueue_scripts', 'gdc_topup_embed_checkout_css', 100 );
-function gdc_topup_embed_checkout_css() {
+add_action( 'wp_enqueue_scripts', 'gend_society_topup_embed_checkout_css', 100 );
+function gend_society_topup_embed_checkout_css() {
     if ( empty( $_GET['gend_embed'] ) ) return;
     // gend_embed=1 already suppresses the gend-society frontend bar + mini-cart
     // (gs_is_embed_request). This strips the rest of the theme chrome + the AI
@@ -335,7 +335,7 @@ function gdc_topup_embed_checkout_css() {
             .gend-wallet-classic, .gend-wallet-classic > *, .gend-wallet-classic::before, .gwc-badge { animation: none !important; opacity: 1 !important; transform: none !important; }
         }
     ';
-    wp_register_style( 'gdc-embed-checkout', false, [], GS_VERSION );
+    wp_register_style( 'gdc-embed-checkout', false, [], GEND_SOCIETY_VERSION );
     wp_enqueue_style( 'gdc-embed-checkout' );
     wp_add_inline_style( 'gdc-embed-checkout', $css );
 }
@@ -344,8 +344,8 @@ function gdc_topup_embed_checkout_css() {
 // portal a launcher to <body>, so CSS display:none isn't always enough inside
 // the embed iframe. Hard-remove it from the DOM (and keep removing for a few
 // beats in case it mounts late).
-add_action( 'wp_footer', 'gdc_topup_embed_strip_widget', 100001 );
-function gdc_topup_embed_strip_widget() {
+add_action( 'wp_footer', 'gend_society_topup_embed_strip_widget', 100001 );
+function gend_society_topup_embed_strip_widget() {
     if ( empty( $_GET['gend_embed'] ) ) return;
     ?>
     <script>
@@ -367,8 +367,8 @@ function gdc_topup_embed_strip_widget() {
 // price override only registers inside its AJAX path; we add the product
 // ourselves so we must set the price too). Other kinds are priced by their
 // owning plugin's callback.
-add_action( 'woocommerce_before_calculate_totals', 'gdc_topup_price_task_credits', 20 );
-function gdc_topup_price_task_credits( $cart ) {
+add_action( 'woocommerce_before_calculate_totals', 'gend_society_topup_price_task_credits', 20 );
+function gend_society_topup_price_task_credits( $cart ) {
     if ( is_admin() && ! defined( 'DOING_AJAX' ) ) return;
     if ( ! is_object( $cart ) || ! method_exists( $cart, 'get_cart' ) ) return;
     foreach ( $cart->get_cart() as $item ) {
@@ -382,10 +382,10 @@ function gdc_topup_price_task_credits( $cart ) {
 // (leo's AI-credit grant only fires on `completed`; virtual orders otherwise sit
 // at `processing`). tasks + DGEN grant on payment_complete already but are
 // idempotent, so completing them too is safe.
-add_filter( 'woocommerce_payment_complete_order_status', 'gdc_topup_autocomplete', 10, 3 );
-function gdc_topup_autocomplete( $status, $order_id, $order ) {
+add_filter( 'woocommerce_payment_complete_order_status', 'gend_society_topup_autocomplete', 10, 3 );
+function gend_society_topup_autocomplete( $status, $order_id, $order ) {
     if ( ! is_a( $order, 'WC_Order' ) ) return $status;
-    $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 );
+    $extra_pid = (int) apply_filters( 'aas_task_checkout_extra_credit_product_id', 0 ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from sales-team.
     foreach ( $order->get_items() as $item ) {
         $product = $item->get_product();
         $sku     = $product ? $product->get_sku() : '';
@@ -401,8 +401,8 @@ function gdc_topup_autocomplete( $status, $order_id, $order ) {
 // Returns a futuristic, dashboard-style SVG icon for a given BP/Youzify nav slug.
 // All icons share a unified 24×24 viewBox + currentColor stroke so they inherit
 // the active/hover color treatments and stagger animation from the parent.
-if ( ! function_exists( 'gdc_get_profile_nav_icon' ) ) {
-function gdc_get_profile_nav_icon( $slug ) {
+if ( ! function_exists( 'gend_society_get_profile_nav_icon' ) ) {
+function gend_society_get_profile_nav_icon( $slug ) {
     $key = strtolower( (string) $slug );
 
     // Aliases — collapse common variants to one canonical icon.
@@ -478,8 +478,8 @@ function gdc_get_profile_nav_icon( $slug ) {
 // `visitors`. We hide it from our primary nav (above) and add an equivalent
 // subnav entry under friends. The `link` parameter points the subnav directly
 // at the existing /visitors/ URL so the underlying screen function still runs.
-add_action( 'bp_setup_nav', 'gdc_visitors_to_friends_subnav', 999 );
-function gdc_visitors_to_friends_subnav() {
+add_action( 'bp_setup_nav', 'gend_society_visitors_to_friends_subnav', 999 );
+function gend_society_visitors_to_friends_subnav() {
     if ( ! function_exists( 'bp_core_new_subnav_item' ) ) return;
     if ( ! function_exists( 'bp_is_active' ) || ! bp_is_active( 'friends' ) ) return;
     if ( ! bp_displayed_user_id() ) return;
@@ -510,7 +510,7 @@ function gdc_visitors_to_friends_subnav() {
 // admin-only groups: a Group Admin's own Web Apps AND an Agent's bound
 // container group both need to show up here as push targets.
 
-function gdc_profile_connected_webapps( $user_id ) {
+function gend_society_profile_connected_webapps( $user_id ) {
     $targets = [];
     if ( ! function_exists( 'groups_get_groups' ) ) {
         return $targets;
@@ -545,11 +545,11 @@ function gdc_profile_connected_webapps( $user_id ) {
     return $targets;
 }
 
-add_action( 'rest_api_init', 'gdc_profile_avatar_register_routes' );
-function gdc_profile_avatar_register_routes() {
+add_action( 'rest_api_init', 'gend_society_profile_avatar_register_routes' );
+function gend_society_profile_avatar_register_routes() {
     register_rest_route( 'gs/v1', '/profile/avatar', [
         'methods'             => WP_REST_Server::CREATABLE,
-        'callback'            => 'gdc_rest_profile_avatar_update',
+        'callback'            => 'gend_society_rest_profile_avatar_update',
         'permission_callback' => function () {
             return is_user_logged_in() ? true : new WP_Error( 'gdc_auth', __( 'Authentication required.', 'gend-society' ), [ 'status' => 401 ] );
         },
@@ -567,7 +567,7 @@ function gdc_profile_avatar_register_routes() {
  * @param WP_REST_Request $request Request instance.
  * @return WP_REST_Response|WP_Error
  */
-function gdc_rest_profile_avatar_update( WP_REST_Request $request ) {
+function gend_society_rest_profile_avatar_update( WP_REST_Request $request ) {
     $user_id = get_current_user_id();
 
     $raw = (string) $request->get_param( 'image_base64' );
@@ -645,7 +645,7 @@ function gdc_rest_profile_avatar_update( WP_REST_Request $request ) {
 
     // ── Optional: push the same image to selected connected Web Apps ──────────
     $requested_targets = (array) $request->get_param( 'targets' );
-    $allowed_targets    = wp_list_pluck( gdc_profile_connected_webapps( $user_id ), 'group_id' );
+    $allowed_targets    = wp_list_pluck( gend_society_profile_connected_webapps( $user_id ), 'group_id' );
     $push_results       = [];
 
     if ( ! empty( $requested_targets ) && function_exists( 'gdc_resolve_install_for_group' ) && function_exists( 'gdc_agent_remote_post' ) ) {
@@ -688,8 +688,8 @@ function gdc_rest_profile_avatar_update( WP_REST_Request $request ) {
 // Hook into youzify_profile_before_header (fires before the <header> element)
 // so our section renders first. The original header + navbar are hidden via CSS.
 
-add_action( 'youzify_profile_before_header', 'gdc_render_profile_header', 1 );
-function gdc_render_profile_header() {
+add_action( 'youzify_profile_before_header', 'gend_society_render_profile_header', 1 );
+function gend_society_render_profile_header() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
 
     $user_id        = (int) bp_displayed_user_id();
@@ -707,7 +707,7 @@ function gdc_render_profile_header() {
     // AI Agent accounts (role=ai_agent / _aipa_is_agent meta) have no BP member
     // type of their own, so this always fell through to the 'MEMBER' default —
     // check gs_user_is_agent() FIRST so an agent's own profile reads AGENT.
-    $is_agent_user   = function_exists( 'gs_user_is_agent' ) && gs_user_is_agent( $user_id );
+    $is_agent_user   = function_exists( 'gend_society_user_is_agent' ) && gend_society_user_is_agent( $user_id );
     $member_type     = function_exists( 'bp_get_member_type' ) ? bp_get_member_type( $user_id ) : false;
     $member_type_obj = ( $member_type && function_exists( 'bp_get_member_type_object' ) )
                         ? bp_get_member_type_object( $member_type ) : null;
@@ -737,7 +737,7 @@ function gdc_render_profile_header() {
     // Card order: DGEN Balance, Task Credits, Store Credits, AI Builder
     // Tokens (stagger follows position so the entrance animation stays
     // left-to-right).
-    $balances = apply_filters( 'gdc_profile_header_balances', [
+    $balances = apply_filters( 'gend_society_profile_header_balances', [
         [
             'label'   => '🇨🇦 DGEN Balance',
             'value'   => number_format( $dgen_balance ),
@@ -793,7 +793,7 @@ function gdc_render_profile_header() {
 
     // ── Linked application row ────────────────────────────────────────────────
     $memberships_url = home_url( '/my-account/memberships/' );
-    $linked_app = apply_filters( 'gdc_profile_linked_app', [
+    $linked_app = apply_filters( 'gend_society_profile_linked_app', [
         'label' => get_user_meta( $user_id, '_gdc_linked_app_name', true ) ?: 'LINKED WEB APPLICATION',
         'id'    => get_user_meta( $user_id, '_gdc_member_id', true )
                     ?: ( '#GEN-' . str_pad( $user_id, 4, '0', STR_PAD_LEFT ) ),
@@ -1071,7 +1071,7 @@ function gdc_render_profile_header() {
             </div>
 
             <?php if ( $is_own_profile ) :
-                $gdc_avatar_targets = gdc_profile_connected_webapps( $user_id );
+                $gdc_avatar_targets = gend_society_profile_connected_webapps( $user_id );
             ?>
             <!-- ── Change profile photo popup (own profile only) ────────── -->
             <div id="gdc-avatar-modal" class="gdc-avatar-modal" hidden aria-hidden="true">
@@ -1502,8 +1502,8 @@ function gdc_render_profile_header() {
         //   - the social plugin is active (so the sidebar already mirrors these tabs)
         // Backend-access users always see the strip; non-backend users still see
         // it on OTHER members' profiles, where the sidebar is "their" menu.
-        $gs_hide_profile_nav = function_exists( 'gs_frontend_bar_is_profile_mode' )
-            && gs_frontend_bar_is_profile_mode()
+        $gs_hide_profile_nav = function_exists( 'gend_society_frontend_bar_is_profile_mode' )
+            && gend_society_frontend_bar_is_profile_mode()
             && bp_is_my_profile();
         ?>
         <?php if ( ! $gs_hide_profile_nav ) : ?>
@@ -1515,7 +1515,7 @@ function gdc_render_profile_header() {
                 <a href="<?php echo esc_url( $item->link ); ?>"
                    class="gdc-nav-item gdc-nav-item--<?php echo sanitize_html_class( $item->slug ); ?><?php echo $is_active ? ' gdc-nav-item--active' : ''; ?>"
                    style="--gdc-nav-i: <?php echo (int) $i; ?>">
-                    <span class="gdc-nav-icon" aria-hidden="true"><?php echo gdc_get_profile_nav_icon( $item->slug ); ?></span>
+                    <span class="gdc-nav-icon" aria-hidden="true"><?php echo gend_society_get_profile_nav_icon( $item->slug ); ?></span>
                     <span class="gdc-nav-text"><?php echo wp_kses( $item->name, [ 'span' => [ 'class' => true ] ] ); ?></span>
                 </a>
                 <?php endforeach; ?>
@@ -2611,7 +2611,7 @@ function gdc_render_profile_header() {
 
 // ─── CSS ──────────────────────────────────────────────────────────────────────
 
-function gdc_profile_header_css() {
+function gend_society_profile_header_css() {
     return '
 /* ── Hide original Youzify header + navbar on member profile pages ────── */
 .youzify.youzify-profile #youzify-profile-header,
@@ -4626,7 +4626,7 @@ body.gw-modal-open .gw-modal {
 
 // ─── Global Youzify CSS (all pages) ──────────────────────────────────────────
 
-function gdc_global_youzify_css() {
+function gend_society_global_youzify_css() {
     return '
 /* ════════════════════════════════════════════════════════════════════════
    GDC GLOBAL — dark terminal palette across all BuddyPress / Youzify pages

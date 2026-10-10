@@ -19,7 +19,7 @@ if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
 
-class GS_AI_Widget {
+class Gend_Society_AI_Widget {
 
     public static function init() {
         // Stand down entirely when LEO is loaded on this site — LEO owns
@@ -43,16 +43,16 @@ class GS_AI_Widget {
 
     /** Hub base (portal-stored, filterable). */
     protected static function hub_base() {
-        $base = get_option( 'gs_gend_base_url' );
+        $base = get_option( 'gend_society_gend_base_url' );
         if ( ! $base ) {
             $base = 'https://gend.me';
         }
-        return untrailingslashit( apply_filters( 'gs_ai_hub_base', $base ) );
+        return untrailingslashit( apply_filters( 'gend_society_ai_hub_base', $base ) );
     }
 
     /** Pinned widget asset version on the hub (filterable for upgrades). */
     protected static function widget_js_file() {
-        return apply_filters( 'gs_ai_widget_js_file', 'widget-app-v1.9.82.js' );
+        return apply_filters( 'gend_society_ai_widget_js_file', 'widget-app-v1.9.82.js' );
     }
 
     /** Only members who connected their gend.me account can use AI. */
@@ -100,15 +100,15 @@ class GS_AI_Widget {
         // authorize client from gs_oauth_client_id() while the exchange used
         // the aipa_oauth_client_id site option produced an invalid_grant and
         // the "popup shows Authorizing… then closes, still logged out" bug.
-        $oauth = ( class_exists( 'GS_AI_Proxy' ) && method_exists( 'GS_AI_Proxy', 'widget_oauth_client' ) )
-            ? GS_AI_Proxy::widget_oauth_client()
+        $oauth = ( class_exists( 'Gend_Society_AI_Proxy' ) && method_exists( 'Gend_Society_AI_Proxy', 'widget_oauth_client' ) )
+            ? Gend_Society_AI_Proxy::widget_oauth_client()
             : array(
-                'id'  => function_exists( 'gs_oauth_client_id' ) ? gs_oauth_client_id() : '',
+                'id'  => function_exists( 'gend_society_oauth_client_id' ) ? gend_society_oauth_client_id() : '',
                 'hub' => self::hub_base(),
             );
         $oauth_client_id = (string) ( $oauth['id'] ?? '' );
         $oauth_hub_url   = untrailingslashit( (string) ( $oauth['hub'] ?? self::hub_base() ) );
-        return apply_filters( 'aipa_widget_config', array(
+        return apply_filters( 'aipa_widget_config', array( // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from leo.
             // Local namespace — forwarded to the hub by GS_AI_Proxy.
             'rest'              => esc_url_raw( get_rest_url( null, 'aipa/v1' ) ),
             'rest_url'          => trailingslashit( esc_url_raw( get_rest_url( get_current_blog_id() ) ) ),
@@ -216,8 +216,8 @@ class GS_AI_Widget {
 
         // Saved-render path: a wireframe already exists. Show it in a
         // sandboxed iframe and (for admins) layer in the regenerate toolbar.
-        $saved_html = class_exists( 'GS_Wireframe_Store' )
-            ? GS_Wireframe_Store::get_html()
+        $saved_html = class_exists( 'Gend_Society_Wireframe_Store' )
+            ? Gend_Society_Wireframe_Store::get_html()
             : (string) get_option( 'aipa_wireframe_html', '' );
 
         if ( $saved_html !== '' ) {
@@ -317,4 +317,4 @@ class GS_AI_Widget {
 // Defer to plugins_loaded so LEO's presence is reliably known before we
 // decide whether to register the widget (LEO requires its widget.php at
 // include time, so the function exists by plugins_loaded).
-add_action( 'plugins_loaded', array( 'GS_AI_Widget', 'init' ), 20 );
+add_action( 'plugins_loaded', array( 'Gend_Society_AI_Widget', 'init' ), 20 );

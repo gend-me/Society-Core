@@ -54,7 +54,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  * secret into a per-namespace Secret on claim creation, the Deployment
  * mounts it as envFrom, and oauth-login.php picks it up here.
  */
-function gs_oauth_config_value( string $constant, string $legacy_option, string $default = '' ): string {
+function gend_society_oauth_config_value( string $constant, string $legacy_option, string $default = '' ): string {
     if ( defined( $constant ) && constant( $constant ) ) {
         return (string) constant( $constant );
     }
@@ -74,24 +74,24 @@ function gs_oauth_config_value( string $constant, string $legacy_option, string 
     return $default;
 }
 
-function gs_oauth_hub_url(): string {
-    return rtrim( gs_oauth_config_value( 'GDC_OAUTH_HUB_URL', 'aipa_central_hub_url', 'https://gend.me' ), '/' );
+function gend_society_oauth_hub_url(): string {
+    return rtrim( gend_society_oauth_config_value( 'GDC_OAUTH_HUB_URL', 'aipa_central_hub_url', 'https://gend.me' ), '/' );
 }
 
-function gs_oauth_client_id(): string {
-    return gs_oauth_config_value( 'GDC_OAUTH_CLIENT_ID', 'aipa_oauth_client_id' );
+function gend_society_oauth_client_id(): string {
+    return gend_society_oauth_config_value( 'GDC_OAUTH_CLIENT_ID', 'aipa_oauth_client_id' );
 }
 
-function gs_oauth_client_secret(): string {
-    return gs_oauth_config_value( 'GDC_OAUTH_CLIENT_SECRET', 'aipa_oauth_client_secret' );
+function gend_society_oauth_client_secret(): string {
+    return gend_society_oauth_config_value( 'GDC_OAUTH_CLIENT_SECRET', 'aipa_oauth_client_secret' );
 }
 
 /**
  * True when this WordPress install IS the gend.me hub itself. Compared
  * by host so that custom-domain mappings on the hub still match.
  */
-function gs_oauth_is_hub_site(): bool {
-    $hub_host  = (string) wp_parse_url( gs_oauth_hub_url(), PHP_URL_HOST );
+function gend_society_oauth_is_hub_site(): bool {
+    $hub_host  = (string) wp_parse_url( gend_society_oauth_hub_url(), PHP_URL_HOST );
     $self_host = (string) wp_parse_url( home_url(), PHP_URL_HOST );
     if ( $hub_host === '' || $self_host === '' ) return false;
     return strtolower( $hub_host ) === strtolower( $self_host );
@@ -106,9 +106,9 @@ function gs_oauth_is_hub_site(): bool {
  *     escape hatch lets a super-admin recover access if the OAuth flow
  *     itself is broken.
  */
-function gs_oauth_should_intercept(): bool {
-    if ( gs_oauth_is_hub_site() ) return false;
-    if ( gs_oauth_client_id() === '' ) return false;
+function gend_society_oauth_should_intercept(): bool {
+    if ( gend_society_oauth_is_hub_site() ) return false;
+    if ( gend_society_oauth_client_id() === '' ) return false;
     if ( isset( $_GET['gs_native'] ) ) return false;
     return true;
 }
@@ -123,10 +123,10 @@ function gs_oauth_should_intercept(): bool {
  * action=lostpassword / action=register are still handled by core (we
  * filter the lost-password URL separately).
  */
-add_action( 'login_form_login', 'gs_oauth_render_login_page' );
+add_action( 'login_form_login', 'gend_society_oauth_render_login_page' );
 
-function gs_oauth_render_login_page() {
-    if ( ! gs_oauth_should_intercept() ) {
+function gend_society_oauth_render_login_page() {
+    if ( ! gend_society_oauth_should_intercept() ) {
         return; // fall through to native form
     }
     if ( is_user_logged_in() ) {
@@ -135,8 +135,8 @@ function gs_oauth_render_login_page() {
     }
 
     $redirect_to  = isset( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : admin_url();
-    $hub_url      = gs_oauth_hub_url();
-    $client_id    = gs_oauth_client_id();
+    $hub_url      = gend_society_oauth_hub_url();
+    $client_id    = gend_society_oauth_client_id();
     $rest_login   = esc_url_raw( rest_url( 'gend-society/v1/oauth/login' ) );
 
     // Render the login page chrome via WP's login_header so theme/plugin
@@ -361,7 +361,7 @@ function gs_oauth_render_login_page() {
 add_action( 'rest_api_init', function () {
     register_rest_route( 'gend-society/v1', '/oauth/login', array(
         'methods'             => 'POST',
-        'callback'            => 'gs_oauth_login_rest',
+        'callback'            => 'gend_society_oauth_login_rest',
         'permission_callback' => '__return_true', // exchange happens server-to-server
     ) );
 } );
@@ -424,7 +424,7 @@ add_filter( 'rest_authentication_errors', function ( $result ) {
     return $result;
 }, 99 );
 
-function gs_oauth_login_rest( WP_REST_Request $req ) {
+function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     $code     = (string) $req->get_param( 'code' );
     $verifier = (string) $req->get_param( 'code_verifier' );
     if ( $code === '' ) {
@@ -434,9 +434,9 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
         return new WP_Error( 'bad_verifier', 'Invalid PKCE verifier format.', array( 'status' => 400 ) );
     }
 
-    $hub_url       = gs_oauth_hub_url();
-    $client_id     = gs_oauth_client_id();
-    $client_secret = gs_oauth_client_secret();
+    $hub_url       = gend_society_oauth_hub_url();
+    $client_id     = gend_society_oauth_client_id();
+    $client_secret = gend_society_oauth_client_secret();
     if ( $client_id === '' ) {
         return new WP_Error( 'no_client', 'OAuth client not configured. Set GDC_OAUTH_CLIENT_ID.', array( 'status' => 503 ) );
     }
@@ -560,7 +560,7 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     // common case where a customer signs up fresh and wp_users hasn't
     // been seeded yet. The grant is idempotent (add_role no-ops if the
     // user already has it).
-    $owner_email = strtolower( trim( gs_oauth_config_value( 'GDC_OWNER_EMAIL', '' ) ) );
+    $owner_email = strtolower( trim( gend_society_oauth_config_value( 'GDC_OWNER_EMAIL', '' ) ) );
     $is_owner    = $owner_email !== '' && strtolower( $email ) === $owner_email;
     if ( $is_owner ) {
         if ( ! in_array( 'administrator', (array) $user->roles, true ) ) {
@@ -584,8 +584,8 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     //     elsewhere shouldn't claim our install)
     //   - we're already paired (gs_install_token already populated)
     //   - we don't have a known install_id (constant or env)
-    if ( $is_owner && function_exists( 'gs_oauth_autopair_install' ) ) {
-        gs_oauth_autopair_install( $hub_url, $access_token );
+    if ( $is_owner && function_exists( 'gend_society_oauth_autopair_install' ) ) {
+        gend_society_oauth_autopair_install( $hub_url, $access_token );
     }
 
     // ── Save tokens for downstream plugins (Leo, contracts, etc.) ──────
@@ -598,7 +598,7 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
     // ── Log in ─────────────────────────────────────────────────────────
     wp_set_current_user( $user->ID, $user->user_login );
     wp_set_auth_cookie( $user->ID, true );
-    do_action( 'wp_login', $user->user_login, $user );
+    do_action( 'wp_login', $user->user_login, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
 
     /**
      * Filter the post-OAuth-login redirect destination.
@@ -606,7 +606,7 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
      * @param string  $redirect_to Default: admin_url().
      * @param WP_User $user        The logged-in user.
      */
-    $redirect_to = apply_filters( 'gs_oauth_login_redirect_to',
+    $redirect_to = apply_filters( 'gend_society_oauth_login_redirect_to',
         isset( $_REQUEST['redirect_to'] ) && $_REQUEST['redirect_to'] ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : admin_url(),
         $user
     );
@@ -628,8 +628,8 @@ function gs_oauth_login_rest( WP_REST_Request $req ) {
  * recovery flow where their account actually lives anyway.
  */
 add_action( 'login_form_lostpassword', function () {
-    if ( ! gs_oauth_should_intercept() ) return;
-    wp_safe_redirect( gs_oauth_hub_url() . '/wp-login.php?action=lostpassword' );
+    if ( ! gend_society_oauth_should_intercept() ) return;
+    wp_safe_redirect( gend_society_oauth_hub_url() . '/wp-login.php?action=lostpassword' );
     exit;
 }, 1 );
 
@@ -638,8 +638,8 @@ add_action( 'login_form_lostpassword', function () {
  * other theme/plugin context.
  */
 add_filter( 'lostpassword_url', function ( $url ) {
-    if ( ! gs_oauth_should_intercept() ) return $url;
-    return gs_oauth_hub_url() . '/wp-login.php?action=lostpassword';
+    if ( ! gend_society_oauth_should_intercept() ) return $url;
+    return gend_society_oauth_hub_url() . '/wp-login.php?action=lostpassword';
 }, 99 );
 
 // ────────────────────────────────────────────────────────────────────────
@@ -651,7 +651,7 @@ add_filter( 'lostpassword_url', function ( $url ) {
  * Set by the migration mu-plugin / Composition env. Empty string when
  * we're not on a known container (e.g. dev box, gend.me hub itself).
  */
-function gs_oauth_resolve_install_id(): string {
+function gend_society_oauth_resolve_install_id(): string {
     if ( defined( 'GDC_CONTAINER_INSTALL_ID' ) && GDC_CONTAINER_INSTALL_ID ) {
         return (string) GDC_CONTAINER_INSTALL_ID;
     }
@@ -675,25 +675,25 @@ function gs_oauth_resolve_install_id(): string {
  * @param string $hub_url      Hub URL (already has trailing-slash logic applied).
  * @param string $access_token OAuth access_token from the just-completed exchange.
  */
-function gs_oauth_autopair_install( string $hub_url, string $access_token ): void {
+function gend_society_oauth_autopair_install( string $hub_url, string $access_token ): void {
 
     if ( $access_token === '' || $hub_url === '' ) return;
 
     // Already paired? Nothing to do — re-pairing would just rotate
     // the install token unnecessarily on every login.
-    if ( (string) get_option( 'gs_install_token', '' ) !== '' ) return;
+    if ( (string) get_option( 'gend_society_install_token', '' ) !== '' ) return;
 
-    $install_id = gs_oauth_resolve_install_id();
+    $install_id = gend_society_oauth_resolve_install_id();
     if ( $install_id === '' ) return;
 
     // Generate or reuse our local Ed25519 keypair (same convention
     // portal-connect.php uses). Stable across reconnects so gend.me's
     // signature verification keeps working through token rotations.
-    $keypair_b64 = (string) get_option( 'gs_keypair', '' );
+    $keypair_b64 = (string) get_option( 'gend_society_keypair', '' );
     $keypair_raw = $keypair_b64 !== '' ? base64_decode( $keypair_b64, true ) : '';
     if ( ! is_string( $keypair_raw ) || strlen( $keypair_raw ) !== SODIUM_CRYPTO_SIGN_KEYPAIRBYTES ) {
         $keypair_raw = sodium_crypto_sign_keypair();
-        update_option( 'gs_keypair', base64_encode( $keypair_raw ), false );
+        update_option( 'gend_society_keypair', base64_encode( $keypair_raw ), false );
     }
     $pubkey_b64 = base64_encode( sodium_crypto_sign_publickey( $keypair_raw ) );
 
@@ -734,22 +734,22 @@ function gs_oauth_autopair_install( string $hub_url, string $access_token ): voi
         return;
     }
 
-    update_option( 'gs_install_id',     $install_id,                                                       false );
-    update_option( 'gs_install_token',  (string) $data['install_token'],                                   false );
-    update_option( 'gs_gend_base_url',  rtrim( $hub_url, '/' ),                                            false );
-    update_option( 'gs_gend_pubkey',    isset( $data['gend_signing_pubkey'] ) ? (string) $data['gend_signing_pubkey'] : '', false );
-    update_option( 'gs_connected_at',   time(),                                                            false );
+    update_option( 'gend_society_install_id',     $install_id,                                                       false );
+    update_option( 'gend_society_install_token',  (string) $data['install_token'],                                   false );
+    update_option( 'gend_society_gend_base_url',  rtrim( $hub_url, '/' ),                                            false );
+    update_option( 'gend_society_gend_pubkey',    isset( $data['gend_signing_pubkey'] ) ? (string) $data['gend_signing_pubkey'] : '', false );
+    update_option( 'gend_society_connected_at',   time(),                                                            false );
 
     // Pre-warm feature gates so the menu update doesn't lag a render.
-    if ( function_exists( 'gs_features_get_cached' ) ) {
-        delete_option( 'gs_features_cache_expires' );
-        gs_features_get_cached();
+    if ( function_exists( 'gend_society_features_get_cached' ) ) {
+        delete_option( 'gend_society_features_cache_expires' );
+        gend_society_features_get_cached();
     }
 
     // Pre-warm remote-membership cache so the dashboard renders Plan
     // Details on the very first post-login page view.
-    if ( function_exists( 'gs_remote_membership_get_cached' ) ) {
-        delete_option( 'gs_remote_membership_cache_expires' );
-        gs_remote_membership_get_cached();
+    if ( function_exists( 'gend_society_remote_membership_get_cached' ) ) {
+        delete_option( 'gend_society_remote_membership_cache_expires' );
+        gend_society_remote_membership_get_cached();
     }
 }

@@ -329,7 +329,7 @@ class Gend_GS_Booking_Meetings_REST {
             return new WP_Error( 'gs_meet_fatal', 'Schedule failed', array( 'status' => 500 ) );
         }
 
-        do_action( 'gs_booking_created', $meeting_id, $host_user_id );
+        do_action( 'gend_society_booking_created', $meeting_id, $host_user_id );
 
         $member_tz = class_exists( 'Gend_GS_Calendar_Events_REST' )
             ? Gend_GS_Calendar_Events_REST::get_member_timezone( $host_user_id )
@@ -395,7 +395,7 @@ class Gend_GS_Booking_Meetings_REST {
                 return new WP_Error( 'gs_meet_db', 'Cancel update failed', array( 'status' => 500 ) );
             }
 
-            do_action( 'gs_booking_cancelled', $meeting_id, $host_user_id, 'host' );
+            do_action( 'gend_society_booking_cancelled', $meeting_id, $host_user_id, 'host' );
 
             return rest_ensure_response( array(
                 'status'     => 'cancelled',

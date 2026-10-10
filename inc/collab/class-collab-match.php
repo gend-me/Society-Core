@@ -337,7 +337,7 @@ class Gend_GS_Collab_Match {
 			// Per-recipient transient debounce (storm-safety, REQUIRED). Keyed
 			// per-(recipient,match) so it is exactly-once-per-match while still
 			// coalescing repeated fires within the 5-minute window.
-			$key = 'gs_collab_match_mail_' . $uid . '_' . $match_id;
+			$key = 'gend_society_collab_match_mail_' . $uid . '_' . $match_id;
 			if ( get_transient( $key ) ) {
 				continue; // Already emailed this recipient for this match recently.
 			}

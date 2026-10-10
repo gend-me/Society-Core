@@ -28,7 +28,7 @@ if ( ! defined( 'ABSPATH' ) ) exit;
  *
  * @return array<string,array{label:string,icon:string,cap:string,intro:string}>
  */
-function gs_group_embed_tabs() {
+function gend_society_group_embed_tabs() {
 	return array(
 		'feature-suite' => array(
 			'label' => __( 'Feature Suite', 'gend-society' ),
@@ -64,7 +64,7 @@ function gs_group_embed_tabs() {
  *
  * @return array<string,array{label:string,icon:string,cap:string,path:string}>
  */
-function gs_group_hub_tabs() {
+function gend_society_group_hub_tabs() {
 	return array(
 		'business-plan' => array(
 			'label' => __( 'Business Plan', 'gend-society' ),
@@ -132,7 +132,7 @@ function gs_group_hub_tabs() {
  *
  * @return array<int,array{label:string,icon:string,url:string,slug:string}>
  */
-function gs_group_embed_menu_items() {
+function gend_society_group_embed_menu_items() {
 	$payload = null;
 
 	$gid = (int) get_blog_option( get_current_blog_id(), 'gdc_bp_group_id', 0 );
@@ -153,14 +153,14 @@ function gs_group_embed_menu_items() {
 	}
 
 	if ( ! is_array( $payload ) ) {
-		$membership = function_exists( 'gs_dashboard_get_membership' ) ? gs_dashboard_get_membership() : null;
-		if ( $membership && function_exists( 'gs_membership_payload_from_local' ) ) {
-			$payload = gs_membership_payload_from_local( $membership );
+		$membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+		if ( $membership && function_exists( 'gend_society_membership_payload_from_local' ) ) {
+			$payload = gend_society_membership_payload_from_local( $membership );
 		}
 	}
 
 	if ( ! is_array( $payload ) ) {
-		$payload = get_option( 'gs_remote_membership_cache', null );
+		$payload = get_option( 'gend_society_remote_membership_cache', null );
 	}
 
 	if ( ! is_array( $payload ) || empty( $payload['group']['id'] ) || empty( $payload['hub_url'] ) ) {
@@ -171,7 +171,7 @@ function gs_group_embed_menu_items() {
 	$group_link = trailingslashit( trailingslashit( (string) $payload['hub_url'] ) . 'groups/' . $group_slug );
 
 	$items = array();
-	foreach ( gs_group_hub_tabs() as $slug => $t ) {
+	foreach ( gend_society_group_hub_tabs() as $slug => $t ) {
 		if ( ! current_user_can( $t['cap'] ) ) {
 			continue;
 		}
@@ -190,8 +190,8 @@ function gs_group_embed_menu_items() {
  * cached remote-membership payload only — never forces a fetch on a page
  * render. Empty string on the hub / unpaired installs.
  */
-function gs_group_embed_group_name() {
-	$cache = get_option( 'gs_remote_membership_cache', null );
+function gend_society_group_embed_group_name() {
+	$cache = get_option( 'gend_society_remote_membership_cache', null );
 	if ( is_array( $cache ) && ! empty( $cache['group']['name'] ) ) {
 		return (string) $cache['group']['name'];
 	}
@@ -210,7 +210,7 @@ add_action( 'admin_menu', function () {
 		__( 'Connected App', 'gend-society' ),
 		'read',
 		'gs-group-embed',
-		'gs_group_embed_render_page'
+		'gend_society_group_embed_render_page'
 	);
 }, 20 );
 
@@ -218,8 +218,8 @@ add_action( 'admin_menu', function () {
  * Page callback — renders the requested tab inline inside a glass panel with
  * a horizontal tab switcher (links to the other accessible tabs).
  */
-function gs_group_embed_render_page() {
-	$tabs = gs_group_embed_tabs();
+function gend_society_group_embed_render_page() {
+	$tabs = gend_society_group_embed_tabs();
 	$tab  = isset( $_GET['tab'] ) ? sanitize_key( wp_unslash( $_GET['tab'] ) ) : 'feature-suite';
 	if ( ! isset( $tabs[ $tab ] ) ) {
 		$tab = 'feature-suite';
@@ -239,7 +239,7 @@ function gs_group_embed_render_page() {
 		$meta = $tabs[ $tab ];
 	}
 
-	$group_name = gs_group_embed_group_name();
+	$group_name = gend_society_group_embed_group_name();
 	?>
 	<div class="wrap gs-embed-wrap">
 		<div class="gs-embed-shell">
@@ -271,7 +271,7 @@ function gs_group_embed_render_page() {
 			</nav>
 
 			<div class="gs-embed-body" data-gs-embed-tab="<?php echo esc_attr( $tab ); ?>">
-				<?php gs_group_embed_render_tab( $tab ); ?>
+				<?php gend_society_group_embed_render_tab( $tab ); ?>
 			</div>
 
 		</div>
@@ -345,32 +345,32 @@ function gs_group_embed_render_page() {
  * always loaded (dashboard-hosting.php / feature-cards.php / feature-access.php)
  * so this works without BuddyPress on every install type.
  */
-function gs_group_embed_render_tab( $tab ) {
+function gend_society_group_embed_render_tab( $tab ) {
 	switch ( $tab ) {
 
 		case 'hosting':
-			if ( function_exists( 'gs_render_hosting_tab' ) ) {
-				$payload = function_exists( 'gs_remote_membership_get_cached' ) ? gs_remote_membership_get_cached() : array();
-				gs_render_hosting_tab( is_array( $payload ) ? $payload : array() );
+			if ( function_exists( 'gend_society_render_hosting_tab' ) ) {
+				$payload = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : array();
+				gend_society_render_hosting_tab( is_array( $payload ) ? $payload : array() );
 				return;
 			}
 			break;
 
 		case 'compute-gas':
-			gs_group_embed_render_compute_gas();
+			gend_society_group_embed_render_compute_gas();
 			return;
 
 		case 'organization':
-			if ( defined( 'GS_DIR' ) && file_exists( GS_DIR . 'inc/pages/feature-access.php' ) ) {
-				require GS_DIR . 'inc/pages/feature-access.php';
+			if ( defined( 'GEND_SOCIETY_DIR' ) && file_exists( GEND_SOCIETY_DIR . 'inc/pages/feature-access.php' ) ) {
+				require GEND_SOCIETY_DIR . 'inc/pages/feature-access.php';
 				return;
 			}
 			break;
 
 		case 'feature-suite':
 		default:
-			if ( function_exists( 'gs_render_feature_cards_widget' ) ) {
-				gs_render_feature_cards_widget();
+			if ( function_exists( 'gend_society_render_feature_cards_widget' ) ) {
+				gend_society_render_feature_cards_widget();
 				return;
 			}
 			break;
@@ -388,7 +388,7 @@ function gs_group_embed_render_tab( $tab ) {
  * panel embedded in gs_render_membership_panel() but stands alone so the
  * embed page carries no dependency on the membership panel's markup.
  */
-function gs_group_embed_render_compute_gas() {
+function gend_society_group_embed_render_compute_gas() {
 	$nonce = wp_create_nonce( 'gs_membership_action' );
 	$ajax  = admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' );
 	?>
@@ -506,7 +506,7 @@ function gs_group_embed_render_compute_gas() {
 			fetch(ajax, {
 				method: 'POST', credentials: 'same-origin',
 				headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
-				body: new URLSearchParams({ action: 'gs_hosting_compute_gas', nonce: nonce }).toString()
+				body: new URLSearchParams({ action: 'gend_society_hosting_compute_gas', nonce: nonce }).toString()
 			})
 				.then(function (r) { return r.json(); })
 				.then(function (resp) {
