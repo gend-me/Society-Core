@@ -87,7 +87,39 @@ function gend_society_portal_connect_render_page() {
             </form>
 
         <?php else : ?>
+            <?php
+            // RUN-02: disclose exactly what the Connect request sends (it matches the JSON body
+            // built in gend_society_portal_connect_handle_submit()).
+            $gend_society_disclosure = function_exists('gend_society_consent_disclosure_items') ? gend_society_consent_disclosure_items() : array();
+            $gend_society_disclosure['pairing_code'] = __('The pairing code you paste below', 'gend-society');
+            $gend_society_terms   = function_exists('gend_society_terms_url') ? gend_society_terms_url() : 'https://gend.me/terms-of-service/';
+            $gend_society_privacy = function_exists('gend_society_privacy_url') ? gend_society_privacy_url() : 'https://gend.me/privacy-policy/';
+            /*
+             * The consent checkbox is rendered (and required by the handler) only on
+             * standalone installs. Containers auto-pair through oauth-login and the hub
+             * never pairs, so their form stays exactly as before Phase 106.
+             */
+            $gend_society_needs_consent = gend_society_portal_connect_requires_consent();
+            ?>
             <p><?php esc_html_e('Pair this WordPress install to your gend.me account. From your gend.me dashboard, copy the pairing code shown for your Self-Hosted app and paste it below.', 'gend-society'); ?></p>
+
+            <h2><?php esc_html_e('What is sent when you connect', 'gend-society'); ?></h2>
+            <ul style="list-style:disc;padding-left:20px;">
+                <?php foreach ($gend_society_disclosure as $gend_society_label) : ?>
+                    <li><?php echo esc_html($gend_society_label); ?></li>
+                <?php endforeach; ?>
+            </ul>
+            <p>
+                <a href="<?php echo esc_url($gend_society_terms); ?>" target="_blank" rel="noopener"><?php esc_html_e('Terms of Service', 'gend-society'); ?></a>
+                &middot;
+                <a href="<?php echo esc_url($gend_society_privacy); ?>" target="_blank" rel="noopener"><?php esc_html_e('Privacy Policy', 'gend-society'); ?></a>
+            </p>
+            <p>
+                <?php esc_html_e('Prefer to look around first? Nothing is sent until you press Connect.', 'gend-society'); ?>
+                <?php if (function_exists('gend_society_welcome_page_url')) : ?>
+                    <a href="<?php echo esc_url(gend_society_welcome_page_url()); ?>"><?php esc_html_e('Back to the GenD page', 'gend-society'); ?></a>
+                <?php endif; ?>
+            </p>
 
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('gs_portal_connect_submit', 'gs_portal_connect_nonce'); ?>
@@ -114,6 +146,16 @@ function gend_society_portal_connect_render_page() {
                         </tr>
                     </tbody>
                 </table>
+                <?php if ($gend_society_needs_consent) : ?>
+                    <p>
+                        <label for="gend_society_consent">
+                            <input type="checkbox" id="gend_society_consent" name="gend_society_consent" value="1" required />
+                            <?php echo esc_html(function_exists('gend_society_consent_text') ? gend_society_consent_text() : __('I agree to send the items listed above to gend.me.', 'gend-society')); ?>
+                            (<a href="<?php echo esc_url($gend_society_terms); ?>" target="_blank" rel="noopener"><?php esc_html_e('Terms of Service', 'gend-society'); ?></a>,
+                            <a href="<?php echo esc_url($gend_society_privacy); ?>" target="_blank" rel="noopener"><?php esc_html_e('Privacy Policy', 'gend-society'); ?></a>)
+                        </label>
+                    </p>
+                <?php endif; ?>
                 <?php submit_button(__('Connect', 'gend-society')); ?>
             </form>
         <?php endif; ?>
@@ -139,6 +181,10 @@ function gend_society_portal_connect_handle_submit() {
         delete_option('gend_society_connected_at');
         delete_option('gend_society_features_cache');
         delete_option('gend_society_features_cache_expires');
+        // RUN-01: disconnecting also withdraws consent; nothing is sent until the next Connect.
+        if (function_exists('gend_society_consent_clear')) {
+            gend_society_consent_clear();
+        }
         gend_society_portal_connect_redirect('success', __('Disconnected.', 'gend-society'));
         return;
     }
@@ -151,6 +197,18 @@ function gend_society_portal_connect_handle_submit() {
     if ($gend_base === '' || strlen($pairing_code) < 6) {
         gend_society_portal_connect_redirect('error', __('Please provide both the gend.me URL and a pairing code.', 'gend-society'));
         return;
+    }
+
+    // RUN-01/RUN-02: on standalone the ticked box is the consent; no box, no request.
+    if (gend_society_portal_connect_requires_consent()) {
+        if (empty($_POST['gend_society_consent'])) {
+            gend_society_portal_connect_redirect('error', __('Please confirm you agree before connecting.', 'gend-society'));
+            return;
+        }
+        // Recorded before the first outbound request is built.
+        if (function_exists('gend_society_consent_record')) {
+            gend_society_consent_record('pairing-code');
+        }
     }
 
     // Generate or reuse our own keypair so the install identity is stable across reconnects.
@@ -177,6 +235,7 @@ function gend_society_portal_connect_handle_submit() {
             'install_url'    => home_url('/'),
             'install_id'     => $install_id,
             'society_pubkey' => $pubkey_b64,
+            'admin_email'    => (string) get_option('admin_email'),
         )),
     ));
 
@@ -210,6 +269,16 @@ function gend_society_portal_connect_handle_submit() {
     update_option('gend_society_connected_at', time(), false);
 
     gend_society_portal_connect_redirect('success', __('Connected to gend.me.', 'gend-society'));
+}
+
+/**
+ * Whether Connect needs the explicit consent checkbox (standalone installs only;
+ * containers auto-pair through oauth-login and the hub never pairs).
+ *
+ * @return bool
+ */
+function gend_society_portal_connect_requires_consent() {
+    return function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode();
 }
 
 function gend_society_portal_connect_redirect($status, $message) {
