@@ -10,7 +10,7 @@
  *     together)
  *   - a manifest path does not exist on disk
  *   - a tier is not one of core|customer|container|hub|updater
- *   - a need is not one of bp|wu|paired|skin|admin
+ *   - a need is not one of bp|wu|paired|skin|admin|standalone
  *   - a partial has no 'loaded_by' array
  *   - gend-society.php does not require exactly inc/bootstrap/context.php,
  *     inc/bootstrap/key-migration.php and inc/bootstrap/loader.php (in that
@@ -46,7 +46,7 @@ $gs_err    = function ( $msg ) use ( &$gs_errors ) {
 };
 
 $gs_valid_tiers = array( 'core', 'customer', 'container', 'hub', 'updater' );
-$gs_valid_needs = array( 'bp', 'wu', 'paired', 'skin', 'admin' );
+$gs_valid_needs = array( 'bp', 'wu', 'paired', 'skin', 'admin', 'standalone' );
 
 $gs_manifest_file = $gs_root . '/inc/bootstrap/manifest.php';
 if ( ! is_file( $gs_manifest_file ) ) {

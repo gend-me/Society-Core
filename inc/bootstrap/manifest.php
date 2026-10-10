@@ -13,8 +13,11 @@
  *          hub       the gend.me hub only
  *          updater   the GitHub self-updater
  *   needs  'bp' BuddyPress, 'wu' WP Ultimo, 'paired' linked to gend.me,
- *          'skin' admin skin, 'admin' wp-admin request. On hub and container
- *          only 'admin' is enforced (see gend_society_module_needs_met()).
+ *          'skin' GenD admin skin on (hub: always; container: unless the
+ *          site chose native; standalone: only after opting in),
+ *          'admin' wp-admin request, 'standalone' standalone runtime only.
+ *          On hub and container bp/wu/paired are always met (see
+ *          gend_society_module_needs_met()).
  *   after  optional callable run right after the require (hook wiring that
  *          used to follow the require in gend-society.php, verbatim)
  *   note   optional one-line reason / history
@@ -55,6 +58,18 @@ return array(
 			'note'  => 'Consent-gated gend.me image table (Phase 105).',
 		),
 		array(
+			'file'  => 'inc/hub-url.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Pure hub-URL / OAuth-config helpers used by customer files (split out of oauth-login.php in 106).',
+		),
+		array(
+			'file'  => 'inc/consent.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Consent record + gate for every gend.me call (Phase 106).',
+		),
+		array(
 			'file'  => 'inc/admin-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),
@@ -68,6 +83,7 @@ return array(
 			'file'  => 'inc/frontend-bar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
+			'note'  => 'Container tier + bp: never loads on standalone and never ships in the wordpress.org zip (RUN-06 structural guarantee).',
 		),
 		array(
 			'file'  => 'inc/network-referrals.php',
@@ -153,7 +169,7 @@ return array(
 		array(
 			'file'  => 'inc/pages/dashboard.php',
 			'tier'  => 'customer',
-			'needs' => array(),
+			'needs' => array( 'skin' ),
 		),
 		array(
 			'file'  => 'inc/group-embed.php',
@@ -507,14 +523,14 @@ return array(
 		array(
 			'file'  => 'inc/login-style.php',
 			'tier'  => 'core',
-			'needs' => array(),
+			'needs' => array( 'skin' ),
 			'note'  => 'Custom login styling.',
 		),
 		array(
 			'file'  => 'inc/oauth-login.php',
-			'tier'  => 'customer',
+			'tier'  => 'container',
 			'needs' => array(),
-			'note'  => '"Sign in with gend.me" on every site except gend.me itself.',
+			'note'  => '"Sign in with gend.me" on every site except gend.me itself; container tier since 106: hub + containers only; never standalone, never in the wordpress.org zip.',
 		),
 		array(
 			'file'  => 'inc/portal-connect.php',
@@ -591,6 +607,30 @@ return array(
 			'tier'  => 'customer',
 			'needs' => array(),
 			'note'  => 'Feature-access upgrade prompt page.',
+		),
+		array(
+			'file'  => 'inc/admin-experience.php',
+			'tier'  => 'core',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Standalone opt-in admin skin: toggle handler + Switch back.',
+		),
+		array(
+			'file'  => 'inc/readiness.php',
+			'tier'  => 'customer',
+			'needs' => array(),
+			'note'  => 'Local readiness checks; pure functions, reused by Phase 110 pre-flight; no remote call.',
+		),
+		array(
+			'file'  => 'inc/pages/welcome.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'GenD page + welcome notice.',
+		),
+		array(
+			'file'  => 'inc/theme-download-notice.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'wordpress.org build: dismissible link to the gend.me theme download; inert when the theme bundle is present.',
 		),
 		array(
 			'file'  => 'inc/admin/fiat-gas-rates-tab.php',
