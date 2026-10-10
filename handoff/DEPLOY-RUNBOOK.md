@@ -278,6 +278,18 @@ is the rename branch, and `<stage>` is a local, empty staging directory.
 
    **Any change = ABORT.** Somebody deployed in between; restart from 11.1.
 2. Repeat the same-filesystem check (11.2 step 3).
+3. Only if an earlier attempt of this release ran on the hub (its new-name rows are still there):
+   repair them first, on the old version, with the staged copy of the fixed migration file. Upload
+   `handoff/105-dedupe-new-keys.php` to the pod's `/tmp` (md5-verified), run the dry run, read the
+   last line, then apply and check that it prints `DEDUPE: OK` with `old-key rows unchanged` and
+   `left to fix: 0`:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- env GS105_KM_FILE=/var/www/html/wp-content/gdc-private/stage-105/gend-society/inc/bootstrap/key-migration.php wp --allow-root --path=/var/www/html --url=gend.me eval-file /tmp/105-dedupe-new-keys.php
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- env GS105_KM_FILE=/var/www/html/wp-content/gdc-private/stage-105/gend-society/inc/bootstrap/key-migration.php GS105_APPLY=1 wp --allow-root --path=/var/www/html --url=gend.me eval-file /tmp/105-dedupe-new-keys.php
+
+   It writes only new `gend_society_` names from the key map (user meta, group meta, network
+   options, post meta on every blog): each object's new key ends up with exactly the old key's
+   rows. Old keys and other plugins' keys are never written. Delete the `/tmp` copy afterwards.
 
 ### 11.4 Swap (one `sh -c`)
 
@@ -302,12 +314,16 @@ Both renames are on the same volume, so each is atomic; the gap between them is 
 
    The curl must print `bool(true)`. Confirm the file is gone.
 2. Curl the four hub sites; each must return 200.
-3. Run the key-migration pass on every blog (a `wp site list` loop) and read back the flags:
+3. Run the deploy pass once from the main site and read back the flags. It migrates the network
+   data and every blog. Web requests that arrive first migrate on load, each scope under an atomic
+   lock (one request per scope, the others wait or read through to the old rows), and the deploy
+   pass waits up to two minutes per scope while a web request holds a lock:
 
-       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'for u in $(wp --allow-root --path=/var/www/html site list --field=url); do wp --allow-root --path=/var/www/html --url="$u" eval "gend_society_migrate_keys();"; echo "$u $(wp --allow-root --path=/var/www/html --url="$u" option get gend_society_keys_migrated)"; done'
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- wp --allow-root --path=/var/www/html --url=gend.me eval 'echo json_encode( gend_society_migrate_all_blogs() );'
 
-   Use the migration entry point named in the release's PR if it differs. Every blog must report
-   its flag, and the network flag `gend_society_network_keys_migrated` must be set.
+   Every blog id and `network` must report the map version (for example `105.1`). The lock rows
+   `gend_society_keys_migrating` (each blog) and `gend_society_network_keys_migrating` (main
+   site options table) must be gone afterwards.
 4. Section 6 (verify), including the fatal-log check.
 
 ### 11.6 Rollback
@@ -319,16 +335,30 @@ Both renames are on the same volume, so each is atomic; the gap between them is 
    This moves every renamed-hook cron event back to its old hook with the same timestamp,
    schedule and args on every blog. Skipping it loses per-booking `gs_booking_send_reminder`
    events, because the old code does not know the new hook names.
-2. Reverse the swap in one `sh -c`:
+2. Reverse the swap in one `sh -c`, and reset opcache IMMEDIATELY after it (11.5 step 1), before
+   anything else. Until the reset, cached new code keeps serving requests (`revalidate_freq` 2 s),
+   still sees the flags set and re-schedules its new-hook cron events on `init`:
 
        MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'mkdir -p /var/www/html/wp-content/gdc-private/stage-105/failed && mv /var/www/html/wp-content/plugins/gend-society /var/www/html/wp-content/gdc-private/stage-105/failed/gend-society && mv /var/www/html/wp-content/gdc-private/rollback-105/gend-society-<oldver> /var/www/html/wp-content/plugins/gend-society'
 
-3. Delete the migration flags on every blog and the network flag, so a later retry migrates
+   Then the opcache reset. On the hub `opcache_reset()` can return `bool(false)` while an OOM
+   restart is pending: call it again until it prints `bool(true)`.
+3. Re-check cron for new-hook events on every blog and clear them. Upload
+   `handoff/105-rollback-cron-check.php` to the pod's `/tmp` (md5-verified) and run it with the
+   key map of the failed tree, first as a dry run, then with `GS105_APPLY=1`:
+
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- env GS105_MAP_FILE=/var/www/html/wp-content/gdc-private/stage-105/failed/gend-society/inc/bootstrap/key-map.php wp --allow-root --path=/var/www/html --url=gend.me eval-file /tmp/105-rollback-cron-check.php
+       MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- env GS105_MAP_FILE=/var/www/html/wp-content/gdc-private/stage-105/failed/gend-society/inc/bootstrap/key-map.php GS105_APPLY=1 wp --allow-root --path=/var/www/html --url=gend.me eval-file /tmp/105-rollback-cron-check.php
+
+   For each new hook and args that also exist on the old hook, the new copies are removed with
+   `wp_clear_scheduled_hook( <new hook>, <args> )`. An event with no old twin (for example a
+   booking reminder created in the window) is moved back to its old hook first, so nothing is
+   lost. The apply run must end with `ROLLBACK CRON: OK (... 0 left, 0 failed)`. Run the dry run
+   once more after step 4; it must print `ROLLBACK CRON: OK (0 new-hook events ...)`.
+4. Delete the migration flags on every blog and the network flag, so a later retry migrates
    again:
 
        MSYS_NO_PATHCONV=1 kubectl --context gke_gend-me_us-central1_gend-prod -n wp-hub exec deploy/wordpress -c wordpress -- sh -c 'for u in $(wp --allow-root --path=/var/www/html site list --field=url); do wp --allow-root --path=/var/www/html --url="$u" option delete gend_society_keys_migrated; done; wp --allow-root --path=/var/www/html --url=gend.me site option delete gend_society_network_keys_migrated'
-
-4. Reset opcache again (11.5 step 1).
 
 Old option/meta rows are never deleted by this procedure. They are current, because the compat
 bridges write through to both keys. But values the new version wrote only to the new keys are

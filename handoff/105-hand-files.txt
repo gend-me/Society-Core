@@ -32,10 +32,13 @@ composer.lock
 gend-society.php
 handoff/104-admin-dump.php
 handoff/104-snapshot.php
+handoff/105-dedupe-new-keys.php
 handoff/105-hand-files.txt
 handoff/105-key-inventory.php
+handoff/105-rollback-cron-check.php
 handoff/105-snapshot-normalize.php
 handoff/105-uat-rename.php
+handoff/DEPLOY-RUNBOOK.md
 inc/admin-menu.php
 inc/agent-switch.php
 inc/ai-proxy.php
