@@ -1,0 +1,161 @@
+/*
+ * GenD page (standalone installs): steps, disclosure, readiness, admin
+ * experience toggle and theme card. WordPress-native look: core admin
+ * colours, system fonts, no remote fonts or images.
+ */
+
+.gend-society-welcome {
+	max-width: 960px;
+}
+
+.gend-society-welcome .gend-society-status {
+	font-size: 14px;
+	margin: 4px 0 16px;
+	color: #50575e;
+}
+
+.gend-society-welcome .gend-society-status.is-connected {
+	color: #00a32a;
+}
+
+.gend-society-card,
+.gend-society-welcome .gs-welcome-card,
+.gend-society-welcome .gend-society-toggle-card,
+.gend-society-welcome .gend-society-theme-card,
+.gend-society-welcome .gend-society-theme-download-panel {
+	box-sizing: border-box;
+	max-width: none;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	margin: 0 0 16px;
+	padding: 16px 20px;
+}
+
+.gend-society-card h2,
+.gend-society-welcome .gs-welcome-card h2,
+.gend-society-welcome .gend-society-toggle-card h2,
+.gend-society-welcome .gend-society-theme-card h2 {
+	font-size: 16px;
+	margin: 0 0 10px;
+}
+
+/* Steps */
+.gend-society-steps {
+	counter-reset: gend-society-step;
+	list-style: none;
+	margin: 0;
+	padding: 0;
+}
+
+.gend-society-steps li {
+	counter-increment: gend-society-step;
+	margin: 0 0 10px;
+	padding-left: 36px;
+	position: relative;
+	line-height: 24px;
+}
+
+.gend-society-steps li::before {
+	background: #2271b1;
+	border-radius: 50%;
+	color: #fff;
+	content: counter(gend-society-step);
+	font-weight: 600;
+	height: 24px;
+	left: 0;
+	position: absolute;
+	text-align: center;
+	top: 0;
+	width: 24px;
+}
+
+/* Disclosure */
+.gend-society-disclosure {
+	list-style: disc;
+	margin: 0 0 12px 20px;
+}
+
+.gend-society-disclosure li {
+	margin: 0 0 4px;
+}
+
+.gend-society-legal a {
+	text-decoration: underline;
+}
+
+.gend-society-connect {
+	margin: 16px 0 6px;
+}
+
+.gend-society-consent-text {
+	max-width: 640px;
+}
+
+/* Readiness */
+.gend-society-readiness-table {
+	margin: 8px 0;
+}
+
+.gend-society-readiness-table td {
+	vertical-align: middle;
+}
+
+.gend-society-readiness-label {
+	font-weight: 600;
+	width: 30%;
+}
+
+.gend-society-readiness-status {
+	width: 70px;
+}
+
+.gend-society-readiness-summary.no-blockers {
+	color: #00a32a;
+}
+
+.gend-society-readiness-summary.has-blockers {
+	color: #d63638;
+}
+
+.gend-society-badge {
+	border-radius: 10px;
+	display: inline-block;
+	font-size: 12px;
+	font-weight: 600;
+	line-height: 20px;
+	padding: 0 8px;
+}
+
+.gend-society-badge--pass {
+	background: #edfaef;
+	color: #00a32a;
+}
+
+.gend-society-badge--warn {
+	background: #fcf9e8;
+	color: #996800;
+}
+
+.gend-society-badge--fail {
+	background: #fcf0f1;
+	color: #d63638;
+}
+
+/* Admin experience toggle card */
+.gend-society-toggle-card label {
+	display: block;
+	margin: 0 0 6px;
+}
+
+/* Theme card */
+.gend-society-theme-card img,
+.gend-society-theme-card .gend-society-theme-screenshot {
+	border: 1px solid #dcdcde;
+	display: block;
+	height: auto;
+	margin: 0 0 10px;
+	max-width: 320px;
+	width: 100%;
+}
