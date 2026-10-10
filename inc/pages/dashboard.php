@@ -551,6 +551,10 @@ function gend_society_dashboard_allow_embed_framing()
     if (empty($_GET['gdc_dash_embed'])) {
         return;
     }
+    // Standalone (106-03): no framing relaxation on customer sites.
+    if (function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode()) {
+        return;
+    }
     remove_action('admin_init', 'send_frame_options_header');
     @header_remove('X-Frame-Options');
 }
@@ -660,7 +664,12 @@ function gend_society_dashboard_render_admin_users_panel()
     $output .= '<h3>' . esc_html__('User Access Controls', 'gend-society') . '</h3>';
     $output .= '<p>' . esc_html__('Assign dashboard roles and manage site registrations.', 'gend-society') . '</p>';
     $output .= '<div style="margin-top: 20px; text-align: right;">';
+    if (function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode()) {
+        // gs-users is never registered on standalone (104-04 finding: 403).
+        $output .= '<a href="' . esc_url(admin_url('users.php')) . '" class="gs-btn">Open User Access</a>';
+    } else {
     $output .= '<a href="' . admin_url('admin.php?page=gs-users') . '" class="gs-btn">Open User Access</a>';
+    }
     $output .= '</div>';
     $output .= '</div>'; // End User Access
 
