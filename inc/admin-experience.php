@@ -228,14 +228,16 @@ if ( ! function_exists( 'gend_society_admin_experience_visibility_css' ) ) {
 	/**
 	 * With the skin ON, make the core admin bar visible again (admin-style.css
 	 * hides it) and move the skin's fixed header below it. Priority 99: after
-	 * admin-style.php's admin_head output.
+	 * admin-style.php's admin_head output. The bar is also stacked above the
+	 * header (z-index 100001), whose 0.8 s slide-down entrance otherwise passes
+	 * over the bar and covers the Switch-back link while it animates.
 	 */
 	function gend_society_admin_experience_visibility_css(): void {
 		if ( ! gend_society_admin_experience_can_switch_back() ) {
 			return;
 		}
 		echo '<style id="gend-society-switch-back-css">'
-			. '#wpadminbar{display:block!important;}'
+			. '#wpadminbar{display:block!important;z-index:100002!important;}'
 			. 'html.wp-toolbar{padding-top:32px!important;}'
 			. '@media screen and (max-width:782px){html.wp-toolbar{padding-top:46px!important;}}'
 			. '.header-anchor-wrap{top:32px!important;}'
