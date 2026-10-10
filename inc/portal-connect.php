@@ -87,22 +87,25 @@ function gend_society_portal_connect_render_page() {
             </form>
 
         <?php else : ?>
-            <?php
-            // RUN-02: disclose exactly what the Connect request sends (it matches the JSON body
-            // built in gend_society_portal_connect_handle_submit()).
-            $gend_society_disclosure = function_exists('gend_society_consent_disclosure_items') ? gend_society_consent_disclosure_items() : array();
-            $gend_society_disclosure['pairing_code'] = __('The pairing code you paste below', 'gend-society');
-            $gend_society_terms   = function_exists('gend_society_terms_url') ? gend_society_terms_url() : 'https://gend.me/terms-of-service/';
-            $gend_society_privacy = function_exists('gend_society_privacy_url') ? gend_society_privacy_url() : 'https://gend.me/privacy-policy/';
-            /*
-             * The consent checkbox is rendered (and required by the handler) only on
-             * standalone installs. Containers auto-pair through oauth-login and the hub
-             * never pairs, so their form stays exactly as before Phase 106.
-             */
-            $gend_society_needs_consent = gend_society_portal_connect_requires_consent();
-            ?>
+<?php
+/*
+ * RUN-02: on standalone installs only, disclose exactly what the Connect request sends
+ * (it matches the JSON body built in gend_society_portal_connect_handle_submit()) and
+ * require the consent checkbox. Containers auto-pair through oauth-login and the hub
+ * never pairs, so their screen output stays byte-identical to before Phase 106: the
+ * conditional PHP tags below sit at column 0 so they emit no whitespace.
+ */
+$gend_society_needs_consent = gend_society_portal_connect_requires_consent();
+if ($gend_society_needs_consent) {
+    $gend_society_disclosure = function_exists('gend_society_consent_disclosure_items') ? gend_society_consent_disclosure_items() : array();
+    $gend_society_disclosure['pairing_code'] = __('The pairing code you paste below', 'gend-society');
+    $gend_society_terms   = function_exists('gend_society_terms_url') ? gend_society_terms_url() : 'https://gend.me/terms-of-service/';
+    $gend_society_privacy = function_exists('gend_society_privacy_url') ? gend_society_privacy_url() : 'https://gend.me/privacy-policy/';
+}
+?>
             <p><?php esc_html_e('Pair this WordPress install to your gend.me account. From your gend.me dashboard, copy the pairing code shown for your Self-Hosted app and paste it below.', 'gend-society'); ?></p>
 
+<?php if ($gend_society_needs_consent) : ?>
             <h2><?php esc_html_e('What is sent when you connect', 'gend-society'); ?></h2>
             <ul style="list-style:disc;padding-left:20px;">
                 <?php foreach ($gend_society_disclosure as $gend_society_label) : ?>
@@ -121,6 +124,7 @@ function gend_society_portal_connect_render_page() {
                 <?php endif; ?>
             </p>
 
+<?php endif; ?>
             <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
                 <?php wp_nonce_field('gs_portal_connect_submit', 'gs_portal_connect_nonce'); ?>
                 <input type="hidden" name="action" value="gend_society_portal_connect_submit" />
@@ -146,7 +150,7 @@ function gend_society_portal_connect_render_page() {
                         </tr>
                     </tbody>
                 </table>
-                <?php if ($gend_society_needs_consent) : ?>
+<?php if ($gend_society_needs_consent) : ?>
                     <p>
                         <label for="gend_society_consent">
                             <input type="checkbox" id="gend_society_consent" name="gend_society_consent" value="1" required />
@@ -155,7 +159,7 @@ function gend_society_portal_connect_render_page() {
                             <a href="<?php echo esc_url($gend_society_privacy); ?>" target="_blank" rel="noopener"><?php esc_html_e('Privacy Policy', 'gend-society'); ?></a>)
                         </label>
                     </p>
-                <?php endif; ?>
+<?php endif; ?>
                 <?php submit_button(__('Connect', 'gend-society')); ?>
             </form>
         <?php endif; ?>
@@ -227,16 +231,22 @@ function gend_society_portal_connect_handle_submit() {
 
     $endpoint = trailingslashit($gend_base) . 'wp-json/gdc-app-manager/v1/connect';
 
+    $connect_body = array(
+        'pairing_code'   => $pairing_code,
+        'install_url'    => home_url('/'),
+        'install_id'     => $install_id,
+        'society_pubkey' => $pubkey_b64,
+    );
+    // RUN-02: the standalone Connect screen discloses the admin email, so only that
+    // request carries it; container/hub requests stay exactly as before Phase 106.
+    if (gend_society_portal_connect_requires_consent()) {
+        $connect_body['admin_email'] = (string) get_option('admin_email');
+    }
+
     $response = wp_remote_post($endpoint, array(
         'timeout' => 20,
         'headers' => array('Content-Type' => 'application/json'),
-        'body'    => wp_json_encode(array(
-            'pairing_code'   => $pairing_code,
-            'install_url'    => home_url('/'),
-            'install_id'     => $install_id,
-            'society_pubkey' => $pubkey_b64,
-            'admin_email'    => (string) get_option('admin_email'),
-        )),
+        'body'    => wp_json_encode($connect_body),
     ));
 
     if (is_wp_error($response)) {
