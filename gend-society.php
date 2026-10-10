@@ -3,7 +3,7 @@
  * Plugin Name: GenD Society
  * Plugin URI:  https://gend.me
  * Description: Connect a WordPress site to a gend.me business group, see if it is ready to move, and optionally use the GenD admin look.
- * Version:     1.2.0
+ * Version:     1.2.1
  * Author:      GenD
  * Author URI:  https://gend.me
  * Network:     true
@@ -18,7 +18,7 @@ if (!defined('ABSPATH')) {
     exit;
 }
 
-define('GEND_SOCIETY_VERSION', '1.2.0');
+define('GEND_SOCIETY_VERSION', '1.2.1');
 define('GEND_SOCIETY_DIR', plugin_dir_path(__FILE__));
 define('GEND_SOCIETY_URL', plugin_dir_url(__FILE__));
 define('GEND_SOCIETY_FILE', __FILE__);
