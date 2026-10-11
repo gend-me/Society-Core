@@ -103,12 +103,10 @@ return array(
 			'note'  => 'SEO title/description box + meta, Open Graph and Twitter tags.',
 		),
 		array(
-			'file'  => 'inc/class-gend-github-updater.php',
+			'file'  => 'inc/self-update.php',
 			'tier'  => 'updater',
-			'needs' => array(),
-			'after' => static function () {
-				new Gend_Society_GitHub_Updater( GEND_SOCIETY_FILE, 'gend-me/Society-Core' );
-			},
+			'needs' => array( 'standalone' ),
+			'note'  => 'Signed self-updates from updates.gend.me (full build, standalone only). Hub/container are image-managed.',
 		),
 		array(
 			'file'  => 'inc/dashboard-overview.php',
