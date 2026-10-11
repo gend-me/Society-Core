@@ -1,0 +1,223 @@
+name: release
+
+# Publishes a GenD Society release to the self-hosted update feed.
+#
+#   release published (not a pre-release), or manual dispatch with a tag:
+#     build dist/full -> sign it (bin/sign-release.js, Ed25519, key pinned in
+#     inc/self-update.php) -> upload the versioned zip/.sha256/.sig to
+#     gs://gend-updates/gend-society/ (never overwritten) -> upload gend-society.json
+#     LAST (the manifest is the switch that makes sites see the release) -> attach the
+#     files to the GitHub release -> smoke-test https://updates.gend.me.
+#   pull request touching the release tooling:
+#     dry run with an ephemeral key. No cloud credentials and no signing keys.
+#
+# Upload auth is direct Workload Identity Federation for this repository (no service
+# account key, no impersonation). Signing keys: secrets GEND_UPDATE_SIGNING_KEY (gs-2026a,
+# active) and GEND_UPDATE_SIGNING_KEY_BACKUP (gs-2026b, backup).
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to publish (vX.Y.Z, must already exist)'
+        required: true
+        type: string
+      key_id:
+        description: 'Signing key id'
+        required: true
+        default: gs-2026a
+        type: choice
+        options:
+          - gs-2026a
+          - gs-2026b
+  pull_request:
+    paths:
+      - bin/sign-release.js
+      - bin/build-dist.js
+      - .github/workflows/release.yml
+      - inc/self-update.php
+
+permissions:
+  contents: read
+
+jobs:
+  dry-run:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install build dependencies
+        run: npm ci
+
+      - name: Build dist/full
+        run: node bin/build-dist.js --variant full
+
+      - name: Signer self-test
+        run: node bin/sign-release.js --self-test
+
+      - name: Sign with an ephemeral key (end-to-end file set)
+        run: |
+          set -euo pipefail
+          work="$RUNNER_TEMP/dry-root"
+          mkdir -p "$work/inc"
+          cp gend-society.php readme.txt "$work/"
+          cp inc/self-update.php "$work/inc/"
+          # Ephemeral key, pinned as gs-2026a in the temp copy only.
+          node -e "
+            const c = require('crypto'), fs = require('fs');
+            const k = c.generateKeyPairSync('ed25519');
+            fs.writeFileSync(process.argv[1], k.privateKey.export({ type: 'pkcs8', format: 'pem' }), { mode: 0o600 });
+            const pub = Buffer.from(k.publicKey.export({ format: 'jwk' }).x, 'base64url').toString('base64');
+            const f = process.argv[2];
+            const src = fs.readFileSync(f, 'utf8');
+            const out = src.replace(/('gs-2026a'\s*=>\s*')[A-Za-z0-9+\/]{43}=(')/, '\$1' + pub + '\$2');
+            if (out === src) { console.error('pinned key layout not found'); process.exit(1); }
+            fs.writeFileSync(f, out);
+          " "$RUNNER_TEMP/ephemeral.pem" "$work/inc/self-update.php"
+          GEND_UPDATE_SIGNING_KEY="$(cat "$RUNNER_TEMP/ephemeral.pem")" \
+            node bin/sign-release.js --root "$work" --zip dist/full/gend-society.zip --out dist/feed --key-id gs-2026a
+          rm -f "$RUNNER_TEMP/ephemeral.pem"
+          ver="$(jq -r .version dist/feed/gend-society.json)"
+          for f in "gend-society-$ver.zip" "gend-society-$ver.zip.sha256" "gend-society-$ver.zip.sig" gend-society.json; do
+            test -s "dist/feed/$f" || { echo "missing dist/feed/$f"; exit 1; }
+          done
+          (cd dist/feed && sha256sum -c "gend-society-$ver.zip.sha256")
+          jq -e --arg v "$ver" '.version == $v and (.package | startswith("https://updates.gend.me/gend-society/")) and (.sha256 | test("^[0-9a-f]{64}$")) and .key_id == "gs-2026a" and (.sections.changelog | length > 0)' dist/feed/gend-society.json
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: feed-dry-run
+          path: dist/feed/
+          if-no-files-found: error
+
+  publish:
+    if: (github.event_name == 'release' && !github.event.release.prerelease) || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      id-token: write
+    concurrency:
+      group: gend-society-publish
+      cancel-in-progress: false
+    env:
+      TAG: ${{ github.event_name == 'release' && github.event.release.tag_name || inputs.tag }}
+      KEY_ID: ${{ inputs.key_id || 'gs-2026a' }}
+      BUCKET_PREFIX: gs://gend-updates/gend-society
+      FEED_URL: https://updates.gend.me/gend-society
+    steps:
+      - name: Validate inputs
+        run: |
+          set -euo pipefail
+          [[ "$TAG" =~ ^v[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "tag '$TAG' is not vX.Y.Z"; exit 1; }
+          [[ "$KEY_ID" == gs-2026a || "$KEY_ID" == gs-2026b ]] || { echo "unknown key id '$KEY_ID'"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ env.TAG }}
+
+      - name: Tag matches GEND_SOCIETY_VERSION
+        run: |
+          set -euo pipefail
+          ver="$(sed -n "s/.*define('GEND_SOCIETY_VERSION', '\(.*\)').*/\1/p" gend-society.php)"
+          [[ "$TAG" == "v$ver" ]] || { echo "tag $TAG != v$ver (GEND_SOCIETY_VERSION)"; exit 1; }
+          echo "VERSION=$ver" >> "$GITHUB_ENV"
+          bash bin/stamp-version.sh check
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install build dependencies
+        run: npm ci
+
+      - name: Build dist/full
+        run: node bin/build-dist.js --variant full
+
+      - name: Release notes and description as HTML
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          body="$(gh release view "$TAG" --json body --jq .body)"
+          [[ -n "${body//[[:space:]]/}" ]] || body="GenD Society $VERSION."
+          gh api -X POST /markdown -f mode=gfm -f context="$GITHUB_REPOSITORY" -f text="$body" > notes.html
+          # readme.txt "== Description ==" up to the next "== " heading; "= x =" -> "### x".
+          desc="$(awk '/^== Description ==/{on=1; next} on && /^== /{exit} on' readme.txt | sed -E 's/^= (.*) =[[:space:]]*$/### \1/')"
+          gh api -X POST /markdown -f mode=gfm -f context="$GITHUB_REPOSITORY" -f text="$desc" > description.html
+          test -s notes.html && test -s description.html
+
+      - name: Sign and write the feed
+        env:
+          GEND_UPDATE_SIGNING_KEY: ${{ inputs.key_id == 'gs-2026b' && secrets.GEND_UPDATE_SIGNING_KEY_BACKUP || secrets.GEND_UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          node bin/sign-release.js --zip dist/full/gend-society.zip --out dist/feed --key-id "$KEY_ID" \
+            --notes-html notes.html --description-html description.html \
+            --released-at "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+          jq -e --arg v "$VERSION" --arg k "$KEY_ID" '.version == $v and .key_id == $k' dist/feed/gend-society.json
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/968775684997/locations/global/workloadIdentityPools/github-actions-pool/providers/github
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload versioned files (immutable, never overwritten)
+        run: |
+          set -euo pipefail
+          zip="gend-society-$VERSION.zip"
+          gcloud storage cp --no-clobber --cache-control="public, max-age=31536000, immutable" \
+            "dist/feed/$zip" "dist/feed/$zip.sha256" "dist/feed/$zip.sig" "$BUCKET_PREFIX/"
+          # --no-clobber skips an object that already exists. A re-run must not point the
+          # manifest at a stored zip whose bytes differ from the one just signed.
+          remote="$(gcloud storage cat "$BUCKET_PREFIX/$zip" | sha256sum | cut -d' ' -f1)"
+          local_sha="$(jq -r .sha256 dist/feed/gend-society.json)"
+          [[ "$remote" == "$local_sha" ]] || { echo "$zip already exists in the bucket with different content; publish a new version"; exit 1; }
+
+      - name: Upload the manifest (last)
+        run: |
+          gcloud storage cp --cache-control="public, max-age=300" \
+            dist/feed/gend-society.json "$BUCKET_PREFIX/gend-society.json"
+
+      - name: Attach files to the GitHub release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "$TAG" dist/feed/gend-society-*.zip* --clobber
+
+      - name: Smoke test https://updates.gend.me
+        run: |
+          set -euo pipefail
+          for i in $(seq 1 10); do
+            if curl -fsS "$FEED_URL/gend-society.json" | jq -e --arg v "${TAG#v}" '.version == $v' > /dev/null \
+              && curl -fsSI "$FEED_URL/gend-society-${TAG#v}.zip" > /dev/null; then
+              echo "feed serves ${TAG#v}"
+              exit 0
+            fi
+            echo "attempt $i: feed not serving ${TAG#v} yet"
+            sleep 30
+          done
+          echo "feed did not serve ${TAG#v} after 10 attempts"
+          exit 1

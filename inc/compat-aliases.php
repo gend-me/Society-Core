@@ -231,10 +231,6 @@ if ( class_exists( 'Gend_Society_AI_Proxy', false ) && ! class_exists( 'GS_AI_Pr
 if ( class_exists( 'Gend_Society_Wireframe_Store', false ) && ! class_exists( 'GS_Wireframe_Store', false ) ) {
 	class_alias( 'Gend_Society_Wireframe_Store', 'GS_Wireframe_Store' );
 }
-/* blog-manager, email-manager, leo, member-management, online-store, projects, reward-programs, sales-team, social-network */
-if ( class_exists( 'Gend_Society_GitHub_Updater', false ) && ! class_exists( 'GenD_GitHub_Updater', false ) ) {
-	class_alias( 'Gend_Society_GitHub_Updater', 'GenD_GitHub_Updater' );
-}
 
 // Definitions loaded by the 'bp_include' group run at priority 10; alias them right after.
 add_action(

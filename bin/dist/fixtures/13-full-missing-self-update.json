@@ -1,0 +1,16 @@
+{
+	"name": "inc/self-update.php dropped from the full build by its exclude list",
+	"exclude": {
+		"full": {
+			"add": [
+				"inc/self-update.php"
+			]
+		}
+	},
+	"expect": [
+		{
+			"variant": "full",
+			"rule": "full-missing-self-update"
+		}
+	]
+}
