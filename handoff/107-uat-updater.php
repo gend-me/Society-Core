@@ -2,7 +2,8 @@
 /**
  * Phase 107 UAT (UPD-01, UPD-04, UPD-05): the self-updater (inc/self-update.php) is inert
  * on hub/container, silent before consent on standalone, and offers the signed feed
- * after consent.
+ * after consent. 1.3.1: the pre-consent update notice prints only on standalone without
+ * consent (Plugins screen, as an admin) and is not defined on hub/container.
  *
  * Run on a deployed install, naming the expected mode:
  *   wp eval-file 107-uat-updater.php hub
@@ -197,6 +198,53 @@ $gs107_offer = function () use ( $gs107_data, $gs107_file ) {
 };
 $gs107_ut = get_site_transient( 'update_plugins' );
 
+// Pre-consent update notice (1.3.1): render the callback as an admin on a simulated
+// screen, then restore the current user and screen.
+$gs107_notice_text = 'checks gend.me for signed updates only after you allow gend.me connections';
+$gs107_notice_out  = function ( $screen_id ) {
+	if ( ! function_exists( 'gend_society_update_consent_notice' ) ) {
+		return null;
+	}
+	if ( ! function_exists( 'set_current_screen' ) ) {
+		require_once ABSPATH . 'wp-admin/includes/class-wp-screen.php';
+		require_once ABSPATH . 'wp-admin/includes/screen.php';
+	}
+	$admin = null;
+	if ( is_multisite() ) {
+		foreach ( get_super_admins() as $login ) {
+			$admin = get_user_by( 'login', $login );
+			if ( $admin ) {
+				break;
+			}
+		}
+	} else {
+		$found = get_users(
+			array(
+				'role'   => 'administrator',
+				'number' => 1,
+			)
+		);
+		$admin = $found ? $found[0] : null;
+	}
+	if ( ! $admin ) {
+		return null;
+	}
+	$prev_user   = get_current_user_id();
+	$prev_screen = isset( $GLOBALS['current_screen'] ) ? $GLOBALS['current_screen'] : null;
+	wp_set_current_user( $admin->ID );
+	$can = current_user_can( 'update_plugins' );
+	set_current_screen( $screen_id );
+	ob_start();
+	gend_society_update_consent_notice();
+	$out = (string) ob_get_clean();
+	$GLOBALS['current_screen'] = $prev_screen; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- restore the simulated screen.
+	wp_set_current_user( $prev_user );
+	return array(
+		'out' => $out,
+		'can' => $can,
+	);
+};
+
 // ── hub / container: the updater is not loaded at all ──
 if ( 'hub' === $gs107_mode || 'container' === $gs107_mode ) {
 	$gs107( ! function_exists( 'gend_society_update_manifest' ), 'gend_society_update_manifest() not defined (inc/self-update.php not loaded)' );
@@ -214,6 +262,11 @@ if ( 'hub' === $gs107_mode || 'container' === $gs107_mode ) {
 		'plugins_api has no gend-society short-circuit of ours'
 	);
 	$gs107( false === has_filter( 'upgrader_pre_download', 'gend_society_update_pre_download' ), 'upgrader_pre_download has no gend-society verifier hooked' );
+	$gs107( ! function_exists( 'gend_society_update_consent_notice' ), 'gend_society_update_consent_notice() not defined (no pre-consent update notice)' );
+	$gs107(
+		false === has_action( 'admin_notices', 'gend_society_update_consent_notice' ) && false === has_action( 'network_admin_notices', 'gend_society_update_consent_notice' ),
+		'pre-consent update notice not hooked on admin_notices / network_admin_notices'
+	);
 	$gs107( null === get_site_option( 'gend_society_update_cache', null ), 'site option gend_society_update_cache absent' );
 	if ( is_object( $gs107_ut ) ) {
 		$gs107( empty( $gs107_ut->response[ $gs107_file ] ), 'update_plugins transient offers no gend-society update', isset( $gs107_ut->response[ $gs107_file ]->new_version ) ? 'offered ' . $gs107_ut->response[ $gs107_file ]->new_version : '' );
@@ -233,6 +286,21 @@ if ( 'standalone-noconsent' === $gs107_mode ) {
 	}
 	$gs107_r = $gs107_offer();
 	$gs107( false === $gs107_r, 'update_plugins_updates.gend.me filter returns false', 'got ' . gettype( $gs107_r ) );
+	$gs107(
+		10 === has_action( 'admin_notices', 'gend_society_update_consent_notice' ) && 10 === has_action( 'network_admin_notices', 'gend_society_update_consent_notice' ),
+		'pre-consent update notice hooked on admin_notices and network_admin_notices'
+	);
+	$gs107_n = $gs107_notice_out( 'plugins' );
+	$gs107(
+		is_array( $gs107_n ) && $gs107_n['can'] && false !== strpos( $gs107_n['out'], $gs107_notice_text ) && false !== strpos( $gs107_n['out'], 'notice-info' ),
+		'plugins screen (admin): the pre-consent update notice is printed',
+		is_array( $gs107_n ) ? ( $gs107_n['can'] ? '' : 'admin cannot update_plugins (DISALLOW_FILE_MODS?) ' ) . strlen( $gs107_n['out'] ) . ' bytes' : 'no callback or no admin user'
+	);
+	if ( function_exists( 'gend_society_connect_url' ) && is_array( $gs107_n ) ) {
+		$gs107( false !== strpos( $gs107_n['out'], esc_url( gend_society_connect_url() ) ), 'the notice links to gend_society_connect_url()' );
+	}
+	$gs107_n = $gs107_notice_out( 'dashboard' );
+	$gs107( is_array( $gs107_n ) && '' === $gs107_n['out'], 'dashboard screen: no update notice' );
 	$gs107( 0 === count( $gs107_requests ), '0 requests to updates.gend.me', implode( ', ', $gs107_requests ) );
 	$gs107( get_site_option( 'gend_society_update_cache', null ) === $gs107_cache_before, 'gend_society_update_cache not written', null === $gs107_cache_before ? 'absent before and after' : 'unchanged' );
 }
@@ -241,6 +309,8 @@ if ( 'standalone-noconsent' === $gs107_mode ) {
 if ( 'standalone' === $gs107_mode ) {
 	$gs107( function_exists( 'gend_society_remote_allowed' ) && true === gend_society_remote_allowed( 'updates' ), "gend_society_remote_allowed('updates') === true (consent recorded)" );
 	$gs107( false !== has_filter( 'update_plugins_updates.gend.me', 'gend_society_update_offer' ), 'update_plugins_updates.gend.me filter registered' );
+	$gs107_n = $gs107_notice_out( 'plugins' );
+	$gs107( is_array( $gs107_n ) && '' === $gs107_n['out'], 'plugins screen after consent: no pre-consent update notice' );
 	if ( function_exists( 'gend_society_update_manifest' ) ) {
 		// Cold cache.
 		delete_site_option( 'gend_society_update_cache' );

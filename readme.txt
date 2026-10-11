@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.3.0
+Stable tag: 1.3.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -99,6 +99,9 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.3.1 =
+* New: the Plugins and Updates screens explain that update checks start after you connect to gend.me.
 
 = 1.3.0 =
 * New: the full build from gend.me now updates itself from gend.me. Every update is checked against a gend.me signature before it is installed, and refused if anything does not match.
