@@ -145,11 +145,49 @@ $gs107(
 	'GEND_SOCIETY_VERSION >= 1.3.0',
 	defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '(undefined)'
 );
-$gs107(
-	! class_exists( 'Gend_Society_GitHub_Updater', false ) && ! class_exists( 'GenD_GitHub_Updater', false ),
-	'legacy GitHub updater class not defined'
-);
-$gs107_dir = defined( 'GEND_SOCIETY_DIR' ) ? GEND_SOCIETY_DIR : WP_PLUGIN_DIR . '/gend-society/';
+// Legacy GitHub updater: gone from gend-society. Other GenD plugins (blog-manager, leo, ...)
+// ship and load their own GenD_GitHub_Updater; that is allowed, as long as it is a real class
+// from another plugin's file (not a gend-society alias) and none of its instances serves
+// gend-society.
+$gs107_dir     = defined( 'GEND_SOCIETY_DIR' ) ? GEND_SOCIETY_DIR : WP_PLUGIN_DIR . '/gend-society/';
+$gs107_gs_path = wp_normalize_path( trailingslashit( $gs107_dir ) );
+$gs107( ! class_exists( 'Gend_Society_GitHub_Updater', false ), "gend-society's Gend_Society_GitHub_Updater not defined" );
+if ( class_exists( 'GenD_GitHub_Updater', false ) ) {
+	$gs107_ref  = new ReflectionClass( 'GenD_GitHub_Updater' );
+	$gs107_from = wp_normalize_path( (string) $gs107_ref->getFileName() );
+	$gs107(
+		'GenD_GitHub_Updater' === $gs107_ref->getName() && 0 !== strpos( $gs107_from, $gs107_gs_path ),
+		'GenD_GitHub_Updater is defined by another plugin, not aliased by gend-society',
+		str_replace( wp_normalize_path( WP_CONTENT_DIR ), '', $gs107_from )
+	);
+} else {
+	$gs107( true, 'GenD_GitHub_Updater not defined (no other GenD plugin updater loaded)' );
+}
+$gs107_gs_instances = 0;
+foreach ( array( 'site_transient_update_plugins', 'pre_set_site_transient_update_plugins', 'plugins_api', 'http_request_args' ) as $gs107_h ) {
+	if ( empty( $GLOBALS['wp_filter'][ $gs107_h ] ) ) {
+		continue;
+	}
+	foreach ( $GLOBALS['wp_filter'][ $gs107_h ]->callbacks as $gs107_cbs ) {
+		foreach ( $gs107_cbs as $gs107_cb ) {
+			$gs107_fn = $gs107_cb['function'];
+			if ( ! is_array( $gs107_fn ) || ! is_object( $gs107_fn[0] ) || false === stripos( get_class( $gs107_fn[0] ), 'GitHub_Updater' ) ) {
+				continue;
+			}
+			if ( property_exists( $gs107_fn[0], 'plugin_file' ) ) {
+				$gs107_rp = new ReflectionProperty( $gs107_fn[0], 'plugin_file' );
+				if ( PHP_VERSION_ID < 80100 ) {
+					$gs107_rp->setAccessible( true );
+				}
+				$gs107_pf = wp_normalize_path( (string) $gs107_rp->getValue( $gs107_fn[0] ) );
+				if ( 0 === strpos( $gs107_pf, $gs107_gs_path ) ) {
+					++$gs107_gs_instances;
+				}
+			}
+		}
+	}
+}
+$gs107( 0 === $gs107_gs_instances, '0 GitHub updater instances registered for gend-society', (string) $gs107_gs_instances );
 $gs107( ! file_exists( $gs107_dir . 'inc/class-gend-github-updater.php' ), 'inc/class-gend-github-updater.php absent' );
 $gs107_runtime = function_exists( 'gend_society_runtime_mode' ) ? gend_society_runtime_mode() : '';
 $gs107( $gs107_runtime === $gs107_family, "gend_society_runtime_mode() === {$gs107_family}", "runtime={$gs107_runtime}" );
