@@ -1,0 +1,15 @@
+{
+	"name": "Update URI header missing from gend-society.php",
+	"replace": {
+		"gend-society.php": [
+			"Update URI:  https://updates.gend.me/gend-society/",
+			"Update URL:  https://example.invalid/gend-society/"
+		]
+	},
+	"expect": [
+		{
+			"variant": "full",
+			"rule": "full-missing-update-uri"
+		}
+	]
+}

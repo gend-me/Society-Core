@@ -52,6 +52,9 @@ const VARIANTS = {
 		remoteRule: 'warn',
 		oldPrefixAllowedIn: ['inc/compat-aliases.php', 'inc/compat-bridges.php'],
 		maxBytes: 0,
+		// Phase 107: the full build updates itself from updates.gend.me.
+		requiredFiles: [{ rel: 'inc/self-update.php', rule: 'full-missing-self-update' }],
+		requireUpdateUri: true,
 	},
 	wporg: {
 		forbiddenTiers: ['hub', 'updater', 'container'],
@@ -61,6 +64,8 @@ const VARIANTS = {
 		remoteRule: 'fail',
 		oldPrefixAllowedIn: [],
 		maxBytes: WPORG_MAX_BYTES,
+		requiredFiles: [],
+		requireUpdateUri: false,
 	},
 };
 
@@ -80,6 +85,11 @@ const ALWAYS_FORBIDDEN = [
 	{ re: /(^|\/)phpcs\.xml[^/]*$/, why: 'phpcs.xml*' },
 	{ re: /\.md$/i, why: '*.md' },
 ];
+
+// Removed in Phase 107 (replaced by inc/self-update.php); must never ship again in any build.
+const LEGACY_UPDATER = 'inc/class-gend-github-updater.php';
+// The exact header the full build must carry: core routes its update check to updates.gend.me.
+const UPDATE_URI_RE = /^[ \t]*\*[ \t]*Update URI:[ \t]+https:\/\/updates\.gend\.me\/gend-society\/[ \t]*$/m;
 
 const CDN_HOSTS = ['cdn.jsdelivr.net', 'unpkg.com', 'cdnjs.cloudflare.com', 'ajax.googleapis.com', 'code.jquery.com', 'raw.githubusercontent.com'];
 const UPLOADS_URL = 'gend.me/wp-content/uploads';
@@ -271,6 +281,9 @@ function selectFiles(root, all, tiers, variant, ex, fail) {
 	for (const rel of ALWAYS) {
 		if (!all.includes(rel)) fail('missing-required-file', rel);
 	}
+	// The legacy GitHub updater fails the build if it is anywhere in the source tree,
+	// shipped or not (an unlisted copy would only be caught as unlisted-inc-php).
+	if (all.includes(LEGACY_UPDATER)) fail('legacy-github-updater', LEGACY_UPDATER);
 
 	// Assets are derived: an asset ships iff a shipped PHP or JS file names its basename
 	// (iterated, so a JS asset can pull in another asset).
@@ -343,6 +356,7 @@ function assertPaths(rels, tiers, cfg, fail) {
 		for (const f of ALWAYS_FORBIDDEN) {
 			if (f.re.test(rel)) fail(`forbidden-path ${f.why}`, rel);
 		}
+		if (rel === LEGACY_UPDATER) fail('legacy-github-updater', rel);
 		const tier = tiers.get(rel);
 		if (tier && cfg.forbiddenTiers.includes(tier)) fail(`tier-${tier}`, rel);
 		for (const p of cfg.forbiddenPaths) {
@@ -376,6 +390,10 @@ function assertContent(stageDir, rels, cfg, oldPrefixEnforced, fail, warn) {
 			for (const re of OLD_PREFIX_RES) n += (code.match(re) || []).length;
 			if (n) oldPrefixHits.push([rel, n]);
 		}
+	}
+	if (cfg.requireUpdateUri) {
+		const main = rels.includes(MAIN_FILE) ? fs.readFileSync(path.join(stageDir, MAIN_FILE), 'utf8') : '';
+		if (!UPDATE_URI_RE.test(firstDocblock(main))) fail('full-missing-update-uri', MAIN_FILE);
 	}
 	for (const [rel, n] of oldPrefixHits) {
 		(oldPrefixEnforced ? fail : warn)('old-prefix', `${rel} (${n})`);
@@ -418,6 +436,9 @@ async function buildVariant(name, opts, tiers, all) {
 
 	// Assertions on the staged directory.
 	assertPaths(rels, tiers, cfg, fail);
+	for (const req of cfg.requiredFiles) {
+		if (!rels.includes(req.rel)) fail(req.rule, req.rel);
+	}
 	const oldPrefix = assertContent(stageDir, rels, cfg, opts.oldPrefixEnforced, fail, warn);
 
 	// Zip, then the same path assertions on the archiver entry list.

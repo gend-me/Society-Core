@@ -1,0 +1,16 @@
+{
+	"name": "legacy inc/class-gend-github-updater.php back in the tree",
+	"write": {
+		"inc/class-gend-github-updater.php": "<?php\n// legacy GitHub updater\n"
+	},
+	"expect": [
+		{
+			"variant": "full",
+			"rule": "legacy-github-updater"
+		},
+		{
+			"variant": "wporg",
+			"rule": "legacy-github-updater"
+		}
+	]
+}
