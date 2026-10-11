@@ -363,6 +363,31 @@ if ( ! function_exists( 'gend_society_update_source_selection' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_update_consent_notice' ) ) {
+	/**
+	 * Notice on Plugins and Dashboard > Updates while gend.me connections are
+	 * not allowed yet: without consent no update check runs, so say why no
+	 * update is offered. No HTTP request, no option write.
+	 */
+	function gend_society_update_consent_notice() {
+		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+		if ( ! $screen || ! in_array( $screen->id, array( 'plugins', 'plugins-network', 'update-core', 'update-core-network' ), true ) ) {
+			return;
+		}
+		if ( ! current_user_can( 'update_plugins' ) || gend_society_remote_allowed( 'updates' ) ) {
+			return;
+		}
+		echo '<div class="notice notice-info"><p>';
+		echo esc_html__( 'GenD Society checks gend.me for signed updates only after you allow gend.me connections.', 'gend-society' );
+		if ( function_exists( 'gend_society_connect_url' ) ) {
+			echo ' <a href="' . esc_url( gend_society_connect_url() ) . '">' . esc_html__( 'Connect to gend.me', 'gend-society' ) . '</a>';
+		}
+		echo '</p></div>';
+	}
+}
+
+add_action( 'admin_notices', 'gend_society_update_consent_notice' );
+add_action( 'network_admin_notices', 'gend_society_update_consent_notice' );
 add_filter( 'update_plugins_updates.gend.me', 'gend_society_update_offer', 10, 3 );
 add_filter( 'plugins_api', 'gend_society_update_plugins_api', 10, 3 );
 add_filter( 'upgrader_pre_download', 'gend_society_update_pre_download', 10, 4 );
