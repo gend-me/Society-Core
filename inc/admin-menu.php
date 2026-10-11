@@ -20,6 +20,14 @@ function gend_society_plugin_active($slug)
 add_action('admin_menu', 'gend_society_register_admin_menu', 5);
 function gend_society_register_admin_menu()
 {
+    // Standalone (plain WordPress, opt-in skin, 106-03): the skin restyles and
+    // regroups but never removes a core admin area. None of the core screens
+    // below has an equivalent reachable entry in the GenD menu built here
+    // (Posts/Pages/Media/Comments/Tools have none at all), so on standalone
+    // every core top-level menu stays, including the native Dashboard.
+    $gend_society_standalone = function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode();
+
+    if (!$gend_society_standalone) {
     // Remove default WP top-level menus we are replacing
     remove_menu_page('index.php');                   // Dashboard
     remove_menu_page('users.php');                   // Users
@@ -44,6 +52,7 @@ function gend_society_register_admin_menu()
         'none',
         2
     );
+    }
 
     // ── USERS — removed from the sidebar. Feature Access lives in the
     //    dashboard membership card's User Access tab; the standalone URL
@@ -181,8 +190,10 @@ function gend_society_register_admin_menu()
     // registered above — has to happen before Content Campaigns / Talk Flows
     // are added at admin_menu priority 1200, otherwise WP's auto-duplicate
     // fires again on that later, still-unset-at-this-point-in-time check.
+    if (!$gend_society_standalone) {
     remove_submenu_page('index.php', 'index.php');
     remove_submenu_page('index.php', 'update-core.php');
+    }
 }
 
 /**
@@ -191,10 +202,14 @@ function gend_society_register_admin_menu()
 add_action('network_admin_menu', 'gend_society_register_network_admin_menu', 5);
 function gend_society_register_network_admin_menu()
 {
+    // Standalone (a customer multisite with per-site activation): never
+    // remove core network menus (106-03).
+    if (!(function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode())) {
     // Remove default WP menus we are replacing
     remove_menu_page('users.php');                   // Users
     remove_menu_page('plugins.php');                 // Plugins
     remove_menu_page('update-core.php');             // Updates
+    }
 
     // ── USERS — removed from network sidebar; Feature Access lives in the
     //    dashboard membership card. Standalone gs-feature-access URL stays
@@ -298,9 +313,27 @@ function gend_society_suppress_plugin_menus()
         return;
     }
 
+    // Standalone (106-03): core admin areas and the GenD page are never
+    // removed; other plugins' menus may still be grouped as before.
+    $gend_society_standalone = function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode();
+    $gend_society_protected  = $gend_society_standalone ? [
+        'index.php',
+        'users.php',
+        'plugins.php',
+        'update-core.php',
+        'edit.php',
+        'edit.php?post_type=page',
+        'upload.php',
+        'edit-comments.php',
+        'themes.php',
+        'tools.php',
+        'options-general.php',
+        'gend-society',
+    ] : [];
+
     // Explicitly unset the index.php submenu array so "Home" and "Updates" do not appear as flyouts
     global $submenu;
-    if (isset($submenu['index.php'])) {
+    if (!$gend_society_standalone && isset($submenu['index.php'])) {
         unset($submenu['index.php']);
     }
 
@@ -376,6 +409,9 @@ function gend_society_suppress_plugin_menus()
     foreach ($menu as $pos => $item) {
         $slug = isset($item[2]) ? $item[2] : '';
         if (!$slug) {
+            continue;
+        }
+        if ($gend_society_standalone && in_array($slug, $gend_society_protected, true)) {
             continue;
         }
 

@@ -4186,6 +4186,11 @@ add_action( 'wp_ajax_gend_society_hosting_media_rescan', function () {
         if ( ! $can_act ) {
             wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
         }
+        // Single-site install (104-04 finding): no linked blogs, and
+        // get_blog_details()/switch_to_blog() do not exist there.
+        if ( ! is_multisite() ) {
+            wp_send_json_error( array( 'message' => __( 'No application linked to this group.', 'gend-society' ) ) );
+        }
         $site_id = (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true );
         if ( $site_id <= 0 || ! get_blog_details( $site_id ) ) {
             wp_send_json_error( array( 'message' => __( 'No application linked to this group.', 'gend-society' ) ) );

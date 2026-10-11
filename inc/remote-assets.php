@@ -73,6 +73,9 @@ if ( ! function_exists( 'gend_society_remote_assets_allowed' ) ) {
 
 		if ( 'hub' === $mode || 'container' === $mode ) {
 			$allowed = true;
+		} elseif ( function_exists( 'gend_society_consent_given' ) ) {
+			// One source of consent (inc/consent.php): consent record, install token or the 105 flag.
+			$allowed = gend_society_consent_given();
 		} else {
 			$allowed = '' !== (string) get_option( 'gend_society_install_token', '' )
 				|| (bool) get_option( 'gend_society_remote_consent', false );

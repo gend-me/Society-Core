@@ -24,6 +24,15 @@
  *     gs_markets_is_main_node() agree with gend_society_is_hub(). The 2 inline
  *     sites are enforced statically by bin/check-manifest.php (9 + 1 + 2 = 12).
  *
+ * Phase 106 review (1.2.1): no expected set here needed changing. This battery
+ * derives every set from the manifest, so the 106 tier moves are picked up as is:
+ * oauth-login.php is now container tier (covered by the standalone "no
+ * hub/container-tier file included" check and the hub "every hub/container-tier
+ * module loaded" check); hub-url.php, consent.php and readiness.php are
+ * core/customer (allowed everywhere); admin-experience.php, pages/welcome.php and
+ * theme-download-notice.php are core/customer with needs 'standalone' (never
+ * checked by the hub loop). The explicit 106 sets live in 106-uat-first-run.php.
+ *
  * @package gend-society
  */
 

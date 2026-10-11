@@ -274,11 +274,72 @@ if ( ! function_exists( 'gend_society_plugin_basename_active' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_admin_experience' ) ) {
+	/**
+	 * Admin experience for this site: the GenD admin skin or native WordPress.
+	 *
+	 * hub        always 'gend' (the option is ignored).
+	 * container  site option gend_society_admin_experience; default 'gend'.
+	 * standalone site option gend_society_admin_experience; default 'native'
+	 *            (a plain install keeps the stock WordPress admin until the
+	 *            owner opts in).
+	 * Values other than 'gend' / 'native' are ignored (default applies).
+	 *
+	 * @return string 'gend' | 'native'.
+	 */
+	function gend_society_admin_experience(): string {
+		$mode = gend_society_runtime_mode();
+		if ( 'hub' === $mode ) {
+			return 'gend';
+		}
+		$default = ( 'container' === $mode ) ? 'gend' : 'native';
+		$value   = function_exists( 'get_option' ) ? get_option( 'gend_society_admin_experience', '' ) : '';
+		if ( is_string( $value ) && in_array( $value, array( 'gend', 'native' ), true ) ) {
+			return $value;
+		}
+		return $default;
+	}
+}
+
+if ( ! function_exists( 'gend_society_admin_skin_enabled' ) ) {
+	/**
+	 * True when the GenD admin skin is on for this site (the 'skin' need).
+	 */
+	function gend_society_admin_skin_enabled(): bool {
+		return 'gend' === gend_society_admin_experience();
+	}
+}
+
+if ( ! function_exists( 'gend_society_build_variant' ) ) {
+	/**
+	 * Which build this copy of the plugin is.
+	 *
+	 * @return string 'source' (raw checkout: hub, containers; no
+	 *                GEND_SOCIETY_BUILD_TIERS stamp), 'full' (gend.me
+	 *                download, ships the container tier) or 'wporg'
+	 *                (wordpress.org zip).
+	 */
+	function gend_society_build_variant(): string {
+		if ( ! defined( 'GEND_SOCIETY_BUILD_TIERS' ) ) {
+			return 'source';
+		}
+		$built = constant( 'GEND_SOCIETY_BUILD_TIERS' );
+		if ( is_string( $built ) ) {
+			$built = array_map( 'trim', explode( ',', $built ) );
+		}
+		return ( is_array( $built ) && in_array( 'container', $built, true ) ) ? 'full' : 'wporg';
+	}
+}
+
 if ( ! function_exists( 'gend_society_module_needs_met' ) ) {
 	/**
-	 * True when every need is met. Vocabulary: 'bp', 'wu', 'paired', 'skin', 'admin'.
-	 * On hub and container bp/wu/paired/skin are always met (both run the full
-	 * suite); only standalone checks them. An unknown need is never met.
+	 * True when every need is met. Vocabulary: 'bp', 'wu', 'paired', 'skin',
+	 * 'admin', 'standalone'.
+	 * On hub and container bp/wu/paired are always met (both run the full
+	 * suite); only standalone checks them. 'skin' follows
+	 * gend_society_admin_skin_enabled() (hub: always; container: unless the
+	 * site opted out to native; standalone: only after opting in).
+	 * 'standalone' is met only in standalone mode. An unknown need is never met.
 	 *
 	 * @param string[] $needs Needs list from the manifest.
 	 */
@@ -301,7 +362,10 @@ if ( ! function_exists( 'gend_society_module_needs_met' ) ) {
 					$met = $managed || '' !== (string) get_option( 'gend_society_install_token', '' );
 					break;
 				case 'skin':
-					$met = true; // Phase 106 makes the admin skin opt-in on standalone.
+					$met = gend_society_admin_skin_enabled();
+					break;
+				case 'standalone':
+					$met = ( 'standalone' === $mode );
 					break;
 				default:
 					$met = false;

@@ -21,11 +21,15 @@ if (!defined('ABSPATH')) {
  * of chasing each one, just clear the underlying preference so `folded`
  * never gets added to <body> in the first place.
  */
+// Standalone (opt-in skin, 106-03): never rewrite the user's own mfold
+// preference — switching back to native must leave the sidebar as it was.
+if (!(function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode())) {
 add_action('admin_init', function () {
     if (function_exists('get_user_setting') && function_exists('set_user_setting') && 'f' === get_user_setting('mfold')) {
         set_user_setting('mfold', 'o');
     }
 });
+}
 
 add_action('admin_enqueue_scripts', 'gend_society_enqueue_admin_assets');
 function gend_society_enqueue_admin_assets()
@@ -136,7 +140,13 @@ add_action('admin_head', function () {
     $is_block_editor = ( $pagenow === 'post.php' || $pagenow === 'post-new.php' );
     $skip_bg = in_array( $pagenow, $exclude_pages, true ) || $is_block_editor;
 
-    echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
+    // Standalone (106-03): keep the core admin bar (it carries "Switch back
+    // to native WordPress admin"); hub/container output is unchanged.
+    if (function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode()) {
+        echo '<style>';
+    } else {
+        echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
+    }
 
     if ( ! $skip_bg ) {
         // gend.me-hosted background; neutral gradient when remote assets

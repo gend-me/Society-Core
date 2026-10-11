@@ -137,7 +137,7 @@ if ( '' !== $gs105u_mpath ) {
 $gs105u_ok( is_array( $gs105u_map ) && ! empty( $gs105u_map['entries'] ), 'rename map readable (GS105_MAP)', $gs105u_mpath );
 
 // ── Version + runtime ──
-$gs105u_ok( defined( 'GEND_SOCIETY_VERSION' ) && '1.2.0' === GEND_SOCIETY_VERSION, 'GEND_SOCIETY_VERSION is 1.2.0', defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : 'undefined' );
+$gs105u_ok( defined( 'GEND_SOCIETY_VERSION' ) && version_compare( GEND_SOCIETY_VERSION, '1.2.0', '>=' ), 'GEND_SOCIETY_VERSION is 1.2.0 or later', defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : 'undefined' );
 $gs105u_ok( defined( 'GS_VERSION' ) && defined( 'GEND_SOCIETY_VERSION' ) && GS_VERSION === GEND_SOCIETY_VERSION, 'GS_VERSION compat constant equals GEND_SOCIETY_VERSION (full build)' );
 $gs105u_mode = function_exists( 'gend_society_runtime_mode' ) ? gend_society_runtime_mode() : null;
 $gs105u_ok( $gs105u_section === $gs105u_mode, 'runtime mode is ' . $gs105u_section, (string) $gs105u_mode );
