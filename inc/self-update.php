@@ -209,6 +209,27 @@ if ( ! function_exists( 'gend_society_update_manifest' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_update_tested' ) ) {
+	/**
+	 * "Tested up to" as core compares it. The manifest carries the readme value
+	 * (major.minor, e.g. 7.1); core compares it with the full running version
+	 * (7.1.3) and would flag every point release as "not tested". wordpress.org
+	 * reports the latest point release of the tested branch, so do the same
+	 * for the running version when it is on that branch.
+	 *
+	 * @param mixed $tested Manifest value.
+	 * @return string
+	 */
+	function gend_society_update_tested( $tested ) {
+		$tested  = is_string( $tested ) ? $tested : '';
+		$running = isset( $GLOBALS['wp_version'] ) && is_string( $GLOBALS['wp_version'] ) ? preg_replace( '/-.*$/', '', $GLOBALS['wp_version'] ) : '';
+		if ( 1 === preg_match( '/^\d+\.\d+$/', $tested ) && 1 === preg_match( '/^\d+\.\d+\.\d+$/', $running ) && 0 === strpos( $running, $tested . '.' ) ) {
+			return $running;
+		}
+		return $tested;
+	}
+}
+
 if ( ! function_exists( 'gend_society_update_offer' ) ) {
 	/**
 	 * Filter `update_plugins_updates.gend.me`: the update offer for this plugin.
@@ -232,7 +253,7 @@ if ( ! function_exists( 'gend_society_update_offer' ) ) {
 			'version'      => $m['version'],
 			'url'          => isset( $m['homepage'] ) && is_string( $m['homepage'] ) ? $m['homepage'] : 'https://gend.me',
 			'package'      => $m['package'],
-			'tested'       => isset( $m['tested'] ) ? (string) $m['tested'] : '',
+			'tested'       => gend_society_update_tested( $m['tested'] ?? '' ),
 			'requires_php' => isset( $m['requires_php'] ) ? (string) $m['requires_php'] : '',
 		);
 	}
@@ -262,7 +283,7 @@ if ( ! function_exists( 'gend_society_update_plugins_api' ) ) {
 			'slug'          => 'gend-society',
 			'version'       => $m['version'],
 			'requires'      => isset( $m['requires'] ) ? (string) $m['requires'] : '',
-			'tested'        => isset( $m['tested'] ) ? (string) $m['tested'] : '',
+			'tested'        => gend_society_update_tested( $m['tested'] ?? '' ),
 			'requires_php'  => isset( $m['requires_php'] ) ? (string) $m['requires_php'] : '',
 			'last_updated'  => isset( $m['last_updated'] ) ? (string) $m['last_updated'] : '',
 			'homepage'      => isset( $m['homepage'] ) ? (string) $m['homepage'] : 'https://gend.me',
