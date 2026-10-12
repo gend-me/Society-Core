@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.3.1
+Stable tag: 1.4.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -99,6 +99,13 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.4.0 =
+* New: connect your site to a gend.me business group without buying anything. Log in to gend.me, pick or create a group, and approve.
+* New: group admins on gend.me can get a pairing code, with a short link and a QR code, from the group page.
+* New: the Connected card shows the group, the owner, and lets you transfer ownership.
+* New: Disconnect revokes the connection on gend.me first.
+* New: a Reconnect notice and button appear when gend.me no longer recognises the site.
 
 = 1.3.1 =
 * New: the Plugins and Updates screens explain that update checks start after you connect to gend.me.
