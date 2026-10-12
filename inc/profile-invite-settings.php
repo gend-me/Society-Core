@@ -43,7 +43,7 @@ function gend_society_invite_settings_render_inline() {
             <?php esc_html_e( 'These credentials power the "Connect Google" and "Connect Outlook" buttons on each member\'s Connections → Invite tab. Apple has no Contacts OAuth — Apple users upload a vCard (.vcf) instead.', 'gend-society' ); ?>
         </p>
 
-        <div class="notice notice-info" style="padding:12px 16px;">
+        <div class="notice notice-info inline" style="padding:12px 16px;">
             <p style="margin:0 0 6px;"><strong><?php esc_html_e( 'Redirect URI to register with both providers:', 'gend-society' ); ?></strong></p>
             <code style="display:block;padding:8px;background:#0b0e14;color:#7dd3fc;border-radius:6px;font-size:0.85rem;"><?php echo esc_html( $redirect_uri ); ?></code>
         </div>
