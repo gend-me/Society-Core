@@ -20,6 +20,11 @@
  *     = its gdc_install_id, chrome link = gdc_install_admin_url (fallback gdc_external_url + wp-admin/),
  *     nothing for a disconnected or non-self-hosted record; the Hosting tab fires the action once with
  *     the group id and shows VAM's "Connected: <url>" text (and the pairing button once disconnected).
+ * Compute Gas tab (108-11): the panel also fires there (inside the tab suite, before the top tabs, not in
+ * the embedded single-panel view), through gend_society_group_hosting_connect_panel(), which fires the action
+ * at most once per page. Source: the Compute Gas class equals 1.3.1 apart from that one block (read-only too).
+ * Normal mode renders the 1.3.1 Compute Gas class (loaded as gs108old_Group_Tab_Compute_Gas) next to the
+ * current one: byte-identical for Paid and the site-row group, panel + 1.3.1 output for a Connected record.
  * Baseline file: env GS108_GLUE_BASELINE_FILE or /tmp/gs108-baseline/group-app-tabs-1.3.1.php.
  *
  * @package gend-society
@@ -54,7 +59,19 @@ foreach ( array( 'gend_society_group_tabs_user_has_access', 'gend_society_group_
 $old_body = preg_match( '/class Gend_Society_Group_Tab_Hosting .*?public static function render_legacy_content\( \$group_id \) \{(.*?)\n        \}/s', $bsrc, $m ) ? preg_replace( '#//[^\n]*#', '', $m[1] ) : '';
 gs108_assert( 'if(!gend_society_group_tabs_user_has_access())return;gend_society_group_render_hosting_suite($group_id);' === preg_replace( '/\s+/', '', $old_body ), 'glue-old-hosting-body', '1.3.1 Hosting tab body = access gate + hosting suite' );
 $new_body = preg_match( '/class Gend_Society_Group_Tab_Hosting .*?public static function render_legacy_content\( \$group_id \) \{(.*?)\n        \}/s', $csrc, $m ) ? preg_replace( '#//[^\n]*#', '', $m[1] ) : '';
-gs108_assert( "if(!gend_society_group_tabs_user_has_access())return;do_action('gend_society_group_hosting_connect_panel',(int)\$group_id);gend_society_group_render_hosting_suite(\$group_id);" === preg_replace( '/\s+/', '', $new_body ), 'glue-new-hosting-body', 'Hosting tab body = access gate + do_action(gend_society_group_hosting_connect_panel, (int) $group_id) + hosting suite' );
+gs108_assert( "if(!gend_society_group_tabs_user_has_access())return;gend_society_group_hosting_connect_panel((int)\$group_id);gend_society_group_render_hosting_suite(\$group_id);" === preg_replace( '/\s+/', '', $new_body ), 'glue-new-hosting-body', 'Hosting tab body = access gate + gend_society_group_hosting_connect_panel((int) $group_id) + hosting suite' );
+// 108-11: the once-per-page helper, and the Compute Gas tab (where group admins land) fires it too.
+$helper = preg_replace( '#//[^\n]*#', '', $fn_src( $csrc, 'gend_society_group_hosting_connect_panel' ) );
+gs108_assert( "functiongend_society_group_hosting_connect_panel(\$group_id){if(did_action('gend_society_group_hosting_connect_panel'))return;do_action('gend_society_group_hosting_connect_panel',(int)\$group_id);}" === preg_replace( '/\s+/', '', $helper ), 'glue-once-helper', 'gend_society_group_hosting_connect_panel() fires the action at most once per page (did_action guard)', $helper );
+$cg_re    = '/^    class Gend_Society_Group_Tab_Compute_Gas extends BP_Group_Extension \{\n.*?^    \}\n/ms';
+$cg_old   = preg_match( $cg_re, $bsrc, $m ) ? $m[0] : '';
+$cg_new   = preg_match( $cg_re, $csrc, $m ) ? $m[0] : '';
+$cg_block = "                <?php\n                if ( ! \$gs_cg_hide_nav ) :\n                    // Phase 108: the Hosting nav item is hidden, so the pairing panel also\n                    // shows here, where group admins land (once per page; it prints nothing\n                    // for groups with a paid site, so their output is unchanged).\n                    gend_society_group_hosting_connect_panel( (int) \$group_id );\n                    ?>\n";
+$cg_orig  = "                <?php if ( ! \$gs_cg_hide_nav ) : ?>\n";
+gs108_assert( '' !== $cg_old && 1 === substr_count( $cg_new, $cg_block ) && $cg_old === str_replace( $cg_block, $cg_orig, $cg_new ), 'glue-compute-gas-source', 'Compute Gas class = 1.3.1 apart from the one panel call before the top tabs (' . strlen( $cg_old ) . ' bytes in 1.3.1)' );
+gs108_assert( 1 === substr_count( $cg_new, "<div class=\"gs-cg-tabsuite\" data-gs-cg-tabsuite>\n" . $cg_block ), 'glue-compute-gas-place', 'Compute Gas fires the panel inside the tab suite, before the top tabs, only when the tab nav is shown' );
+$cbs0 = apply_filters( 'gdc_gs_endpoint_content_callbacks', array() );
+gs108_assert( isset( $cbs0['compute-gas'] ) && array( 'Gend_Society_Group_Tab_Compute_Gas', 'render_legacy_content' ) === $cbs0['compute-gas'], 'glue-compute-gas-callback', 'Group Page endpoint "compute-gas" renders Gend_Society_Group_Tab_Compute_Gas::render_legacy_content' );
 $cbs = apply_filters( 'gdc_gs_endpoint_content_callbacks', array() );
 gs108_assert( isset( $cbs['hosting'] ) && array( 'Gend_Society_Group_Tab_Hosting', 'render_legacy_content' ) === $cbs['hosting'], 'glue-endpoint-callback', 'Group Page endpoint "hosting" renders Gend_Society_Group_Tab_Hosting::render_legacy_content' );
 gs108_assert( false !== has_action( 'gend_society_group_hosting_connect_panel' ), 'glue-has-action', 'gend_society_group_hosting_connect_panel has a callback (vendor-app-manager pairing panel)' );
@@ -174,7 +191,32 @@ gs108_on_cleanup(
 $norm        = function ( $html ) {
 	return (string) preg_replace( '/last scanned [^<]*? ago/', 'last scanned <T> ago', $html );
 };
-$hosting_new = function ( $gid ) use ( $norm ) {
+// Each render below is its own "page": the once-per-page guard (did_action) is reset first.
+$reset_page = function () {
+	unset( $GLOBALS['wp_actions']['gend_society_group_hosting_connect_panel'] );
+};
+if ( ! class_exists( 'gs108old_Group_Tab_Compute_Gas' ) && '' !== $cg_old ) {
+	eval( str_replace( 'class Gend_Society_Group_Tab_Compute_Gas extends', 'class gs108old_Group_Tab_Compute_Gas extends', $cg_old ) ); // phpcs:ignore Squiz.PHP.Eval.Discouraged -- test harness: the pinned 1.3.1 class under a renamed name.
+}
+gs108_assert( class_exists( 'gs108old_Group_Tab_Compute_Gas' ), 'glue-compute-gas-old-loaded', '1.3.1 Compute Gas class loaded as gs108old_Group_Tab_Compute_Gas' );
+$cg_render = function ( $class, $gid, $forced = '', $reset = true ) use ( $norm, $reset_page ) {
+	if ( $reset ) {
+		$reset_page();
+	}
+	ob_start();
+	call_user_func( array( $class, 'render_legacy_content' ), $gid, $forced );
+	return $norm( (string) ob_get_clean() );
+};
+$cg_new_r  = function ( $gid, $forced = '', $reset = true ) use ( $cg_render ) {
+	return $cg_render( 'Gend_Society_Group_Tab_Compute_Gas', $gid, $forced, $reset );
+};
+$cg_old_r  = function ( $gid, $forced = '' ) use ( $cg_render ) {
+	return $cg_render( 'gs108old_Group_Tab_Compute_Gas', $gid, $forced );
+};
+$hosting_new = function ( $gid, $reset = true ) use ( $norm, $reset_page ) {
+	if ( $reset ) {
+		$reset_page();
+	}
 	ob_start();
 	Gend_Society_Group_Tab_Hosting::render_legacy_content( $gid );
 	return $norm( (string) ob_get_clean() );
@@ -208,6 +250,13 @@ $pn    = $hosting_new( $paid );
 $po    = $hosting_old( $paid );
 gs108_assert( $pn === $po && '' !== $po, 'glue-paid-hosting', 'GS108 Paid Hosting tab output byte-identical to 1.3.1 (' . strlen( $po ) . ' bytes)', $first_diff( $pn, $po ) );
 gs108_assert( array( $paid ) === $fired, 'glue-paid-fired', 'the action still fires once with the group id (int)', wp_json_encode( $fired ) );
+$fired = array();
+$pcn   = $cg_new_r( $paid );
+$pco   = $cg_old_r( $paid );
+gs108_assert( $pcn === $pco && '' !== $pco, 'glue-paid-compute-gas', 'GS108 Paid Compute Gas tab output byte-identical to 1.3.1 (' . strlen( $pco ) . ' bytes)', $first_diff( $pcn, $pco ) );
+gs108_assert( array( $paid ) === $fired, 'glue-paid-compute-gas-fired', 'Compute Gas fires the action once with the group id (int)', wp_json_encode( $fired ) );
+$fired = array();
+gs108_assert( $cg_new_r( $paid, 'gas-stations' ) === $cg_old_r( $paid, 'gas-stations' ) && array() === $fired, 'glue-paid-compute-gas-embed', 'embedded Gas Stations view (forced tab): identical to 1.3.1, the action does not fire', wp_json_encode( $fired ) );
 
 // --- Beta linked to the seeded legacy membership with a site row.
 $legacy = wu_get_sites(
@@ -237,6 +286,10 @@ if ( gs108_assert( $lmid > 0, 'glue-legacy-site', 'seeded legacy site row ' . ( 
 	$bp    = $panel_only( $beta );
 	gs108_assert( '' === $bp && $bn === $bo, 'glue-site-row-hosting', 'site-row group: the panel action prints nothing and the Hosting tab is byte-identical to 1.3.1', 'panel ' . strlen( $bp ) . ' bytes: ' . substr( wp_strip_all_tags( $bp ), 0, 160 ) . ' / ' . $first_diff( $bn, $bp . $bo ) );
 	gs108_assert( array( $beta ) === $fired, 'glue-site-row-fired', 'the action fires once with the group id', wp_json_encode( $fired ) );
+	$fired = array();
+	$bcn   = $cg_new_r( $beta );
+	$bco   = $cg_old_r( $beta );
+	gs108_assert( $bcn === $bco && array( $beta ) === $fired, 'glue-site-row-compute-gas', 'site-row group: Compute Gas tab byte-identical to 1.3.1, action fired once', $first_diff( $bcn, $bco ) . ' ' . wp_json_encode( $fired ) );
 }
 
 // --- Alpha linked to a Connected record.
@@ -314,6 +367,23 @@ gs108_assert( false !== strpos( $an, 'Connected:' ) && false !== strpos( $an, es
 $ao = $hosting_old( $alpha );
 $ap = $panel_only( $alpha );
 gs108_assert( $an === $ap . $ao, 'glue-connected-hosting-rest', 'apart from the panel the Hosting tab output is the 1.3.1 suite', $first_diff( $an, $ap . $ao ) );
+// Compute Gas for the Connected record: the same panel inside the tab suite, the rest is 1.3.1.
+$fired = array();
+$acn   = $cg_new_r( $alpha );
+$aco   = $cg_old_r( $alpha );
+gs108_assert( array( $alpha ) === $fired && is_int( $fired[0] ), 'glue-connected-compute-gas-fired', 'Compute Gas fires the action once with (int) group id', wp_json_encode( $fired ) );
+$p_at = '' !== $ap ? strpos( $acn, $ap ) : false;
+gs108_assert( '' !== $ap && false !== $p_at && $p_at > (int) strpos( $acn, 'data-gs-cg-tabsuite>' ) && $p_at < (int) strpos( $acn, '<nav class="gs-cg-toptabs"' ), 'glue-connected-compute-gas-panel', 'Compute Gas shows the same panel ("Connected: <url>") inside the tab suite, before the top tabs' );
+$a_rest = false !== $p_at ? substr( $acn, 0, $p_at ) . substr( $acn, $p_at + strlen( $ap ) ) : '';
+gs108_assert( false !== $p_at && $a_rest === $aco, 'glue-connected-compute-gas-rest', 'apart from the panel the Compute Gas tab output is 1.3.1', false !== $p_at ? $first_diff( $a_rest, $aco ) : 'panel not found' );
+// One request rendering both tabs: the panel renders once (first caller).
+$fired = array();
+$reset_page();
+$h1 = $hosting_new( $alpha, false );
+$c1 = $cg_new_r( $alpha, '', false );
+gs108_assert( array( $alpha ) === $fired && 1 === substr_count( $h1 . $c1, $ap ) && false !== strpos( $h1, $ap ) && $c1 === $aco, 'glue-once-per-page', 'Hosting tab + Compute Gas in one request: the panel renders once (Hosting, first), Compute Gas then equals 1.3.1', wp_json_encode( $fired ) );
+$fired = array();
+gs108_assert( $cg_new_r( $alpha, 'gas-stations' ) === $cg_old_r( $alpha, 'gas-stations' ) && array() === $fired, 'glue-connected-compute-gas-embed', 'embedded Gas Stations view: no panel, identical to 1.3.1', wp_json_encode( $fired ) );
 
 // Admin URL missing -> external URL + wp-admin/.
 $mem->delete_meta( 'gdc_install_admin_url' );
@@ -328,6 +398,7 @@ $mem = wu_get_membership( $cmid );
 gs108_assert_eq( '', gend_society_group_get_linked_install_id( $alpha ), 'glue-disconnected-id', 'disconnected record: no linked install id' );
 gs108_assert( false === strpos( $chrome( 'gend_society_group_tab_open', $alpha ), 'Open Web App Admin' ), 'glue-disconnected-link', 'disconnected record: no "Open Web App Admin" link' );
 gs108_assert( false !== strpos( $hosting_new( $alpha ), 'data-gdc-cp-mint="1"' ), 'glue-disconnected-panel', 'disconnected record: Hosting tab offers "Get pairing code" again' );
+gs108_assert( false !== strpos( $cg_new_r( $alpha ), 'data-gdc-cp-mint="1"' ), 'glue-disconnected-compute-gas', 'disconnected record: Compute Gas offers "Get pairing code" too' );
 
 // Not self-hosted -> nothing.
 $mem->update_meta( 'gdc_connection_state', 'connected' );
@@ -342,5 +413,6 @@ if ( $member ) {
 	wp_set_current_user( $member->ID );
 	$fired = array();
 	gs108_assert( '' === $hosting_new( $alpha ) && array() === $fired, 'glue-member', 'gs108member: empty Hosting tab, action not fired' );
+	gs108_assert( '' === $cg_new_r( $alpha ) && array() === $fired, 'glue-member-compute-gas', 'gs108member: empty Compute Gas tab, action not fired' );
 	wp_set_current_user( $super );
 }

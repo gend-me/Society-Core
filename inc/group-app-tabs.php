@@ -63,6 +63,18 @@ function gend_society_group_connected_record_meta( $membership, $key ) {
 }
 
 /**
+ * Phase 108: fire gend_society_group_hosting_connect_panel (vendor-app-manager's
+ * purchase-free pairing panel) at most once per page. Both the Hosting tab and the
+ * Compute Gas tab call this; the panel prints nothing for groups with a paid site.
+ *
+ * @param int $group_id BuddyPress group id.
+ */
+function gend_society_group_hosting_connect_panel( $group_id ) {
+    if ( did_action( 'gend_society_group_hosting_connect_panel' ) ) return;
+    do_action( 'gend_society_group_hosting_connect_panel', (int) $group_id );
+}
+
+/**
  * Common access gate — only group admins or site admins see these tabs.
  * Falls back to false on non-group contexts so the extension just
  * doesn't render.
@@ -246,7 +258,7 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             // Phase 108: vendor-app-manager renders the purchase-free "Connect your
             // own WordPress site" pairing panel here (group admins, groups without
             // a paid site). For other groups the action renders nothing.
-            do_action( 'gend_society_group_hosting_connect_panel', (int) $group_id );
+            gend_society_group_hosting_connect_panel( (int) $group_id );
             gend_society_group_render_hosting_suite( $group_id );
         }
     }
@@ -464,7 +476,13 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 .gs-cg-toptab-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
             </style>
             <div class="gs-cg-tabsuite" data-gs-cg-tabsuite>
-                <?php if ( ! $gs_cg_hide_nav ) : ?>
+                <?php
+                if ( ! $gs_cg_hide_nav ) :
+                    // Phase 108: the Hosting nav item is hidden, so the pairing panel also
+                    // shows here, where group admins land (once per page; it prints nothing
+                    // for groups with a paid site, so their output is unchanged).
+                    gend_society_group_hosting_connect_panel( (int) $group_id );
+                    ?>
                 <nav class="gs-cg-toptabs" role="tablist" aria-label="<?php esc_attr_e( 'Compute Gas sections', 'gend-society' ); ?>">
                     <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'consumed-gas' ? ' is-active' : ''; ?>" data-cg-tab="consumed-gas" role="tab" aria-selected="<?php echo $cg_active_tab === 'consumed-gas' ? 'true' : 'false'; ?>">
                         <span class="gs-cg-toptab-icon" aria-hidden="true">
