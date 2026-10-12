@@ -191,11 +191,18 @@ if ( ! function_exists( 'gend_society_connection_health_note_status' ) ) {
 	 * Record an HTTP status another gend.me call saw with the install token.
 	 * 401 -> unauthorized, 200 -> ok, anything else leaves the stored result alone.
 	 *
+	 * A 401 while the status is already unauthorized changes nothing: failed
+	 * fetches are not cached, so they repeat on every admin load, and a new
+	 * checked_at each time would undo the admin's dismissal on the next page.
+	 * Only the throttled health check starts a new "check".
+	 *
 	 * @param int $code HTTP status.
 	 */
 	function gend_society_connection_health_note_status( int $code ): void {
 		if ( 401 === $code ) {
-			gend_society_connection_health_save( 'unauthorized', 401 );
+			if ( 'unauthorized' !== gend_society_connection_health_get()['status'] ) {
+				gend_society_connection_health_save( 'unauthorized', 401 );
+			}
 		} elseif ( 200 === $code ) {
 			gend_society_connection_health_save( 'ok', 200 );
 		}

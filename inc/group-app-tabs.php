@@ -37,10 +37,29 @@ function gend_society_group_get_linked_install_id( $group_id ) {
     $membership = wu_get_membership( $membership_id );
     if ( ! $membership ) return '';
     $sites = method_exists( $membership, 'get_sites' ) ? $membership->get_sites() : array();
-    if ( ! is_array( $sites ) || empty( $sites ) ) return '';
+    if ( ! is_array( $sites ) || empty( $sites ) ) {
+        // Phase 108: a Connected (self-hosted, site-less) membership keeps the install on the membership record.
+        return gend_society_group_connected_record_meta( $membership, 'gdc_install_id' );
+    }
     $primary = $sites[0];
     if ( ! is_object( $primary ) || ! method_exists( $primary, 'get_meta' ) ) return '';
     return (string) $primary->get_meta( 'gdc_install_id', '' );
+}
+
+/**
+ * Phase 108: one meta value of a Connected install record (membership meta on a
+ * site-less self-hosted membership). '' unless the membership is self-hosted and
+ * its connection is not disconnected. Only used where the membership has no
+ * site rows, so groups with sites keep their 1.3.1 behaviour.
+ *
+ * @param object $membership WU membership.
+ * @param string $key        Meta key.
+ */
+function gend_society_group_connected_record_meta( $membership, $key ) {
+    if ( ! is_object( $membership ) || ! method_exists( $membership, 'get_meta' ) ) return '';
+    if ( ! $membership->get_meta( 'gdc_self_hosted', false ) ) return '';
+    if ( 'disconnected' === (string) $membership->get_meta( 'gdc_connection_state', '' ) ) return '';
+    return (string) $membership->get_meta( $key, '' );
 }
 
 /**
@@ -79,6 +98,16 @@ function gend_society_group_tab_open( $title, $intro, $group_id ) {
             }
         }
     }
+    // Phase 108: a Connected (site-less) install links to its own wp-admin as reported by the plugin.
+    $admin_link = $app_link ? trailingslashit( $app_link ) . 'wp-admin/' : '';
+    if ( ! $app_link && ! empty( $mem ) && empty( $sites ) ) {
+        $admin_link = gend_society_group_connected_record_meta( $mem, 'gdc_install_admin_url' );
+        if ( '' === $admin_link ) {
+            $external   = gend_society_group_connected_record_meta( $mem, 'gdc_external_url' );
+            $admin_link = '' !== $external ? trailingslashit( $external ) . 'wp-admin/' : '';
+        }
+        $app_link = $admin_link;
+    }
     ?>
     <div class="gs-group-tab-panel">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
@@ -87,7 +116,7 @@ function gend_society_group_tab_open( $title, $intro, $group_id ) {
                 <p style="margin:0; color:#cbd5f5; font-size:0.88rem;"><?php echo esc_html( $intro ); ?></p>
             </div>
             <?php if ( $app_link ) : ?>
-                <a href="<?php echo esc_url( trailingslashit( $app_link ) . 'wp-admin/' ); ?>" target="_blank" rel="noopener" style="background:rgba(78,170,255,0.18); border:1px solid rgba(78,170,255,0.45); color:#fff; padding:8px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:0.82rem;">
+                <a href="<?php echo esc_url( $admin_link ); ?>" target="_blank" rel="noopener" style="background:rgba(78,170,255,0.18); border:1px solid rgba(78,170,255,0.45); color:#fff; padding:8px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:0.82rem;">
                     Open Web App Admin →
                 </a>
             <?php endif; ?>
@@ -214,6 +243,10 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             // No gs_group_tab_open() wrapper — the new suite header below
             // is the only chrome we need. (Same fix that landed on the
             // Compute Gas tab — the wrapper rendered a duplicate title.)
+            // Phase 108: vendor-app-manager renders the purchase-free "Connect your
+            // own WordPress site" pairing panel here (group admins, groups without
+            // a paid site). For other groups the action renders nothing.
+            do_action( 'gend_society_group_hosting_connect_panel', (int) $group_id );
             gend_society_group_render_hosting_suite( $group_id );
         }
     }
