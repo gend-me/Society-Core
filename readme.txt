@@ -102,7 +102,7 @@ Disconnecting the site from gend.me stops all of the above.
 
 = 1.4.0 =
 * New: connect your site to a gend.me business group without buying anything. Log in to gend.me, pick or create a group, and approve.
-* New: group admins on gend.me can get a pairing code, with a short link and a QR code, from the group page.
+* New: group admins on gend.me can get a pairing code, with a short link and a QR code, from the group page. Groups without a paid site show them a "Connect your WordPress site" link.
 * New: the Connected card shows the group, the owner, and lets you transfer ownership.
 * New: Disconnect revokes the connection on gend.me first.
 * New: a Reconnect notice and button appear when gend.me no longer recognises the site.

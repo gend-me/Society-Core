@@ -71,7 +71,12 @@ function gend_society_group_connected_record_meta( $membership, $key ) {
  */
 function gend_society_group_hosting_connect_panel( $group_id ) {
     if ( did_action( 'gend_society_group_hosting_connect_panel' ) ) return;
+    ob_start();
     do_action( 'gend_society_group_hosting_connect_panel', (int) $group_id );
+    $panel = (string) ob_get_clean();
+    // Target of the group page's "Connect your WordPress site" link; only when a panel printed.
+    if ( '' !== $panel ) echo '<span id="gend-society-connect-panel" class="gs-connect-panel-anchor"></span>';
+    echo $panel; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the panel callbacks escape their own markup.
 }
 
 /**
@@ -4339,4 +4344,75 @@ if ( ! function_exists( 'gend_society_cg_mobile_waitlist_ajax' ) ) {
     // without a wp_create_nonce call from a public-rendered page; the
     // tab itself is admin-gated, so in practice the user IS logged in.
     add_action( 'wp_ajax_nopriv_gend_society_cg_mobile_waitlist', 'gend_society_cg_mobile_waitlist_ajax' );
+}
+
+/*
+ * Phase 108: "Connect your WordPress site" link on the group page, just under the
+ * group nav. Group admins and super admins only, on groups without a paid
+ * membership, a site row or a live connection, and only while vendor-app-manager's
+ * Connect switch (gdc_connect_enabled) is on. It opens the pairing panel on the
+ * Compute Gas tab. Everyone else gets no markup and no stylesheet.
+ */
+
+/**
+ * The link target for $group_id as seen by $user_id, or '' when the link is hidden.
+ *
+ * @param int $group_id BuddyPress group id.
+ * @param int $user_id  Viewer (0 = current user).
+ */
+function gend_society_group_connect_link_url( $group_id, $user_id = 0 ) {
+    $group_id = (int) $group_id;
+    $user_id  = $user_id ? (int) $user_id : get_current_user_id();
+    if ( $group_id <= 0 || $user_id <= 0 ) return '';
+    if ( ! function_exists( 'gdc_connect_enabled' ) || ! gdc_connect_enabled() ) return '';
+    if ( ! function_exists( 'gdc_connect_group_state' ) || ! function_exists( 'gdc_connect_user_can_use_group' ) ) return '';
+    if ( ! function_exists( 'groups_get_group' ) || ! function_exists( 'bp_get_group_permalink' ) ) return '';
+    if ( ! gdc_connect_user_can_use_group( $user_id, $group_id ) ) return '';
+    $state = gdc_connect_group_state( $group_id );
+    if ( ! is_array( $state ) || 'ok' !== ( isset( $state['state'] ) ? $state['state'] : '' ) ) return '';
+    if ( (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true ) > 0 ) return '';
+    if ( '' !== gend_society_group_get_linked_install_id( $group_id ) ) return '';
+    $group = groups_get_group( $group_id );
+    if ( ! $group || empty( $group->id ) ) return '';
+    return trailingslashit( bp_get_group_permalink( $group ) ) . 'compute-gas/#gend-society-connect-panel';
+}
+
+/**
+ * The link markup for $group_id, or '' when the link is hidden.
+ *
+ * @param int $group_id BuddyPress group id.
+ */
+function gend_society_group_connect_link_html( $group_id ) {
+    $url = gend_society_group_connect_link_url( $group_id );
+    if ( '' === $url ) return '';
+    return '<p class="gs-group-connect-link"><a class="gs-group-connect-link__a" href="' . esc_url( $url ) . '">'
+        . esc_html__( 'Connect your WordPress site', 'gend-society' )
+        . ' <span aria-hidden="true">&rarr;</span></a></p>';
+}
+
+/**
+ * Current group id on a group page for a logged-in viewer, else 0. With $link, also 0 on
+ * the Compute Gas and Hosting tabs, which show the panel itself.
+ *
+ * @param bool $link True when asking for the link (not for the stylesheet).
+ */
+function gend_society_group_connect_link_page_group( $link = true ) {
+    if ( ! is_user_logged_in() || ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) return 0;
+    if ( $link && function_exists( 'bp_is_current_action' ) && ( bp_is_current_action( 'compute-gas' ) || bp_is_current_action( 'hosting' ) ) ) return 0;
+    return function_exists( 'bp_get_current_group_id' ) ? (int) bp_get_current_group_id() : 0;
+}
+
+// The stylesheet also loads on the panel tabs (scroll offset of the link target).
+add_action( 'wp_enqueue_scripts', 'gend_society_group_connect_link_enqueue' );
+function gend_society_group_connect_link_enqueue() {
+    $gid = gend_society_group_connect_link_page_group( false );
+    if ( ! $gid || '' === gend_society_group_connect_link_url( $gid ) ) return;
+    wp_enqueue_style( 'gend-society-group-connect-link', GEND_SOCIETY_URL . 'assets/gs-group-connect-link.css', array(), GEND_SOCIETY_VERSION );
+}
+
+add_action( 'youzify_group_main_content', 'gend_society_group_connect_link_render', 9 );
+function gend_society_group_connect_link_render() {
+    $gid = gend_society_group_connect_link_page_group();
+    if ( ! $gid ) return;
+    echo gend_society_group_connect_link_html( $gid ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in gend_society_group_connect_link_html().
 }

@@ -25,6 +25,13 @@
  * at most once per page. Source: the Compute Gas class equals 1.3.1 apart from that one block (read-only too).
  * Normal mode renders the 1.3.1 Compute Gas class (loaded as gs108old_Group_Tab_Compute_Gas) next to the
  * current one: byte-identical for Paid and the site-row group, panel + 1.3.1 output for a Connected record.
+ * 108-12b: when a panel prints, the helper puts the anchor <span id="gend-society-connect-panel"> right before it
+ * (nothing for paid / site-row groups). The group page shows a "Connect your WordPress site" link (youzify_group_main_content,
+ * priority 9) to group admins and super admins of groups whose VAM state is 'ok', without a gdc_site_id or a linked install,
+ * while gdc_connect_enabled() is on (function_exists-guarded); not on the Compute Gas / Hosting tabs. Read-only: wiring, the
+ * guards in the source, and no link for any linked / site-id group (and none at all while the switch is off). Normal mode: shown
+ * for the unpaid-group admin and a super admin; hidden for a moderator, a member, an admin of another group, logged out, the
+ * paid group, the site-row group, a Connected group and with the switch off; shown again once the record is disconnected.
  * Baseline file: env GS108_GLUE_BASELINE_FILE or /tmp/gs108-baseline/group-app-tabs-1.3.1.php.
  *
  * @package gend-society
@@ -62,7 +69,7 @@ $new_body = preg_match( '/class Gend_Society_Group_Tab_Hosting .*?public static 
 gs108_assert( "if(!gend_society_group_tabs_user_has_access())return;gend_society_group_hosting_connect_panel((int)\$group_id);gend_society_group_render_hosting_suite(\$group_id);" === preg_replace( '/\s+/', '', $new_body ), 'glue-new-hosting-body', 'Hosting tab body = access gate + gend_society_group_hosting_connect_panel((int) $group_id) + hosting suite' );
 // 108-11: the once-per-page helper, and the Compute Gas tab (where group admins land) fires it too.
 $helper = preg_replace( '#//[^\n]*#', '', $fn_src( $csrc, 'gend_society_group_hosting_connect_panel' ) );
-gs108_assert( "functiongend_society_group_hosting_connect_panel(\$group_id){if(did_action('gend_society_group_hosting_connect_panel'))return;do_action('gend_society_group_hosting_connect_panel',(int)\$group_id);}" === preg_replace( '/\s+/', '', $helper ), 'glue-once-helper', 'gend_society_group_hosting_connect_panel() fires the action at most once per page (did_action guard)', $helper );
+gs108_assert( "functiongend_society_group_hosting_connect_panel(\$group_id){if(did_action('gend_society_group_hosting_connect_panel'))return;ob_start();do_action('gend_society_group_hosting_connect_panel',(int)\$group_id);\$panel=(string)ob_get_clean();if(''!==\$panel)echo'<spanid=\"gend-society-connect-panel\"class=\"gs-connect-panel-anchor\"></span>';echo\$panel;}" === preg_replace( '/\s+/', '', $helper ), 'glue-once-helper', 'gend_society_group_hosting_connect_panel() fires the action at most once per page (did_action guard); anchor span only when a panel printed', $helper );
 $cg_re    = '/^    class Gend_Society_Group_Tab_Compute_Gas extends BP_Group_Extension \{\n.*?^    \}\n/ms';
 $cg_old   = preg_match( $cg_re, $bsrc, $m ) ? $m[0] : '';
 $cg_new   = preg_match( $cg_re, $csrc, $m ) ? $m[0] : '';
@@ -75,6 +82,55 @@ gs108_assert( isset( $cbs0['compute-gas'] ) && array( 'Gend_Society_Group_Tab_Co
 $cbs = apply_filters( 'gdc_gs_endpoint_content_callbacks', array() );
 gs108_assert( isset( $cbs['hosting'] ) && array( 'Gend_Society_Group_Tab_Hosting', 'render_legacy_content' ) === $cbs['hosting'], 'glue-endpoint-callback', 'Group Page endpoint "hosting" renders Gend_Society_Group_Tab_Hosting::render_legacy_content' );
 gs108_assert( false !== has_action( 'gend_society_group_hosting_connect_panel' ), 'glue-has-action', 'gend_society_group_hosting_connect_panel has a callback (vendor-app-manager pairing panel)' );
+// 108-12b: the group page link.
+$gs12b_anchor = '<span id="gend-society-connect-panel" class="gs-connect-panel-anchor"></span>';
+gs108_assert( 9 === has_action( 'youzify_group_main_content', 'gend_society_group_connect_link_render' ) && 10 === has_action( 'wp_enqueue_scripts', 'gend_society_group_connect_link_enqueue' ), 'glue-link-wiring', 'link renders on youzify_group_main_content (9, under the group nav); stylesheet on wp_enqueue_scripts (10)' );
+$gs12b_url_src  = $fn_src( $csrc, 'gend_society_group_connect_link_url' );
+$gs12b_html_src = $fn_src( $csrc, 'gend_society_group_connect_link_html' );
+gs108_assert(
+	false !== strpos( $gs12b_url_src, "if ( ! function_exists( 'gdc_connect_enabled' ) || ! gdc_connect_enabled() ) return '';" )
+	&& false !== strpos( $gs12b_url_src, "if ( ! function_exists( 'gdc_connect_group_state' ) || ! function_exists( 'gdc_connect_user_can_use_group' ) ) return '';" )
+	&& false !== strpos( $gs12b_url_src, "'ok' !== " ) && false !== strpos( $gs12b_url_src, "'gdc_site_id'" ) && false !== strpos( $gs12b_url_src, 'gend_society_group_get_linked_install_id( $group_id )' ),
+	'glue-link-guards',
+	'link URL: function_exists-guarded kill switch + VAM helpers, state ok only, no gdc_site_id, no linked install'
+);
+gs108_assert( is_readable( GEND_SOCIETY_DIR . 'assets/gs-group-connect-link.css' ) && '' !== $gs12b_html_src && false === strpos( $gs12b_html_src, '<style' ) && false === strpos( $gs12b_html_src, '<script' ) && false === strpos( $gs12b_html_src, 'style=' ), 'glue-link-static-css', 'static stylesheet assets/gs-group-connect-link.css; no inline <style>/<script>/style= in the link markup' );
+$gs12b_super = 0;
+foreach ( get_super_admins() as $gs12b_login ) {
+	$gs12b_u = get_user_by( 'login', $gs12b_login );
+	if ( $gs12b_u ) {
+		$gs12b_super = (int) $gs12b_u->ID;
+		break;
+	}
+}
+global $wpdb;
+$gs12b_bad = array();
+$gs12b_n   = 0;
+$gs12b_ids = $wpdb->get_col( "SELECT DISTINCT group_id FROM {$wpdb->base_prefix}bp_groups_groupmeta WHERE meta_key IN ('gdc_membership_id','gdc_site_id') AND meta_value <> '' AND meta_value <> '0' ORDER BY group_id LIMIT 200" );
+foreach ( (array) $gs12b_ids as $gs12b_gid ) {
+	$gs12b_gid = (int) $gs12b_gid;
+	$gs12b_st  = function_exists( 'gdc_connect_group_state' ) ? gdc_connect_group_state( $gs12b_gid ) : array( 'state' => '' );
+	$gs12b_sid = (int) groups_get_groupmeta( $gs12b_gid, 'gdc_site_id', true );
+	if ( 'ok' === $gs12b_st['state'] && 0 === $gs12b_sid && '' === gend_society_group_get_linked_install_id( $gs12b_gid ) ) {
+		continue; // A disconnected Connected record: the link is meant to show there.
+	}
+	$gs12b_n++;
+	if ( '' !== gend_society_group_connect_link_url( $gs12b_gid, $gs12b_super ) ) {
+		$gs12b_bad[] = $gs12b_gid . ':' . $gs12b_st['state'];
+	}
+}
+gs108_assert( $gs12b_super > 0 && array() === $gs12b_bad, 'glue-link-linked-groups', "no link for the super admin on any of {$gs12b_n} paid / site-row / connected groups", implode( ',', $gs12b_bad ) );
+if ( ! function_exists( 'gdc_connect_enabled' ) || ! gdc_connect_enabled() ) {
+	$gs12b_any = array();
+	foreach ( (array) $wpdb->get_col( "SELECT id FROM {$wpdb->base_prefix}bp_groups ORDER BY id LIMIT 200" ) as $gs12b_gid ) {
+		if ( '' !== gend_society_group_connect_link_url( (int) $gs12b_gid, $gs12b_super ) ) {
+			$gs12b_any[] = (int) $gs12b_gid;
+		}
+	}
+	gs108_assert( array() === $gs12b_any, 'glue-link-switch-off-here', 'Connect switch is off here: no link on any group', implode( ',', $gs12b_any ) );
+} else {
+	gs108_info( 'Connect switch is on here: per-group link visibility is covered by the normal-mode asserts' );
+}
 
 if ( ! function_exists( 'gs108old_group_tab_open' ) ) {
 	$code = $fn_src( $bsrc, 'gend_society_group_get_linked_install_id' ) . $fn_src( $bsrc, 'gend_society_group_tab_open' );
@@ -257,6 +313,99 @@ gs108_assert( $pcn === $pco && '' !== $pco, 'glue-paid-compute-gas', 'GS108 Paid
 gs108_assert( array( $paid ) === $fired, 'glue-paid-compute-gas-fired', 'Compute Gas fires the action once with the group id (int)', wp_json_encode( $fired ) );
 $fired = array();
 gs108_assert( $cg_new_r( $paid, 'gas-stations' ) === $cg_old_r( $paid, 'gas-stations' ) && array() === $fired, 'glue-paid-compute-gas-embed', 'embedded Gas Stations view (forced tab): identical to 1.3.1, the action does not fire', wp_json_encode( $fired ) );
+gs108_assert( false === strpos( $pn . $pcn, 'gend-society-connect-panel' ), 'glue-paid-no-anchor', 'GS108 Paid: no panel anchor on either tab' );
+
+// --- 108-12b: the "Connect your WordPress site" link (Alpha and Beta are unlinked here).
+$gs12b_user = function ( $login ) {
+	$u = get_user_by( 'login', $login );
+	return $u ? (int) $u->ID : 0;
+};
+$u_admin  = $gs12b_user( 'gs108admin' );
+$u_mod    = $gs12b_user( 'gs108mod' );
+$u_member = $gs12b_user( 'gs108member' );
+$u_other  = $gs12b_user( 'gs108other' );
+$alpha_g  = groups_get_group( $alpha );
+$want_url = trailingslashit( bp_get_group_permalink( $alpha_g ) ) . 'compute-gas/#gend-society-connect-panel';
+$a_state  = gdc_connect_group_state( $alpha );
+gs108_assert( $u_admin && $u_mod && $u_member && $u_other && groups_is_user_admin( $u_admin, $alpha ) && groups_is_user_mod( $u_mod, $alpha ) && ! groups_is_user_admin( $u_member, $alpha ) && groups_is_user_member( $u_member, $alpha ) && ! groups_is_user_member( $u_other, $alpha ) && ! is_super_admin( $u_admin ) && 'ok' === $a_state['state'], 'glue-link-fixtures', 'Alpha (state ok): gs108admin admin (not super), gs108mod moderator, gs108member member, gs108other not a member' );
+gs108_assert_eq( $want_url, gend_society_group_connect_link_url( $alpha, $u_admin ), 'glue-link-unpaid-admin', 'unpaid group, group admin: link to <group>/compute-gas/#gend-society-connect-panel' );
+gs108_assert_eq( $want_url, gend_society_group_connect_link_url( $alpha, $super ), 'glue-link-unpaid-super', 'unpaid group, super admin: link shown' );
+gs108_assert_eq( '', gend_society_group_connect_link_url( $alpha, $u_mod ), 'glue-link-mod', 'moderator: no link (admins only)' );
+gs108_assert_eq( '', gend_society_group_connect_link_url( $alpha, $u_member ), 'glue-link-member', 'member: no link' );
+gs108_assert_eq( '', gend_society_group_connect_link_url( $alpha, $u_other ), 'glue-link-other-group-admin', 'admin of another group (gs108other): no link' );
+gs108_assert_eq( '', gend_society_group_connect_link_url( $paid, $u_admin ), 'glue-link-paid-admin', 'paid group, its group admin: no link' );
+gs108_assert_eq( '', gend_society_group_connect_link_url( $paid, $super ), 'glue-link-paid-super', 'paid group, super admin: no link' );
+$site_id_groups = array_map( 'intval', (array) $wpdb->get_col( "SELECT group_id FROM {$wpdb->base_prefix}bp_groups_groupmeta WHERE meta_key = 'gdc_site_id' AND meta_value > 0 LIMIT 20" ) );
+$site_id_shown  = array_filter(
+	$site_id_groups,
+	function ( $g ) use ( $super ) {
+		return '' !== gend_society_group_connect_link_url( $g, $super );
+	}
+);
+gs108_assert( array() !== $site_id_groups && array() === $site_id_shown, 'glue-link-site-id-groups', 'groups with a gdc_site_id site (' . implode( ',', $site_id_groups ) . '): no link, even where VAM state is ok', implode( ',', $site_id_shown ) );
+$html = function () use ( $alpha ) {
+	return gend_society_group_connect_link_html( $alpha );
+};
+wp_set_current_user( $u_admin );
+$link_html = $html();
+gs108_assert( '<p class="gs-group-connect-link"><a class="gs-group-connect-link__a" href="' . esc_url( $want_url ) . '">Connect your WordPress site <span aria-hidden="true">&rarr;</span></a></p>' === $link_html, 'glue-link-html', 'link markup: one <p> with the link', $link_html );
+// Switch off (in-process only, the option is never written): no link.
+remove_filter( 'pre_site_option_gdc_connect_enabled', $on, PHP_INT_MAX );
+$off = function () {
+	return '0';
+};
+add_filter( 'pre_site_option_gdc_connect_enabled', $off, PHP_INT_MAX );
+gs108_assert( ! gdc_connect_enabled() && '' === gend_society_group_connect_link_url( $alpha, $u_admin ) && '' === gend_society_group_connect_link_url( $alpha, $super ) && '' === $html(), 'glue-link-switch-off', 'gdc_connect_enabled off: no link for the group admin or the super admin' );
+remove_filter( 'pre_site_option_gdc_connect_enabled', $off, PHP_INT_MAX );
+add_filter( 'pre_site_option_gdc_connect_enabled', $on, PHP_INT_MAX );
+gs108_assert( gdc_connect_enabled() && $want_url === gend_society_group_connect_link_url( $alpha, $u_admin ), 'glue-link-switch-on-again', 'switch back on: link back' );
+// Page-level render + stylesheet, with BuddyPress's current group / action set in-process.
+$page = function ( $uid, $gid, $action ) {
+	$bp    = buddypress();
+	$saved = array( $bp->current_component, $bp->current_action, isset( $bp->groups->current_group ) ? $bp->groups->current_group : null, get_current_user_id() );
+	wp_set_current_user( $uid );
+	$bp->current_component     = $bp->groups->id;
+	$bp->current_action        = $action;
+	$bp->groups->current_group = groups_get_group( $gid );
+	wp_dequeue_style( 'gend-society-group-connect-link' );
+	gend_society_group_connect_link_enqueue();
+	$css = wp_style_is( 'gend-society-group-connect-link', 'enqueued' );
+	ob_start();
+	gend_society_group_connect_link_render();
+	$out = (string) ob_get_clean();
+	wp_dequeue_style( 'gend-society-group-connect-link' );
+	$bp->current_component     = $saved[0];
+	$bp->current_action        = $saved[1];
+	$bp->groups->current_group = $saved[2];
+	wp_set_current_user( $saved[3] );
+	return array( $out, $css );
+};
+list( $o, $css ) = $page( $u_admin, $alpha, 'business-plan' );
+$css_src         = isset( wp_styles()->registered['gend-society-group-connect-link'] ) ? (string) wp_styles()->registered['gend-society-group-connect-link']->src : '';
+gs108_assert( $o === $link_html && $css && false !== strpos( $css_src, 'assets/gs-group-connect-link.css' ), 'glue-link-page-admin', 'group page (Business Plan) as the unpaid-group admin: link printed, static stylesheet enqueued', $o . ' ' . $css_src );
+list( $o, $css ) = $page( $u_admin, $alpha, 'compute-gas' );
+gs108_assert( '' === $o && $css, 'glue-link-page-compute-gas', 'Compute Gas tab (shows the panel itself): no link; stylesheet loaded for the anchor offset' );
+list( $o, $css ) = $page( $u_admin, $alpha, 'hosting' );
+gs108_assert( '' === $o, 'glue-link-page-hosting', 'Hosting tab: no link' );
+list( $o, $css ) = $page( $u_member, $alpha, 'business-plan' );
+gs108_assert( '' === $o && ! $css, 'glue-link-page-member', 'member: no markup, no stylesheet (page unchanged)' );
+list( $o, $css ) = $page( $u_mod, $alpha, 'members-hub' );
+gs108_assert( '' === $o && ! $css, 'glue-link-page-mod', 'moderator: no markup, no stylesheet' );
+list( $o, $css ) = $page( $u_admin, $paid, 'business-plan' );
+gs108_assert( '' === $o && ! $css, 'glue-link-page-paid', 'paid group, its admin: no markup, no stylesheet (page unchanged)' );
+list( $o, $css ) = $page( 0, $alpha, 'business-plan' );
+gs108_assert( '' === $o && ! $css, 'glue-link-page-logged-out', 'logged out: no markup, no stylesheet' );
+remove_filter( 'pre_site_option_gdc_connect_enabled', $on, PHP_INT_MAX );
+add_filter( 'pre_site_option_gdc_connect_enabled', $off, PHP_INT_MAX );
+list( $o, $css ) = $page( $u_admin, $alpha, 'business-plan' );
+gs108_assert( '' === $o && ! $css, 'glue-link-page-switch-off', 'switch off: no markup, no stylesheet for the unpaid-group admin' );
+remove_filter( 'pre_site_option_gdc_connect_enabled', $off, PHP_INT_MAX );
+add_filter( 'pre_site_option_gdc_connect_enabled', $on, PHP_INT_MAX );
+wp_set_current_user( $super );
+// The link target: unpaid group, Compute Gas tab -> anchor right before the pairing panel.
+$fired = array();
+$ucg   = $cg_new_r( $alpha );
+gs108_assert( 1 === substr_count( $ucg, $gs12b_anchor ) && 1 === substr_count( $ucg, $gs12b_anchor . '<div class="gdc-cp" data-gdc-cp="1"' ) && array( $alpha ) === $fired, 'glue-link-target', 'unpaid group, Compute Gas tab: <span id="gend-society-connect-panel"> once, right before the pairing panel' );
 
 // --- Beta linked to the seeded legacy membership with a site row.
 $legacy = wu_get_sites(
@@ -290,6 +439,7 @@ if ( gs108_assert( $lmid > 0, 'glue-legacy-site', 'seeded legacy site row ' . ( 
 	$bcn   = $cg_new_r( $beta );
 	$bco   = $cg_old_r( $beta );
 	gs108_assert( $bcn === $bco && array( $beta ) === $fired, 'glue-site-row-compute-gas', 'site-row group: Compute Gas tab byte-identical to 1.3.1, action fired once', $first_diff( $bcn, $bco ) . ' ' . wp_json_encode( $fired ) );
+	gs108_assert( '' === gend_society_group_connect_link_url( $beta, $super ) && '' === gend_society_group_connect_link_url( $beta, $gs12b_user( 'gs108other' ) ), 'glue-link-site-row', 'site-row group: no link for its admin or the super admin' );
 }
 
 // --- Alpha linked to a Connected record.
@@ -364,26 +514,29 @@ $fired = array();
 $an    = $hosting_new( $alpha );
 gs108_assert( array( $alpha ) === $fired && is_int( $fired[0] ), 'glue-connected-fired', 'Hosting tab fires gend_society_group_hosting_connect_panel once with (int) group id', wp_json_encode( $fired ) );
 gs108_assert( false !== strpos( $an, 'Connected:' ) && false !== strpos( $an, esc_url( $ext ) ) && false === strpos( $an, 'data-gdc-cp-mint' ), 'glue-connected-panel', 'Hosting tab shows VAM "Connected: <url>" and no pairing button', substr( wp_strip_all_tags( $panel_only( $alpha ) ), 0, 200 ) );
-$ao = $hosting_old( $alpha );
-$ap = $panel_only( $alpha );
-gs108_assert( $an === $ap . $ao, 'glue-connected-hosting-rest', 'apart from the panel the Hosting tab output is the 1.3.1 suite', $first_diff( $an, $ap . $ao ) );
+$ao  = $hosting_old( $alpha );
+$ap  = $panel_only( $alpha );
+$apx = '' !== $ap ? $gs12b_anchor . $ap : '';
+gs108_assert( $an === $apx . $ao, 'glue-connected-hosting-rest', 'apart from the panel (and its anchor) the Hosting tab output is the 1.3.1 suite', $first_diff( $an, $apx . $ao ) );
 // Compute Gas for the Connected record: the same panel inside the tab suite, the rest is 1.3.1.
 $fired = array();
 $acn   = $cg_new_r( $alpha );
 $aco   = $cg_old_r( $alpha );
 gs108_assert( array( $alpha ) === $fired && is_int( $fired[0] ), 'glue-connected-compute-gas-fired', 'Compute Gas fires the action once with (int) group id', wp_json_encode( $fired ) );
-$p_at = '' !== $ap ? strpos( $acn, $ap ) : false;
-gs108_assert( '' !== $ap && false !== $p_at && $p_at > (int) strpos( $acn, 'data-gs-cg-tabsuite>' ) && $p_at < (int) strpos( $acn, '<nav class="gs-cg-toptabs"' ), 'glue-connected-compute-gas-panel', 'Compute Gas shows the same panel ("Connected: <url>") inside the tab suite, before the top tabs' );
-$a_rest = false !== $p_at ? substr( $acn, 0, $p_at ) . substr( $acn, $p_at + strlen( $ap ) ) : '';
-gs108_assert( false !== $p_at && $a_rest === $aco, 'glue-connected-compute-gas-rest', 'apart from the panel the Compute Gas tab output is 1.3.1', false !== $p_at ? $first_diff( $a_rest, $aco ) : 'panel not found' );
+$p_at = '' !== $apx ? strpos( $acn, $apx ) : false;
+gs108_assert( '' !== $ap && false !== $p_at && $p_at > (int) strpos( $acn, 'data-gs-cg-tabsuite>' ) && $p_at < (int) strpos( $acn, '<nav class="gs-cg-toptabs"' ), 'glue-connected-compute-gas-panel', 'Compute Gas shows the same panel ("Connected: <url>", after its anchor) inside the tab suite, before the top tabs' );
+$a_rest = false !== $p_at ? substr( $acn, 0, $p_at ) . substr( $acn, $p_at + strlen( $apx ) ) : '';
+gs108_assert( false !== $p_at && $a_rest === $aco, 'glue-connected-compute-gas-rest', 'apart from the panel and its anchor the Compute Gas tab output is 1.3.1', false !== $p_at ? $first_diff( $a_rest, $aco ) : 'panel not found' );
 // One request rendering both tabs: the panel renders once (first caller).
 $fired = array();
 $reset_page();
 $h1 = $hosting_new( $alpha, false );
 $c1 = $cg_new_r( $alpha, '', false );
-gs108_assert( array( $alpha ) === $fired && 1 === substr_count( $h1 . $c1, $ap ) && false !== strpos( $h1, $ap ) && $c1 === $aco, 'glue-once-per-page', 'Hosting tab + Compute Gas in one request: the panel renders once (Hosting, first), Compute Gas then equals 1.3.1', wp_json_encode( $fired ) );
+gs108_assert( array( $alpha ) === $fired && 1 === substr_count( $h1 . $c1, $ap ) && 1 === substr_count( $h1 . $c1, $gs12b_anchor ) && false !== strpos( $h1, $apx ) && $c1 === $aco, 'glue-once-per-page', 'Hosting tab + Compute Gas in one request: the panel renders once (Hosting, first), Compute Gas then equals 1.3.1', wp_json_encode( $fired ) );
 $fired = array();
 gs108_assert( $cg_new_r( $alpha, 'gas-stations' ) === $cg_old_r( $alpha, 'gas-stations' ) && array() === $fired, 'glue-connected-compute-gas-embed', 'embedded Gas Stations view: no panel, identical to 1.3.1', wp_json_encode( $fired ) );
+
+gs108_assert( '' === gend_society_group_connect_link_url( $alpha, $super ) && '' === gend_society_group_connect_link_url( $alpha, $u_admin ), 'glue-link-connected', 'Connected group: no link (super admin, group admin)' );
 
 // Admin URL missing -> external URL + wp-admin/.
 $mem->delete_meta( 'gdc_install_admin_url' );
@@ -399,6 +552,7 @@ gs108_assert_eq( '', gend_society_group_get_linked_install_id( $alpha ), 'glue-d
 gs108_assert( false === strpos( $chrome( 'gend_society_group_tab_open', $alpha ), 'Open Web App Admin' ), 'glue-disconnected-link', 'disconnected record: no "Open Web App Admin" link' );
 gs108_assert( false !== strpos( $hosting_new( $alpha ), 'data-gdc-cp-mint="1"' ), 'glue-disconnected-panel', 'disconnected record: Hosting tab offers "Get pairing code" again' );
 gs108_assert( false !== strpos( $cg_new_r( $alpha ), 'data-gdc-cp-mint="1"' ), 'glue-disconnected-compute-gas', 'disconnected record: Compute Gas offers "Get pairing code" too' );
+gs108_assert_eq( $want_url, gend_society_group_connect_link_url( $alpha, $u_admin ), 'glue-link-disconnected', 'disconnected record: the link is back for the group admin' );
 
 // Not self-hosted -> nothing.
 $mem->update_meta( 'gdc_connection_state', 'connected' );
