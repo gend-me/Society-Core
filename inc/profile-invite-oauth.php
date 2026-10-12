@@ -52,16 +52,28 @@ function gend_society_invite_oauth_provider_config( $provider ) {
 
 /**
  * The redirect URI we register with each provider. Must match exactly.
+ *
+ * On a multisite network every site uses the main site's callback, so only
+ * gend.me's URI is registered with Google / Microsoft and no network site
+ * needs its own setup. Users (and their token user meta) are network-wide,
+ * and subdirectory sites share the main site's origin + login cookie, so the
+ * popup's postMessage and the cookie check in the callback still line up.
  */
 function gend_society_invite_oauth_redirect_uri() {
+    if ( is_multisite() ) {
+        return get_rest_url( get_main_site_id(), 'gs/v1/invite/oauth/callback' );
+    }
     return rest_url( 'gs/v1/invite/oauth/callback' );
 }
 
 /**
- * Site-wide credentials — entered by an admin in the Settings page.
+ * Site-wide credentials. On multisite they always come from the main site
+ * (gend.me) — there is no per-site credentials screen any more.
  */
 function gend_society_invite_oauth_credentials( $provider ) {
-    $opts = get_option( 'gend_society_invite_oauth_credentials', array() );
+    $opts = is_multisite()
+        ? get_blog_option( get_main_site_id(), 'gend_society_invite_oauth_credentials', array() )
+        : get_option( 'gend_society_invite_oauth_credentials', array() );
     if ( ! is_array( $opts ) ) return null;
     $key = $provider;
     if ( ! isset( $opts[ $key ] ) || empty( $opts[ $key ]['client_id'] ) || empty( $opts[ $key ]['client_secret'] ) ) {
