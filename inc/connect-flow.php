@@ -605,6 +605,8 @@ if ( ! function_exists( 'gend_society_connect_store' ) ) {
 		delete_option( 'gend_society_features_cache_expires' );
 		delete_option( 'gend_society_remote_membership_cache' );
 		delete_option( 'gend_society_remote_membership_cache_expires' );
+		// A new token: an earlier "unauthorized" health result no longer applies.
+		delete_option( 'gend_society_connection_health' );
 	}
 }
 
