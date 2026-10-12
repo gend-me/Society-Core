@@ -28,7 +28,7 @@ if ( ! defined( 'GEND_SOCIETY_CONSENT_VERSION' ) ) {
 	 * Version of the consent text/disclosure. Bump when the disclosed items
 	 * or the wording change materially.
 	 */
-	define( 'GEND_SOCIETY_CONSENT_VERSION', '106.1' );
+	define( 'GEND_SOCIETY_CONSENT_VERSION', '108.1' );
 }
 
 if ( ! function_exists( 'gend_society_terms_url' ) ) {
@@ -57,10 +57,12 @@ if ( ! function_exists( 'gend_society_consent_disclosure_items' ) ) {
 	 */
 	function gend_society_consent_disclosure_items(): array {
 		return array(
-			'site_url'    => __( 'Your site address (URL)', 'gend-society' ),
-			'install_id'  => __( 'A random install ID (UUID) created by this plugin', 'gend-society' ),
-			'public_key'  => __( "This site's public key (used to verify signed messages)", 'gend-society' ),
-			'admin_email' => __( 'The site admin email address', 'gend-society' ),
+			'site_url'     => __( 'Your site address (URL)', 'gend-society' ),
+			'install_id'   => __( 'A random install ID (UUID) created by this plugin', 'gend-society' ),
+			'public_key'   => __( "This site's public key (used to verify signed messages)", 'gend-society' ),
+			'admin_email'  => __( 'The site admin email address', 'gend-society' ),
+			'gend_account' => __( 'Your gend.me account and the business group you choose are linked to this site on gend.me', 'gend-society' ),
+			'owner_name'   => __( "The display name of this site's connection owner", 'gend-society' ),
 		);
 	}
 }

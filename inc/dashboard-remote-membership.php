@@ -103,7 +103,10 @@ function gend_society_remote_membership_fetch() {
         ),
     ) );
     if ( is_wp_error( $response ) ) return null;
-    if ( (int) wp_remote_retrieve_response_code( $response ) !== 200 ) return null;
+    $code = (int) wp_remote_retrieve_response_code( $response );
+    // Phase 108 (CON-06): report 401/200 to the connection health status (standalone only; the function is absent on hub/container).
+    if ( function_exists( 'gend_society_connection_health_note_status' ) ) gend_society_connection_health_note_status( $code );
+    if ( $code !== 200 ) return null;
     $raw   = (string) wp_remote_retrieve_body( $response );
     $clean = trim( str_replace( "\xEF\xBB\xBF", '', $raw ) );
     $data  = json_decode( $clean, true );

@@ -37,10 +37,46 @@ function gend_society_group_get_linked_install_id( $group_id ) {
     $membership = wu_get_membership( $membership_id );
     if ( ! $membership ) return '';
     $sites = method_exists( $membership, 'get_sites' ) ? $membership->get_sites() : array();
-    if ( ! is_array( $sites ) || empty( $sites ) ) return '';
+    if ( ! is_array( $sites ) || empty( $sites ) ) {
+        // Phase 108: a Connected (self-hosted, site-less) membership keeps the install on the membership record.
+        return gend_society_group_connected_record_meta( $membership, 'gdc_install_id' );
+    }
     $primary = $sites[0];
     if ( ! is_object( $primary ) || ! method_exists( $primary, 'get_meta' ) ) return '';
     return (string) $primary->get_meta( 'gdc_install_id', '' );
+}
+
+/**
+ * Phase 108: one meta value of a Connected install record (membership meta on a
+ * site-less self-hosted membership). '' unless the membership is self-hosted and
+ * its connection is not disconnected. Only used where the membership has no
+ * site rows, so groups with sites keep their 1.3.1 behaviour.
+ *
+ * @param object $membership WU membership.
+ * @param string $key        Meta key.
+ */
+function gend_society_group_connected_record_meta( $membership, $key ) {
+    if ( ! is_object( $membership ) || ! method_exists( $membership, 'get_meta' ) ) return '';
+    if ( ! $membership->get_meta( 'gdc_self_hosted', false ) ) return '';
+    if ( 'disconnected' === (string) $membership->get_meta( 'gdc_connection_state', '' ) ) return '';
+    return (string) $membership->get_meta( $key, '' );
+}
+
+/**
+ * Phase 108: fire gend_society_group_hosting_connect_panel (vendor-app-manager's
+ * purchase-free pairing panel) at most once per page. Both the Hosting tab and the
+ * Compute Gas tab call this; the panel prints nothing for groups with a paid site.
+ *
+ * @param int $group_id BuddyPress group id.
+ */
+function gend_society_group_hosting_connect_panel( $group_id ) {
+    if ( did_action( 'gend_society_group_hosting_connect_panel' ) ) return;
+    ob_start();
+    do_action( 'gend_society_group_hosting_connect_panel', (int) $group_id );
+    $panel = (string) ob_get_clean();
+    // Target of the group page's "Connect your WordPress site" link; only when a panel printed.
+    if ( '' !== $panel ) echo '<span id="gend-society-connect-panel" class="gs-connect-panel-anchor"></span>';
+    echo $panel; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the panel callbacks escape their own markup.
 }
 
 /**
@@ -79,6 +115,16 @@ function gend_society_group_tab_open( $title, $intro, $group_id ) {
             }
         }
     }
+    // Phase 108: a Connected (site-less) install links to its own wp-admin as reported by the plugin.
+    $admin_link = $app_link ? trailingslashit( $app_link ) . 'wp-admin/' : '';
+    if ( ! $app_link && ! empty( $mem ) && empty( $sites ) ) {
+        $admin_link = gend_society_group_connected_record_meta( $mem, 'gdc_install_admin_url' );
+        if ( '' === $admin_link ) {
+            $external   = gend_society_group_connected_record_meta( $mem, 'gdc_external_url' );
+            $admin_link = '' !== $external ? trailingslashit( $external ) . 'wp-admin/' : '';
+        }
+        $app_link = $admin_link;
+    }
     ?>
     <div class="gs-group-tab-panel">
         <div style="display:flex; align-items:center; justify-content:space-between; gap:14px; flex-wrap:wrap; margin-bottom:14px;">
@@ -87,7 +133,7 @@ function gend_society_group_tab_open( $title, $intro, $group_id ) {
                 <p style="margin:0; color:#cbd5f5; font-size:0.88rem;"><?php echo esc_html( $intro ); ?></p>
             </div>
             <?php if ( $app_link ) : ?>
-                <a href="<?php echo esc_url( trailingslashit( $app_link ) . 'wp-admin/' ); ?>" target="_blank" rel="noopener" style="background:rgba(78,170,255,0.18); border:1px solid rgba(78,170,255,0.45); color:#fff; padding:8px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:0.82rem;">
+                <a href="<?php echo esc_url( $admin_link ); ?>" target="_blank" rel="noopener" style="background:rgba(78,170,255,0.18); border:1px solid rgba(78,170,255,0.45); color:#fff; padding:8px 14px; border-radius:8px; text-decoration:none; font-weight:600; font-size:0.82rem;">
                     Open Web App Admin →
                 </a>
             <?php endif; ?>
@@ -214,6 +260,10 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             // No gs_group_tab_open() wrapper — the new suite header below
             // is the only chrome we need. (Same fix that landed on the
             // Compute Gas tab — the wrapper rendered a duplicate title.)
+            // Phase 108: vendor-app-manager renders the purchase-free "Connect your
+            // own WordPress site" pairing panel here (group admins, groups without
+            // a paid site). For other groups the action renders nothing.
+            gend_society_group_hosting_connect_panel( (int) $group_id );
             gend_society_group_render_hosting_suite( $group_id );
         }
     }
@@ -431,7 +481,13 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                 .gs-cg-toptab-icon { width: 18px; height: 18px; display: inline-flex; align-items: center; justify-content: center; }
             </style>
             <div class="gs-cg-tabsuite" data-gs-cg-tabsuite>
-                <?php if ( ! $gs_cg_hide_nav ) : ?>
+                <?php
+                if ( ! $gs_cg_hide_nav ) :
+                    // Phase 108: the Hosting nav item is hidden, so the pairing panel also
+                    // shows here, where group admins land (once per page; it prints nothing
+                    // for groups with a paid site, so their output is unchanged).
+                    gend_society_group_hosting_connect_panel( (int) $group_id );
+                    ?>
                 <nav class="gs-cg-toptabs" role="tablist" aria-label="<?php esc_attr_e( 'Compute Gas sections', 'gend-society' ); ?>">
                     <button type="button" class="gs-cg-toptab<?php echo $cg_active_tab === 'consumed-gas' ? ' is-active' : ''; ?>" data-cg-tab="consumed-gas" role="tab" aria-selected="<?php echo $cg_active_tab === 'consumed-gas' ? 'true' : 'false'; ?>">
                         <span class="gs-cg-toptab-icon" aria-hidden="true">
@@ -4288,4 +4344,75 @@ if ( ! function_exists( 'gend_society_cg_mobile_waitlist_ajax' ) ) {
     // without a wp_create_nonce call from a public-rendered page; the
     // tab itself is admin-gated, so in practice the user IS logged in.
     add_action( 'wp_ajax_nopriv_gend_society_cg_mobile_waitlist', 'gend_society_cg_mobile_waitlist_ajax' );
+}
+
+/*
+ * Phase 108: "Connect your WordPress site" link on the group page, just under the
+ * group nav. Group admins and super admins only, on groups without a paid
+ * membership, a site row or a live connection, and only while vendor-app-manager's
+ * Connect switch (gdc_connect_enabled) is on. It opens the pairing panel on the
+ * Compute Gas tab. Everyone else gets no markup and no stylesheet.
+ */
+
+/**
+ * The link target for $group_id as seen by $user_id, or '' when the link is hidden.
+ *
+ * @param int $group_id BuddyPress group id.
+ * @param int $user_id  Viewer (0 = current user).
+ */
+function gend_society_group_connect_link_url( $group_id, $user_id = 0 ) {
+    $group_id = (int) $group_id;
+    $user_id  = $user_id ? (int) $user_id : get_current_user_id();
+    if ( $group_id <= 0 || $user_id <= 0 ) return '';
+    if ( ! function_exists( 'gdc_connect_enabled' ) || ! gdc_connect_enabled() ) return '';
+    if ( ! function_exists( 'gdc_connect_group_state' ) || ! function_exists( 'gdc_connect_user_can_use_group' ) ) return '';
+    if ( ! function_exists( 'groups_get_group' ) || ! function_exists( 'bp_get_group_permalink' ) ) return '';
+    if ( ! gdc_connect_user_can_use_group( $user_id, $group_id ) ) return '';
+    $state = gdc_connect_group_state( $group_id );
+    if ( ! is_array( $state ) || 'ok' !== ( isset( $state['state'] ) ? $state['state'] : '' ) ) return '';
+    if ( (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true ) > 0 ) return '';
+    if ( '' !== gend_society_group_get_linked_install_id( $group_id ) ) return '';
+    $group = groups_get_group( $group_id );
+    if ( ! $group || empty( $group->id ) ) return '';
+    return trailingslashit( bp_get_group_permalink( $group ) ) . 'compute-gas/#gend-society-connect-panel';
+}
+
+/**
+ * The link markup for $group_id, or '' when the link is hidden.
+ *
+ * @param int $group_id BuddyPress group id.
+ */
+function gend_society_group_connect_link_html( $group_id ) {
+    $url = gend_society_group_connect_link_url( $group_id );
+    if ( '' === $url ) return '';
+    return '<p class="gs-group-connect-link"><a class="gs-group-connect-link__a" href="' . esc_url( $url ) . '">'
+        . esc_html__( 'Connect your WordPress site', 'gend-society' )
+        . ' <span aria-hidden="true">&rarr;</span></a></p>';
+}
+
+/**
+ * Current group id on a group page for a logged-in viewer, else 0. With $link, also 0 on
+ * the Compute Gas and Hosting tabs, which show the panel itself.
+ *
+ * @param bool $link True when asking for the link (not for the stylesheet).
+ */
+function gend_society_group_connect_link_page_group( $link = true ) {
+    if ( ! is_user_logged_in() || ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) return 0;
+    if ( $link && function_exists( 'bp_is_current_action' ) && ( bp_is_current_action( 'compute-gas' ) || bp_is_current_action( 'hosting' ) ) ) return 0;
+    return function_exists( 'bp_get_current_group_id' ) ? (int) bp_get_current_group_id() : 0;
+}
+
+// The stylesheet also loads on the panel tabs (scroll offset of the link target).
+add_action( 'wp_enqueue_scripts', 'gend_society_group_connect_link_enqueue' );
+function gend_society_group_connect_link_enqueue() {
+    $gid = gend_society_group_connect_link_page_group( false );
+    if ( ! $gid || '' === gend_society_group_connect_link_url( $gid ) ) return;
+    wp_enqueue_style( 'gend-society-group-connect-link', GEND_SOCIETY_URL . 'assets/gs-group-connect-link.css', array(), GEND_SOCIETY_VERSION );
+}
+
+add_action( 'youzify_group_main_content', 'gend_society_group_connect_link_render', 9 );
+function gend_society_group_connect_link_render() {
+    $gid = gend_society_group_connect_link_page_group();
+    if ( ! $gid ) return;
+    echo gend_society_group_connect_link_html( $gid ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in gend_society_group_connect_link_html().
 }

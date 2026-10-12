@@ -537,6 +537,18 @@ return array(
 			'note'  => 'gend.me portal handshake.',
 		),
 		array(
+			'file'  => 'inc/connect-flow.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Connect to a gend.me business group: redirect flow client, challenge endpoint, code exchange (Phase 108). Standalone only.',
+		),
+		array(
+			'file'  => 'inc/connection-health.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone', 'paired' ),
+			'note'  => 'Connection health without cron: throttled admin-load ping to /install/{id}/health, Reconnect notice on 401 (Phase 108). Standalone, connected only.',
+		),
+		array(
 			'file'  => 'inc/support-access.php',
 			'tier'  => 'customer',
 			'needs' => array(),
