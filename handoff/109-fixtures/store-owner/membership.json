@@ -35,7 +35,7 @@
     ]
   },
   "dashboard_plan": {
-    "id": 11,
+    "id": 22,
     "name": "Store Owner",
     "slug": "store-owner",
     "description": "",
@@ -73,6 +73,6 @@
   },
   "last_upgrade": null,
   "checkout_allowed_plan_ids": [
-    12
+    23
   ]
 }

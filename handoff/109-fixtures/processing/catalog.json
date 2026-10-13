@@ -1,7 +1,7 @@
 {
   "tiers": [
     {
-      "id": 2,
+      "id": 21,
       "slug": "content-builder",
       "name": "Content Builder",
       "price_label": "$14.99 / month",
@@ -15,7 +15,7 @@
       "checkout_allowed": true
     },
     {
-      "id": 11,
+      "id": 22,
       "slug": "store-owner",
       "name": "Store Owner",
       "price_label": "$29.99 / month",
@@ -29,7 +29,7 @@
       "checkout_allowed": true
     },
     {
-      "id": 12,
+      "id": 23,
       "slug": "social-connector",
       "name": "Social Connector",
       "price_label": "$49.99 / month",
@@ -180,7 +180,7 @@
       "name": "Wireframe Generator (Leo)",
       "area": "app",
       "unlock_plan": {
-        "id": 2,
+        "id": 21,
         "slug": "content-builder",
         "name": "Content Builder"
       }
@@ -190,7 +190,7 @@
       "name": "Social Blogs",
       "area": "write",
       "unlock_plan": {
-        "id": 2,
+        "id": 21,
         "slug": "content-builder",
         "name": "Content Builder"
       }
@@ -200,7 +200,7 @@
       "name": "Community Emails",
       "area": "write",
       "unlock_plan": {
-        "id": 2,
+        "id": 21,
         "slug": "content-builder",
         "name": "Content Builder"
       }
@@ -210,7 +210,7 @@
       "name": "Store Management",
       "area": "store",
       "unlock_plan": {
-        "id": 11,
+        "id": 22,
         "slug": "store-owner",
         "name": "Store Owner"
       }
@@ -220,7 +220,7 @@
       "name": "Sales Management",
       "area": "store",
       "unlock_plan": {
-        "id": 11,
+        "id": 22,
         "slug": "store-owner",
         "name": "Store Owner"
       }
@@ -230,7 +230,7 @@
       "name": "Remote Projects",
       "area": "projects",
       "unlock_plan": {
-        "id": 12,
+        "id": 23,
         "slug": "social-connector",
         "name": "Social Connector"
       }
@@ -240,7 +240,7 @@
       "name": "Social Profiles",
       "area": "social",
       "unlock_plan": {
-        "id": 12,
+        "id": 23,
         "slug": "social-connector",
         "name": "Social Connector"
       }
@@ -250,7 +250,7 @@
       "name": "Membership Management",
       "area": "social",
       "unlock_plan": {
-        "id": 12,
+        "id": 23,
         "slug": "social-connector",
         "name": "Social Connector"
       }
@@ -260,7 +260,7 @@
       "name": "Member Rewards",
       "area": "reward",
       "unlock_plan": {
-        "id": 12,
+        "id": 23,
         "slug": "social-connector",
         "name": "Social Connector"
       }
@@ -269,5 +269,5 @@
   "current_plan_slug": "connected",
   "plan_source": "connected",
   "cache_seconds": 86400,
-  "rev": "389b53a870edb774f9336d7e1246f1e78a62e81a"
+  "rev": "c66e8ff7a0facb62e6fe920d9a64595e51219f77"
 }

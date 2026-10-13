@@ -35,7 +35,7 @@
     ]
   },
   "dashboard_plan": {
-    "id": 87,
+    "id": 20,
     "name": "Connected",
     "slug": "connected",
     "description": "",
@@ -73,12 +73,12 @@
   },
   "last_upgrade": {
     "order_status": "processing",
-    "plan_id": 11,
+    "plan_id": 22,
     "created": "2026-10-12 21:30:00"
   },
   "checkout_allowed_plan_ids": [
-    2,
-    11,
-    12
+    21,
+    22,
+    23
   ]
 }

@@ -44,7 +44,7 @@
         "area": "projects",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -55,7 +55,7 @@
         "area": "social",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -66,7 +66,7 @@
         "area": "social",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -77,7 +77,7 @@
         "area": "reward",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -85,5 +85,5 @@
     ]
   },
   "cache_seconds": 120,
-  "rev": "12ec158dad4adeb3e051c7158e642b78d8949b06"
+  "rev": "d2911883c288b0385c55320368afadc211fac63b"
 }

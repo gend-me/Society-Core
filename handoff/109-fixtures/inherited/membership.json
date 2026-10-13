@@ -35,7 +35,7 @@
     ]
   },
   "dashboard_plan": {
-    "id": 12,
+    "id": 23,
     "name": "Social Connector",
     "slug": "social-connector",
     "description": "",
@@ -70,7 +70,7 @@
     "group_id": 4101,
     "group_name": "GS109 Business Group",
     "membership_id": 9102,
-    "plan_id": 12,
+    "plan_id": 23,
     "plan_slug": "social-connector",
     "plan_name": "Social Connector"
   },

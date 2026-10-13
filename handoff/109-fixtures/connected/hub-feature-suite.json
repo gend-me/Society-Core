@@ -9,7 +9,7 @@
         "area": "app",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 2,
+          "id": 21,
           "slug": "content-builder",
           "name": "Content Builder"
         }
@@ -20,7 +20,7 @@
         "area": "write",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 2,
+          "id": 21,
           "slug": "content-builder",
           "name": "Content Builder"
         }
@@ -31,7 +31,7 @@
         "area": "write",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 2,
+          "id": 21,
           "slug": "content-builder",
           "name": "Content Builder"
         }
@@ -42,7 +42,7 @@
         "area": "store",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 11,
+          "id": 22,
           "slug": "store-owner",
           "name": "Store Owner"
         }
@@ -53,7 +53,7 @@
         "area": "store",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 11,
+          "id": 22,
           "slug": "store-owner",
           "name": "Store Owner"
         }
@@ -64,7 +64,7 @@
         "area": "projects",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -75,7 +75,7 @@
         "area": "social",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -86,7 +86,7 @@
         "area": "social",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -97,7 +97,7 @@
         "area": "reward",
         "status": "upgrade_required",
         "unlock_plan": {
-          "id": 12,
+          "id": 23,
           "slug": "social-connector",
           "name": "Social Connector"
         }
@@ -105,5 +105,5 @@
     ]
   },
   "cache_seconds": 120,
-  "rev": "bf2af13f8d49ecda50c3a98414c90ae606d27b73"
+  "rev": "16ad9ffd720cf8f59d4c69ccc333a53894d144a6"
 }

@@ -1,5 +1,5 @@
 {
-  "plan_id": 11,
+  "plan_id": 22,
   "plan_slug": "store-owner",
   "plan_name": "Store Owner",
   "allowed_areas": [
@@ -41,7 +41,7 @@
       "delivery": "hub_embed",
       "state": "upgrade",
       "unlock_plan": {
-        "id": 12,
+        "id": 23,
         "slug": "social-connector",
         "name": "Social Connector"
       },
@@ -115,5 +115,5 @@
       ]
     }
   ],
-  "rev": "b0a02290b95d7066604b58fc9a2279c85da19c1c"
+  "rev": "a26476dd71400f0703820d456afa2a333c6edb2e"
 }

@@ -1,5 +1,5 @@
 {
-  "plan_id": 87,
+  "plan_id": 20,
   "plan_slug": "connected",
   "plan_name": "Connected",
   "allowed_areas": [],
@@ -37,7 +37,7 @@
       "delivery": "hub_embed",
       "state": "upgrade",
       "unlock_plan": {
-        "id": 12,
+        "id": 23,
         "slug": "social-connector",
         "name": "Social Connector"
       },
@@ -111,5 +111,5 @@
       ]
     }
   ],
-  "rev": "944f0aa8f99b7579d0bdb4b2571cc59fd5f43d65"
+  "rev": "e283ad978f1846c418c41df4e03c5724c3f35bf0"
 }

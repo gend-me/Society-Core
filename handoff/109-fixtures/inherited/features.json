@@ -1,5 +1,5 @@
 {
-  "plan_id": 12,
+  "plan_id": 23,
   "plan_slug": "social-connector",
   "plan_name": "Social Connector",
   "allowed_areas": [
@@ -17,7 +17,7 @@
     "group_id": 4101,
     "group_name": "GS109 Business Group",
     "membership_id": 9102,
-    "plan_id": 12,
+    "plan_id": 23,
     "plan_slug": "social-connector",
     "plan_name": "Social Connector"
   },
@@ -120,5 +120,5 @@
       ]
     }
   ],
-  "rev": "ac0569819ff169f6d8739347322d146231053c38"
+  "rev": "cdfe374ebb478bc9719d55b7ccf22afcc8c9d6f4"
 }
