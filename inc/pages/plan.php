@@ -438,12 +438,13 @@ if ( ! function_exists( 'gend_society_plan_render_compare' ) ) {
 		foreach ( $tiers as $t ) {
 			$cls = 'gs-plan-compare__tier';
 			$tag = '';
-			if ( ! empty( $t['is_current'] ) ) {
-				$cls .= ' is-current';
-				$tag  = __( 'Current plan', 'gend-society' );
-			} elseif ( ! empty( $t['is_inherited'] ) ) {
+			// A plan the group holds is also this site's effective plan: label it as inherited.
+			if ( ! empty( $t['is_inherited'] ) ) {
 				$cls .= ' is-inherited';
 				$tag  = __( 'Inherited from your group', 'gend-society' );
+			} elseif ( ! empty( $t['is_current'] ) ) {
+				$cls .= ' is-current';
+				$tag  = __( 'Current plan', 'gend-society' );
 			}
 			$h .= '<th scope="col" class="' . esc_attr( $cls ) . '" data-gs-plan-tier="' . esc_attr( (string) $t['slug'] ) . '">';
 			$h .= '<span class="gs-plan-compare__name">' . esc_html( (string) $t['name'] ) . '</span>';
@@ -462,10 +463,10 @@ if ( ! function_exists( 'gend_society_plan_render_compare' ) ) {
 			foreach ( $tiers as $t ) {
 				$cell = $vm['matrix'][ (string) $t['slug'] ][ (string) $slug ] ?? 'no';
 				$cls  = 'gs-plan-compare__cell ' . ( 'included' === $cell ? 'is-included' : 'is-no' );
-				if ( ! empty( $t['is_current'] ) ) {
-					$cls .= ' is-current';
-				} elseif ( ! empty( $t['is_inherited'] ) ) {
+				if ( ! empty( $t['is_inherited'] ) ) {
 					$cls .= ' is-inherited';
+				} elseif ( ! empty( $t['is_current'] ) ) {
+					$cls .= ' is-current';
 				}
 				$h .= '<td class="' . esc_attr( $cls ) . '" data-gs-plan-cell="' . esc_attr( 'included' === $cell ? 'included' : 'no' ) . '">';
 				$h .= 'included' === $cell
@@ -484,10 +485,10 @@ if ( ! function_exists( 'gend_society_plan_render_compare' ) ) {
 				$h .= '<a class="button button-primary" href="' . esc_url( (string) $t['launcher_url'] ) . '" target="_blank" rel="opener" data-gs-plan-checkout="' . esc_attr( (string) (int) $t['id'] ) . '">';
 				/* translators: %s: plan name. */
 				$h .= esc_html( sprintf( __( 'Choose %s', 'gend-society' ), (string) $t['name'] ) ) . '</a>';
-			} elseif ( ! empty( $t['is_current'] ) ) {
-				$h .= '<span class="gs-plan-compare__tag">' . esc_html__( 'Current plan', 'gend-society' ) . '</span>';
 			} elseif ( ! empty( $t['is_inherited'] ) ) {
 				$h .= '<span class="gs-plan-compare__tag">' . esc_html__( 'Inherited', 'gend-society' ) . '</span>';
+			} elseif ( ! empty( $t['is_current'] ) ) {
+				$h .= '<span class="gs-plan-compare__tag">' . esc_html__( 'Current plan', 'gend-society' ) . '</span>';
 			}
 			$h .= '</td>';
 		}

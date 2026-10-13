@@ -1,0 +1,122 @@
+<?php
+/**
+ * Phase 109 plugin battery: helpers for the plan 109-06 sections (card, compare, page-assets, consent).
+ *
+ * Builds on _planaccess.php (pairing with the fixture hub, request capture, loopback requests with a real
+ * session). Rendered HTML is inspected with DOMXPath, never with regular expressions on markup.
+ *
+ * @package gend-society
+ */
+
+defined( 'ABSPATH' ) || exit;
+require_once __DIR__ . '/_planaccess.php';
+
+/** Require inc/pages/plan.php when this process did not load it (it is loaded at boot on standalone). */
+function gs109pl_require_page() {
+	$p = GEND_SOCIETY_DIR . 'inc/pages/plan.php';
+	if ( ! function_exists( 'gend_society_plan_fragments' ) && is_readable( $p ) ) {
+		require_once $p;
+	}
+	return function_exists( 'gend_society_plan_fragments' ) && function_exists( 'gend_society_plan_page_render' );
+}
+
+/** Pair with a fixture scenario, load plan-access + the page, start from empty caches, act as the admin. */
+function gs109pl_start( $scenario = 'connected' ) {
+	gs109p_setup();
+	$fx = gs109p_pair( $scenario );
+	if ( ! $fx ) {
+		return array();
+	}
+	if ( ! gs109_assert( gs109pl_require_page(), 'page-loaded', 'inc/pages/plan.php loaded (standalone)' ) ) {
+		return array();
+	}
+	wp_set_current_user( gs109p_admin_id() );
+	return $fx;
+}
+
+/** Switch scenario, drop caches, return a fresh view-model. */
+function gs109pl_vm( $scenario ) {
+	gs109_fixture_scenario( $scenario );
+	gs109p_clear_caches();
+	return gend_society_plan_view_model( true );
+}
+
+/** DOMXPath over an HTML fragment or page (UTF-8). */
+function gs109pl_xp( $html ) {
+	$doc = new DOMDocument();
+	$old = libxml_use_internal_errors( true );
+	$doc->loadHTML( '<?xml encoding="UTF-8"?><html><body>' . $html . '</body></html>', LIBXML_NOERROR | LIBXML_NOWARNING );
+	libxml_clear_errors();
+	libxml_use_internal_errors( $old );
+	return new DOMXPath( $doc );
+}
+
+/** DOMXPath over a full HTML page. */
+function gs109pl_xp_page( $html ) {
+	$doc = new DOMDocument();
+	$old = libxml_use_internal_errors( true );
+	$doc->loadHTML( '<?xml encoding="UTF-8"?>' . $html, LIBXML_NOERROR | LIBXML_NOWARNING );
+	libxml_clear_errors();
+	libxml_use_internal_errors( $old );
+	return new DOMXPath( $doc );
+}
+
+/** Whitespace-normalised text of a node (or of the first node a query matches). */
+function gs109pl_text( DOMXPath $xp, $query ) {
+	$n = $xp->query( $query );
+	if ( ! $n || ! $n->length ) {
+		return null;
+	}
+	return trim( preg_replace( '/\s+/u', ' ', html_entity_decode( $n->item( 0 )->textContent, ENT_QUOTES, 'UTF-8' ) ) );
+}
+
+/** Attribute values of every node a query matches. */
+function gs109pl_attrs( DOMXPath $xp, $query, $attr ) {
+	$out = array();
+	$n   = $xp->query( $query );
+	foreach ( $n ? $n : array() as $el ) {
+		$out[] = (string) $el->getAttribute( $attr );
+	}
+	return $out;
+}
+
+/** Count of nodes a query matches. */
+function gs109pl_count( DOMXPath $xp, $query ) {
+	$n = $xp->query( $query );
+	return $n ? $n->length : 0;
+}
+
+/** Date as the card prints it (site date format). */
+function gs109pl_date( $ymd ) {
+	return date_i18n( (string) get_option( 'date_format', 'F j, Y' ), strtotime( $ymd ) );
+}
+
+/** Area slugs of one Feature Access group (included | upgrade | after_migration). */
+function gs109pl_area_group( DOMXPath $xp, $state ) {
+	return gs109pl_attrs( $xp, '//ul[@data-gs-plan-group="' . $state . '"]/li', 'data-gs-plan-area' );
+}
+
+/** Choose buttons: plan id => href. */
+function gs109pl_choose( DOMXPath $xp ) {
+	$out = array();
+	foreach ( $xp->query( '//a[@data-gs-plan-checkout]' ) as $a ) {
+		$out[ (int) $a->getAttribute( 'data-gs-plan-checkout' ) ] = array(
+			'href'   => (string) $a->getAttribute( 'href' ),
+			'target' => (string) $a->getAttribute( 'target' ),
+			'rel'    => (string) $a->getAttribute( 'rel' ),
+			'text'   => trim( preg_replace( '/\s+/u', ' ', $a->textContent ) ),
+		);
+	}
+	ksort( $out );
+	return $out;
+}
+
+/** Plan id and nonce action of a launcher URL ('' when it is not the admin-post launcher on this site). */
+function gs109pl_launcher_plan( $href ) {
+	$href = html_entity_decode( (string) $href, ENT_QUOTES, 'UTF-8' );
+	if ( 0 !== strpos( $href, admin_url( 'admin-post.php' ) ) ) {
+		return '';
+	}
+	parse_str( (string) wp_parse_url( $href, PHP_URL_QUERY ), $q );
+	return ( $q['action'] ?? '' ) === 'gend_society_plan_checkout' && ! empty( $q['_wpnonce'] ) ? (string) ( $q['plan'] ?? '' ) : '';
+}
