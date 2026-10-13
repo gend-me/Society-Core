@@ -566,7 +566,9 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 		$lu               = isset( $mem['last_upgrade'] ) && is_array( $mem['last_upgrade'] ) ? $mem['last_upgrade'] : null;
 		if ( $lu ) {
 			$status           = preg_replace( '/^wc-/', '', strtolower( (string) ( $lu['order_status'] ?? '' ) ) );
-			$vm['processing'] = in_array( $status, array( 'pending', 'on-hold', 'processing' ), true ) && (int) ( $lu['plan_id'] ?? 0 ) !== $pid;
+			// In flight = not paid yet. The hub swaps the plan in the request that marks the order paid (WC
+			// "processing"), so a paid order for another plan is an older upgrade, not a pending one.
+			$vm['processing'] = in_array( $status, array( 'pending', 'on-hold' ), true ) && (int) ( $lu['plan_id'] ?? 0 ) !== $pid;
 		}
 
 		// --- areas (v2 only)
