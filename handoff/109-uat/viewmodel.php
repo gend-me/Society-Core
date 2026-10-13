@@ -8,7 +8,9 @@
  *   store-owner  next_renewal, paid; groups + feature-suite included; only social-connector purchasable
  *   inherited    source group, inherited {group_name, plan_name, plan_slug}; no tier at or below the
  *                inherited one is checkout_allowed
- *   processing   processing true (plan unchanged, last upgrade order still in flight)
+ *   processing   processing true (plan unchanged, last upgrade order still in flight: pending / on-hold)
+ *                (109-11) a paid upgrade order (WC processing / completed) for another plan is not "in flight": after a
+ *                tier change or a revert to Connected the card must not say "Payment processing"
  *   revoked      state revoked
  *   allowed_areas [] (or a v1 hub without areas[]) never produces an included area
  *
@@ -141,6 +143,18 @@ gs109_assert( true === ( $vm['processing'] ?? null ) && 'connected' === $vm['pla
 gs109p_scenario( 'connected' );
 $vm = gend_society_plan_view_model();
 gs109_assert( false === $vm['processing'], 'vm-not-processing', 'connected (no last_upgrade): processing false' );
+// 109-11: the hub swaps the plan in the same request that marks the order paid, so a 'processing' / 'completed'
+// order is done; seen with another plan id it is an older upgrade (tier change, then a lapse back to Connected).
+$memp = gs109_fixture_json( 'processing', 'membership.json' );
+$paid = array();
+foreach ( array( 'pending' => true, 'on-hold' => true, 'wc-on-hold' => true, 'processing' => false, 'completed' => false, 'failed' => false, 'cancelled' => false ) as $st => $want ) {
+	$memp['last_upgrade']['order_status'] = $st;
+	$o2 = gs109p_inject( 'membership', 200, $memp );
+	$vm = gend_society_plan_view_model( true );
+	$o2();
+	$paid[ $st ] = $vm['processing'];
+}
+gs109_assert_eq( array( 'pending' => true, 'on-hold' => true, 'wc-on-hold' => true, 'processing' => false, 'completed' => false, 'failed' => false, 'cancelled' => false ), $paid, 'vm-processing-statuses', 'only an unpaid upgrade order (pending / on-hold) is "in flight"; a paid one for another plan is not' );
 
 // --------------------------------------------------------------------------------------------------- revoked
 gs109p_scenario( 'revoked' );
