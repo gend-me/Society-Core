@@ -555,6 +555,12 @@ return array(
 			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, checkout launcher. Standalone, connected only.',
 		),
 		array(
+			'file'  => 'inc/hub-embed.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone', 'paired' ),
+			'note'  => 'Phase 109: GenD > Groups / Feature Suite / Projects rendered locally from hub JSON (no iframe, local assets). Standalone, connected only; after plan-access.php.',
+		),
+		array(
 			'file'  => 'inc/support-access.php',
 			'tier'  => 'customer',
 			'needs' => array(),

@@ -203,3 +203,14 @@
 .gend-society-plan .gs-plan-compare__after li {
 	margin: 4px 0;
 }
+
+/* Standalone upgrade page / hub-embed upgrade states (inc/pages/feature-upgrade.php, 109-08). */
+
+.gend-society-plan .gs-up-standalone .gs-up-state {
+	font-size: 15px;
+	font-weight: 600;
+}
+
+.gend-society-plan .gs-up-standalone .gs-up-actions .button {
+	margin: 0 6px 6px 0;
+}

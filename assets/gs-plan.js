@@ -126,7 +126,12 @@
 		xhr.onerror = function () {
 			done(false);
 		};
-		xhr.send('action=gend_society_plan_refresh&nonce=' + encodeURIComponent(cfg.nonce || ''));
+		var body = 'action=gend_society_plan_refresh&nonce=' + encodeURIComponent(cfg.nonce || '');
+		// Upgrade and hub pages (109-08) ask for their own fragment too.
+		if (cfg.refreshView) {
+			body += '&gs_view=' + encodeURIComponent(cfg.refreshView) + '&gs_area=' + encodeURIComponent(cfg.refreshArea || '');
+		}
+		xhr.send(body);
 	}
 
 	function finished() {

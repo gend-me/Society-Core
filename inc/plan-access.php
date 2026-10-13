@@ -170,7 +170,8 @@ if ( ! function_exists( 'gend_society_plan_hub_get' ) ) {
 	 * @param bool   $force  Skip the cache and send no If-None-Match.
 	 * @return array{state:string,payload:?array,status:int,source:string}
 	 *               state: ok | not_connected | revoked | unreachable;
-	 *               source: cache | fetch | 304 | stale | none.
+	 *               source: cache | fetch | 304 | stale | none;
+	 *               + 'error' (decoded body or null) on any other non-200 answer.
 	 */
 	function gend_society_plan_hub_get( string $route, string $option, bool $force = false ): array {
 		$out = array(
@@ -242,6 +243,9 @@ if ( ! function_exists( 'gend_society_plan_hub_get' ) ) {
 		if ( 200 !== $code ) {
 			$out['state']  = 'unreachable';
 			$out['source'] = $stale;
+			// The decoded error body (e.g. a hub area's 402 {code, state, unlock_plan}); never cached.
+			$err          = json_decode( trim( (string) wp_remote_retrieve_body( $response ) ), true );
+			$out['error'] = is_array( $err ) ? $err : null;
 			return $out;
 		}
 

@@ -86,6 +86,45 @@ if ( ! function_exists( 'gend_society_plan_page_origin' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_plan_assets_enqueue' ) ) {
+	/**
+	 * Enqueue gs-plan.css and (when paired) gs-plan.js with its wp_localize_script config. Shared by this page,
+	 * the standalone upgrade page and the hub-embed pages (109-08).
+	 *
+	 * @param string $view Refresh context sent with the Refresh AJAX ('' on this page, 'upgrade' or 'hub').
+	 * @param string $area Area slug for that context.
+	 */
+	function gend_society_plan_assets_enqueue( string $view = '', string $area = '' ): void {
+		$dir = defined( 'GEND_SOCIETY_DIR' ) ? GEND_SOCIETY_DIR : plugin_dir_path( dirname( __DIR__ ) . '/gend-society.php' );
+		$url = defined( 'GEND_SOCIETY_URL' ) ? GEND_SOCIETY_URL : plugin_dir_url( dirname( __DIR__ ) . '/gend-society.php' );
+		$ver = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '1';
+		$css = 'assets/gs-plan.css';
+		$js  = 'assets/gs-plan.js';
+		wp_enqueue_style( 'gend-society-plan', $url . $css, array(), file_exists( $dir . $css ) ? $ver . '.' . filemtime( $dir . $css ) : $ver );
+		if ( ! gend_society_plan_page_available() ) {
+			return;
+		}
+		wp_enqueue_script( 'gend-society-plan', $url . $js, array(), file_exists( $dir . $js ) ? $ver . '.' . filemtime( $dir . $js ) : $ver, true );
+		$cfg = array(
+			'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
+			'nonce'     => wp_create_nonce( 'gs_plan' ),
+			'hubOrigin' => gend_society_plan_page_origin(),
+			'installId' => (string) get_option( 'gend_society_install_id', '' ),
+			'i18n'      => array(
+				'refreshing' => __( 'Checking your plan with gend.me…', 'gend-society' ),
+				'refreshed'  => __( 'Plan details updated.', 'gend-society' ),
+				'failed'     => __( 'Could not refresh the plan details. Try again in a moment.', 'gend-society' ),
+				'waiting'    => __( 'Finish the checkout in the window that opened. This page updates when it closes.', 'gend-society' ),
+			),
+		);
+		if ( '' !== $view ) {
+			$cfg['refreshView'] = $view;
+			$cfg['refreshArea'] = $area;
+		}
+		wp_localize_script( 'gend-society-plan', 'gendSocietyPlan', $cfg );
+	}
+}
+
 if ( ! function_exists( 'gend_society_plan_page_enqueue' ) ) {
 	/**
 	 * Local stylesheet + script on this page only. Configuration goes through wp_localize_script.
@@ -97,32 +136,7 @@ if ( ! function_exists( 'gend_society_plan_page_enqueue' ) ) {
 		if ( '' === $page_hook || $hook_suffix !== $page_hook ) {
 			return;
 		}
-		$dir = defined( 'GEND_SOCIETY_DIR' ) ? GEND_SOCIETY_DIR : plugin_dir_path( dirname( __DIR__ ) . '/gend-society.php' );
-		$url = defined( 'GEND_SOCIETY_URL' ) ? GEND_SOCIETY_URL : plugin_dir_url( dirname( __DIR__ ) . '/gend-society.php' );
-		$ver = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '1';
-		$css = 'assets/gs-plan.css';
-		$js  = 'assets/gs-plan.js';
-		wp_enqueue_style( 'gend-society-plan', $url . $css, array(), file_exists( $dir . $css ) ? $ver . '.' . filemtime( $dir . $css ) : $ver );
-		if ( ! gend_society_plan_page_available() ) {
-			return;
-		}
-		wp_enqueue_script( 'gend-society-plan', $url . $js, array(), file_exists( $dir . $js ) ? $ver . '.' . filemtime( $dir . $js ) : $ver, true );
-		wp_localize_script(
-			'gend-society-plan',
-			'gendSocietyPlan',
-			array(
-				'ajaxUrl'   => admin_url( 'admin-ajax.php' ),
-				'nonce'     => wp_create_nonce( 'gs_plan' ),
-				'hubOrigin' => gend_society_plan_page_origin(),
-				'installId' => (string) get_option( 'gend_society_install_id', '' ),
-				'i18n'      => array(
-					'refreshing' => __( 'Checking your plan with gend.me…', 'gend-society' ),
-					'refreshed'  => __( 'Plan details updated.', 'gend-society' ),
-					'failed'     => __( 'Could not refresh the plan details. Try again in a moment.', 'gend-society' ),
-					'waiting'    => __( 'Finish the checkout in the window that opened. This page updates when it closes.', 'gend-society' ),
-				),
-			)
-		);
+		gend_society_plan_assets_enqueue();
 	}
 }
 add_action( 'admin_enqueue_scripts', 'gend_society_plan_page_enqueue' );
