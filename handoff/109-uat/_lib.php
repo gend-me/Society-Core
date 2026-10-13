@@ -173,6 +173,9 @@ function gs109_readonly_install() {
 function gs109_readonly_verdict() {
 	$w = array_values( array_unique( $GLOBALS['gs109_uat']['writes'] ) );
 	if ( $w ) {
+		foreach ( array_slice( $w, 5, 25 ) as $more ) {
+			gs109_info( 'write attempted (more): ' . $more );
+		}
 		return gs109_fail( 'write', 'attempted ' . count( $w ) . ': ' . implode( ' | ', array_slice( $w, 0, 5 ) ) );
 	}
 	$GLOBALS['gs109_uat']['pass']++;

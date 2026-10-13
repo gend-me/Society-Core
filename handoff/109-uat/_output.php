@@ -66,6 +66,25 @@ function gs109o_load_old( $baseline ) {
 	return $loaded[ $baseline ] = ( '' !== $first && function_exists( $first ) );
 }
 
+/**
+ * Serve $payload as gend_society_features_cache (fresh) through pre_option filters: no option write, so the
+ * renders also run under GS109_READONLY. Returns a remover.
+ */
+function gs109o_features_inject( array $payload ) {
+	$f1 = function () use ( $payload ) {
+		return $payload;
+	};
+	$f2 = function () {
+		return time() + 600;
+	};
+	add_filter( 'pre_option_gend_society_features_cache', $f1, PHP_INT_MAX );
+	add_filter( 'pre_option_gend_society_features_cache_expires', $f2, PHP_INT_MAX );
+	return function () use ( $f1, $f2 ) {
+		remove_filter( 'pre_option_gend_society_features_cache', $f1, PHP_INT_MAX );
+		remove_filter( 'pre_option_gend_society_features_cache_expires', $f2, PHP_INT_MAX );
+	};
+}
+
 /** Output of a callable (echo + return value). */
 function gs109o_capture( callable $fn, array $args = array() ) {
 	ob_start();
@@ -198,12 +217,12 @@ function gs109o_upgrade_parity() {
 		'iframes_new'  => 0,
 		'listener_new' => 0,
 		'sample'       => '',
+		'md5'          => array(),
 	);
 	if ( ! gs109o_load_old( 'feature-upgrade-1.4.0.php.txt' ) || ! function_exists( 'gend_society_render_feature_upgrade_page' ) ) {
 		$res['diff'][] = 'could not load both versions';
 		return $res;
 	}
-	gs109_snapshot_options();
 	add_filter(
 		'pre_http_request',
 		function ( $pre, $args, $url ) {
@@ -215,14 +234,15 @@ function gs109o_upgrade_parity() {
 	wp_set_current_user( gs109p_admin_id() );
 	foreach ( gs109o_upgrade_inputs() as $in ) {
 		list( $label, $get, $payload ) = $in;
-		update_option( 'gend_society_features_cache', $payload, false );
-		update_option( 'gend_society_features_cache_expires', time() + 600, false );
+		$off   = gs109o_features_inject( $payload );
 		$learn = function_exists( 'gend_society_features_resolve_learn_more_url' ) ? gend_society_features_resolve_learn_more_url( (string) ( $get['required_child'] ?? '' ), (string) ( $get['tab'] ?? '' ), $payload['learn_more_pages'] ) : '';
 		$_GET  = $get;
 		$new   = gs109o_capture( 'gend_society_render_feature_upgrade_page' );
 		$_GET  = $get;
 		$old   = gs109o_capture( 'gs109o_gend_society_render_feature_upgrade_page' );
 		$_GET  = array();
+		$off();
+		$res['md5'][ $label ] = md5( $new );
 		list( $exp, $counts ) = gs109o_expect_upgrade_page( $old, $learn );
 		++$res['cases'];
 		$res['D12']      += $counts['D12'];

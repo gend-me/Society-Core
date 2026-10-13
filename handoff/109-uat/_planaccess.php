@@ -456,7 +456,7 @@ function gs109p_admin_screen( $page, array $extra = array() ) {
  * Admin slugs to try: every gated prefix / granular / hub slug the gate knows, the plugin's own pages, the
  * pages registered when admin_menu runs on this install, and core screens.
  */
-function gs109p_admin_slugs() {
+function gs109p_admin_slugs( $with_registered = true ) {
 	$slugs = array(
 		'index.php', 'plugins.php', 'update-core.php', 'options-general.php', 'users.php', 'themes.php', 'profile.php',
 		'edit.php', 'upload.php', 'tools.php', 'site-editor.php', 'post-new.php', 'edit-comments.php', 'nav-menus.php',
@@ -472,7 +472,9 @@ function gs109p_admin_slugs() {
 		}
 		$slugs = array_merge( $slugs, array_keys( gend_society_features_granular_slug_map() ), array_keys( gend_society_features_hub_area_map() ) );
 	}
-	$slugs = array_merge( $slugs, gs109p_registered_pages() );
+	if ( $with_registered ) { // false under GS109_READONLY: admin_menu makes other plugins cache data
+		$slugs = array_merge( $slugs, gs109p_registered_pages() );
+	}
 	return array_values( array_unique( array_filter( array_map( 'strval', $slugs ) ) ) );
 }
 

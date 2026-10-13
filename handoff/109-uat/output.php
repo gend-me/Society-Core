@@ -1,6 +1,9 @@
 <?php
 /**
  * Section output (plan 109-08; D12 + regression guard for 109-10 / 109-14): hub and container output vs 1.4.0.
+ * gs109-readonly: yes  (109-10: every features payload is served through pre_option filters and no options snapshot
+ * is taken, so the section renders and compares only; it prints the md5 of every new render and, with env
+ * GS109_OUTPUT_BASELINE=<md5>, asserts the combined md5 equals it. Usable under GS109_READONLY=1 on live.)
  *
  * hub / container:
  *   - every Phase 109 standalone module is skipped: plan-access.php, pages/plan.php, hub-embed.php (functions,
@@ -57,16 +60,23 @@ $hooks = array(
 	has_action( 'admin_enqueue_scripts', 'gend_society_feature_upgrade_standalone_enqueue' ),
 );
 gs109_assert( array( false, false, false, false ) === $hooks, 'output-hooks-absent', 'no 109 AJAX / admin-post / refresh filter / standalone upgrade enqueue hook', $hooks );
-$pages = gs109p_registered_pages();
-// A CLI admin_menu run that throws (WooCommerce screen helpers are not loaded in CLI) leaves the admin as the
-// current user; the gate comparison below must run logged out, like nolock.
-wp_set_current_user( 0 );
-$found = array_values( array_intersect( array( 'gs-plan', 'gs-hub-groups', 'gs-hub-feature-suite', 'gs-hub-projects' ), $pages ) );
-gs109_assert( ! $found, 'output-pages-absent', 'no Plan & features or hub-embed admin page registered', $found );
+if ( gs109_is_readonly() ) {
+	// admin_menu makes other plugins cache data (set_transient = a cache write on an external object cache).
+	gs109_info( 'read-only: admin page registration not exercised (admin_menu side effects); the 109 page modules are absent (functions + hooks above)' );
+} else {
+	$pages = gs109p_registered_pages();
+	// A CLI admin_menu run that throws (WooCommerce screen helpers are not loaded in CLI) leaves the admin as the
+	// current user; the gate comparison below must run logged out, like nolock.
+	wp_set_current_user( 0 );
+	$found = array_values( array_intersect( array( 'gs-plan', 'gs-hub-groups', 'gs-hub-feature-suite', 'gs-hub-projects' ), $pages ) );
+	gs109_assert( ! $found, 'output-pages-absent', 'no Plan & features or hub-embed admin page registered', $found );
+}
 
 // ── feature-gates decisions == 1.4.0 ────────────────────────────────────────────────────────────────────
 if ( gs109_assert( gs109p_load_140() && function_exists( 'gend_society_features_enforce_redirect' ), 'output-gates-loaded', 'feature-gates 1.4.0 side by side' ) ) {
-	gs109_snapshot_options();
+	if ( ! gs109_is_readonly() ) {
+		gs109_snapshot_options();
+	}
 	add_filter(
 		'pre_http_request',
 		function ( $pre, $args, $url ) {
@@ -82,14 +92,13 @@ if ( gs109_assert( gs109p_load_140() && function_exists( 'gend_society_features_
 		'granular'  => array( 'store.sales_team', 'features.shortcodes' ),
 		'hub-areas' => array( 'groups', 'feature-suite' ),
 	);
-	$slugs     = gs109p_admin_slugs();
+	$slugs     = gs109p_admin_slugs( ! gs109_is_readonly() );
 	wp_set_current_user( 0 );
 	$cases     = 0;
 	$redirects = 0;
 	$diff      = array();
 	foreach ( $inputs as $label => $areas ) {
-		update_option( 'gend_society_features_cache', array( 'plan_slug' => 'gs109-' . $label, 'allowed_areas' => $areas, 'learn_more_pages' => array( 'store.sales_team' => 'http://localhost:8919/learn/' ) ), false );
-		update_option( 'gend_society_features_cache_expires', time() + 600, false );
+		$off = gs109o_features_inject( array( 'plan_slug' => 'gs109-' . $label, 'allowed_areas' => $areas, 'learn_more_pages' => array( 'store.sales_team' => 'http://localhost:8919/learn/' ) ) );
 		foreach ( $slugs as $slug ) {
 			foreach ( array( array(), array( 'tab' => 'payouts' ) ) as $extra ) {
 				$new = gs109p_gate_decision( 'gend_society_features_enforce_redirect', $slug, $extra );
@@ -101,6 +110,7 @@ if ( gs109_assert( gs109p_load_140() && function_exists( 'gend_society_features_
 				}
 			}
 		}
+		$off();
 	}
 	gs109_assert( $redirects > 0 && ! $diff, 'output-gates', 'feature-gates decisions == 1.4.0 (' . $cases . ' cases, ' . $redirects . ' redirects)', implode( ' | ', array_slice( $diff, 0, 3 ) ) );
 }
@@ -111,13 +121,29 @@ gs109_assert( $par['cases'] >= 28 && $par['D12'] > 0 && $par['LISTENER'] === $pa
 gs109_assert( 0 === $par['iframes_new'] && 0 === $par['listener_new'], 'output-upgrade-clean', 'no <iframe>, no gs_membership_changed listener in the upgrade page' );
 
 // ── membership panel byte-identical ─────────────────────────────────────────────────────────────────────
+if ( gs109_is_readonly() ) {
+	gs109_info( 'read-only: membership panel parity not rendered (its hosting / media / projects sections cache data); proven by the normal run on the clone' );
+	$pan = null;
+} else {
 $pan = gs109o_panel_parity();
 gs109_assert( 3 === $pan['cases'] && ! $pan['diff'] && $pan['bytes'] > 1000, 'output-panel', 'membership panel == 1.4.0 (' . $pan['cases'] . ' payloads, ' . $pan['bytes'] . ' bytes; relative "N ago" times normalised)', implode( ' | ', array_slice( $pan['diff'], 0, 3 ) ) );
 // The panel's own frames (server-plan checkout, hosting sections; not the D12 learn-more page) are 1.4.0 output and
 // unchanged by 109; reported for the 109-10 / 109-14 snapshot lists.
 gs109_assert( $pan['iframes_new'] === $pan['iframes_old'], 'output-panel-frames-unchanged', 'membership panel frames unchanged vs 1.4.0 (' . $pan['iframes_new'] . ' pre-existing, out of D12 scope)' );
 gs109_info( 'pre-existing frames in the 1.4.0 membership panel on ' . gs109_mode() . ': ' . $pan['iframes_old'] . ' (dashboard-remote-membership / dashboard-hosting server checkout; see 109-08 deferred items)' );
+}
 
 // ── no iframe in the D12 output (upgrade page, media popup) ────────────────────────────────────────────
 $rendered = (string) $par['sample'] . (string) gend_society_media_storage_panel_inline_js();
 gs109_assert( '' !== (string) $par['sample'] && false === stripos( $rendered, '<iframe' ), 'output-no-iframe', 'no <iframe> in the upgrade page (learn-more case) or the media popup script' );
+
+// -- 109-10: md5 of every new render (read-only comparison against a value captured elsewhere) --------------------
+$md5s = (array) ( $par['md5'] ?? array() );
+ksort( $md5s );
+$md5s['media_js'] = md5( (string) gend_society_media_storage_panel_inline_js() );
+$all              = md5( (string) wp_json_encode( $md5s ) );
+gs109_info( 'render md5s: ' . count( $md5s ) . ' renders, combined ' . $all . ( gs109_is_readonly() ? ' (read-only run)' : '' ) );
+$want = strtolower( trim( (string) getenv( 'GS109_OUTPUT_BASELINE' ) ) );
+if ( '' !== $want ) {
+	gs109_assert_eq( $want, $all, 'output-render-md5-baseline', 'combined render md5 equals GS109_OUTPUT_BASELINE' );
+}
