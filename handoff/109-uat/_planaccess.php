@@ -1,6 +1,7 @@
 <?php
 /**
- * Phase 109 plugin battery: helpers for the plan 109-04 sections (nolock, fetch, refresh, launcher, viewmodel).
+ * Phase 109 plugin battery: helpers for the plan 109-04 sections (nolock, fetch, refresh, viewmodel; the 109-04
+ * launcher section became popup in 109-21).
  *
  * Handlers run in-process: redirects are captured through the wp_redirect filter and wp_die through the
  * wp_die / wp_die_ajax / wp_die_json handlers (all throw GS109P_Stop), so `exit` is never reached.

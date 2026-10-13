@@ -6,7 +6,7 @@
  *   pages        gs-hub-groups / gs-hub-feature-suite / gs-hub-projects registered per the features payload
  *                (hub_embed only; Projects absent when the hub does not offer it); admin_url on included areas
  *   connected    (free, D11) Groups + Feature Suite render the fixture data; Projects shows the upgrade copy
- *                naming Social Connector (402) with the Choose button of 109-06
+ *                naming Social Connector (402) with the "Choose a plan on gend.me" popup button (109-21)
  *   escaping     markup injected into hub strings is printed as text; non-hub image hosts become placeholders
  *   states       402 (hub body names the plan), 409 After migration, 401 Reconnect, 404, unreachable (stale
  *                data + note / no data), store-owner and inherited scenarios
@@ -152,8 +152,7 @@ $h  = $frag( 'projects' );
 $xp = gs109pl_xp( $h );
 gs109_assert_eq( 'upgrade', gs109pl_attrs( $xp, '//div[@id="gs-hub-projects"]', 'data-gs-hub-state' )[0] ?? '', 'embed-projects-402', 'Projects on Connected: hub 402 -> upgrade state' );
 gs109_assert_eq( 'Available with Social Connector', gs109pl_text( $xp, '//*[@data-gs-up-copy="upgrade"]' ), 'embed-projects-copy', 'Projects: "Available with Social Connector"' );
-$ch = gs109pl_choose( $xp );
-gs109_assert( array_keys( $ch ) === array( 23 ) && '23' === gs109pl_launcher_plan( $ch[23]['href'] ) && '_blank' === $ch[23]['target'] && 'opener' === $ch[23]['rel'] && 'Choose Social Connector' === $ch[23]['text'], 'embed-projects-choose', 'Projects: Choose Social Connector on the admin-post launcher (109-06 markup)', $ch );
+gs109_assert( gs109pl_popup_is( gs109pl_popup( $xp ), gs109pl_change_url( 'connected' ), 'Choose a plan on gend.me' ) && array() === gs109pl_choose( $xp ), 'embed-projects-choose', 'Projects: one "Choose a plan on gend.me" button to the Change Plan page (no per-tier Choose, no launcher)', gs109pl_popup( $xp ) );
 gs109_assert( null === gs109p_raw( 'gend_society_hub_area_cache_projects' ), 'embed-projects-nocache', '402: no hub-area cache kept' );
 
 // ── 402 body names the plan; 409; 404; 401 ───────────────────────────────────────────────────────────────
@@ -162,7 +161,7 @@ $off = gs109p_inject( 'hub/groups', 402, array( 'code' => 'upgrade_required', 's
 $xp  = gs109pl_xp( $frag( 'groups' ) );
 $off();
 gs109_assert_eq( 'Available with Store Owner', gs109pl_text( $xp, '//*[@data-gs-up-copy="upgrade"]' ), 'embed-402-body', '402: the copy names the plan from the hub answer (Store Owner)' );
-gs109_assert_eq( array( 22 ), array_keys( gs109pl_choose( $xp ) ), 'embed-402-choose', '402: Choose Store Owner' );
+gs109_assert( gs109pl_popup_is( gs109pl_popup( $xp ), gs109pl_change_url( 'connected' ), 'Choose a plan on gend.me' ) && false !== strpos( (string) gs109pl_text( $xp, '//div[@data-gs-up-area="groups"]' ), 'once this site is on Store Owner' ), 'embed-402-choose', '402: copy names Store Owner, one "Choose a plan on gend.me" button' );
 
 $off = gs109p_inject( 'hub/groups', 409, array( 'code' => 'after_migration', 'state' => 'after_migration' ) );
 $h   = $frag( 'groups' );
@@ -170,7 +169,7 @@ $off();
 $xp  = gs109pl_xp( $h );
 gs109_assert_eq( 'Runs on your gend.me container after migration', gs109pl_text( $xp, '//*[@data-gs-up-copy="after_migration"]' ), 'embed-409-copy', '409: After migration copy' );
 $ob = gs109pl_attrs( $xp, '//a[@data-gs-up-outbound]', 'href' );
-gs109_assert( $ob && 'http://localhost:8919/my-account/memberships/' === $ob[0] && 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout]' ), 'embed-409-link', '409: "See container plans on gend.me" on the hub, no Choose button', $ob );
+gs109_assert( $ob && 'http://localhost:8919/my-account/memberships/' === $ob[0] && 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout or @data-gs-plan-popup]' ), 'embed-409-link', '409: "See container plans on gend.me" on the hub, no plan button', $ob );
 
 $off = gs109p_inject( 'hub/groups', 404, array( 'code' => 'unknown_area' ) );
 $xp  = gs109pl_xp( $frag( 'groups' ) );

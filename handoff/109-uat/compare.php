@@ -7,6 +7,8 @@
  *   - every matrix cell equals the fixture catalogue; one row per area
  *   - "Where it runs": container_only areas read After migration, hub areas On gend.me now
  *   - the After migration list carries every after_migration area of the catalogue with its features
+ *   - read-only (109-21): no Choose row / buttons / links of any kind in the table, one line "Plans are
+ *     changed on gend.me." under it
  *
  * @package gend-society
  */
@@ -81,6 +83,8 @@ $check = function ( $scenario, $label ) {
 		$feat_ok = $feat_ok && $txt === $row['label'] . ': ' . implode( ', ', $row['features'] );
 	}
 	gs109_assert( $feat_ok, $id . '-after-features', "{$label}: After migration rows list the area's features" );
+	gs109_assert( 0 === gs109pl_count( $xp, '//table//a' ) && 0 === gs109pl_count( $xp, '//tfoot' ) && 0 === gs109pl_count( $xp, '//*[@data-gs-plan-checkout or @data-gs-plan-popup]' ) && 0 === gs109pl_count( $xp, '//*[contains(@class,"gs-plan-compare__action")]' ), $id . '-readonly', "{$label}: comparison is read-only (no Choose row, no buttons or links in the table)" );
+	gs109_assert_eq( 'Plans are changed on gend.me.', gs109pl_text( $xp, '//p[@class="gs-plan-compare__note"]' ), $id . '-note', "{$label}: \"Plans are changed on gend.me.\" under the table" );
 	return $xp;
 };
 

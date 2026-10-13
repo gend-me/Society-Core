@@ -12,6 +12,8 @@
  *                (109-11) a paid upgrade order (WC processing / completed) for another plan is not "in flight": after a
  *                tier change or a revert to Connected the card must not say "Payment processing"
  *   revoked      state revoked
+ *   (109-21)     change_plan_url = membership_url + ?ui=embed&plan_only=1&group=dashboard on the hub host; tiers
+ *                carry no launcher_url
  *   allowed_areas [] (or a v1 hub without areas[]) never produces an included area
  *
  * @package gend-society
@@ -33,10 +35,10 @@ if ( ! $fx ) {
 $token = $fx['token'];
 wp_set_current_user( gs109p_admin_id() );
 
-$keys_top  = array( 'state', 'plan', 'source', 'inherited', 'owner_name', 'processing', 'areas', 'tiers', 'matrix', 'after_migration', 'hub_origin', 'install_id', 'fetched_at' );
+$keys_top  = array( 'state', 'plan', 'source', 'inherited', 'owner_name', 'processing', 'areas', 'tiers', 'matrix', 'after_migration', 'change_plan_url', 'hub_origin', 'install_id', 'fetched_at' );
 $keys_plan = array( 'id', 'slug', 'name', 'price_label', 'is_free', 'is_lifetime', 'next_renewal', 'status', 'status_label' );
 $keys_area = array( 'slug', 'label', 'delivery', 'state', 'unlock_plan', 'features', 'admin_url' );
-$keys_tier = array( 'id', 'slug', 'name', 'price_label', 'rank', 'is_current', 'is_inherited', 'checkout_allowed', 'launcher_url' );
+$keys_tier = array( 'id', 'slug', 'name', 'price_label', 'rank', 'is_current', 'is_inherited', 'checkout_allowed' );
 $missing   = function ( array $keys, $arr ) {
 	return is_array( $arr ) ? array_values( array_diff( $keys, array_keys( $arr ) ) ) : $keys;
 };
@@ -98,7 +100,9 @@ $grp = array_values( array_filter( $vm['areas'], function ( $a ) { return 'group
 gs109_assert( $grp && 0 === strpos( $grp[0]['admin_url'], admin_url() ) && null === $grp[0]['unlock_plan'] && array( 'Group overview', 'Members', 'Recent activity' ) === $grp[0]['features'], 'vm-connected-groups', 'groups: local admin_url, no unlock plan, feature list', wp_json_encode( $grp ) );
 gs109_assert_eq( array( 'content-builder', 'store-owner', 'social-connector' ), $allowed( $vm ), 'vm-connected-tiers', 'all three paid tiers checkout_allowed (rank order)' );
 $t21 = $tier( $vm, 'content-builder' );
-gs109_assert( 21 === (int) ( $t21['id'] ?? 0 ) && '$14.99 / month' === ( $t21['price_label'] ?? '' ) && false !== strpos( (string) ( $t21['launcher_url'] ?? '' ), 'action=gend_society_plan_checkout' ) && false !== strpos( (string) $t21['launcher_url'], 'plan=21' ), 'vm-connected-launcher', 'tier rows carry price and the launcher URL', wp_json_encode( $t21 ) );
+gs109_assert( 21 === (int) ( $t21['id'] ?? 0 ) && '$14.99 / month' === ( $t21['price_label'] ?? '' ) && ! array_key_exists( 'launcher_url', $t21 ), 'vm-connected-tier-row', 'tier rows carry the price and no launcher_url (109-21)', wp_json_encode( $t21 ) );
+$mem_c = gs109_fixture_json( 'connected', 'membership.json' );
+gs109_assert( (string) $mem_c['membership_url'] . '?ui=embed&plan_only=1&group=dashboard' === ( $vm['change_plan_url'] ?? '' ), 'vm-connected-change-url', 'change_plan_url = membership_url + ?ui=embed&plan_only=1&group=dashboard', (string) ( $vm['change_plan_url'] ?? '' ) );
 gs109_assert( 'included' === ( $vm['matrix']['content-builder']['groups'] ?? '' ) && 'no' === ( $vm['matrix']['store-owner']['projects'] ?? '' ) && 'included' === ( $vm['matrix']['social-connector']['projects'] ?? '' ), 'vm-connected-matrix', 'matrix tier x area included|no' );
 gs109_assert( 6 === count( (array) ( $vm['after_migration'] ?? array() ) ) && 'app' === ( $vm['after_migration'][0]['area'] ?? '' ) && array( 'Wireframe Generator (Leo)' ) === ( $vm['after_migration'][0]['features'] ?? null ), 'vm-connected-after-list', 'after_migration list from the catalogue (6 areas with features)' );
 gs109_assert( 'http://localhost:8919' === ( $vm['hub_origin'] ?? '' ) && get_option( 'gend_society_install_id' ) === ( $vm['install_id'] ?? '' ) && (int) ( $vm['fetched_at'] ?? 0 ) > time() - 60, 'vm-connected-origin', 'hub_origin, install_id, fetched_at', wp_json_encode( array( $vm['hub_origin'] ?? null, $vm['fetched_at'] ?? null ) ) );
@@ -111,7 +115,8 @@ gs109_assert( 'store-owner' === ( $vm['plan']['slug'] ?? '' ) && false === $vm['
 gs109_assert( 'site' === $vm['source'] && null === $vm['inherited'], 'vm-store-owner-source', 'source site' );
 gs109_assert_eq( array( 'feature-suite', 'groups' ), $by_state( $vm, 'included' ), 'vm-store-owner-included', 'groups + feature-suite included' );
 gs109_assert_eq( array( 'social-connector' ), $allowed( $vm ), 'vm-store-owner-tiers', 'only social-connector purchasable' );
-gs109_assert( ! empty( $tier( $vm, 'store-owner' )['is_current'] ) && '' === $tier( $vm, 'store-owner' )['launcher_url'], 'vm-store-owner-current', 'store-owner tier is_current, no launcher URL' );
+gs109_assert( ! empty( $tier( $vm, 'store-owner' )['is_current'] ) && empty( $tier( $vm, 'store-owner' )['checkout_allowed'] ), 'vm-store-owner-current', 'store-owner tier is_current, not checkout_allowed' );
+gs109_assert_eq( gs109_fixture_json( 'store-owner', 'membership.json' )['membership_url'] . '?ui=embed&plan_only=1&group=dashboard', $vm['change_plan_url'] ?? '', 'vm-store-owner-change-url', 'store-owner: change_plan_url on the hub' );
 
 // ------------------------------------------------------------------------------------------------ inherited
 gs109p_scenario( 'inherited' );

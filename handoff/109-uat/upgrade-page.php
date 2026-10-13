@@ -3,8 +3,9 @@
  * Section upgrade-page (plan 109-08; PLAN-05, D12): the one upgrade page, admin.php?page=gs-feature-upgrade.
  *
  * standalone (fixture hub):
- *   - copy per state from the view-model: Upgrade "Available with <plan>" + the 109-06 Choose button (popup
- *     launcher), After migration "Runs on your gend.me container after migration" + an outbound link to the hub
+ *   - copy per state from the view-model: Upgrade "Available with <plan>" + one "Choose a plan on gend.me"
+ *     button = gend.me's Change Plan page in a popup (109-21; no per-tier Choose, no launcher), After
+ *     migration "Runs on your gend.me container after migration" + an outbound link to the hub
  *     (new tab, noopener, no Choose), Included links to the hub page; the Upgrade and After migration strings
  *     differ and equal the Plan & features card copy for the same areas (109-06 copy list)
  *   - revoked -> Reconnect; inherited -> Projects included; unknown area copy
@@ -59,8 +60,8 @@ $up = gs109pl_text( $xp, '//*[@data-gs-up-copy="upgrade"]' );
 gs109_assert_eq( 'upgrade', gs109pl_attrs( $xp, '//div[@data-gs-up-area="projects"]', 'data-gs-up-state' )[0] ?? '', 'upgrade-projects-state', 'projects: Upgrade state' );
 gs109_assert_eq( 'Available with Social Connector', $up, 'upgrade-projects-copy', 'projects: "Available with Social Connector"' );
 gs109_assert_eq( gs109pl_text( $card, '//li[@data-gs-plan-area="projects"]/a[@class="gs-plan-area__state"]' ), $up, 'upgrade-copy-matches-card', 'Upgrade copy == the Plan & features card copy (109-06 list)' );
-$ch = gs109pl_choose( $xp );
-gs109_assert( array_keys( $ch ) === array( 23 ) && '23' === gs109pl_launcher_plan( $ch[23]['href'] ) && '_blank' === $ch[23]['target'] && 'opener' === $ch[23]['rel'] && 'Choose Social Connector' === $ch[23]['text'], 'upgrade-projects-choose', 'Choose Social Connector: admin-post launcher, target _blank, rel opener (gs-plan.js popup)', $ch );
+gs109_assert( gs109pl_popup_is( gs109pl_popup( $xp ), gs109pl_change_url( 'connected' ), 'Choose a plan on gend.me' ) && array() === gs109pl_choose( $xp ), 'upgrade-projects-choose', 'one "Choose a plan on gend.me" button: the Change Plan page, target _blank, rel noopener (gs-plan.js popup); no per-tier Choose', gs109pl_popup( $xp ) );
+gs109_assert( false !== strpos( (string) gs109pl_text( $xp, '//div[@data-gs-up-area="projects"]' ), 'once this site is on Social Connector' ), 'upgrade-projects-names-plan', 'the copy still names the unlocking plan (Social Connector)' );
 gs109_assert( 1 === gs109pl_count( $xp, '//button[@data-gs-plan-refresh]' ), 'upgrade-refresh-button', 'Refresh button (gs-plan.js)' );
 
 $xp = gs109pl_xp( $frag( 'write', $vm ) );
@@ -70,7 +71,7 @@ gs109_assert_eq( gs109pl_text( $card, '//li[@data-gs-plan-area="write"]/span[@cl
 gs109_assert( $up !== $am, 'upgrade-copy-differs', 'Upgrade and After migration copy differ' );
 $ob = $xp->query( '//a[@data-gs-up-outbound]' );
 gs109_assert( 1 === $ob->length && 'http://localhost:8919/my-account/memberships/' === $ob->item( 0 )->getAttribute( 'href' ) && '_blank' === $ob->item( 0 )->getAttribute( 'target' ) && 'noopener' === $ob->item( 0 )->getAttribute( 'rel' ) && 'See container plans on gend.me' === trim( $ob->item( 0 )->textContent ), 'upgrade-write-outbound', 'After migration: "See container plans on gend.me" on the hub, new tab, noopener' );
-gs109_assert( 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout]' ), 'upgrade-write-nochoose', 'After migration: no Choose button (no popup)' );
+gs109_assert( 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout or @data-gs-plan-popup]' ), 'upgrade-write-nochoose', 'After migration: no Change Plan button (no popup)' );
 gs109_assert_eq( 'Content', gs109pl_text( $xp, '//div[@data-gs-up-area="write"]/h2' ), 'upgrade-write-label', 'area label from the hub (Content)' );
 
 $xp = gs109pl_xp( $frag( 'groups', $vm ) );
@@ -82,10 +83,10 @@ gs109_assert_eq( 'unknown', gs109pl_attrs( $xp, '//div[@data-gs-up-area="nosuch"
 
 // ── store-owner: Social Connector still purchasable; inherited: projects included, nothing to buy ───────────
 $vm = gs109pl_vm( 'store-owner' );
-gs109_assert_eq( array( 23 ), array_keys( gs109pl_choose( gs109pl_xp( $frag( 'projects', $vm ) ) ) ), 'upgrade-store-owner', 'store-owner: projects -> Choose Social Connector' );
+gs109_assert( gs109pl_popup_is( gs109pl_popup( gs109pl_xp( $frag( 'projects', $vm ) ) ), gs109pl_change_url( 'store-owner' ), 'Choose a plan on gend.me' ), 'upgrade-store-owner', 'store-owner: projects -> "Choose a plan on gend.me"' );
 $vm = gs109pl_vm( 'inherited' );
 $xp = gs109pl_xp( $frag( 'projects', $vm ) );
-gs109_assert( 'Included with your plan' === gs109pl_text( $xp, '//*[@data-gs-up-copy="included"]' ) && 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout]' ), 'upgrade-inherited', 'inherited: projects Included, no Choose' );
+gs109_assert( 'Included with your plan' === gs109pl_text( $xp, '//*[@data-gs-up-copy="included"]' ) && 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout or @data-gs-plan-popup]' ), 'upgrade-inherited', 'inherited: projects Included, no plan button' );
 $vm = gs109pl_vm( 'revoked' );
 $xp = gs109pl_xp( $frag( 'projects', $vm ) );
 gs109_assert( 'revoked' === ( gs109pl_attrs( $xp, '//div[@data-gs-up-area="projects"]', 'data-gs-up-state' )[0] ?? '' ) && false !== strpos( (string) gs109pl_text( $xp, '//div[@id="gs-feature-upgrade"]' ), 'Reconnect to gend.me' ), 'upgrade-revoked', 'revoked: Reconnect' );

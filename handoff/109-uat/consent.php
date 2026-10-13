@@ -37,7 +37,7 @@ $log  = gs109p_httplog_since( $mark );
 
 gs109_assert( 200 === $page['status'] && false !== strpos( $page['body'], 'Connect to gend.me to see plans' ), 'consent-connect-card', 'gs-plan: 200 with the Connect card', $page['status'] . ' ' . $page['error'] );
 gs109_assert( 200 === $gend['status'], 'consent-gend-page', 'GenD page: 200', $gend['status'] );
-gs109_assert( false === strpos( $page['body'], 'data-gs-plan-checkout' ) && false === strpos( $page['body'], 'gend-society-plan-js' ), 'consent-no-ui', 'no plan cards and no plan script before connecting' );
+gs109_assert( false === strpos( $page['body'], 'data-gs-plan-checkout' ) && false === strpos( $page['body'], 'data-gs-plan-popup' ) && false === strpos( $page['body'], 'gend-society-plan-js' ), 'consent-no-ui', 'no plan cards and no plan script before connecting' );
 
 $hub_lines = array();
 foreach ( array_filter( explode( "\n", $log ) ) as $l ) {
