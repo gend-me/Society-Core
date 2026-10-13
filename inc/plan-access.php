@@ -675,6 +675,43 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_plan_disconnect_billing' ) ) {
+	/**
+	 * The paid plan that keeps billing on gend.me after a Disconnect (109 D23), read from the cached
+	 * membership only: no request is made, so the Connect screen renders offline as before.
+	 *
+	 * Returns null for a free / Connected membership, a plan inherited from the business group (the group
+	 * pays for it, not this site's membership), an unpaired install, or no cached membership. Otherwise {plan_name, membership_url}; membership_url is the hub's own membership page,
+	 * only when it is on the paired hub host ('' otherwise). No token or nonce is ever part of it.
+	 *
+	 * @return array{plan_name:string,membership_url:string}|null
+	 */
+	function gend_society_plan_disconnect_billing(): ?array {
+		$id = gend_society_plan_identity();
+		if ( '' === $id['install_id'] ) {
+			return null;
+		}
+		$mem = gend_society_plan_cache_read( 'gend_society_remote_membership_cache', $id['install_id'] )['payload'];
+		if ( ! is_array( $mem ) ) {
+			return null;
+		}
+		if ( 'group' === (string) ( $mem['plan_source'] ?? '' ) ) {
+			return null;
+		}
+		$dp     = isset( $mem['dashboard_plan'] ) && is_array( $mem['dashboard_plan'] ) ? $mem['dashboard_plan'] : array();
+		$amount = isset( $mem['billing']['amount'] ) ? (float) $mem['billing']['amount'] : (float) ( $dp['amount'] ?? 0 );
+		if ( $amount <= 0 ) {
+			return null;
+		}
+		$name = trim( (string) ( $dp['name'] ?? '' ) );
+		$url  = isset( $mem['membership_url'] ) && is_string( $mem['membership_url'] ) ? trim( $mem['membership_url'] ) : '';
+		return array(
+			'plan_name'      => '' !== $name ? $name : __( 'paid', 'gend-society' ),
+			'membership_url' => '' !== $url && gend_society_plan_is_hub_url( $url ) ? $url : '',
+		);
+	}
+}
+
 // ─── Refresh AJAX (Refresh button, popup close / checkout completion) ──────────────────────────────────
 
 if ( ! function_exists( 'gend_society_plan_refresh_ajax' ) ) {

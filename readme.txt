@@ -105,6 +105,7 @@ Disconnecting the site from gend.me stops all of the above.
 
 = 1.5.1 =
 * Choose a plan now opens your gend.me Change Plan page in a popup; the separate plan launcher was removed.
+* Disconnect now warns when your paid gend.me plan keeps billing, with a link to manage or cancel it on gend.me.
 
 = 1.5.0 =
 * New: see your gend.me plan, its price and renewal date in wp-admin (GenD > Plan & features).

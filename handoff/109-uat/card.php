@@ -26,6 +26,7 @@ require_once __DIR__ . '/_plan.php';
 
 if ( 'standalone' !== gs109_mode() ) {
 	gs109_assert( ! function_exists( 'gend_society_plan_fragments' ) && ! function_exists( 'gend_society_plan_page_render' ), 'card-absent', 'Plan & features page not loaded on ' . gs109_mode() );
+	gs109_assert( ! function_exists( 'gend_society_plan_disconnect_billing' ), 'd23-absent', 'disconnect billing warning helper not loaded on ' . gs109_mode() );
 	return;
 }
 
@@ -170,6 +171,54 @@ gs109_assert( 1 === gs109pl_count( $xp, '//div[@id="gs-plan-blocked"][@hidden]//
 gs109_assert( 0 === gs109pl_count( $xp, '//iframe' ) && false === stripos( $p['output'], '<script' ) && false === stripos( $p['output'], '<style' ), 'card-page-no-inline', 'page body: no iframe, no inline script or style' );
 $all .= $p['output'];
 gs109_assert( false === strpos( $all, $token ), 'card-no-token', 'install token absent from every rendered card' );
+
+// ── 109-21b (D23): Disconnect warns that a paid plan keeps billing (Connect screen, cached membership only) ──
+$gs109d_render = function ( $scenario ) {
+	gs109pl_vm( $scenario ); // fills the membership cache from the fixture
+	gs109_http_record();
+	$r = gs109p_call( 'gend_society_portal_connect_render_connected', 'GET' );
+	return array( $r['output'], gs109_http_log() );
+};
+if ( gs109_assert( function_exists( 'gend_society_portal_connect_render_connected' ) && function_exists( 'gend_society_plan_disconnect_billing' ), 'd23-loaded', 'Connected card + disconnect billing helper loaded (standalone)' ) ) {
+	$hub_host = (string) wp_parse_url( gend_society_plan_identity()['base'], PHP_URL_HOST );
+	list( $out, $http ) = $gs109d_render( 'store-owner' );
+	$xp   = gs109pl_xp( $out );
+	$mu   = (string) ( gs109_fixture_json( 'store-owner', 'membership.json' )['membership_url'] ?? '' );
+	$warn = '//div[@data-gs-disconnect-billing]';
+	gs109_assert_eq( 'Your Store Owner plan on gend.me keeps billing after you disconnect. Manage or cancel it on gend.me.', gs109pl_text( $xp, $warn ), 'd23-paid-copy', 'store-owner (paid): billing warning copy' );
+	$lk = gs109pl_attrs( $xp, $warn . '//a', 'href' );
+	gs109_assert( 1 === count( $lk ) && html_entity_decode( $lk[0] ) === $mu, 'd23-paid-link', 'link = the hub membership_url, unchanged', $lk );
+	gs109_assert( $lk && $hub_host === (string) wp_parse_url( html_entity_decode( $lk[0] ), PHP_URL_HOST ) && '' !== $hub_host, 'd23-paid-link-host', 'link is on the paired hub host (' . $hub_host . ')', $lk );
+	gs109_assert( 1 === gs109pl_count( $xp, $warn . '//a[@target="_blank"][@rel="noopener"]' ), 'd23-paid-link-tab', 'link opens a new tab (target _blank rel noopener)' );
+	gs109_assert( false === strpos( $out, $token ) && ( ! $lk || ( false === strpos( $lk[0], 'token' ) && false === strpos( $lk[0], '_wpnonce' ) ) ), 'd23-paid-no-token', 'no install token anywhere in the card; no token/nonce in the link' );
+	$order = $xp->query( $warn . '/following::input[@name="op"][@value="disconnect"]' );
+	gs109_assert( $order && 1 === $order->length, 'd23-paid-before-button', 'warning sits before the Disconnect button' );
+	gs109_assert_eq( array(), $http, 'd23-paid-no-request', 'rendering the card makes no request (cached membership only)' );
+	gs109_assert( false === stripos( $out, '<script' ) && false === stripos( $out, '<style' ) && false === stripos( $out, 'style=' ), 'd23-no-inline', 'no inline script or style in the Connected card' );
+
+	list( $out, $http ) = $gs109d_render( 'connected' );
+	$xp = gs109pl_xp( $out );
+	gs109_assert( 0 === gs109pl_count( $xp, $warn ) && false === strpos( $out, 'keeps billing' ) && 1 === gs109pl_count( $xp, '//input[@name="op"][@value="disconnect"]' ), 'd23-free-none', 'connected (free): no billing warning, Disconnect button still there' );
+
+	list( $out, $http ) = $gs109d_render( 'inherited' );
+	gs109_assert( 0 === gs109pl_count( gs109pl_xp( $out ), $warn ), 'd23-inherited-none', 'inherited (group pays, own billing 0): no billing warning' );
+
+	// Off-hub membership_url: the warning stays, without a link.
+	$mem                   = gs109_fixture_json( 'store-owner', 'membership.json' );
+	$mem['membership_url'] = 'https://evil.example/my-account/membership/9101/';
+	unset( $mem['rev'] );
+	$o1 = gs109p_inject( 'membership', 200, $mem );
+	list( $out, $http ) = $gs109d_render( 'store-owner' );
+	$o1();
+	$xp = gs109pl_xp( $out );
+	gs109_assert( 1 === gs109pl_count( $xp, $warn ) && 0 === gs109pl_count( $xp, $warn . '//a' ) && false === strpos( $out, 'evil.example' ), 'd23-offhub-nolink', 'membership_url off the paired hub: warning without a link' );
+
+	// No cached membership: no warning, no request.
+	gs109p_clear_caches();
+	gs109_http_record();
+	$r = gs109p_call( 'gend_society_portal_connect_render_connected', 'GET' );
+	gs109_assert( false === strpos( $r['output'], 'keeps billing' ) && array() === gs109_http_log(), 'd23-nocache-none', 'no cached membership: no warning and no request' );
+}
 
 // ── subscriber cannot see it ───────────────────────────────────────────────────────────────────────────
 wp_set_current_user( gs109p_user( 'subscriber' ) );
