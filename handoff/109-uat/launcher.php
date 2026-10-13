@@ -84,6 +84,7 @@ $prev_base = get_option( 'gend_society_gend_base_url' );
 update_option( 'gs109_fixture_hub', 'http://localhost:8919,http://hub.gs109.test', false );
 update_option( 'gend_society_gend_base_url', 'http://hub.gs109.test', false );
 gs109p_clear_caches();
+$alias = 'integration' === gs109_hub_mode() ? gs109p_alias_host( 'http://hub.gs109.test', 'http://localhost:8919' ) : null;
 $off = gs109p_inject( 'membership/change-plan', 200, array( 'checkout_url' => 'http://hub.gs109.test/checkout/?gdc_wc=1' ) );
 $r   = gs109p_call( $handler, 'GET', array( 'action' => 'gend_society_plan_checkout', 'plan' => '21', '_wpnonce' => wp_create_nonce( 'gs_plan_checkout' ) ) );
 $off();
@@ -95,6 +96,9 @@ $off();
 gs109_assert( 'redirect' !== $r['kind'], 'launcher-other-host-refused', 'checkout URL on the site host (not the hub host) is refused', wp_json_encode( array( $r['kind'], $r['location'] ) ) );
 update_option( 'gend_society_gend_base_url', $prev_base, false );
 update_option( 'gs109_fixture_hub', 'http://localhost:8919', false );
+if ( $alias ) {
+	$alias();
+}
 gs109p_clear_caches();
 
 $r = gs109p_call( $handler, 'GET', array( 'action' => 'gend_society_plan_checkout', 'plan' => '21', '_wpnonce' => 'bad' ) );
@@ -107,10 +111,11 @@ wp_set_current_user( $admin );
 
 // --------------------------------------------------------------------------------- scenarios not allowed
 gs109p_scenario( 'store-owner' );
+$expect23 = (string) gs109_fixture_json( 'store-owner', 'change-plan.json' )['checkout_url'];
 $r = gend_society_plan_checkout_resolve( 21 );
 gs109_assert( is_wp_error( $r ) && 'plan_not_allowed' === $r->get_error_code(), 'launcher-store-owner-21', 'store-owner: plan 21 (below the current plan) is not checkout_allowed', is_wp_error( $r ) ? $r->get_error_code() : 'resolved' );
 $r = gend_society_plan_checkout_resolve( 23 );
-gs109_assert( is_array( $r ) && $expect === ( $r['url'] ?? '' ), 'launcher-store-owner-23', 'store-owner: plan 23 allowed' );
+gs109_assert( is_array( $r ) && $expect23 === ( $r['url'] ?? '' ), 'launcher-store-owner-23', 'store-owner: plan 23 allowed', is_wp_error( $r ) ? $r->get_error_code() : (string) ( $r['url'] ?? '' ) . ' vs ' . $expect23 );
 gs109p_scenario( 'inherited' );
 gs109p_http();
 $r = gend_society_plan_checkout_resolve( 23 );

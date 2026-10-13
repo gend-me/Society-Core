@@ -153,7 +153,36 @@ function gs109p_httplog_since( $mark ) {
 	if ( ! is_readable( $p ) ) {
 		return '';
 	}
-	return (string) file_get_contents( $p, false, null, (int) $mark );
+	// Request lines only: the gs109-e2e-bed mu-plugin also writes {"marker":"deleted_option"} lines (109-10).
+	$lines = explode( "\n", (string) file_get_contents( $p, false, null, (int) $mark ) );
+	$keep  = array();
+	foreach ( $lines as $l ) {
+		if ( '' !== $l && false === strpos( $l, '"marker":' ) ) {
+			$keep[] = $l;
+		}
+	}
+	return $keep ? implode( "\n", $keep ) . "\n" : '';
+}
+
+/**
+ * Integration mode (109-10): answer every request to $alias (scheme://host[:port]) from $real with the same path,
+ * method, headers and body, so the REAL hub can stand behind another host name. Returns a remover.
+ */
+function gs109p_alias_host( $alias, $real ) {
+	$alias = rtrim( (string) $alias, '/' );
+	$real  = rtrim( (string) $real, '/' );
+	$f     = function ( $pre, $args, $url ) use ( $alias, $real ) {
+		if ( false !== $pre || 0 !== strpos( (string) $url, $alias . '/' ) ) {
+			return $pre;
+		}
+		return wp_remote_request( $real . substr( (string) $url, strlen( $alias ) ), $args );
+	};
+	add_filter( 'pre_http_request', $f, 6, 3 );
+	$off = function () use ( $f ) {
+		remove_filter( 'pre_http_request', $f, 6 );
+	};
+	gs109_on_cleanup( $off, 'alias ' . $alias );
+	return $off;
 }
 
 /** Statuses the fixture answered since the last call (e.g. ['GET features -> 304']). */

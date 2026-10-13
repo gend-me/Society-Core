@@ -105,7 +105,8 @@ $h  = $frag( 'groups' );
 $xp = gs109pl_xp( $h );
 gs109_assert_eq( 'ok', gs109pl_attrs( $xp, '//div[@id="gs-hub-groups"]', 'data-gs-hub-state' )[0] ?? '', 'embed-groups-state', 'Groups: state ok, fragment #gs-hub-groups' );
 gs109_assert_eq( $g['data']['group']['name'], gs109pl_text( $xp, '//*[@data-gs-hub-field="group-name"]' ), 'embed-groups-name', 'group name from the fixture' );
-gs109_assert_eq( '3 members', gs109pl_text( $xp, '//*[@data-gs-hub-field="member-count"]' ), 'embed-groups-count', 'member count' );
+$mcount = (int) ( $g['data']['group']['member_count'] ?? 0 );
+gs109_assert_eq( $mcount . ( 1 === $mcount ? ' member' : ' members' ), gs109pl_text( $xp, '//*[@data-gs-hub-field="member-count"]' ), 'embed-groups-count', 'member count (' . $mcount . ' from the hub data)' );
 gs109_assert_eq( $g['data']['group']['description'], gs109pl_text( $xp, '//*[@data-gs-hub-field="description"]' ), 'embed-groups-desc', 'description' );
 $names = array();
 foreach ( $xp->query( '//li[@data-gs-hub-member]/span[@class="gs-hub-member__name"]' ) as $n ) {
@@ -216,6 +217,8 @@ $evil                                    = $g;
 $evil['data']['group']['name']           = '<script>alert("gs109")</script>Evil Group';
 $evil['data']['group']['description']    = '<img src=x onerror=alert(1)>desc';
 $evil['data']['group']['avatar_url']     = 'https://evil.example/avatar.png';
+$evil['data']['members']                 = array_slice( array_pad( (array) $evil['data']['members'], 3, array( 'name' => 'GS109 Member', 'role' => 'member', 'avatar_url' => '' ) ), 0, 3 );
+$evil['data']['members'][2]['avatar_url'] = 'http://localhost:8919/wp-content/uploads/avatars/4/avatar.png';
 $evil['data']['members'][0]['name']      = '<b>Bold</b> & "Q"';
 $evil['data']['members'][0]['avatar_url'] = 'http://localhost:8909/wp-content/uploads/bed.png';
 $evil['data']['members'][1]['avatar_url'] = 'javascript:alert(1)';
