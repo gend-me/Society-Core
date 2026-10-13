@@ -819,8 +819,8 @@ if ( ! function_exists( 'gend_society_plan_launcher_die_handler' ) ) {
 		$url = defined( 'GEND_SOCIETY_URL' ) ? GEND_SOCIETY_URL : plugin_dir_url( __DIR__ );
 		$css = 'assets/gs-plan-launcher.css';
 		$js  = 'assets/gs-plan-launcher.js';
-		wp_register_style( 'gend-society-plan-launcher', $url . $css, array(), (string) ( @filemtime( $dir . $css ) ?: GEND_SOCIETY_VERSION ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
-		wp_register_script( 'gend-society-plan-launcher', $url . $js, array(), (string) ( @filemtime( $dir . $js ) ?: GEND_SOCIETY_VERSION ), true ); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+		wp_register_style( 'gend-society-plan-launcher', $url . $css, array(), file_exists( $dir . $css ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $dir . $css ) : GEND_SOCIETY_VERSION );
+		wp_register_script( 'gend-society-plan-launcher', $url . $js, array(), file_exists( $dir . $js ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $dir . $js ) : GEND_SOCIETY_VERSION, true );
 		?>
 <!DOCTYPE html>
 <html <?php language_attributes(); ?>>
