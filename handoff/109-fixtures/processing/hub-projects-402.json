@@ -1,0 +1,9 @@
+{
+  "code": "upgrade_required",
+  "state": "upgrade",
+  "unlock_plan": {
+    "id": 12,
+    "slug": "social-connector",
+    "name": "Social Connector"
+  }
+}

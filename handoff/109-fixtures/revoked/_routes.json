@@ -1,0 +1,10 @@
+{
+  "scenario": "revoked",
+  "conditional": false,
+  "routes": {
+    "*": {
+      "status": 401,
+      "file": "revoked-401.json"
+    }
+  }
+}

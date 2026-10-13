@@ -1,0 +1,80 @@
+{
+  "install_id": "0b1c9f3e-5d2a-4e8b-9a61-109c0ffee001",
+  "membership_id": 9101,
+  "membership_url": "http://localhost:8919/my-account/membership/9101/",
+  "embed_url": "http://localhost:8919/my-account/membership/9101/?ui=embed",
+  "hub_url": "http://localhost:8919/",
+  "app_url": "http://localhost:8909/",
+  "app_title": "localhost:8909",
+  "status": "active",
+  "status_label": "Active",
+  "billing": {
+    "amount": 0.0,
+    "currency": "USD",
+    "duration": 1,
+    "unit": "month",
+    "label": ""
+  },
+  "dates": {
+    "created": "2026-10-12",
+    "activated": "2026-10-12",
+    "expires": "",
+    "renews": "",
+    "next_renewal": ""
+  },
+  "migration": {
+    "stage": "",
+    "index": 0,
+    "live": false,
+    "steps": [
+      "prepare",
+      "export",
+      "provision",
+      "verify",
+      "live"
+    ]
+  },
+  "dashboard_plan": {
+    "id": 87,
+    "name": "Connected",
+    "slug": "connected",
+    "description": "",
+    "image": "",
+    "amount": 0.0,
+    "amount_label": "",
+    "duration": 1,
+    "duration_unit": "month",
+    "group": "dashboard",
+    "subgroup": "connected"
+  },
+  "hosting_plan": null,
+  "customer": {
+    "user_id": 2,
+    "username": "gs109owner",
+    "name": "GS109 Owner",
+    "email": "gs109owner@example.test",
+    "avatar": ""
+  },
+  "group": {
+    "id": 4101,
+    "name": "GS109 Business Group",
+    "slug": "gs109-business-group",
+    "avatar": ""
+  },
+  "orders": [],
+  "backups": [],
+  "domains": [],
+  "cache_seconds": 60,
+  "plan_source": "connected",
+  "inherited_from": null,
+  "is_lifetime": true,
+  "owner": {
+    "display_name": "GS109 Owner"
+  },
+  "last_upgrade": null,
+  "checkout_allowed_plan_ids": [
+    2,
+    11,
+    12
+  ]
+}

@@ -1,0 +1,73 @@
+{
+  "area": "feature-suite",
+  "state": "included",
+  "data": {
+    "features": [
+      {
+        "slug": "wireframe",
+        "name": "Wireframe Generator (Leo)",
+        "area": "app",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "blog",
+        "name": "Social Blogs",
+        "area": "write",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "email",
+        "name": "Community Emails",
+        "area": "write",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "store",
+        "name": "Store Management",
+        "area": "store",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "sales",
+        "name": "Sales Management",
+        "area": "store",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "projects",
+        "name": "Remote Projects",
+        "area": "projects",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "social",
+        "name": "Social Profiles",
+        "area": "social",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "membership",
+        "name": "Membership Management",
+        "area": "social",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "rewards",
+        "name": "Member Rewards",
+        "area": "reward",
+        "status": "included",
+        "unlock_plan": null
+      }
+    ]
+  },
+  "cache_seconds": 120,
+  "rev": "5e87212f08251ec8bc76d4fd708c3ee4466be93d"
+}
