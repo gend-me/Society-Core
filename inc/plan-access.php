@@ -14,10 +14,10 @@
  *     option. TTL = the payload's cache_seconds (hub: features 3600, catalogue 86400).
  *   - gend_society_plan_invalidate_all(): drops every plan cache (wp_login, the Refresh AJAX, checkout
  *     completion through the Refresh AJAX); the next fetch is unconditional.
- *   - gend_society_plan_view_model(): one array every Phase 109 template renders from.
- *   - admin-post gend_society_plan_checkout: the same-origin checkout launcher. It asks the hub for the
- *     checkout URL server side and redirects to the hub host only, so the install token never appears in a
- *     URL, in HTML or in a log.
+ *   - gend_society_plan_view_model(): one array every Phase 109 template renders from. Its change_plan_url
+ *     is gend.me's own Change Plan page for this site's membership (membership_url from the hub +
+ *     ?ui=embed&plan_only=1&group=dashboard), built only when that URL is on the paired hub; the templates
+ *     open it in a popup. No token or nonce is ever part of it.
  *
  * Nothing here locks code shipped in the plugin (wordpress.org Guideline 5): the hub alone enforces what a
  * plan includes, on its own routes.
@@ -394,20 +394,29 @@ if ( ! function_exists( 'gend_society_plan_is_hub_url' ) ) {
 	}
 }
 
-if ( ! function_exists( 'gend_society_plan_launcher_url' ) ) {
+if ( ! function_exists( 'gend_society_plan_change_plan_url' ) ) {
 	/**
-	 * Same-origin checkout launcher for a plan (opened by the plan card in a popup).
+	 * gend.me's own Change Plan page for this site's membership ('' when it cannot be built safely).
 	 *
-	 * @param int $plan_id Hub plan id.
+	 * Built from the hub's membership_url (GET /install/{id}/membership) + ?ui=embed&plan_only=1&group=dashboard,
+	 * the page media-storage-panel.php already opens for hosting plans. Only a URL on the paired hub host is
+	 * accepted, and only for a real membership id.
+	 *
+	 * @param array $membership /membership payload.
 	 */
-	function gend_society_plan_launcher_url( int $plan_id ): string {
+	function gend_society_plan_change_plan_url( array $membership ): string {
+		$mid = (int) ( $membership['membership_id'] ?? 0 );
+		$url = isset( $membership['membership_url'] ) && is_string( $membership['membership_url'] ) ? trim( $membership['membership_url'] ) : '';
+		if ( $mid <= 0 || '' === $url || ! gend_society_plan_is_hub_url( $url ) ) {
+			return '';
+		}
 		return add_query_arg(
 			array(
-				'action'   => 'gend_society_plan_checkout',
-				'plan'     => $plan_id,
-				'_wpnonce' => wp_create_nonce( 'gs_plan_checkout' ),
+				'ui'        => 'embed',
+				'plan_only' => '1',
+				'group'     => 'dashboard',
 			),
-			admin_url( 'admin-post.php' )
+			$url
 		);
 	}
 }
@@ -468,7 +477,8 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 	 *
 	 * @param bool $force Refetch without conditions (after invalidation, e.g. the Refresh AJAX).
 	 * @return array See the Phase 109 interface: state, plan, source, inherited, owner_name, processing,
-	 *               areas, tiers, matrix, after_migration, hub_origin, install_id, fetched_at (+ stale).
+	 *               areas, tiers, matrix, after_migration, change_plan_url, hub_origin, install_id,
+	 *               fetched_at (+ stale).
 	 */
 	function gend_society_plan_view_model( bool $force = false ): array {
 		$vm = array(
@@ -492,6 +502,7 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 			'tiers'           => array(),
 			'matrix'          => array(),
 			'after_migration' => array(),
+			'change_plan_url' => '',
 			'hub_origin'      => gend_society_plan_hub_origin(),
 			'install_id'      => gend_society_plan_identity()['install_id'],
 			'fetched_at'      => 0,
@@ -619,7 +630,6 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 				'is_current'       => $current,
 				'is_inherited'     => ! empty( $t['is_inherited'] ),
 				'checkout_allowed' => $ok,
-				'launcher_url'     => $ok ? gend_society_plan_launcher_url( $tid ) : '',
 			);
 		}
 		usort(
@@ -655,6 +665,9 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 				}
 			}
 		}
+
+		// --- gend.me's own Change Plan page (opened in a popup by the templates)
+		$vm['change_plan_url'] = gend_society_plan_change_plan_url( $mem );
 
 		$fetched          = (int) get_option( 'gend_society_features_cache_fetched_at', 0 );
 		$vm['fetched_at'] = $fetched > 0 ? $fetched : time();
@@ -700,148 +713,3 @@ if ( ! function_exists( 'gend_society_plan_refresh_ajax' ) ) {
 	}
 }
 add_action( 'wp_ajax_gend_society_plan_refresh', 'gend_society_plan_refresh_ajax' );
-
-// ─── Checkout launcher (admin-post) ────────────────────────────────────────────────────────────────────
-
-if ( ! function_exists( 'gend_society_plan_checkout_resolve' ) ) {
-	/**
-	 * Ask the hub for the checkout URL of a plan this install may buy now.
-	 *
-	 * @param int $plan_id Hub plan id.
-	 * @return array{url:string,host:string}|WP_Error
-	 */
-	function gend_society_plan_checkout_resolve( int $plan_id ) {
-		if ( $plan_id <= 0 ) {
-			return new WP_Error( 'invalid_plan', __( 'No plan was chosen.', 'gend-society' ) );
-		}
-		$vm = gend_society_plan_view_model( true );
-		if ( 'ok' !== $vm['state'] ) {
-			return new WP_Error( 'hub_' . $vm['state'], __( 'gend.me could not be reached to open the checkout. Try again in a moment.', 'gend-society' ) );
-		}
-		$tier = null;
-		foreach ( $vm['tiers'] as $t ) {
-			if ( $plan_id === (int) $t['id'] ) {
-				$tier = $t;
-			}
-		}
-		if ( ! $tier || empty( $tier['checkout_allowed'] ) ) {
-			return new WP_Error( 'plan_not_allowed', __( 'This plan cannot be bought for this site right now.', 'gend-society' ) );
-		}
-		$r = gend_society_remote_membership_call( 'membership/change-plan', array( 'plan_id' => $plan_id ), 'POST' );
-		if ( is_wp_error( $r ) ) {
-			$status = (int) ( $r->get_error_data()['status'] ?? 0 );
-			return new WP_Error( 409 === $status ? 'plan_not_allowed' : 'change_plan_failed', __( 'gend.me did not open a checkout for this plan.', 'gend-society' ) );
-		}
-		$url = isset( $r['checkout_url'] ) && is_string( $r['checkout_url'] ) ? $r['checkout_url'] : '';
-		if ( ! gend_society_plan_is_hub_url( $url ) ) {
-			return new WP_Error( 'bad_checkout_host', __( 'gend.me answered with a checkout address that is not on gend.me.', 'gend-society' ) );
-		}
-		return array(
-			'url'  => $url,
-			'host' => strtolower( (string) wp_parse_url( $url, PHP_URL_HOST ) ),
-		);
-	}
-}
-
-if ( ! function_exists( 'gend_society_plan_checkout_handle' ) ) {
-	/**
-	 * admin-post gend_society_plan_checkout: nonce + manage_options, then 302 to the hub checkout (hub host
-	 * only). Errors render a small local page in the popup.
-	 */
-	function gend_society_plan_checkout_handle(): void {
-		if ( ! current_user_can( 'manage_options' ) ) {
-			wp_die( esc_html__( 'You are not allowed to change this site\'s plan.', 'gend-society' ), '', array( 'response' => 403 ) );
-		}
-		check_admin_referer( 'gs_plan_checkout' );
-		$plan_id = isset( $_GET['plan'] ) ? absint( wp_unslash( $_GET['plan'] ) ) : 0;
-		$res     = gend_society_plan_checkout_resolve( $plan_id );
-		if ( is_wp_error( $res ) ) {
-			gend_society_plan_launcher_error( $res );
-			return;
-		}
-		$host  = $res['host'];
-		$allow = function ( $hosts ) use ( $host, &$allow ) {
-			remove_filter( 'allowed_redirect_hosts', $allow, 10 );
-			$hosts[] = $host;
-			return $hosts;
-		};
-		add_filter( 'allowed_redirect_hosts', $allow, 10 );
-		wp_safe_redirect( $res['url'], 302, 'gend-society' );
-		remove_filter( 'allowed_redirect_hosts', $allow, 10 );
-		exit;
-	}
-}
-add_action( 'admin_post_gend_society_plan_checkout', 'gend_society_plan_checkout_handle' );
-
-if ( ! function_exists( 'gend_society_plan_launcher_error' ) ) {
-	/**
-	 * Stop the launcher with a local error page (never a redirect elsewhere).
-	 *
-	 * @param WP_Error $error Why the checkout could not open.
-	 */
-	function gend_society_plan_launcher_error( WP_Error $error ): void {
-		$codes  = array(
-			'invalid_plan'      => 400,
-			'plan_not_allowed'  => 409,
-			'hub_revoked'       => 409,
-			'hub_not_connected' => 409,
-		);
-		$status = $codes[ $error->get_error_code() ] ?? 502;
-		add_filter( 'wp_die_handler', 'gend_society_plan_launcher_die_handler_name', 100 );
-		wp_die( esc_html( $error->get_error_message() ), esc_html__( 'Checkout could not open', 'gend-society' ), array( 'response' => (int) $status ) );
-	}
-}
-
-if ( ! function_exists( 'gend_society_plan_launcher_die_handler_name' ) ) {
-	/**
-	 * Callback name for the wp_die_handler filter (launcher error page).
-	 */
-	function gend_society_plan_launcher_die_handler_name(): string {
-		return 'gend_society_plan_launcher_die_handler';
-	}
-}
-
-if ( ! function_exists( 'gend_society_plan_launcher_die_handler' ) ) {
-	/**
-	 * The launcher error page: local stylesheet and script only, a "Close window" button.
-	 *
-	 * @param string $message Escaped message.
-	 * @param string $title   Escaped title.
-	 * @param array  $args    wp_die() arguments.
-	 */
-	function gend_society_plan_launcher_die_handler( $message, $title = '', $args = array() ): void {
-		$status = is_array( $args ) && isset( $args['response'] ) ? (int) $args['response'] : 500;
-		if ( ! headers_sent() ) {
-			status_header( $status );
-			nocache_headers();
-			header( 'Content-Type: text/html; charset=utf-8' );
-		}
-		$dir = defined( 'GEND_SOCIETY_DIR' ) ? GEND_SOCIETY_DIR : plugin_dir_path( __DIR__ ) . '/';
-		$url = defined( 'GEND_SOCIETY_URL' ) ? GEND_SOCIETY_URL : plugin_dir_url( __DIR__ );
-		$css = 'assets/gs-plan-launcher.css';
-		$js  = 'assets/gs-plan-launcher.js';
-		wp_register_style( 'gend-society-plan-launcher', $url . $css, array(), file_exists( $dir . $css ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $dir . $css ) : GEND_SOCIETY_VERSION );
-		wp_register_script( 'gend-society-plan-launcher', $url . $js, array(), file_exists( $dir . $js ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $dir . $js ) : GEND_SOCIETY_VERSION, true );
-		?>
-<!DOCTYPE html>
-<html <?php language_attributes(); ?>>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<meta name="robots" content="noindex, nofollow">
-<title><?php echo esc_html( wp_strip_all_tags( (string) $title ) ); ?></title>
-		<?php wp_print_styles( array( 'gend-society-plan-launcher' ) ); ?>
-</head>
-<body class="gs-plan-launcher">
-<main class="gs-plan-launcher__box" role="main">
-<h1><?php echo esc_html( wp_strip_all_tags( (string) $title ) ); ?></h1>
-<p><?php echo esc_html( wp_strip_all_tags( (string) $message ) ); ?></p>
-<p class="gs-plan-launcher__actions"><button type="button" class="gs-plan-launcher__close"><?php esc_html_e( 'Close window', 'gend-society' ); ?></button></p>
-</main>
-		<?php wp_print_scripts( array( 'gend-society-plan-launcher' ) ); ?>
-</body>
-</html>
-		<?php
-		die();
-	}
-}

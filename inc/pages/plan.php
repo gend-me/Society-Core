@@ -7,15 +7,15 @@
  *
  * The page renders from gend_society_plan_view_model() (inc/plan-access.php, loaded only once the install is
  * paired): the membership card (plan, price, renewal, status badge), the inherited-plan banner, the Feature
- * Access card (Included / Upgrade / After migration) and the plan comparison with "Choose <plan>" buttons.
+ * Access card (Included / Upgrade / After migration) and a read-only plan comparison.
  *
- * Checkout: every Choose button is a plain link to the same-origin admin-post launcher
- * (gend_society_plan_launcher_url()), opened by assets/gs-plan.js in a popup synchronously from the click
- * (a new tab without JavaScript). The launcher redirects to the gend.me checkout server side, so the install
- * token never reaches a URL or this page. When the popup reports back (an origin-checked
- * gend_society_plan_changed message) or closes, the Refresh AJAX (gend_society_plan_refresh) drops the plan
- * caches and returns the cards again through the gend_society_plan_refresh_html filter below; the page swaps
- * them in without a reload.
+ * Changing the plan happens on gend.me itself: the membership card's one button links to gend.me's own Change
+ * Plan page for this membership (view-model change_plan_url, built from the hub's membership_url on the paired
+ * hub host only), opened by assets/gs-plan.js in a popup synchronously from the click (a new tab without
+ * JavaScript), as media-storage-panel.php does. No token is part of that URL. When the popup reports back (an
+ * origin-checked gend_society_plan_changed message) or closes, the Refresh AJAX (gend_society_plan_refresh)
+ * drops the plan caches and returns the cards again through the gend_society_plan_refresh_html filter below;
+ * the page swaps them in without a reload.
  *
  * Local assets only (assets/gs-plan.css, assets/gs-plan.js), no inline script or style, no iframe, and no
  * gend.me request while the install is not connected or the owner has not consented (the data layer checks
@@ -180,13 +180,20 @@ if ( ! function_exists( 'gend_society_plan_status_text' ) ) {
 
 if ( ! function_exists( 'gend_society_plan_has_checkout' ) ) {
 	/**
-	 * True when at least one tier can be bought from this page now.
+	 * True when the Change Plan button shows: gend.me's Change Plan URL is known (paired hub host) and, for a
+	 * plan inherited from the group, a higher tier can still be bought.
 	 *
 	 * @param array $vm View-model.
 	 */
 	function gend_society_plan_has_checkout( array $vm ): bool {
+		if ( '' === (string) ( $vm['change_plan_url'] ?? '' ) ) {
+			return false;
+		}
+		if ( 'group' !== (string) ( $vm['source'] ?? '' ) ) {
+			return true;
+		}
 		foreach ( (array) $vm['tiers'] as $t ) {
-			if ( ! empty( $t['checkout_allowed'] ) && '' !== (string) $t['launcher_url'] ) {
+			if ( ! empty( $t['checkout_allowed'] ) ) {
 				return true;
 			}
 		}
@@ -298,7 +305,8 @@ if ( ! function_exists( 'gend_society_plan_render_membership_card' ) ) {
 					)
 				) . '</p>';
 			}
-			$h .= '<p><a class="button button-primary" href="#gs-plan-compare">' . esc_html__( 'Choose a plan', 'gend-society' ) . '</a></p>';
+			$label = $is_connected ? __( 'Choose a plan', 'gend-society' ) : __( 'Change plan', 'gend-society' );
+			$h    .= '<p class="gs-plan-change"><a class="button button-primary" href="' . esc_url( (string) $vm['change_plan_url'] ) . '" target="_blank" rel="noopener" data-gs-plan-popup="1">' . esc_html( $label ) . '</a></p>';
 		}
 		$h .= '</div>';
 		return $h;
@@ -402,8 +410,8 @@ if ( ! function_exists( 'gend_society_plan_render_areas_card' ) ) {
 
 if ( ! function_exists( 'gend_society_plan_render_compare' ) ) {
 	/**
-	 * Plan comparison: tiers as columns (by rank), areas as rows, a "Where it runs" column, Choose buttons
-	 * for tiers that can be bought now, and the After migration list.
+	 * Plan comparison (read-only): tiers as columns (by rank), areas as rows, a "Where it runs" column and the
+	 * After migration list. Plans are changed on gend.me (the membership card's button).
 	 *
 	 * @param array $vm View-model.
 	 */
@@ -492,21 +500,8 @@ if ( ! function_exists( 'gend_society_plan_render_compare' ) ) {
 			$h    .= '<td class="gs-plan-compare__where" data-gs-plan-where="' . esc_attr( isset( $after[ (string) $slug ] ) ? 'after_migration' : 'hub' ) . '">' . esc_html( $where ) . '</td>';
 			$h    .= '</tr>';
 		}
-		$h .= '</tbody><tfoot><tr><td></td>';
-		foreach ( $tiers as $t ) {
-			$h .= '<td class="gs-plan-compare__action">';
-			if ( ! empty( $t['checkout_allowed'] ) && '' !== (string) $t['launcher_url'] ) {
-				$h .= '<a class="button button-primary" href="' . esc_url( (string) $t['launcher_url'] ) . '" target="_blank" rel="opener" data-gs-plan-checkout="' . esc_attr( (string) (int) $t['id'] ) . '">';
-				/* translators: %s: plan name. */
-				$h .= esc_html( sprintf( __( 'Choose %s', 'gend-society' ), (string) $t['name'] ) ) . '</a>';
-			} elseif ( ! empty( $t['is_inherited'] ) ) {
-				$h .= '<span class="gs-plan-compare__tag">' . esc_html__( 'Inherited', 'gend-society' ) . '</span>';
-			} elseif ( ! empty( $t['is_current'] ) ) {
-				$h .= '<span class="gs-plan-compare__tag">' . esc_html__( 'Current plan', 'gend-society' ) . '</span>';
-			}
-			$h .= '</td>';
-		}
-		$h .= '<td></td></tr></tfoot></table></div>';
+		$h .= '</tbody></table></div>';
+		$h .= '<p class="gs-plan-compare__note">' . esc_html__( 'Plans are changed on gend.me.', 'gend-society' ) . '</p>';
 
 		if ( $vm['after_migration'] ) {
 			$h .= '<h3 class="gs-plan-compare__after-title">' . esc_html__( 'After migration', 'gend-society' ) . '</h3>';

@@ -1,8 +1,11 @@
 /*
- * gend-society: GenD > Plan & features (inc/pages/plan.php), standalone installs.
+ * gend-society: GenD > Plan & features (inc/pages/plan.php), the standalone upgrade page and the hub-embed
+ * upgrade state, standalone installs.
  *
- * - "Choose <plan>" opens the same-origin checkout launcher in a popup synchronously from the click, so popup
- *   blockers allow it. When the browser blocks it anyway, a link opens the same launcher in a new tab.
+ * - "Choose a plan" / "Change plan" ([data-gs-plan-popup]) opens gend.me's own Change Plan page for this
+ *   site's membership (<hub>/my-account/membership/<id>/?ui=embed&plan_only=1&group=dashboard, the href the
+ *   server built) in a popup synchronously from the click, so popup blockers allow it. When the browser blocks
+ *   it anyway, a link opens the same page in a new tab.
  * - Completion: a gend_society_plan_changed message is accepted only from the exact hub origin and only for
  *   this install id; otherwise the popup closing (checked every 600 ms) is the signal.
  * - Either way the Refresh AJAX drops the plan caches on the server and returns the cards, which replace the
@@ -172,10 +175,10 @@
 	}
 
 	document.addEventListener('click', function (ev) {
-		var checkout = closest(ev.target, '[data-gs-plan-checkout]');
-		if (checkout) {
+		var change = closest(ev.target, '[data-gs-plan-popup]');
+		if (change) {
 			ev.preventDefault();
-			openCheckout(checkout.getAttribute('href'));
+			openCheckout(change.getAttribute('href'));
 			return;
 		}
 		if (closest(ev.target, '[data-gs-plan-refresh]')) {

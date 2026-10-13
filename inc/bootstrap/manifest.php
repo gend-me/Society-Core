@@ -552,7 +552,7 @@ return array(
 			'file'  => 'inc/plan-access.php',
 			'tier'  => 'customer',
 			'needs' => array( 'standalone', 'paired' ),
-			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, checkout launcher. Standalone, connected only.',
+			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, gend.me Change Plan URL. Standalone, connected only.',
 		),
 		array(
 			'file'  => 'inc/hub-embed.php',
