@@ -196,12 +196,18 @@ function gs109_fixtures_dir() {
 
 /** Decoded fixture file (e.g. gs109_fixture_json( 'connected', 'features.json' )); null when missing. */
 function gs109_fixture_json( $scenario, $file ) {
+	if ( 'integration' === gs109_hub_mode() ) {
+		return gs109_int_json( $scenario, $file );
+	}
 	$p = gs109_fixtures_dir() . '/' . basename( (string) $scenario ) . '/' . basename( (string) $file );
 	return is_readable( $p ) ? json_decode( (string) file_get_contents( $p ), true ) : null;
 }
 
 /** Switch the fixture scenario served by the bed mu-plugin (restored by the gs109_fixture_pair cleanup). */
 function gs109_fixture_scenario( $scenario ) {
+	if ( 'integration' === gs109_hub_mode() ) {
+		return gs109_int_scenario( $scenario );
+	}
 	if ( ! is_dir( gs109_fixtures_dir() . '/' . $scenario ) ) {
 		return gs109_fail( 'fixture', "scenario {$scenario} not found under " . gs109_fixtures_dir() );
 	}
@@ -220,6 +226,9 @@ function gs109_fixture_pair( $scenario = 'connected' ) {
 	if ( gs109_is_readonly() ) {
 		gs109_fail( 'fixture', 'pair refused: GS109_READONLY' );
 		return array();
+	}
+	if ( 'integration' === gs109_hub_mode() ) {
+		return gs109_int_pair( $scenario );
 	}
 	if ( 'fixture' !== gs109_hub_mode() ) {
 		gs109_fail( 'fixture', 'pair refused: GS109_HUB=' . gs109_hub_mode() );
@@ -276,6 +285,9 @@ function gs109_fixture_pair( $scenario = 'connected' ) {
 
 /** Lines appended to wp-content/gs109-fixture.log since the first call in this section. */
 function gs109_fixture_log_lines() {
+	if ( 'integration' === gs109_hub_mode() ) {
+		return gs109_int_log_lines();
+	}
 	$p = WP_CONTENT_DIR . '/gs109-fixture.log';
 	if ( ! isset( $GLOBALS['gs109_uat']['fixture_log_at'] ) ) {
 		$GLOBALS['gs109_uat']['fixture_log_at'] = is_readable( $p ) ? filesize( $p ) : 0;
@@ -287,4 +299,206 @@ function gs109_fixture_log_lines() {
 	}
 	$all = (string) file_get_contents( $p, false, null, (int) $GLOBALS['gs109_uat']['fixture_log_at'] );
 	return array_values( array_filter( explode( "\n", $all ) ) );
+}
+
+/* ---------------------------------------------------------------------------------------------------
+ * Phase 109-10: integration mode (GS109_HUB=integration). The bed is really connected to the gs109hub clone
+ * (108 redirect flow); tools/109-10-regress.sh saves that pairing in the bed option gs109_int_pairing and writes
+ * /tmp/gs109-int.json {key, hub, install_id} for the clone-only control mu-plugin gs109-int-control.php.
+ * ------------------------------------------------------------------------------------------------- */
+
+/** {key, hub, install_id} of the integration run, or array() when missing. */
+function gs109_int_cfg() {
+	static $cfg = null;
+	if ( null === $cfg ) {
+		$raw = is_readable( '/tmp/gs109-int.json' ) ? json_decode( (string) file_get_contents( '/tmp/gs109-int.json' ), true ) : null;
+		$cfg = is_array( $raw ) && ! empty( $raw['key'] ) && ! empty( $raw['install_id'] ) ? $raw : array();
+	}
+	return $cfg;
+}
+
+/** Raw curl (outside the WP HTTP API): [status, headers (lowercase), body]. */
+function gs109_int_curl( $method, $url, array $headers = array(), $body = null ) {
+	$ch  = curl_init( $url );
+	$hdr = array();
+	foreach ( $headers as $k => $v ) {
+		$hdr[] = $k . ': ' . $v;
+	}
+	$resp_headers = array();
+	curl_setopt_array(
+		$ch,
+		array(
+			CURLOPT_CUSTOMREQUEST  => $method,
+			CURLOPT_RETURNTRANSFER => true,
+			CURLOPT_TIMEOUT        => 60,
+			CURLOPT_HTTPHEADER     => $hdr,
+			CURLOPT_HEADERFUNCTION => function ( $c, $line ) use ( &$resp_headers ) {
+				$p = strpos( $line, ':' );
+				if ( false !== $p ) {
+					$resp_headers[ strtolower( trim( substr( $line, 0, $p ) ) ) ] = trim( substr( $line, $p + 1 ) );
+				}
+				return strlen( $line );
+			},
+		)
+	);
+	if ( null !== $body ) {
+		curl_setopt( $ch, CURLOPT_POSTFIELDS, $body );
+	}
+	$out  = curl_exec( $ch );
+	$code = (int) curl_getinfo( $ch, CURLINFO_HTTP_CODE );
+	curl_close( $ch );
+	return array( $code, $resp_headers, false === $out ? '' : (string) $out );
+}
+
+/** Call the clone-only control mu-plugin. Returns the decoded answer or array( 'error' => ... ). */
+function gs109_int_control( $cmd, array $params = array() ) {
+	$cfg = gs109_int_cfg();
+	if ( ! $cfg ) {
+		return array( 'error' => '/tmp/gs109-int.json missing (run tools/109-10-regress.sh integration)' );
+	}
+	$url = rtrim( $cfg['hub'], '/' ) . '/?' . http_build_query( array_merge( array( 'gs109_int' => $cmd, 'key' => $cfg['key'], 'iid' => $cfg['install_id'] ), $params ) );
+	list( $code, , $body ) = gs109_int_curl( 'GET', $url );
+	$j = json_decode( $body, true );
+	if ( 200 !== $code || ! is_array( $j ) ) {
+		return array( 'error' => 'control ' . $cmd . ' HTTP ' . $code . ' ' . substr( $body, 0, 200 ) );
+	}
+	return $j;
+}
+
+function gs109_int_current() {
+	return isset( $GLOBALS['gs109_uat']['int_scenario'] ) ? (string) $GLOBALS['gs109_uat']['int_scenario'] : '';
+}
+
+/** Switch the REAL hub install to $scenario (no-op when it is already there). */
+function gs109_int_scenario( $scenario ) {
+	if ( gs109_int_current() === $scenario ) {
+		return true;
+	}
+	$r = gs109_int_control( 'scenario', array( 's' => $scenario ) );
+	if ( isset( $r['error'] ) ) {
+		return gs109_fail( 'integration', 'hub scenario ' . $scenario . ': ' . $r['error'] );
+	}
+	$GLOBALS['gs109_uat']['int_scenario'] = $scenario;
+	return true;
+}
+
+/** Re-apply the bed's real pairing + switch the hub to $scenario. Same return shape as fixture mode. */
+function gs109_int_pair( $scenario = 'connected' ) {
+	$cfg  = gs109_int_cfg();
+	$pair = get_option( 'gs109_int_pairing', false );
+	if ( ! $cfg || ! is_array( $pair ) || empty( $pair['gend_society_install_id'] ) ) {
+		gs109_fail( 'integration', 'pair refused: no saved real pairing (gs109_int_pairing) or /tmp/gs109-int.json' );
+		return array();
+	}
+	gs109_snapshot_options( array( 'gs109_fixture_scenario', 'gs109_fixture_dir', 'gs109_fixture_hub' ) );
+	foreach ( $pair as $n => $v ) {
+		update_option( $n, $v, false );
+	}
+	if ( ! isset( $GLOBALS['gs109_uat']['int_cleanup'] ) ) {
+		$GLOBALS['gs109_uat']['int_cleanup'] = true;
+		gs109_on_cleanup(
+			function () {
+				$GLOBALS['gs109_uat']['int_scenario'] = '';
+				$r = gs109_int_control( 'scenario', array( 's' => 'connected' ) );
+				unset( $GLOBALS['gs109_uat']['int_cleanup'] );
+				if ( isset( $r['error'] ) ) {
+					gs109_info( 'integration cleanup: hub back to connected failed: ' . $r['error'] );
+				}
+			},
+			'integration: hub back to connected'
+		);
+	}
+	$GLOBALS['gs109_uat']['int_scenario'] = '';
+	if ( ! gs109_int_scenario( $scenario ) ) {
+		return array();
+	}
+	$id = function_exists( 'gend_society_plan_identity' ) ? gend_society_plan_identity() : array();
+	return array(
+		'install_id' => (string) get_option( 'gend_society_install_id', '' ),
+		'token'      => isset( $id['token'] ) ? (string) $id['token'] : (string) ( $cfg['token'] ?? '' ),
+		'hub'        => rtrim( (string) $cfg['hub'], '/' ),
+	);
+}
+
+/** Raw token of the real pairing (plugin accessor first, then the saved run config). */
+function gs109_int_token() {
+	$id = function_exists( 'gend_society_plan_identity' ) ? gend_society_plan_identity() : array();
+	if ( ! empty( $id['token'] ) && (string) ( $id['install_id'] ?? '' ) === (string) ( gs109_int_cfg()['install_id'] ?? '' ) ) {
+		return (string) $id['token'];
+	}
+	return (string) ( gs109_int_cfg()['token'] ?? '' );
+}
+
+/** The real hub's decoded answer for a fixture file name in $scenario (switches there and back when needed). */
+function gs109_int_json( $scenario, $file ) {
+	$cfg = gs109_int_cfg();
+	if ( ! $cfg ) {
+		return null;
+	}
+	$map = array(
+		'features.json'          => array( 'GET', 'features' ),
+		'membership.json'        => array( 'GET', 'membership' ),
+		'catalog.json'           => array( 'GET', 'catalog' ),
+		'hub-groups.json'        => array( 'GET', 'hub/groups' ),
+		'hub-feature-suite.json' => array( 'GET', 'hub/feature-suite' ),
+		'hub-projects.json'      => array( 'GET', 'hub/projects' ),
+		'hub-projects-402.json'  => array( 'GET', 'hub/projects' ),
+		'hub-409.json'           => array( 'GET', 'hub/store' ),
+		'hub-404.json'           => array( 'GET', 'hub/no-such-area' ),
+		'revoked-401.json'       => array( 'GET', 'features' ),
+		'change-plan.json'       => array( 'POST', 'membership/change-plan' ),
+		'change-plan-409.json'   => array( 'POST', 'membership/change-plan' ),
+	);
+	$file = basename( (string) $file );
+	if ( ! isset( $map[ $file ] ) ) {
+		gs109_info( "integration: no real route for {$file}" );
+		return null;
+	}
+	$back = gs109_int_current();
+	if ( $back !== $scenario && ! gs109_int_scenario( $scenario ) ) {
+		return null;
+	}
+	list( $method, $route ) = $map[ $file ];
+	$body = null;
+	if ( 'POST' === $method ) {
+		$plan = 20;
+		if ( 'change-plan.json' === $file ) {
+			list( , , $mb ) = gs109_int_curl( 'GET', rtrim( $cfg['hub'], '/' ) . '/wp-json/gdc-app-manager/v1/install/' . rawurlencode( $cfg['install_id'] ) . '/membership', array( 'Authorization' => 'Bearer ' . gs109_int_token() ) );
+			$mj   = json_decode( $mb, true );
+			$ids  = is_array( $mj ) ? array_map( 'intval', (array) ( $mj['checkout_allowed_plan_ids'] ?? array() ) ) : array();
+			$plan = $ids ? $ids[0] : 0;
+		}
+		$body = wp_json_encode( array( 'plan_id' => $plan ) );
+	}
+	$h = array( 'Authorization' => 'Bearer ' . gs109_int_token(), 'Accept' => 'application/json' );
+	if ( null !== $body ) {
+		$h['Content-Type'] = 'application/json';
+	}
+	list( $code, , $raw ) = gs109_int_curl( $method, rtrim( $cfg['hub'], '/' ) . '/wp-json/gdc-app-manager/v1/install/' . rawurlencode( $cfg['install_id'] ) . '/' . $route, $h, $body );
+	if ( '' !== $back && $back !== $scenario ) {
+		gs109_int_scenario( $back );
+	}
+	$j = json_decode( $raw, true );
+	return is_array( $j ) ? $j : null;
+}
+
+/** Hub answers since the last call, as fixture log lines ("<t> scenario=<s> GET features -> 304"). */
+function gs109_int_log_lines() {
+	$p = WP_CONTENT_DIR . '/gs109-http.log';
+	clearstatcache( true, $p );
+	$size = is_readable( $p ) ? (int) filesize( $p ) : 0;
+	if ( ! isset( $GLOBALS['gs109_uat']['int_log_at'] ) ) {
+		$GLOBALS['gs109_uat']['int_log_at'] = $size;
+		return array();
+	}
+	$all = $size > (int) $GLOBALS['gs109_uat']['int_log_at'] ? (string) file_get_contents( $p, false, null, (int) $GLOBALS['gs109_uat']['int_log_at'] ) : '';
+	$out = array();
+	foreach ( array_filter( explode( "\n", $all ) ) as $l ) {
+		$j = json_decode( $l, true );
+		if ( ! is_array( $j ) || empty( $j['hub'] ) || ! preg_match( '#/wp-json/gdc-app-manager/v1/install/[^/]+/([^?]+)#', (string) ( $j['url'] ?? '' ), $m ) ) {
+			continue;
+		}
+		$out[] = gmdate( 'c' ) . ' scenario=' . gs109_int_current() . ' ' . strtoupper( (string) ( $j['method'] ?? 'GET' ) ) . ' ' . trim( $m[1], '/' ) . ' -> ' . (int) ( $j['status'] ?? 0 );
+	}
+	return $out;
 }

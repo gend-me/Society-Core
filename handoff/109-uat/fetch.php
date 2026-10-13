@@ -146,14 +146,15 @@ gs109_assert( $req && '"' . $exp_catalog['rev'] . '"' === gs109p_header( $req[0]
 gs109_assert( 'ok' === $c2['state'] && $c2['payload'] == $c1['payload'] && (int) $cc2['expires'] > time() + 86000, 'fetch-catalog-304-keep', 'catalogue 304: payload kept, expiry bumped' ); // phpcs:ignore Universal.Operators.StrictComparisons
 
 // --- membership: legacy option written, TTL = cache_seconds 60
+$exp_mid = (int) ( gs109_fixture_json( 'connected', 'membership.json' )['membership_id'] ?? 0 );
 gs109p_http();
 $m1 = gend_society_plan_membership( true );
 $mexp = (int) gs109p_raw( 'gend_society_remote_membership_cache_expires' );
-gs109_assert( 'ok' === $m1['state'] && 9101 === (int) ( $m1['payload']['membership_id'] ?? 0 ), 'fetch-membership', 'membership fetched (membership 9101)' );
+gs109_assert( 'ok' === $m1['state'] && $exp_mid > 0 && $exp_mid === (int) ( $m1['payload']['membership_id'] ?? 0 ), 'fetch-membership', 'membership fetched (membership ' . $exp_mid . ')' );
 gs109_assert( $mexp >= time() + 55 && $mexp <= time() + 60, 'fetch-membership-ttl', 'membership TTL = cache_seconds 60 (' . ( $mexp - time() ) . ' s)' );
 gs109p_http();
 $lm = gend_society_remote_membership_get_cached();
-gs109_assert( is_array( $lm ) && 9101 === (int) ( $lm['membership_id'] ?? 0 ) && 0 === count( gs109p_hub_requests( gs109p_http() ) ), 'fetch-membership-legacy', 'gend_society_remote_membership_get_cached() reads the same cache without a request' );
+gs109_assert( is_array( $lm ) && $exp_mid === (int) ( $lm['membership_id'] ?? 0 ) && 0 === count( gs109p_hub_requests( gs109p_http() ) ), 'fetch-membership-legacy', 'gend_society_remote_membership_get_cached() reads the same cache without a request' );
 
 // --- non-200 / transport error: stale payload kept, state unreachable
 update_option( 'gend_society_features_cache_expires', time() - 5, false );
