@@ -549,6 +549,12 @@ return array(
 			'note'  => 'Connection health without cron: throttled admin-load ping to /install/{id}/health, Reconnect notice on 401 (Phase 108). Standalone, connected only.',
 		),
 		array(
+			'file'  => 'inc/plan-access.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone', 'paired' ),
+			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, checkout launcher. Standalone, connected only.',
+		),
+		array(
 			'file'  => 'inc/support-access.php',
 			'tier'  => 'customer',
 			'needs' => array(),

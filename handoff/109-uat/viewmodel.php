@@ -86,7 +86,7 @@ $bad_tier = array_filter(
 gs109_assert( ! empty( $vm['areas'] ) && ! $bad_area && ! empty( $vm['tiers'] ) && ! $bad_tier, 'vm-shape-rows', 'area + tier rows carry every key' );
 gs109_assert_eq( 'ok', $vm['state'] ?? '', 'vm-connected-state', 'connected: state ok' );
 gs109_assert( 'connected' === ( $vm['plan']['slug'] ?? '' ) && 20 === (int) ( $vm['plan']['id'] ?? 0 ) && true === ( $vm['plan']['is_free'] ?? null ) && true === ( $vm['plan']['is_lifetime'] ?? null ) && '' === ( $vm['plan']['next_renewal'] ?? null ), 'vm-connected-plan', 'Connected #20, free, lifetime, no renewal', wp_json_encode( $vm['plan'] ?? null ) );
-gs109_assert( 'connected' === ( $vm['source'] ?? '' ) && null === ( $vm['inherited'] ?? 'x' ) && 'GS109 Owner' === ( $vm['owner_name'] ?? '' ) && false === ( $vm['processing'] ?? null ), 'vm-connected-meta', 'source connected, not inherited, owner name, not processing' );
+gs109_assert( 'connected' === ( $vm['source'] ?? '' ) && array_key_exists( 'inherited', $vm ) && null === $vm['inherited'] && 'GS109 Owner' === ( $vm['owner_name'] ?? '' ) && false === ( $vm['processing'] ?? null ), 'vm-connected-meta', 'source connected, not inherited, owner name, not processing' );
 gs109_assert_eq( array( 'feature-suite', 'groups' ), $by_state( $vm, 'included' ), 'vm-connected-included', 'D11: exactly groups + feature-suite included' );
 gs109_assert_eq( array( 'projects' ), $by_state( $vm, 'upgrade' ), 'vm-connected-upgrade', 'projects is the only upgrade area' );
 $proj = array_values( array_filter( $vm['areas'], function ( $a ) { return 'projects' === $a['slug']; } ) );

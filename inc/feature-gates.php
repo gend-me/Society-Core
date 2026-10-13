@@ -269,6 +269,10 @@ add_action( 'admin_init', 'gend_society_features_enforce_redirect' );
 
 function gend_society_features_enforce_redirect() {
 
+    // Phase 109 (D9, wordpress.org Guideline 5): a standalone install never sends an admin screen to the
+    // upgrade page; the hub enforces plan entitlement on its own routes. Hub and container are unchanged.
+    if ( function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() ) return;
+
     // Super admins + network admins bypass entirely.
     if ( is_multisite() && current_user_can( 'manage_network' ) ) return;
 
@@ -368,6 +372,13 @@ function gend_society_features_enforce_redirect() {
  */
 function gend_society_features_get_cached() {
 
+    // Phase 109 (D10): a connected standalone install reads through the conditional (ETag / 304) fetch in
+    // inc/plan-access.php, which keeps this same option cache. Hub and container are unchanged.
+    if ( function_exists( 'gend_society_plan_features' ) && function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() ) {
+        $plan = gend_society_plan_features();
+        return is_array( $plan['payload'] ) ? $plan['payload'] : null;
+    }
+
     $expires = (int) get_option( GEND_SOCIETY_FEATURES_CACHE_EXPIRES_OPTION, 0 );
     if ( $expires > time() ) {
         $cached = get_option( GEND_SOCIETY_FEATURES_CACHE_OPTION, null );
@@ -388,6 +399,12 @@ function gend_society_features_get_cached() {
  * One-shot fetch from gend.me /install/{install_id}/features.
  */
 function gend_society_features_fetch_remote() {
+
+    // Phase 109 (D10): standalone delegates to the conditional fetch (inc/plan-access.php).
+    if ( function_exists( 'gend_society_plan_features' ) && function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() ) {
+        $plan = gend_society_plan_features();
+        return 'ok' === $plan['state'] ? $plan['payload'] : null;
+    }
 
     // RUN-01: no gend.me request before the owner consented (always true on hub/container).
     if ( function_exists( 'gend_society_remote_allowed' ) && ! gend_society_remote_allowed( 'features' ) ) return null;
