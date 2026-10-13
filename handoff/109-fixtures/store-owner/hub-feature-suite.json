@@ -1,0 +1,89 @@
+{
+  "area": "feature-suite",
+  "state": "included",
+  "data": {
+    "features": [
+      {
+        "slug": "wireframe",
+        "name": "Wireframe Generator (Leo)",
+        "area": "app",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "blog",
+        "name": "Social Blogs",
+        "area": "write",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "email",
+        "name": "Community Emails",
+        "area": "write",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "store",
+        "name": "Store Management",
+        "area": "store",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "sales",
+        "name": "Sales Management",
+        "area": "store",
+        "status": "included",
+        "unlock_plan": null
+      },
+      {
+        "slug": "projects",
+        "name": "Remote Projects",
+        "area": "projects",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      },
+      {
+        "slug": "social",
+        "name": "Social Profiles",
+        "area": "social",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      },
+      {
+        "slug": "membership",
+        "name": "Membership Management",
+        "area": "social",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      },
+      {
+        "slug": "rewards",
+        "name": "Member Rewards",
+        "area": "reward",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      }
+    ]
+  },
+  "cache_seconds": 120,
+  "rev": "d2911883c288b0385c55320368afadc211fac63b"
+}

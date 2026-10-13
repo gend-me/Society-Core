@@ -1,0 +1,45 @@
+{
+  "area": "groups",
+  "state": "included",
+  "data": {
+    "group": {
+      "id": 4101,
+      "name": "GS109 Business Group",
+      "url": "http://localhost:8919/groups/gs109-business-group/",
+      "avatar_url": "http://localhost:8919/wp-content/uploads/group-avatars/4101/avatar.png",
+      "member_count": 3,
+      "description": "Test business group for phase 109."
+    },
+    "members": [
+      {
+        "name": "GS109 Owner",
+        "avatar_url": "http://localhost:8919/wp-content/uploads/avatars/2/avatar.png",
+        "role": "admin"
+      },
+      {
+        "name": "GS109 Moderator",
+        "avatar_url": "http://localhost:8919/wp-content/uploads/avatars/3/avatar.png",
+        "role": "mod"
+      },
+      {
+        "name": "GS109 Member",
+        "avatar_url": "http://localhost:8919/wp-content/uploads/avatars/4/avatar.png",
+        "role": "member"
+      }
+    ],
+    "activity": [
+      {
+        "text": "GS109 Member joined the group GS109 Business Group",
+        "date": "2026-10-12 21:04:00",
+        "url": "http://localhost:8919/groups/gs109-business-group/activity/"
+      },
+      {
+        "text": "GS109 Owner connected a site to the group",
+        "date": "2026-10-12 20:58:00",
+        "url": "http://localhost:8919/groups/gs109-business-group/activity/"
+      }
+    ]
+  },
+  "cache_seconds": 120,
+  "rev": "7f57f9141b16d26501cbdd664d9e6f05ebc903fe"
+}

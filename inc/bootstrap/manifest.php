@@ -549,6 +549,18 @@ return array(
 			'note'  => 'Connection health without cron: throttled admin-load ping to /install/{id}/health, Reconnect notice on 401 (Phase 108). Standalone, connected only.',
 		),
 		array(
+			'file'  => 'inc/plan-access.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone', 'paired' ),
+			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, checkout launcher. Standalone, connected only.',
+		),
+		array(
+			'file'  => 'inc/hub-embed.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone', 'paired' ),
+			'note'  => 'Phase 109: GenD > Groups / Feature Suite / Projects rendered locally from hub JSON (no iframe, local assets). Standalone, connected only; after plan-access.php.',
+		),
+		array(
 			'file'  => 'inc/support-access.php',
 			'tier'  => 'customer',
 			'needs' => array(),
@@ -635,6 +647,12 @@ return array(
 			'tier'  => 'customer',
 			'needs' => array( 'standalone' ),
 			'note'  => 'GenD page + welcome notice.',
+		),
+		array(
+			'file'  => 'inc/pages/plan.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Phase 109: GenD > Plan & features (membership card, Feature Access, comparison, popup checkout). Standalone only.',
 		),
 		array(
 			'file'  => 'inc/theme-download-notice.php',

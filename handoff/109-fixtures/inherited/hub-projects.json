@@ -1,0 +1,22 @@
+{
+  "area": "projects",
+  "state": "included",
+  "data": {
+    "projects": [
+      {
+        "title": "Spring catalogue shoot",
+        "status": "in_progress",
+        "due": "2026-11-02",
+        "url": "http://localhost:8919/groups/gs109-business-group/projects/101/"
+      },
+      {
+        "title": "Member onboarding emails",
+        "status": "open",
+        "due": "",
+        "url": "http://localhost:8919/groups/gs109-business-group/projects/102/"
+      }
+    ]
+  },
+  "cache_seconds": 120,
+  "rev": "ae8de4f73a61da0710904e8e2f4957a191824839"
+}

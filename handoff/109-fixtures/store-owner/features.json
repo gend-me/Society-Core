@@ -1,0 +1,119 @@
+{
+  "plan_id": 22,
+  "plan_slug": "store-owner",
+  "plan_name": "Store Owner",
+  "allowed_areas": [
+    "app",
+    "write",
+    "store"
+  ],
+  "is_active": true,
+  "cache_seconds": 3600,
+  "learn_more_pages": [],
+  "plan_source": "site",
+  "inherited_from": null,
+  "areas": [
+    {
+      "slug": "groups",
+      "label": "Groups",
+      "delivery": "hub_embed",
+      "state": "included",
+      "unlock_plan": null,
+      "features": [
+        "Group overview",
+        "Members",
+        "Recent activity"
+      ]
+    },
+    {
+      "slug": "feature-suite",
+      "label": "Feature Suite",
+      "delivery": "hub_embed",
+      "state": "included",
+      "unlock_plan": null,
+      "features": [
+        "Feature status for your plan"
+      ]
+    },
+    {
+      "slug": "projects",
+      "label": "Projects",
+      "delivery": "hub_embed",
+      "state": "upgrade",
+      "unlock_plan": {
+        "id": 23,
+        "slug": "social-connector",
+        "name": "Social Connector"
+      },
+      "features": [
+        "Remote Projects"
+      ]
+    },
+    {
+      "slug": "app",
+      "label": "App Builder",
+      "delivery": "container_only",
+      "state": "after_migration",
+      "unlock_plan": null,
+      "features": [
+        "Wireframe Generator (Leo)"
+      ]
+    },
+    {
+      "slug": "write",
+      "label": "Content",
+      "delivery": "container_only",
+      "state": "after_migration",
+      "unlock_plan": null,
+      "features": [
+        "Social Blogs",
+        "Community Emails"
+      ]
+    },
+    {
+      "slug": "store",
+      "label": "Store",
+      "delivery": "container_only",
+      "state": "after_migration",
+      "unlock_plan": null,
+      "features": [
+        "Store Management",
+        "Sales Management"
+      ]
+    },
+    {
+      "slug": "social",
+      "label": "Social",
+      "delivery": "container_only",
+      "state": "after_migration",
+      "unlock_plan": null,
+      "features": [
+        "Social Profiles",
+        "Membership Management"
+      ]
+    },
+    {
+      "slug": "reward",
+      "label": "Rewards",
+      "delivery": "container_only",
+      "state": "after_migration",
+      "unlock_plan": null,
+      "features": [
+        "Member Rewards"
+      ]
+    },
+    {
+      "slug": "hosting",
+      "label": "Hosting",
+      "delivery": "container_only",
+      "state": "after_migration",
+      "unlock_plan": null,
+      "features": [
+        "Managed container hosting",
+        "Daily backups",
+        "Custom domains"
+      ]
+    }
+  ],
+  "rev": "a26476dd71400f0703820d456afa2a333c6edb2e"
+}

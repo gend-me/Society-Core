@@ -1,0 +1,109 @@
+{
+  "area": "feature-suite",
+  "state": "included",
+  "data": {
+    "features": [
+      {
+        "slug": "wireframe",
+        "name": "Wireframe Generator (Leo)",
+        "area": "app",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 21,
+          "slug": "content-builder",
+          "name": "Content Builder"
+        }
+      },
+      {
+        "slug": "blog",
+        "name": "Social Blogs",
+        "area": "write",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 21,
+          "slug": "content-builder",
+          "name": "Content Builder"
+        }
+      },
+      {
+        "slug": "email",
+        "name": "Community Emails",
+        "area": "write",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 21,
+          "slug": "content-builder",
+          "name": "Content Builder"
+        }
+      },
+      {
+        "slug": "store",
+        "name": "Store Management",
+        "area": "store",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 22,
+          "slug": "store-owner",
+          "name": "Store Owner"
+        }
+      },
+      {
+        "slug": "sales",
+        "name": "Sales Management",
+        "area": "store",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 22,
+          "slug": "store-owner",
+          "name": "Store Owner"
+        }
+      },
+      {
+        "slug": "projects",
+        "name": "Remote Projects",
+        "area": "projects",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      },
+      {
+        "slug": "social",
+        "name": "Social Profiles",
+        "area": "social",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      },
+      {
+        "slug": "membership",
+        "name": "Membership Management",
+        "area": "social",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      },
+      {
+        "slug": "rewards",
+        "name": "Member Rewards",
+        "area": "reward",
+        "status": "upgrade_required",
+        "unlock_plan": {
+          "id": 23,
+          "slug": "social-connector",
+          "name": "Social Connector"
+        }
+      }
+    ]
+  },
+  "cache_seconds": 120,
+  "rev": "16ad9ffd720cf8f59d4c69ccc333a53894d144a6"
+}

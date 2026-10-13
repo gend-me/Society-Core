@@ -207,6 +207,10 @@ function gend_society_media_storage_panel_enqueue( $hook_suffix ) {
  * Standalone vanilla-JS popup handler. Mirrors dashboard-remote-membership.php
  * :830-857 but self-contained (no dependency on the dashboard IIFE).
  *
+ * Phase 109: the popup closing is the only completion signal. The unchecked
+ * (any origin) membership-changed message listener was removed in every mode;
+ * the hub no longer posts that message (109-07).
+ *
  * @return string
  */
 function gend_society_media_storage_panel_inline_js() {
@@ -245,13 +249,6 @@ function gend_society_media_storage_panel_inline_js() {
 			var watchdog = setInterval(function () {
 				if (popup.closed) { clearInterval(watchdog); refreshAndReload(); }
 			}, 600);
-			window.addEventListener('message', function onMsg(ev) {
-				if (!ev.data || ev.data.type !== 'gs_membership_changed') { return; }
-				window.removeEventListener('message', onMsg);
-				clearInterval(watchdog);
-				try { popup.close(); } catch (e) {}
-				refreshAndReload();
-			});
 		});
 	}
 

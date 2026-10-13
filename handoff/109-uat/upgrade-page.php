@@ -1,0 +1,132 @@
+<?php
+/**
+ * Section upgrade-page (plan 109-08; PLAN-05, D12): the one upgrade page, admin.php?page=gs-feature-upgrade.
+ *
+ * standalone (fixture hub):
+ *   - copy per state from the view-model: Upgrade "Available with <plan>" + the 109-06 Choose button (popup
+ *     launcher), After migration "Runs on your gend.me container after migration" + an outbound link to the hub
+ *     (new tab, noopener, no Choose), Included links to the hub page; the Upgrade and After migration strings
+ *     differ and equal the Plan & features card copy for the same areas (109-06 copy list)
+ *   - revoked -> Reconnect; inherited -> Projects included; unknown area copy
+ *   - the Refresh AJAX (gs_view=upgrade) returns #gs-feature-upgrade re-rendered after a plan change
+ *   - real loopback page: no <iframe>, gs-plan.js/css local with refreshView upgrade, no inline script/style in
+ *     the page body, no token; subscriber gets no page
+ * hub / container: the page renders the 1.4.0 output for 28 inputs except the declared EXPECTED classes (D12
+ *   iframe -> outbound link, LISTENER removal); no <iframe>, no gs_membership_changed listener in the output.
+ *
+ * @package gend-society
+ */
+
+defined( 'ABSPATH' ) || exit;
+require_once __DIR__ . '/_output.php';
+
+if ( 'standalone' !== gs109_mode() ) {
+	gs109p_setup();
+	$par = gs109o_upgrade_parity();
+	gs109_info( 'upgrade page renders compared: ' . $par['cases'] . ' (D12 replaced ' . $par['D12'] . ', LISTENER removed ' . $par['LISTENER'] . ')' );
+	gs109_assert( $par['cases'] >= 28 && $par['D12'] > 0 && $par['LISTENER'] === $par['cases'], 'upgrade-parity-nontrivial', 'every 1.4.0 render had the listener and the learn-more inputs had the iframe' );
+	gs109_assert( ! $par['diff'], 'upgrade-parity', gs109_mode() . ': upgrade page == 1.4.0 except D12 + LISTENER (' . $par['cases'] . ' renders)', implode( ' | ', array_slice( $par['diff'], 0, 3 ) ) );
+	gs109_assert( 0 === $par['iframes_new'] && 0 === $par['listener_new'], 'upgrade-no-iframe', 'no <iframe> and no gs_membership_changed listener in any render' );
+	$xp = gs109pl_xp( $par['sample'] );
+	$a  = $xp->query( '//div[@class="gs-up-learn-more-embed"]/a' );
+	gs109_assert( $a && 1 === $a->length && '_blank' === $a->item( 0 )->getAttribute( 'target' ) && 'noopener' === $a->item( 0 )->getAttribute( 'rel' ) && 'More about this upgrade' === trim( $a->item( 0 )->textContent ) && false === strpos( $a->item( 0 )->getAttribute( 'href' ), 'gdc_upgrade_embed' ), 'upgrade-learn-link', 'learn more: outbound link, new tab, noopener, same label, no embed flag' );
+	gs109_assert( false === has_action( 'admin_enqueue_scripts', 'gend_society_feature_upgrade_standalone_enqueue' ) && false === has_filter( 'gend_society_plan_refresh_html', 'gend_society_feature_upgrade_refresh_fragment' ), 'upgrade-standalone-hooks-absent', 'standalone upgrade hooks not registered on ' . gs109_mode() );
+	// No loopback page check here: on the single-site container bed every gend-society admin screen dies in
+	// inc/group-embed.php (get_blog_option() is multisite-only; pre-existing, 109-08 deferred item). The in-process
+	// renders above are the page callback's full output.
+	return;
+}
+
+$fx = gs109pl_start( 'connected' );
+if ( ! $fx || ! gs109_assert( function_exists( 'gend_society_feature_upgrade_render_standalone' ), 'upgrade-loaded', 'standalone upgrade renderer present' ) ) {
+	return;
+}
+$hp = GEND_SOCIETY_DIR . 'inc/hub-embed.php';
+if ( ! function_exists( 'gend_society_hub_area_fetch' ) && is_readable( $hp ) ) {
+	require_once $hp;
+}
+$token = $fx['token'];
+$frag  = function ( $area, $vm ) {
+	return gend_society_feature_upgrade_fragment( $area, $vm );
+};
+
+// ── connected ─────────────────────────────────────────────────────────────────────────────────────────
+$vm   = gs109pl_vm( 'connected' );
+$card = gs109pl_xp( gend_society_plan_render_areas_card( $vm ) );
+
+$xp = gs109pl_xp( $frag( 'projects', $vm ) );
+$up = gs109pl_text( $xp, '//*[@data-gs-up-copy="upgrade"]' );
+gs109_assert_eq( 'upgrade', gs109pl_attrs( $xp, '//div[@data-gs-up-area="projects"]', 'data-gs-up-state' )[0] ?? '', 'upgrade-projects-state', 'projects: Upgrade state' );
+gs109_assert_eq( 'Available with Social Connector', $up, 'upgrade-projects-copy', 'projects: "Available with Social Connector"' );
+gs109_assert_eq( gs109pl_text( $card, '//li[@data-gs-plan-area="projects"]/a[@class="gs-plan-area__state"]' ), $up, 'upgrade-copy-matches-card', 'Upgrade copy == the Plan & features card copy (109-06 list)' );
+$ch = gs109pl_choose( $xp );
+gs109_assert( array_keys( $ch ) === array( 23 ) && '23' === gs109pl_launcher_plan( $ch[23]['href'] ) && '_blank' === $ch[23]['target'] && 'opener' === $ch[23]['rel'] && 'Choose Social Connector' === $ch[23]['text'], 'upgrade-projects-choose', 'Choose Social Connector: admin-post launcher, target _blank, rel opener (gs-plan.js popup)', $ch );
+gs109_assert( 1 === gs109pl_count( $xp, '//button[@data-gs-plan-refresh]' ), 'upgrade-refresh-button', 'Refresh button (gs-plan.js)' );
+
+$xp = gs109pl_xp( $frag( 'write', $vm ) );
+$am = gs109pl_text( $xp, '//*[@data-gs-up-copy="after_migration"]' );
+gs109_assert_eq( 'Runs on your gend.me container after migration', $am, 'upgrade-write-copy', 'write: After migration copy' );
+gs109_assert_eq( gs109pl_text( $card, '//li[@data-gs-plan-area="write"]/span[@class="gs-plan-area__state"]' ), $am, 'upgrade-after-matches-card', 'After migration copy == the Plan & features card copy' );
+gs109_assert( $up !== $am, 'upgrade-copy-differs', 'Upgrade and After migration copy differ' );
+$ob = $xp->query( '//a[@data-gs-up-outbound]' );
+gs109_assert( 1 === $ob->length && 'http://localhost:8919/my-account/memberships/' === $ob->item( 0 )->getAttribute( 'href' ) && '_blank' === $ob->item( 0 )->getAttribute( 'target' ) && 'noopener' === $ob->item( 0 )->getAttribute( 'rel' ) && 'See container plans on gend.me' === trim( $ob->item( 0 )->textContent ), 'upgrade-write-outbound', 'After migration: "See container plans on gend.me" on the hub, new tab, noopener' );
+gs109_assert( 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout]' ), 'upgrade-write-nochoose', 'After migration: no Choose button (no popup)' );
+gs109_assert_eq( 'Content', gs109pl_text( $xp, '//div[@data-gs-up-area="write"]/h2' ), 'upgrade-write-label', 'area label from the hub (Content)' );
+
+$xp = gs109pl_xp( $frag( 'groups', $vm ) );
+$op = gs109pl_attrs( $xp, '//div[@data-gs-up-area="groups"]//a[contains(@class,"button-primary")]', 'href' );
+gs109_assert( 'Included with your plan' === gs109pl_text( $xp, '//*[@data-gs-up-copy="included"]' ) && $op && html_entity_decode( $op[0] ) === admin_url( 'admin.php?page=gs-hub-groups' ), 'upgrade-groups-included', 'groups: Included, links to GenD > Groups', $op );
+
+$xp = gs109pl_xp( $frag( 'nosuch', $vm ) );
+gs109_assert_eq( 'unknown', gs109pl_attrs( $xp, '//div[@data-gs-up-area="nosuch"]', 'data-gs-up-state' )[0] ?? '', 'upgrade-unknown', 'unknown area: neutral copy' );
+
+// ── store-owner: Social Connector still purchasable; inherited: projects included, nothing to buy ───────────
+$vm = gs109pl_vm( 'store-owner' );
+gs109_assert_eq( array( 23 ), array_keys( gs109pl_choose( gs109pl_xp( $frag( 'projects', $vm ) ) ) ), 'upgrade-store-owner', 'store-owner: projects -> Choose Social Connector' );
+$vm = gs109pl_vm( 'inherited' );
+$xp = gs109pl_xp( $frag( 'projects', $vm ) );
+gs109_assert( 'Included with your plan' === gs109pl_text( $xp, '//*[@data-gs-up-copy="included"]' ) && 0 === gs109pl_count( $xp, '//a[@data-gs-plan-checkout]' ), 'upgrade-inherited', 'inherited: projects Included, no Choose' );
+$vm = gs109pl_vm( 'revoked' );
+$xp = gs109pl_xp( $frag( 'projects', $vm ) );
+gs109_assert( 'revoked' === ( gs109pl_attrs( $xp, '//div[@data-gs-up-area="projects"]', 'data-gs-up-state' )[0] ?? '' ) && false !== strpos( (string) gs109pl_text( $xp, '//div[@id="gs-feature-upgrade"]' ), 'Reconnect to gend.me' ), 'upgrade-revoked', 'revoked: Reconnect' );
+
+// ── Refresh AJAX (gs_view=upgrade) ───────────────────────────────────────────────────────────────────────
+gs109_fixture_scenario( 'connected' );
+gs109p_clear_caches();
+gend_society_plan_view_model( true );
+gs109_fixture_scenario( 'inherited' );
+$r    = gs109p_call( 'gend_society_plan_refresh_ajax', 'POST', array(), array( 'nonce' => wp_create_nonce( 'gs_plan' ), 'gs_view' => 'upgrade', 'gs_area' => 'projects' ), true );
+$html = is_array( $r['json'] ) ? (array) ( $r['json']['data']['html'] ?? array() ) : array();
+$xp   = gs109pl_xp( (string) ( $html['gs-feature-upgrade'] ?? '' ) );
+gs109_assert( ! empty( $r['json']['success'] ) && 'included' === ( gs109pl_attrs( $xp, '//div[@id="gs-feature-upgrade"]/div', 'data-gs-up-state' )[0] ?? '' ), 'upgrade-refresh', 'Refresh AJAX returns #gs-feature-upgrade re-rendered (Upgrade -> Included after the plan change)', array_keys( $html ) );
+gs109_fixture_scenario( 'connected' );
+gs109p_clear_caches();
+
+// ── real page over loopback ─────────────────────────────────────────────────────────────────────────────
+$sess = gs109p_session( gs109p_admin_id() );
+$bed  = strtolower( (string) wp_parse_url( home_url(), PHP_URL_HOST ) . ( wp_parse_url( home_url(), PHP_URL_PORT ) ? ':' . wp_parse_url( home_url(), PHP_URL_PORT ) : '' ) );
+foreach ( array( 'projects' => 'upgrade', 'write' => 'after_migration', 'store' => 'after_migration' ) as $area => $state ) {
+	$p  = gs109p_web( 'GET', admin_url( 'admin.php?page=gs-feature-upgrade&area=' . $area ), $sess );
+	$xp = gs109pl_xp_page( $p['body'] );
+	gs109_assert( 200 === $p['status'] && $state === ( gs109pl_attrs( $xp, '//div[@id="gs-feature-upgrade"]/div', 'data-gs-up-state' )[0] ?? '' ), "upgrade-page-{$area}", "admin.php?page=gs-feature-upgrade&area={$area}: 200, {$state}", $p['status'] . ' ' . $p['error'] );
+	gs109_assert( false === stripos( $p['body'], '<iframe' ) && 0 === gs109pl_count( $xp, '//iframe' ), "upgrade-page-{$area}-noiframe", 'no <iframe>' );
+	$wrap = $xp->query( '//div[contains(concat(" ",normalize-space(@class)," ")," gend-society-upgrade ")]' );
+	gs109_assert( $wrap && 1 === $wrap->length && 0 === $xp->query( './/script|.//style', $wrap->item( 0 ) )->length && false === strpos( $p['body'], 'gs-up-shell' ), "upgrade-page-{$area}-noinline", 'page body: no <script>/<style>, not the 1.4.0 layout' );
+	$pj   = gs109pl_attrs( $xp, '//script[@id="gend-society-plan-js"]', 'src' );
+	$pex  = (string) gs109pl_text( $xp, '//script[@id="gend-society-plan-js-extra"]' );
+	$pcfg = preg_match( '/var gendSocietyPlan = (\{.*\});/s', $pex, $m ) ? json_decode( $m[1], true ) : null;
+	gs109_assert( $pj && 0 === strpos( $pj[0], GEND_SOCIETY_URL . 'assets/gs-plan.js' ) && is_array( $pcfg ) && 'upgrade' === ( $pcfg['refreshView'] ?? '' ) && $area === ( $pcfg['refreshArea'] ?? '' ) && 'http://localhost:8919' === ( $pcfg['hubOrigin'] ?? '' ), "upgrade-page-{$area}-assets", 'gs-plan.js from the plugin, refreshView upgrade / refreshArea ' . $area );
+	$foreign = array();
+	foreach ( array_merge( gs109pl_attrs( $xp, '//script[@src]', 'src' ), gs109pl_attrs( $xp, '//link[contains(concat(" ",normalize-space(@rel)," ")," stylesheet ")]', 'href' ) ) as $u ) {
+		$hh = wp_parse_url( $u, PHP_URL_HOST );
+		$pp = wp_parse_url( $u, PHP_URL_PORT );
+		if ( $hh && strtolower( $hh . ( $pp ? ':' . $pp : '' ) ) !== $bed ) {
+			$foreign[] = $u;
+		}
+	}
+	gs109_assert( ! $foreign, "upgrade-page-{$area}-local", 'scripts / stylesheets on the bed only', $foreign );
+	gs109_assert( false === strpos( $p['body'], $token ) && false === strpos( $p['body'], 'gs_membership_changed' ), "upgrade-page-{$area}-clean", 'no token, no legacy listener' );
+}
+$sub = gs109p_session( gs109p_user( 'subscriber' ) );
+$sp  = gs109p_web( 'GET', admin_url( 'admin.php?page=gs-feature-upgrade&area=projects' ), $sub );
+gs109_assert( false === strpos( $sp['body'], 'id="gs-feature-upgrade"' ), 'upgrade-subscriber', 'subscriber: no upgrade copy / Choose button', $sp['status'] );

@@ -1180,10 +1180,17 @@ function gend_society_render_membership_panel( $payload = null ) {
                                     <?php endif; ?>
                                 </div>
                             </div>
+<?php /* Phase 109: standalone installs choose plans on GenD > Plan & features (popup checkout); control lines at column 0 keep hub/container output byte-identical. */ ?>
+<?php if ( function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() && function_exists( 'gend_society_plan_page_url' ) ) : ?>
+                            <a class="gs-mship-action-btn" href="<?php echo esc_url( gend_society_plan_page_url() ); ?>" style="display: block; width: 100%; max-width: 420px; margin: 12px auto 0; text-align: center;">
+                                <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
+                            </a>
+<?php else : ?>
                             <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="dashboard" style="display: block; width: 100%; max-width: 420px; margin: 12px auto 0;" aria-expanded="false" aria-controls="gs-plan-picker-membership-top">
                                 <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
                             </button>
                             <div class="gs-plan-picker" id="gs-plan-picker-membership-top" style="max-width: 420px; margin: 0 auto;" hidden></div>
+<?php endif; ?>
                         <?php endif; ?>
                     </div>
                 </div>

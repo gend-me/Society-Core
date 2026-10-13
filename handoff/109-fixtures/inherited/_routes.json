@@ -1,0 +1,58 @@
+{
+  "scenario": "inherited",
+  "conditional": false,
+  "routes": {
+    "features": {
+      "status": 200,
+      "file": "features.json"
+    },
+    "membership": {
+      "status": 200,
+      "file": "membership.json"
+    },
+    "membership/change-plan": {
+      "status": 200,
+      "file": "change-plan.json",
+      "method": "POST",
+      "not_allowed": {
+        "status": 409,
+        "file": "change-plan-409.json"
+      }
+    },
+    "catalog": {
+      "status": 200,
+      "file": "catalog.json"
+    },
+    "hub/groups": {
+      "status": 200,
+      "file": "hub-groups.json"
+    },
+    "hub/feature-suite": {
+      "status": 200,
+      "file": "hub-feature-suite.json"
+    },
+    "hub/*": {
+      "status": 409,
+      "file": "hub-409.json",
+      "unknown": {
+        "status": 404,
+        "file": "hub-404.json"
+      },
+      "known": [
+        "groups",
+        "feature-suite",
+        "projects",
+        "app",
+        "write",
+        "store",
+        "social",
+        "reward",
+        "hosting"
+      ]
+    },
+    "hub/projects": {
+      "status": 200,
+      "file": "hub-projects.json"
+    }
+  }
+}

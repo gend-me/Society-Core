@@ -1,0 +1,273 @@
+{
+  "tiers": [
+    {
+      "id": 21,
+      "slug": "content-builder",
+      "name": "Content Builder",
+      "price_label": "$14.99 / month",
+      "amount": 14.99,
+      "currency": "USD",
+      "interval": "month",
+      "image": "",
+      "rank": 1,
+      "is_current": false,
+      "is_inherited": false,
+      "checkout_allowed": true
+    },
+    {
+      "id": 22,
+      "slug": "store-owner",
+      "name": "Store Owner",
+      "price_label": "$29.99 / month",
+      "amount": 29.99,
+      "currency": "USD",
+      "interval": "month",
+      "image": "",
+      "rank": 2,
+      "is_current": false,
+      "is_inherited": false,
+      "checkout_allowed": true
+    },
+    {
+      "id": 23,
+      "slug": "social-connector",
+      "name": "Social Connector",
+      "price_label": "$49.99 / month",
+      "amount": 49.99,
+      "currency": "USD",
+      "interval": "month",
+      "image": "",
+      "rank": 3,
+      "is_current": false,
+      "is_inherited": false,
+      "checkout_allowed": true
+    }
+  ],
+  "areas": [
+    {
+      "slug": "groups",
+      "label": "Groups",
+      "delivery": "hub_embed"
+    },
+    {
+      "slug": "feature-suite",
+      "label": "Feature Suite",
+      "delivery": "hub_embed"
+    },
+    {
+      "slug": "projects",
+      "label": "Projects",
+      "delivery": "hub_embed"
+    },
+    {
+      "slug": "app",
+      "label": "App Builder",
+      "delivery": "container_only"
+    },
+    {
+      "slug": "write",
+      "label": "Content",
+      "delivery": "container_only"
+    },
+    {
+      "slug": "store",
+      "label": "Store",
+      "delivery": "container_only"
+    },
+    {
+      "slug": "social",
+      "label": "Social",
+      "delivery": "container_only"
+    },
+    {
+      "slug": "reward",
+      "label": "Rewards",
+      "delivery": "container_only"
+    },
+    {
+      "slug": "hosting",
+      "label": "Hosting",
+      "delivery": "container_only"
+    }
+  ],
+  "matrix": {
+    "content-builder": {
+      "groups": "included",
+      "feature-suite": "included",
+      "projects": "no",
+      "app": "included",
+      "write": "included",
+      "store": "no",
+      "social": "no",
+      "reward": "no",
+      "hosting": "no"
+    },
+    "store-owner": {
+      "groups": "included",
+      "feature-suite": "included",
+      "projects": "no",
+      "app": "included",
+      "write": "included",
+      "store": "included",
+      "social": "no",
+      "reward": "no",
+      "hosting": "no"
+    },
+    "social-connector": {
+      "groups": "included",
+      "feature-suite": "included",
+      "projects": "included",
+      "app": "included",
+      "write": "included",
+      "store": "included",
+      "social": "included",
+      "reward": "included",
+      "hosting": "no"
+    }
+  },
+  "after_migration": [
+    {
+      "area": "app",
+      "label": "App Builder",
+      "features": [
+        "Wireframe Generator (Leo)"
+      ]
+    },
+    {
+      "area": "write",
+      "label": "Content",
+      "features": [
+        "Social Blogs",
+        "Community Emails"
+      ]
+    },
+    {
+      "area": "store",
+      "label": "Store",
+      "features": [
+        "Store Management",
+        "Sales Management"
+      ]
+    },
+    {
+      "area": "social",
+      "label": "Social",
+      "features": [
+        "Social Profiles",
+        "Membership Management"
+      ]
+    },
+    {
+      "area": "reward",
+      "label": "Rewards",
+      "features": [
+        "Member Rewards"
+      ]
+    },
+    {
+      "area": "hosting",
+      "label": "Hosting",
+      "features": [
+        "Managed container hosting",
+        "Daily backups",
+        "Custom domains"
+      ]
+    }
+  ],
+  "features": [
+    {
+      "slug": "wireframe",
+      "name": "Wireframe Generator (Leo)",
+      "area": "app",
+      "unlock_plan": {
+        "id": 21,
+        "slug": "content-builder",
+        "name": "Content Builder"
+      }
+    },
+    {
+      "slug": "blog",
+      "name": "Social Blogs",
+      "area": "write",
+      "unlock_plan": {
+        "id": 21,
+        "slug": "content-builder",
+        "name": "Content Builder"
+      }
+    },
+    {
+      "slug": "email",
+      "name": "Community Emails",
+      "area": "write",
+      "unlock_plan": {
+        "id": 21,
+        "slug": "content-builder",
+        "name": "Content Builder"
+      }
+    },
+    {
+      "slug": "store",
+      "name": "Store Management",
+      "area": "store",
+      "unlock_plan": {
+        "id": 22,
+        "slug": "store-owner",
+        "name": "Store Owner"
+      }
+    },
+    {
+      "slug": "sales",
+      "name": "Sales Management",
+      "area": "store",
+      "unlock_plan": {
+        "id": 22,
+        "slug": "store-owner",
+        "name": "Store Owner"
+      }
+    },
+    {
+      "slug": "projects",
+      "name": "Remote Projects",
+      "area": "projects",
+      "unlock_plan": {
+        "id": 23,
+        "slug": "social-connector",
+        "name": "Social Connector"
+      }
+    },
+    {
+      "slug": "social",
+      "name": "Social Profiles",
+      "area": "social",
+      "unlock_plan": {
+        "id": 23,
+        "slug": "social-connector",
+        "name": "Social Connector"
+      }
+    },
+    {
+      "slug": "membership",
+      "name": "Membership Management",
+      "area": "social",
+      "unlock_plan": {
+        "id": 23,
+        "slug": "social-connector",
+        "name": "Social Connector"
+      }
+    },
+    {
+      "slug": "rewards",
+      "name": "Member Rewards",
+      "area": "reward",
+      "unlock_plan": {
+        "id": 23,
+        "slug": "social-connector",
+        "name": "Social Connector"
+      }
+    }
+  ],
+  "current_plan_slug": "connected",
+  "plan_source": "connected",
+  "cache_seconds": 86400,
+  "rev": "c66e8ff7a0facb62e6fe920d9a64595e51219f77"
+}
