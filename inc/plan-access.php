@@ -323,7 +323,6 @@ if ( ! function_exists( 'gend_society_plan_invalidate_all' ) ) {
 	 * but their revisions go, so the next fetch is unconditional.
 	 */
 	function gend_society_plan_invalidate_all(): void {
-		global $wpdb;
 		if ( function_exists( 'gend_society_features_invalidate' ) ) {
 			gend_society_features_invalidate();
 		}
@@ -333,9 +332,9 @@ if ( ! function_exists( 'gend_society_plan_invalidate_all' ) ) {
 		gend_society_plan_cache_expire( 'gend_society_features_cache', true );
 		gend_society_plan_cache_expire( 'gend_society_remote_membership_cache', true );
 		gend_society_plan_cache_expire( 'gend_society_plan_catalog_cache', true );
-		$names = $wpdb->get_col( $wpdb->prepare( "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s", $wpdb->esc_like( 'gend_society_hub_area_cache_' ) . '%' ) );
-		foreach ( (array) $names as $name ) {
-			delete_option( $name );
+		$areas = function_exists( 'gend_society_hub_embed_areas' ) ? array_keys( gend_society_hub_embed_areas() ) : array( 'groups', 'feature-suite', 'projects' );
+		foreach ( $areas as $area ) {
+			delete_option( 'gend_society_hub_area_cache_' . sanitize_key( $area ) );
 		}
 		do_action( 'gend_society_plan_invalidated' );
 	}
@@ -787,7 +786,7 @@ if ( ! function_exists( 'gend_society_plan_launcher_error' ) ) {
 		);
 		$status = $codes[ $error->get_error_code() ] ?? 502;
 		add_filter( 'wp_die_handler', 'gend_society_plan_launcher_die_handler_name', 100 );
-		wp_die( esc_html( $error->get_error_message() ), esc_html__( 'Checkout could not open', 'gend-society' ), array( 'response' => $status ) );
+		wp_die( esc_html( $error->get_error_message() ), esc_html__( 'Checkout could not open', 'gend-society' ), array( 'response' => (int) $status ) );
 	}
 }
 
