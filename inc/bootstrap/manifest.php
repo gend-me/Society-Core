@@ -643,6 +643,12 @@ return array(
 			'note'  => 'GenD page + welcome notice.',
 		),
 		array(
+			'file'  => 'inc/pages/plan.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Phase 109: GenD > Plan & features (membership card, Feature Access, comparison, popup checkout). Standalone only.',
+		),
+		array(
 			'file'  => 'inc/theme-download-notice.php',
 			'tier'  => 'customer',
 			'needs' => array( 'standalone' ),

@@ -1,0 +1,205 @@
+/*
+ * GenD > Plan & features (standalone installs, inc/pages/plan.php). WordPress-native look: core admin
+ * colours, system fonts, no remote fonts or images.
+ */
+
+.gend-society-plan {
+	max-width: 1080px;
+}
+
+.gend-society-plan .gend-society-card {
+	box-sizing: border-box;
+	background: #fff;
+	border: 1px solid #c3c4c7;
+	border-radius: 4px;
+	box-shadow: 0 1px 1px rgba(0, 0, 0, 0.04);
+	margin: 0 0 16px;
+	padding: 16px 20px;
+}
+
+.gend-society-plan .gend-society-card h2 {
+	font-size: 16px;
+	margin: 0 0 12px;
+}
+
+.gend-society-plan .gs-plan-toolbar {
+	margin: 8px 0 16px;
+}
+
+.gend-society-plan .gs-plan-live {
+	color: #50575e;
+	margin-left: 8px;
+}
+
+.gend-society-plan .gs-plan-blocked,
+.gend-society-plan .gs-plan-inherit {
+	margin: 0 0 16px;
+}
+
+.gend-society-plan [hidden] {
+	display: none !important;
+}
+
+.gend-society-plan .gs-plan-membership.is-ok {
+	border-left: 4px solid #00a32a;
+}
+
+.gend-society-plan .gs-plan-membership.is-revoked {
+	border-left: 4px solid #d63638;
+}
+
+.gend-society-plan .gs-plan-membership.is-unreachable {
+	border-left: 4px solid #dba617;
+}
+
+.gend-society-plan .gs-plan-summary {
+	align-items: center;
+	display: flex;
+	flex-wrap: wrap;
+	font-size: 15px;
+	gap: 4px;
+}
+
+.gend-society-plan .gs-plan-name {
+	font-size: 18px;
+	font-weight: 600;
+}
+
+.gend-society-plan .gs-plan-sep {
+	color: #8c8f94;
+}
+
+.gend-society-plan .gs-plan-badge {
+	background: #edfaef;
+	border: 1px solid #00a32a;
+	border-radius: 10px;
+	color: #007017;
+	font-size: 12px;
+	font-weight: 600;
+	padding: 1px 8px;
+}
+
+.gend-society-plan .gs-plan-badge.is-on-hold,
+.gend-society-plan .gs-plan-badge.is-pending {
+	background: #fcf9e8;
+	border-color: #dba617;
+	color: #6e4f00;
+}
+
+.gend-society-plan .gs-plan-badge.is-expired,
+.gend-society-plan .gs-plan-badge.is-cancelled {
+	background: #fcf0f1;
+	border-color: #d63638;
+	color: #8a2424;
+}
+
+.gend-society-plan .gs-plan-note {
+	border-left: 4px solid #72aee6;
+	background: #f6f7f7;
+	margin: 12px 0;
+	padding: 4px 12px;
+}
+
+.gend-society-plan .gs-plan-note--warning,
+.gend-society-plan .gs-plan-note--processing {
+	border-left-color: #dba617;
+}
+
+.gend-society-plan .gs-plan-note--error {
+	border-left-color: #d63638;
+}
+
+.gend-society-plan .gs-plan-owner {
+	color: #50575e;
+}
+
+.gend-society-plan .gs-plan-areas__group {
+	font-size: 14px;
+	margin: 16px 0 6px;
+}
+
+.gend-society-plan .gs-plan-areas__list {
+	margin: 0;
+}
+
+.gend-society-plan .gs-plan-area {
+	border-bottom: 1px solid #f0f0f1;
+	display: flex;
+	flex-wrap: wrap;
+	gap: 4px 12px;
+	margin: 0;
+	padding: 8px 0;
+}
+
+.gend-society-plan .gs-plan-area__label {
+	font-weight: 600;
+	min-width: 140px;
+}
+
+.gend-society-plan .gs-plan-area.is-after-migration .gs-plan-area__state {
+	color: #50575e;
+}
+
+.gend-society-plan .gs-plan-area__features {
+	color: #646970;
+	flex-basis: 100%;
+	font-size: 12px;
+}
+
+.gend-society-plan .gs-plan-compare__scroll {
+	overflow-x: auto;
+}
+
+.gend-society-plan .gs-plan-compare__table th,
+.gend-society-plan .gs-plan-compare__table td {
+	text-align: center;
+	vertical-align: middle;
+}
+
+.gend-society-plan .gs-plan-compare__table tbody th {
+	text-align: left;
+}
+
+.gend-society-plan .gs-plan-compare__name,
+.gend-society-plan .gs-plan-compare__price,
+.gend-society-plan .gs-plan-compare__tag {
+	display: block;
+}
+
+.gend-society-plan .gs-plan-compare__name {
+	font-weight: 600;
+}
+
+.gend-society-plan .gs-plan-compare__price,
+.gend-society-plan .gs-plan-compare__tag {
+	color: #50575e;
+	font-size: 12px;
+}
+
+.gend-society-plan .gs-plan-compare__tier.is-current,
+.gend-society-plan .gs-plan-compare__cell.is-current {
+	background: #edfaef;
+}
+
+.gend-society-plan .gs-plan-compare__tier.is-inherited,
+.gend-society-plan .gs-plan-compare__cell.is-inherited {
+	background: #f0f6fc;
+}
+
+.gend-society-plan .gs-plan-compare__cell.is-included {
+	color: #007017;
+	font-weight: 600;
+}
+
+.gend-society-plan .gs-plan-compare__cell.is-no {
+	color: #8c8f94;
+}
+
+.gend-society-plan .gs-plan-compare__where {
+	color: #50575e;
+	font-size: 12px;
+}
+
+.gend-society-plan .gs-plan-compare__after li {
+	margin: 4px 0;
+}
