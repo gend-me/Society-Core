@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.4.0
+Stable tag: 1.5.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -82,8 +82,11 @@ This plugin connects to outside services only after a site administrator chooses
 [gend.me](https://gend.me) is the GenD business-group and hosting platform. The plugin uses it in these cases:
 
 1. **Connect (started by an administrator).** When you click Connect, the plugin sends your site address (URL), a random install ID (UUID) created by the plugin, the site's public key, the site admin email address and the pairing code you entered to gend.me. This links the site to your business group and gives the site an install token.
-2. **After connecting, using the install token:**
-   * plan and feature lookups, so the GenD page can show what your plan includes;
+2. **After connecting, using the install token.** The install token is sent in a request header, never in a web address. The site sends its install ID with each request; gend.me answers with the details listed here. None of these requests happen before you connect.
+   * **Plan and features** (`/wp-json/gdc-app-manager/v1/install/<install ID>/features` and `.../membership`): your gend.me plan, its price and renewal date, the plan owner's display name, and which features the plan includes, so the GenD and Plan & features pages can show them. The answers are kept for up to an hour, and fetched again when an administrator logs in or clicks Refresh.
+   * **Plan catalogue** (`.../install/<install ID>/catalog`): the gend.me plans you can choose, with prices and features, for the plan comparison.
+   * **Groups, Feature Suite and Projects pages** (`.../install/<install ID>/hub/<area>`): your business group's name, description, member names and pictures, recent group activity, feature list and (on plans that include it) project list. The plugin shows them with its own templates and keeps them for up to five minutes.
+   * **Choosing a plan:** when an administrator clicks Choose on a plan, the site sends the chosen plan ID to gend.me and receives a gend.me checkout address. The checkout opens in a gend.me window in your browser, and payment details are entered on gend.me, never on your site. When the checkout finishes, the gend.me window sends your admin page a short message (plan changed, with the install ID), and the page fetches the plan again.
    * membership panel actions that you start from the GenD screens;
    * a list of the site's active plugins, sent when a plugin is activated or deactivated and once a day;
    * mail relay through gend.me, only if an administrator chooses gend.me mail.
@@ -99,6 +102,16 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.5.0 =
+* New: see your gend.me plan, its price and renewal date in wp-admin (GenD > Plan & features).
+* New: choose or change a plan in a gend.me window. Your admin page updates when the checkout finishes.
+* New: a Feature Access card shows each area as Included, Upgrade (with the plan that unlocks it) or After migration.
+* New: a plan comparison of the gend.me plans.
+* New: if your business group already has a higher plan, the site inherits it.
+* New: Groups and Feature Suite pages from gend.me inside wp-admin, shown with the plugin's own templates.
+* New: a Refresh button fetches your plan again from gend.me.
+* Nothing in the plugin is locked behind a plan. Plans only decide what gend.me provides.
 
 = 1.4.0 =
 * New: connect your site to a gend.me business group without buying anything. Log in to gend.me, pick or create a group, and approve.
