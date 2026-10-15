@@ -1,0 +1,14 @@
+{
+  "hosted": false,
+  "plan": null,
+  "lapse": null,
+  "retention_days": 30,
+  "choose_url": "",
+  "last_backup": null,
+  "actions": {
+    "backup_now": false,
+    "restore": false
+  },
+  "cache_seconds": 300,
+  "rev": "377f41c1718bd86dbd74acfad249cb9c2901660b"
+}

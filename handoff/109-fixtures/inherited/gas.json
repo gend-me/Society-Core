@@ -1,0 +1,48 @@
+{
+  "currency": "GAS",
+  "peg": "CAD",
+  "earned": {
+    "total": 0.0,
+    "label": "0.00 DGEN",
+    "events": 0,
+    "last": ""
+  },
+  "used": {
+    "total": 0.0,
+    "label": "0.000000 GAS",
+    "this_month": 0.0,
+    "last_month": 0.0,
+    "change_label": "No usage yet",
+    "direction": "flat"
+  },
+  "owed": {
+    "unbilled": 0.0,
+    "label": "0.000000 GAS",
+    "below_minimum": true,
+    "minimum_cad": 1.0
+  },
+  "billing": {
+    "enabled": true,
+    "next_run": "2026-11-01",
+    "period": "2026-10",
+    "pending": null,
+    "paused": false
+  },
+  "servers": {
+    "current": null,
+    "from": {
+      "label": "$95.00",
+      "unit": "month"
+    },
+    "add_server_url": "http://localhost:8919/my-account/memberships/?gdc_open_modal=9101"
+  },
+  "history": [],
+  "devices": [],
+  "add_device_urls": {
+    "mobile": "http://localhost:8919/gas-station/mobile/",
+    "desktop": "http://localhost:8919/gas-station/desktop/"
+  },
+  "cache_seconds": 300,
+  "generated_at": "2026-10-15T12:00:00Z",
+  "rev": "48b454560a8b03aa4288dc9706d4560daeb63641"
+}

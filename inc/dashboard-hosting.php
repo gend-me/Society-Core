@@ -181,6 +181,11 @@ if ( ! function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) ) {
      * @return string Empty string when neither mode has anything to offer.
      */
     function gend_society_hosting_resource_upgrade_data_attrs( $type ) {
+        // Phase 109-29: on a standalone install every gend.me action is a popup / new-tab link to gend.me
+        // (D14), never this modal (iframe or proxy picker), so no data-gs-upgrade-open attributes there.
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            return '';
+        }
         $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
         // Backups are two choices, not one list: a storage plan, then how
         // often to back up. The membership page's Backups picker presents
@@ -229,6 +234,10 @@ if ( ! function_exists( 'gend_society_hosting_plan_upgrade_data_attrs' ) ) {
      * @return string
      */
     function gend_society_hosting_plan_upgrade_data_attrs( $type, $plan_id ) {
+        // Phase 109-29: standalone uses popup links instead (see gend_society_hosting_resource_upgrade_data_attrs()).
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            return '';
+        }
         $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
         if ( $same_origin ) {
             $url = function_exists( 'gdc_plan_attach_resource_embed_url' ) ? gdc_plan_attach_resource_embed_url( $type ) : '';
@@ -250,6 +259,9 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
      * dashboard-remote-membership.php).
      */
     function gend_society_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing, $hosting_jump_map = array() ) {
+        // Phase 109-29: a standalone install has no gend.me container, so no container caps / "Included in your
+        // plan" and no checkout iframe (column-0 control lines keep hub/container output byte-identical).
+        $gs_sa = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
         $gs_hosting_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
         $resources = gend_society_hosting_collect_container_resources( $media_data, $tables_data, $gs_hosting_membership );
 
@@ -300,13 +312,20 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
             <div>
                 <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Storage', 'gend-society' ); ?></h4>
+<?php if ( $gs_sa ) : ?>
+                <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Storage this site uses on its own server, with live usage. Separate storage containers come with gend.me hosting.', 'gend-society' ); ?></p>
+<?php else : ?>
                 <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Resources your container plan provisions on this install, with live usage.', 'gend-society' ); ?></p>
+<?php endif; ?>
             </div>
             <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
                 <button type="button" class="gs-hosting__btn" data-gs-hosting="media-rescan" style="background: rgba(255,255,255,0.08);"><?php esc_html_e( 'Rescan storage', 'gend-society' ); ?></button>
                 <div style="text-align: right;">
                     <div class="gs-hosting__stat-label"><?php esc_html_e( 'Container Plan', 'gend-society' ); ?></div>
                     <div style="color:#fff; font-size:1rem; font-weight:600; margin-top:4px;">
+<?php if ( $gs_sa ) : ?>
+                            <span class="gs-dash-sa-muted"><?php esc_html_e( 'After migration', 'gend-society' ); ?></span>
+<?php else : ?>
                         <?php if ( $gs_container_any ) : ?>
                             <?php echo esc_html( $gs_container_label ); ?>
                             <?php if ( $gs_container_unit !== '' ) : ?>
@@ -315,6 +334,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                         <?php else : ?>
                             <span style="color: var(--gs-muted, #94a3b8); font-weight: 400; font-style: italic; font-size: 0.85rem;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></span>
                         <?php endif; ?>
+<?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -352,6 +372,13 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                             <div class="gs-hosting__resource-card-hint"><?php echo esc_html( $r['hint'] ); ?></div>
                         </div>
                     </div>
+<?php if ( $gs_sa ) : ?>
+                    <div class="gs-hosting__resource-card-usage">
+                        <?php echo esc_html( $r['used_label'] ); ?>
+                        <span class="gs-hosting__resource-card-cap"><?php esc_html_e( 'used on this server', 'gend-society' ); ?></span>
+                    </div>
+                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php esc_html_e( 'Container: after migration', 'gend-society' ); ?></div>
+<?php else : ?>
                     <div class="gs-hosting__resource-card-usage">
                         <?php echo esc_html( $r['used_label'] ); ?>
                         <span class="gs-hosting__resource-card-cap">/ <?php echo esc_html( $r['cap_label'] ); ?></span>
@@ -362,6 +389,8 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                     <div class="gs-hosting__resource-card-pct" style="<?php echo $warn ? 'color:#fcd34d;' : ''; ?>">
                         <?php echo (int) $pct; ?>% <?php esc_html_e( 'used', 'gend-society' ); ?>
                     </div>
+<?php endif; ?>
+<?php if ( ! $gs_sa ) : ?>
                     <?php if ( ! empty( $r['price']['label'] ) ) : ?>
                         <div class="gs-hosting__resource-card-usage" style="margin-top: 6px; font-size: 0.85rem;">
                             <?php echo esc_html( $r['price']['label'] ); ?>
@@ -376,6 +405,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                     <?php else : ?>
                         <div class="gs-hosting__resource-card-meta" style="margin-top: 6px; font-style: italic;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></div>
                     <?php endif; ?>
+<?php endif; ?>
                     <?php if ( ! empty( $r['meta'] ) ) : ?>
                         <p class="gs-hosting__resource-card-meta"><?php echo esc_html( $r['meta'] ); ?></p>
                     <?php endif; ?>
@@ -470,7 +500,11 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
             <div class="gs-upgrade-modal__backdrop" data-gs-upgrade-close></div>
             <div class="gs-upgrade-modal__card">
                 <button type="button" class="gs-upgrade-modal__close" data-gs-upgrade-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+<?php if ( $gs_sa ) : ?>
+                <div class="gs-upgrade-modal__frame" data-gs-upg-iframe hidden></div>
+<?php else : ?>
                 <iframe class="gs-upgrade-modal__frame" data-gs-upg-iframe src="about:blank" title="<?php esc_attr_e( 'Upgrade checkout', 'gend-society' ); ?>" loading="lazy"></iframe>
+<?php endif; ?>
                 <div class="gs-upgrade-modal__picker" data-gs-upg-picker hidden></div>
             </div>
         </div>
@@ -799,7 +833,13 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
             }
         }
 
-        gend_society_hosting_render_analytics_hero( array(
+        // Phase 109-29 (D33): a standalone install reads GET /install/{id}/backups-status; a Connected install
+        // (hosted false) has no gend.me backups yet, so the panel says "After migration" instead of offering
+        // a plan or a Backup now that the hub refuses (409 not_hosted).
+        $gs_bk_sa      = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
+        $gs_bk_sa_view = $gs_bk_sa && function_exists( 'gend_society_dashboard_standalone_backups_view' ) ? gend_society_dashboard_standalone_backups_view() : array();
+        $gs_bk_sa_now  = ! empty( $gs_bk_sa_view['backup_now'] );
+        $gs_bk_hero    = array(
             'title'  => __( 'Backups', 'gend-society' ),
             'sub'    => __( 'Daily automatic snapshots plus on-demand backups. Restore rolls the install back to that snapshot.', 'gend-society' ),
             'pct'    => $gs_bk_pct,
@@ -809,7 +849,13 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
                 array( 'k' => __( 'Capacity', 'gend-society' ), 'v' => size_format( $gs_bk_cap, 2 ) ),
                 array( 'k' => __( 'Total Backups', 'gend-society' ), 'v' => (string) $gs_bk_count ),
             ),
-        ) );
+        );
+        if ( $gs_bk_sa && empty( $gs_bk_sa_view['hosted'] ) ) {
+            $gs_bk_hero['sub']           = (string) ( $gs_bk_sa_view['text'] ?? '' );
+            unset( $gs_bk_hero['pct'], $gs_bk_hero['warn'] ); // no gend.me quota to measure against yet
+            $gs_bk_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+        }
+        gend_society_hosting_render_analytics_hero( $gs_bk_hero );
         ?>
 
         <?php
@@ -834,9 +880,15 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
                     <span class="k"><?php echo esc_html( $gs_bk_cur['name'] !== '' ? $gs_bk_cur['name'] : __( 'Backup Plan', 'gend-society' ) ); ?></span><span class="v" style="color:#6ee7b7;"><?php echo esc_html( $gs_bk_cur['price'] !== '' ? $gs_bk_cur['price'] . ' · ' : '' ); ?><?php esc_html_e( 'Active', 'gend-society' ); ?></span>
                 </div>
             <?php endforeach; else : ?>
+<?php if ( $gs_bk_sa && empty( $gs_bk_sa_view['hosted'] ) ) : ?>
+                <div class="gs-hosting__analytics-stat">
+                    <span class="k"><?php esc_html_e( 'Backup Plan', 'gend-society' ); ?></span><span class="v"><?php echo esc_html( (string) ( $gs_bk_sa_view['badge'] ?? '' ) ); ?></span>
+                </div>
+<?php else : ?>
                 <div class="gs-hosting__analytics-stat">
                     <span class="k"><?php esc_html_e( 'Backup Plan', 'gend-society' ); ?></span><span class="v" style="color:#fcd34d;"><?php esc_html_e( 'No Plan Attached', 'gend-society' ); ?></span>
                 </div>
+<?php endif; ?>
             <?php endif; ?>
             <?php
             // ONE button opening the backups plan picker (storage tiers +
@@ -858,7 +910,9 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
         </div>
 
         <div class="gs-hosting__filter-row" style="margin-top: 20px;">
+<?php if ( ! $gs_bk_sa || $gs_bk_sa_now ) : ?>
             <button type="button" class="gs-hosting__btn" data-gs-hosting="backup-now"><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
+<?php endif; ?>
             <input type="search" class="gs-hosting__search" placeholder="<?php esc_attr_e( 'Filter by kind, date, or note…', 'gend-society' ); ?>" data-gs-hosting-backups-search>
             <select class="gs-hosting__select" data-gs-hosting-backups-kind>
                 <option value="all"><?php esc_html_e( 'All kinds', 'gend-society' ); ?></option>
@@ -881,7 +935,11 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
             </thead>
             <tbody>
                 <?php if ( empty( $backups ) ) : ?>
+<?php if ( $gs_bk_sa && ! $gs_bk_sa_now ) : ?>
+                    <tr data-empty="1"><td colspan="5" style="color:var(--gs-muted, #94a3b8); font-style:italic; padding:18px 12px;"><?php esc_html_e( 'No gend.me backups for this site yet.', 'gend-society' ); ?></td></tr>
+<?php else : ?>
                     <tr data-empty="1"><td colspan="5" style="color:var(--gs-muted, #94a3b8); font-style:italic; padding:18px 12px;"><?php esc_html_e( 'No backups recorded yet. Click "Backup now" to create the first one.', 'gend-society' ); ?></td></tr>
+<?php endif; ?>
                 <?php else : foreach ( $backups as $b ) :
                     $bid     = (int) ( $b['id'] ?? 0 );
                     $kind    = (string) ( $b['kind'] ?? 'manual' );
@@ -1442,6 +1500,10 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                     <div class="gs-compute-gas__subpanel" data-gs-cg-admin-panel="gas-stations">
                         <?php
                         global $wpdb;
+                        // Phase 109-29: no local gdc_gas_ledger on a standalone install (the query only logged a DB error).
+                        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+                            $gs_admin_earnings = array();
+                        } else {
                         $gs_admin_ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
                         $gs_admin_earnings = $wpdb->get_results(
                             $wpdb->prepare(
@@ -1451,6 +1513,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                             ),
                             ARRAY_A
                         );
+                        }
                         ?>
                         <div class="gs-compute-gas__devices">
                             <div style="display:flex; justify-content:space-between; gap:12px; align-items:center; flex-wrap:wrap;">
@@ -1499,7 +1562,17 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         </div>
                         <?php
                         $gs_cg_server_embed_url = function_exists( 'gdc_plan_attach_resource_embed_url' ) ? gdc_plan_attach_resource_embed_url( 'server' ) : '';
+                        // Phase 109-29: standalone adds a server on gend.me in a popup (D14), never in a frame.
+                        $gs_cg_sa         = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
+                        $gs_cg_sa_add_url = $gs_cg_sa && function_exists( 'gend_society_dashboard_standalone_action_url' ) ? gend_society_dashboard_standalone_action_url( 'add_server' ) : '';
                         ?>
+<?php if ( $gs_cg_sa ) : ?>
+<?php if ( '' !== $gs_cg_sa_add_url ) : ?>
+                            <a class="gs-mship-action-btn" data-gs-popup href="<?php echo esc_url( $gs_cg_sa_add_url ); ?>" target="_blank" rel="opener"><?php esc_html_e( 'Add a server on gend.me', 'gend-society' ); ?></a>
+<?php else : ?>
+                            <div class="gs-mship-empty"><?php esc_html_e( 'Connect to gend.me to add a server.', 'gend-society' ); ?></div>
+<?php endif; ?>
+<?php else : ?>
                         <?php if ( $gs_cg_server_embed_url !== '' ) : ?>
                             <div class="gs-hosting__card" style="padding: 0; overflow: hidden;">
                                 <iframe data-gs-hosting-servers-frame data-src="<?php echo esc_url( $gs_cg_server_embed_url ); ?>" src="about:blank" title="<?php esc_attr_e( 'Server plan checkout', 'gend-society' ); ?>" loading="lazy" style="width: 100%; height: 900px; border: 0; display: block; background: #0b0e14;"></iframe>
@@ -1507,6 +1580,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         <?php else : ?>
                             <div class="gs-hosting__feedback is-error"><?php esc_html_e( 'Server checkout is not available right now.', 'gend-society' ); ?></div>
                         <?php endif; ?>
+<?php endif; ?>
                     </div>
                 </div>
             </section>
@@ -1546,7 +1620,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
 
                 // No Upgrade CTA on this hero (removed on request) - same
                 // cta-less call shape the Codebase hero below uses.
-                gend_society_hosting_render_analytics_hero( array(
+                $gs_tables_hero = array(
                     'title' => __( 'Database Tables', 'gend-society' ),
                     'sub'   => __( 'Live row counts and on-disk size for every table on this install.', 'gend-society' ),
                     'pct'   => $gs_tables_pct,
@@ -1559,7 +1633,13 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         array( 'k' => __( 'Largest Table', 'gend-society' ), 'v' => $tables_data['largest_name'] ?: '—' ),
                         array( 'k' => __( 'Plan', 'gend-society' ), 'v' => gend_society_hosting_plan_label( $billing ) ),
                     ),
-                ) );
+                );
+                // Phase 109-29: a standalone install has no gend.me database quota (no container): no ring, no cap.
+                if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+                    unset( $gs_tables_hero['pct'], $gs_tables_hero['warn'] );
+                    $gs_tables_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+                }
+                gend_society_hosting_render_analytics_hero( $gs_tables_hero );
                 ?>
 
                 <!-- Inline mount point: the tables explorer below (list +
@@ -2076,7 +2156,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 $gs_codebase_cap  = (int) apply_filters( 'gend_society_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 );
                 $gs_codebase_pct  = gend_society_hosting_pct( $gs_codebase_used, $gs_codebase_cap );
 
-                gend_society_hosting_render_analytics_hero( array(
+                $gs_codebase_hero = array(
                     'title' => __( 'Codebase Storage', 'gend-society' ),
                     'sub'   => __( 'Plugins, themes, and mu-plugins on this install, with live usage.', 'gend-society' ),
                     'pct'   => $gs_codebase_pct,
@@ -2088,7 +2168,13 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         array( 'k' => __( 'Themes', 'gend-society' ), 'v' => (string) (int) ( $gs_codebase_data['theme_count'] ?? 0 ) ),
                         array( 'k' => __( 'Last Scanned', 'gend-society' ), 'v' => human_time_diff( (int) ( $gs_codebase_data['scanned_at'] ?? time() ), time() ) . ' ' . __( 'ago', 'gend-society' ) ),
                     ),
-                ) );
+                );
+                // Phase 109-29: no gend.me codebase quota on a standalone install (no container): no ring, no cap.
+                if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+                    unset( $gs_codebase_hero['pct'], $gs_codebase_hero['warn'] );
+                    $gs_codebase_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+                }
+                gend_society_hosting_render_analytics_hero( $gs_codebase_hero );
                 ?>
 
                 <nav class="gs-codebase__subtabs" role="tablist" aria-label="<?php esc_attr_e( 'Codebase sections', 'gend-society' ); ?>">
@@ -3642,6 +3728,17 @@ if ( ! function_exists( 'gend_society_hosting_server_price' ) ) {
      * @return array{current:array|null,starting:array|null}
      */
     function gend_society_hosting_server_price( $membership ) {
+        // Phase 109-29: standalone reads the account's servers from GET /install/{id}/gas "servers".
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            $gas = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
+            $srv = is_array( $gas['payload'] ) && isset( $gas['payload']['servers'] ) && is_array( $gas['payload']['servers'] ) ? $gas['payload']['servers'] : array();
+            $cur = isset( $srv['current'] ) && is_array( $srv['current'] ) && ! empty( $srv['current']['label'] ) ? $srv['current'] : null;
+            $frm = isset( $srv['from'] ) && is_array( $srv['from'] ) && ! empty( $srv['from']['label'] ) ? $srv['from'] : null;
+            return array(
+                'current'  => $cur ? array( 'amount' => 0.0, 'label' => (string) $cur['label'], 'unit' => (string) ( $cur['unit'] ?? '' ), 'count' => (int) ( $cur['count'] ?? 0 ) ) : null,
+                'starting' => ( ! $cur && $frm ) ? array( 'label' => (string) $frm['label'], 'amount' => 0.0 ) : null,
+            );
+        }
         $current = null;
         if ( $membership && is_object( $membership ) && method_exists( $membership, 'get_all_products' ) ) {
             $currency     = method_exists( $membership, 'get_currency' )      ? (string) $membership->get_currency()      : '';
@@ -3809,7 +3906,12 @@ if ( ! function_exists( 'gend_society_hosting_ajax_authorize' ) ) {
  * error to the client.
  */
 function gend_society_hosting_call_or_fallback( $path, $body, $local_fallback = null, $body_method = 'POST' ) {
-    if ( function_exists( 'gend_society_remote_membership_call' ) ) {
+    // Phase 109-29: gend.me has no hosting/toggles, hosting/compute-gas, hosting/cache-* or hosting/template-reset
+    // install route (every call answered 404 rest_no_route), so a standalone install goes straight to the local
+    // answer instead of sending 4-6 dead requests per dashboard load.
+    $gs_no_hub_route = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone()
+        && preg_match( '#^hosting/(toggles|compute-gas|cache-page|cache-object|template-reset)(/|$)#', (string) $path );
+    if ( ! $gs_no_hub_route && function_exists( 'gend_society_remote_membership_call' ) ) {
         $r = gend_society_remote_membership_call( $path, $body, $body_method );
         if ( ! is_wp_error( $r ) ) {
             return $r;
@@ -3886,6 +3988,62 @@ add_action( 'wp_ajax_gend_society_hosting_toggle_set', function () {
     wp_send_json_success( is_array( $r ) ? $r : array() );
 } );
 
+if ( ! function_exists( 'gend_society_hosting_standalone_gas_data' ) ) {
+    /**
+     * Phase 109-29 (standalone only): gend_society_hosting_compute_gas_real_data()'s shape, filled from the cached
+     * GET /install/{id}/gas answer (gend_society_dashboard_standalone_gas()). No local query, no request when not
+     * connected or not consented.
+     *
+     * @return array
+     */
+    function gend_society_hosting_standalone_gas_data() {
+        $gas   = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'state' => 'not_connected', 'payload' => null );
+        $p     = is_array( $gas['payload'] ) ? $gas['payload'] : array();
+        $used  = isset( $p['used'] ) && is_array( $p['used'] ) ? $p['used'] : array();
+        $owed  = isset( $p['owed'] ) && is_array( $p['owed'] ) ? $p['owed'] : array();
+        $bill  = isset( $p['billing'] ) && is_array( $p['billing'] ) ? $p['billing'] : array();
+        $total = (float) ( $used['total'] ?? 0 );
+        $unb   = (float) ( $owed['unbilled'] ?? 0 );
+        $pay     = array();
+        $pay_url = ( ! empty( $bill['pending'] ) && is_array( $bill['pending'] ) && function_exists( 'gend_society_dashboard_standalone_url' ) )
+            ? gend_society_dashboard_standalone_url( $bill['pending']['pay_url'] ?? '' ) // only a page on the paired hub
+            : '';
+        if ( '' !== $pay_url ) {
+            $pay[] = array(
+                'id'          => (int) ( $bill['pending']['order_id'] ?? 0 ),
+                'status'      => 'pending',
+                'total_label' => (string) ( $bill['pending']['total_label'] ?? '' ),
+                'date'        => (string) ( $bill['pending']['due'] ?? '' ),
+                'pay_url'     => $pay_url,
+                'invoice_url' => '',
+            );
+        }
+        $message = '';
+        if ( 'not_connected' === $gas['state'] ) {
+            $message = __( 'Connect to gend.me to see the compute gas of your gend.me account.', 'gend-society' );
+        } elseif ( 'revoked' === $gas['state'] ) {
+            $message = __( 'gend.me no longer accepts this site\'s connection. Reconnect to see compute gas.', 'gend-society' );
+        } elseif ( ! $p ) {
+            $message = __( 'Could not reach gend.me. Compute gas will show again once it answers.', 'gend-society' );
+        } elseif ( $total <= 0 ) {
+            $message = __( 'No GAS compute usage recorded yet for this app.', 'gend-society' );
+        }
+        return array(
+            'period'             => __( 'All time', 'gend-society' ),
+            'total_gas'          => $total,
+            'billed_gas'         => max( 0.0, $total - $unb ),
+            'unbilled_gas'       => $unb,
+            'total_gas_label'    => (string) ( $used['label'] ?? number_format( $total, 6 ) . ' GAS' ),
+            'billed_gas_label'   => number_format( max( 0.0, $total - $unb ), 6 ) . ' GAS',
+            'unbilled_gas_label' => (string) ( $owed['label'] ?? number_format( $unb, 6 ) . ' GAS' ),
+            'breakdown'          => array(),
+            'payments'           => $pay,
+            'message'            => $message,
+            'state'              => (string) $gas['state'],
+        );
+    }
+}
+
 /**
  * Real Compute Gas cost breakdown + payment links for THIS site, read
  * directly from vendor-app-manager's real gdc_gas_ledger table (a
@@ -3898,6 +4056,11 @@ add_action( 'wp_ajax_gend_society_hosting_toggle_set', function () {
  * @return array
  */
 function gend_society_hosting_compute_gas_real_data() {
+    // Phase 109-29: a standalone install has no local gdc_gas_ledger table (the queries below only logged DB
+    // errors there); it shows its owner's gas from gend.me's GET /install/{id}/gas instead.
+    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+        return gend_society_hosting_standalone_gas_data();
+    }
     global $wpdb;
     $site_id = get_current_blog_id();
     $ledger  = $wpdb->base_prefix . 'gdc_gas_ledger';
@@ -4010,6 +4173,23 @@ if ( ! function_exists( 'gend_society_hosting_gas_month_over_month' ) ) {
      * @return array{this_month:float,last_month:float,this_month_label:string,last_month_label:string,change_pct:float|null,change_label:string,direction:string}
      */
     function gend_society_hosting_gas_month_over_month( $site_id = null ) {
+        // Phase 109-29: standalone reads the owner's month-over-month from GET /install/{id}/gas (no local ledger).
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            $gas  = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
+            $used = is_array( $gas['payload'] ) && isset( $gas['payload']['used'] ) && is_array( $gas['payload']['used'] ) ? $gas['payload']['used'] : array();
+            $this_month = (float) ( $used['this_month'] ?? 0 );
+            $last_month = (float) ( $used['last_month'] ?? 0 );
+            $direction  = in_array( (string) ( $used['direction'] ?? '' ), array( 'up', 'down', 'new', 'flat' ), true ) ? (string) $used['direction'] : 'flat';
+            return array(
+                'this_month'       => $this_month,
+                'last_month'       => $last_month,
+                'this_month_label' => number_format( $this_month, 6 ) . ' GAS',
+                'last_month_label' => number_format( $last_month, 6 ) . ' GAS',
+                'change_pct'       => $last_month > 0 ? ( ( $this_month - $last_month ) / $last_month ) * 100 : null,
+                'change_label'     => '' !== (string) ( $used['change_label'] ?? '' ) ? (string) $used['change_label'] : __( 'No usage yet', 'gend-society' ),
+                'direction'        => $direction,
+            );
+        }
         global $wpdb;
         $site_id = null === $site_id ? get_current_blog_id() : (int) $site_id;
         $ledger  = $wpdb->base_prefix . 'gdc_gas_ledger';
@@ -4064,6 +4244,19 @@ if ( ! function_exists( 'gend_society_hosting_gas_month_over_month' ) ) {
  * different real money flows on the same ledger table, not one balance.
  */
 function gend_society_hosting_gas_earned_summary( $user_id ) {
+    // Phase 109-29: standalone shows what the gend.me account owner earned (GET /install/{id}/gas "earned").
+    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+        $gas    = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
+        $earned = is_array( $gas['payload'] ) && isset( $gas['payload']['earned'] ) && is_array( $gas['payload']['earned'] ) ? $gas['payload']['earned'] : array();
+        $total  = (float) ( $earned['total'] ?? 0 );
+        return array(
+            'event_count'             => (int) ( $earned['events'] ?? 0 ),
+            'total_earned'            => $total,
+            'total_earned_label'      => number_format( $total, 6 ) . ' GAS',
+            'total_earned_dgen_label' => '' !== (string) ( $earned['label'] ?? '' ) ? (string) $earned['label'] : number_format( $total, 2 ) . ' DGEN',
+            'last_earned'             => (string) ( $earned['last'] ?? '' ),
+        );
+    }
     global $wpdb;
     $ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
     $row    = $wpdb->get_row( $wpdb->prepare(
@@ -4099,6 +4292,25 @@ function gend_society_hosting_gas_earned_summary( $user_id ) {
  * chronological ledger, filterable client-side by direction.
  */
 function gend_society_hosting_gas_history_rows( $limit = 100 ) {
+    // Phase 109-29: standalone lists the gend.me account's ledger rows from GET /install/{id}/gas "history".
+    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+        $gas  = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
+        $rows = is_array( $gas['payload'] ) && isset( $gas['payload']['history'] ) && is_array( $gas['payload']['history'] ) ? $gas['payload']['history'] : array();
+        $out  = array();
+        foreach ( $rows as $row ) {
+            if ( ! is_array( $row ) ) {
+                continue;
+            }
+            $out[] = array(
+                'direction'    => 'earned' === ( $row['direction'] ?? '' ) ? 'earned' : 'used',
+                'label'        => (string) ( $row['label'] ?? '' ),
+                'amount_label' => (string) ( $row['amount_label'] ?? '' ),
+                'status'       => (string) ( $row['status'] ?? '' ),
+                'created_at'   => (string) ( $row['created_at'] ?? '' ),
+            );
+        }
+        return array_slice( $out, 0, max( 1, (int) $limit ) );
+    }
     global $wpdb;
     $ledger  = $wpdb->base_prefix . 'gdc_gas_ledger';
     $site_id = get_current_blog_id();

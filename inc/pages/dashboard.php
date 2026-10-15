@@ -186,6 +186,49 @@ function gend_society_dashboard_setup_custom_screen()
 
     // 5. Enqueue Media Uploader for App Icon
     add_action('admin_enqueue_scripts', 'gend_society_dashboard_enqueue_media');
+
+    // 6. Phase 109-29: standalone popup opener (local assets, standalone only).
+    add_action('admin_enqueue_scripts', 'gend_society_dashboard_enqueue_standalone');
+}
+
+/**
+ * Phase 109-29 (D14/D28): local gs-dashboard-standalone.js/.css on the dashboard of a standalone install only.
+ * The script opens gend.me pages ([data-gs-popup]: UPGRADE = Change Plan, Add Server, Pay, Choose a plan) in a
+ * popup window, falls back to a link when the browser blocks it, and refreshes the panels once the popup closes or
+ * gend.me signals a plan change (origin + install id checked). QR codes use WooCommerce's bundled jquery-qrcode
+ * when this site has it (no QR service); otherwise only the link shows.
+ */
+function gend_society_dashboard_enqueue_standalone()
+{
+    if (!function_exists('gend_society_dashboard_is_standalone') || !gend_society_dashboard_is_standalone()) {
+        return;
+    }
+    $dir = GEND_SOCIETY_DIR . 'assets/';
+    $url = GEND_SOCIETY_URL . 'assets/';
+    $css = 'gs-dashboard-standalone.css';
+    $js  = 'gs-dashboard-standalone.js';
+    wp_enqueue_style('gend-society-dashboard-standalone', $url . $css, array(), GEND_SOCIETY_VERSION . '.' . (file_exists($dir . $css) ? filemtime($dir . $css) : 0));
+    $deps = array();
+    foreach (array('woocommerce/assets/js/jquery-qrcode/jquery.qrcode.min.js', 'online-store/plugins/woocommerce/assets/js/jquery-qrcode/jquery.qrcode.min.js') as $rel) {
+        if (defined('WP_PLUGIN_DIR') && file_exists(WP_PLUGIN_DIR . '/' . $rel)) {
+            wp_register_script('gend-society-jquery-qrcode', plugins_url($rel), array('jquery'), (string) filemtime(WP_PLUGIN_DIR . '/' . $rel), true);
+            $deps[] = 'gend-society-jquery-qrcode';
+            break;
+        }
+    }
+    wp_enqueue_script('gend-society-dashboard-standalone', $url . $js, $deps, GEND_SOCIETY_VERSION . '.' . (file_exists($dir . $js) ? filemtime($dir . $js) : 0), true);
+    $paired = function_exists('gend_society_dashboard_standalone_paired') && gend_society_dashboard_standalone_paired();
+    wp_localize_script('gend-society-dashboard-standalone', 'gendSocietyDashboard', array(
+        'ajaxUrl'   => $paired && function_exists('gend_society_plan_refresh_ajax') ? admin_url('admin-ajax.php') : '',
+        'nonce'     => $paired && function_exists('gend_society_plan_refresh_ajax') ? wp_create_nonce('gs_plan') : '',
+        'hubOrigin' => $paired && function_exists('gend_society_plan_hub_origin') ? gend_society_plan_hub_origin() : '',
+        'installId' => $paired ? (string) get_option('gend_society_install_id', '') : '',
+        'i18n'      => array(
+            'blocked'    => __('Your browser blocked the gend.me window.', 'gend-society'),
+            'openTab'    => __('Open it in a new tab', 'gend-society'),
+            'refreshing' => __('Updating your plan from gend.me...', 'gend-society'),
+        ),
+    ));
 }
 
 function gend_society_dashboard_enqueue_media() {
@@ -737,6 +780,12 @@ function gend_society_render_custom_dashboard_screen()
                 }
             }
         }
+        // Phase 109-29 (D28): a standalone install always gets the same panel - when gend.me data is missing (not
+        // connected yet, or the hub has not answered) it renders from this site's own title/URL with its
+        // "Connect to gend.me" states instead of falling back to the Site Administrators card.
+        if (!is_array($payload) && function_exists('gend_society_dashboard_is_standalone') && gend_society_dashboard_is_standalone() && function_exists('gend_society_dashboard_standalone_local_payload')) {
+            $payload = gend_society_dashboard_standalone_local_payload();
+        }
         if (is_array($payload)) {
             $account_section = gend_society_render_membership_panel($payload);
         }
@@ -751,6 +800,12 @@ function gend_society_render_custom_dashboard_screen()
         $account_section = '<div class="notice notice-warning"><p>No active membership found for this site.</p></div>';
     }
 
+    // Phase 109-29: core common.js moves admin notices after the first ".wrap h1" when no .wp-header-end exists - on
+    // this page that is a hidden sub-panel inside the dashboard, so notices (incl. "Switch back to standard
+    // WordPress") were never visible. Standalone gets core's anchor above the dashboard; hub/container unchanged.
+    if (function_exists('gend_society_dashboard_is_standalone') && gend_society_dashboard_is_standalone()) {
+        echo '<hr class="wp-header-end">';
+    }
     echo '<div class="gs-dashboard-wrap">';
 
     // The unified panel includes Domain + Plan + Backups tabs

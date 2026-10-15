@@ -11,9 +11,21 @@
  *                                           (gap2/plugin/tools/dash.js, copied in as wp-content/gs109-dash-browser.json);
  *                                           first-run notice naming the switch; core menus (Plugins / Settings /
  *                                           Users / Appearance) still there
- *                part "standalone-unpaired" 0 requests to the hub / gend.me (loopback page + in-process render)
- *   hub | container                         experience 'gend'; INFO "dashboard render md5" of the custom dashboard
- *                                           (tools/109-29-regress.sh compares it with the fork-point tree)
+ *                part "standalone-unpaired" 0 requests to the hub / gend.me (loopback page + in-process render); the
+ *                                           same panel renders (no Site Administrators fallback): Integration Hub card
+ *                                           with button[data-gs-connect-open] "Connect to gend.me" + the 109-30 slot
+ *                                           fired once, "Connect to gend.me" states in the plan / gas / backups panels,
+ *                                           no iframe, no remote script/style/image, no third-party QR
+ *                part "standalone-paired"   fixture hub (109-fixtures, generated with the 109-28 contract incl. /gas and
+ *                                           /backups-status): connected, store-owner, inherited, revoked (401), hub
+ *                                           down, hosted backups; UPGRADE / Add Server / Pay / Choose a plan are
+ *                                           [data-gs-popup] hub links, 0 iframes, no token in the page, no hosting/*
+ *                                           route, no gdc_gas_ledger query, one GET per route then 0 within the cache;
+ *                                           devices + compute-gas AJAX from /gas; the browser popup result
+ *                                           (dash.js popup -> wp-content/gs109-dash-popup.json)
+ *   hub | container                         experience 'gend'; no Connect button, no 109-30 slot, no standalone assets;
+ *                                           INFO "dashboard render md5" of the custom dashboard (tools/109-29-regress.sh
+ *                                           compares it with the fork-point tree)
  *
  * Every part prints "dashboard <part>: ALL PASS (n)" or "dashboard <part>: FAILURES n"; the section ends with
  * "dashboard: ALL PASS (n)" when nothing failed.
@@ -155,6 +167,20 @@ if ( 'standalone' !== $gs109d_mode ) {
 	$n2 = gs109d_normalize( $r2 );
 	gs109_assert( '' !== $r1 && $n1 === $n2, 'dash-' . $gs109d_mode . '-render-stable', $gs109d_mode . ': custom dashboard renders and two renders normalise to the same bytes (' . strlen( $r1 ) . ' bytes)' );
 	gs109_info( 'dashboard render md5: ' . $gs109d_mode . ' bytes ' . strlen( $n1 ) . ' combined ' . md5( $n1 ) );
+	// The standalone-only pieces never appear here (absent functions count as absent: the fork-point tree has none).
+	$slot = 0;
+	$sf   = function () use ( &$slot ) {
+		$slot++;
+	};
+	add_action( 'gend_society_integration_hub_card_slot', $sf );
+	$r3 = gs109d_render( $uid );
+	remove_action( 'gend_society_integration_hub_card_slot', $sf );
+	gs109_assert( 0 === $slot && false === strpos( $r3, 'data-gs-connect-open' ) && false === strpos( $r3, 'data-gs-popup' ) && false === strpos( $r3, 'gs-dash-sa-' ), 'dash-' . $gs109d_mode . '-no-standalone-ui', $gs109d_mode . ': no Connect button, no 109-30 slot call, no popup links, no standalone classes' );
+	if ( function_exists( 'gend_society_dashboard_enqueue_standalone' ) ) {
+		gend_society_dashboard_enqueue_standalone();
+	}
+	gs109_assert( ! wp_script_is( 'gend-society-dashboard-standalone', 'enqueued' ) && ! wp_style_is( 'gend-society-dashboard-standalone', 'enqueued' ), 'dash-' . $gs109d_mode . '-no-standalone-assets', $gs109d_mode . ': gs-dashboard-standalone.js/.css not enqueued' );
+	gs109_assert( ! function_exists( 'gend_society_dashboard_is_standalone' ) || ( ! gend_society_dashboard_is_standalone() && ! gend_society_dashboard_standalone_paired() ), 'dash-' . $gs109d_mode . '-not-standalone', $gs109d_mode . ': the standalone data helpers stay off' );
 	gs109d_part( $gs109d_mode, true );
 	return;
 }
@@ -282,7 +308,317 @@ gs109p_http( true );
 $html = gs109d_render( $admin );
 $req  = gs109p_http( true );
 gs109_assert( '' !== $html && ! $req, 'dash-unpaired-render-0-requests', 'in-process render of the custom dashboard: 0 requests (' . strlen( $html ) . ' bytes)', wp_json_encode( array_map( function ( $r ) { return $r['method'] . ' ' . $r['url']; }, $req ) ) );
+
+// The same panel, not the Site Administrators fallback (D28/D32).
+$fx = gs109d_xpf( $html );
+gs109_assert( 1 === gs109d_count( $fx, '//*[@id="gs-mship-root"]' ) && 0 === gs109d_count( $fx, '//*[contains(@class,"gs-admin-grid")]' ), 'dash-unpaired-panel', 'unpaired: the GenD membership panel renders (no Site Administrators fallback)' );
+gs109_assert( 'Integration Hub' === gs109d_text( $fx, '//div[contains(@class,"gs-mship-cell--group")]//h3' ) && 'Not connected to gend.me yet.' === gs109d_text( $fx, '//div[contains(@class,"gs-mship-cell--group")]//div[contains(@class,"gs-mship-empty")]' ), 'dash-unpaired-hub-card', 'Integration Hub card (top-left) says "Not connected to gend.me yet."' );
+$btn = $fx->query( '//div[contains(@class,"gs-mship-cell--group")]//button[@data-gs-connect-open]' );
+gs109_assert( $btn && 1 === $btn->length && 'Connect to gend.me' === trim( $btn->item( 0 )->textContent ) && 'button' === $btn->item( 0 )->getAttribute( 'type' ) && '' === $btn->item( 0 )->getAttribute( 'style' ), 'dash-unpaired-connect-button', 'one button[data-gs-connect-open] type=button "Connect to gend.me" in the Integration Hub card (no inline style)' );
+$slot = 0;
+$sf   = function () use ( &$slot ) {
+	$slot++;
+	echo '<i data-gs109-slot></i>';
+};
+add_action( 'gend_society_integration_hub_card_slot', $sf );
+$sh = gs109d_render( $admin );
+remove_action( 'gend_society_integration_hub_card_slot', $sf );
+$sx = gs109d_xpf( $sh );
+gs109_assert( 1 === $slot && 1 === gs109d_count( $sx, '//div[contains(@class,"gs-mship-cell--group")]//i[@data-gs109-slot]' ) && 0 === (int) has_action( 'gend_society_integration_hub_card_slot' ), 'dash-unpaired-slot', 'do_action( gend_society_integration_hub_card_slot ) fires exactly once, inside the Integration Hub card; nothing is hooked to it in 109-29' );
+gs109_assert( false !== strpos( (string) gs109d_text( $fx, '//div[contains(@class,"gs-mship-plan-col")]' ), 'Connect to gend.me to see your dashboard plan' ) && 0 === gs109d_count( $fx, '//a[@data-gs-popup]' ), 'dash-unpaired-plan', 'membership card: "Connect to gend.me to see your dashboard plan..." and no popup links' );
+$gas_sub = (string) gs109d_text( $fx, '//div[contains(@class,"gs-bcg-hero")]//p[contains(@class,"gs-bcg-sub")]' );
+gs109_assert( 0 === strpos( $gas_sub, 'Connect to gend.me' ) && 1 === gs109d_count( $fx, '//div[contains(@class,"gs-bcg-hero")]//div[contains(@class,"gs-bcg-actions") and @hidden]' ) && 2 === gs109d_count( $fx, '//div[contains(@class,"gs-bcg-hero")]//div[contains(@class,"gs-bcg-stats") and @hidden]' ), 'dash-unpaired-gas', 'Compute Gas panel: "' . $gas_sub . '", actions and stats hidden' );
+gs109_assert( 'Not connected' === gs109d_text( $fx, '//div[contains(@class,"gs-bk-hero")]//span[contains(@class,"gs-bk-badge")]' ) && 0 === gs109d_count( $fx, '//div[contains(@class,"gs-bk-hero")]//*[@data-gs-mship="backup-now" or @data-gs-hosting-goto="backups" or @data-gs-upgrade-open]' ), 'dash-unpaired-backups', 'Backups panel: "Not connected", no Backup now / Manage Backups / plan buttons' );
+gs109_assert( 0 === gs109d_count( $fx, '//iframe' ) && false === stripos( $html, '<iframe' ) && 0 === gs109d_count( $fx, '//*[contains(@src,"qrserver") or contains(@href,"qrserver") or contains(@data-src,"qrserver")]' ) && 1 === gs109d_count( $fx, '//div[@data-gs-qr]' ), 'dash-unpaired-no-frame-qr', 'no <iframe> and no third-party QR image (no src/href to api.qrserver.com; local QR box instead)' );
+$caps = array();
+foreach ( array( '20 GB', '5 GB', '2 GB', 'Included in your plan' ) as $c ) {
+	if ( false !== strpos( (string) gs109d_text( $fx, '//div[contains(@class,"gs-hosting__resources-grid")]' ), $c ) ) {
+		$caps[] = $c;
+	}
+}
+gs109_assert( ! $caps && false !== strpos( (string) gs109d_text( $fx, '//div[contains(@class,"gs-hosting__resources-grid")]' ), 'Container: after migration' ), 'dash-unpaired-storage', 'storage cards: no container caps / "Included in your plan"; "Container: after migration"', wp_json_encode( $caps ) );
+$pxp  = gs109d_xp( $up['body'] );
+$bad  = array();
+$bedh = 'localhost:8909';
+foreach ( array( '//script[@src]' => 'src', '//link[@rel="stylesheet"]' => 'href', '//img[@src]' => 'src', '//iframe' => 'src' ) as $q => $attr ) {
+	foreach ( gs109d_attrs( $pxp, $q, $attr ) as $u ) {
+		$h = strtolower( (string) wp_parse_url( $u, PHP_URL_HOST ) );
+		$p = wp_parse_url( $u, PHP_URL_PORT );
+		if ( '' === $h || ( 'localhost' === $h && 8909 === (int) $p ) || 'secure.gravatar.com' === $h ) {
+			continue;
+		}
+		$bad[] = $q . ' ' . $u;
+	}
+}
+gs109_assert( 0 === gs109d_count( $pxp, '//iframe' ) && ! $bad, 'dash-unpaired-no-remote-assets', 'whole page: no iframe, no remote script / stylesheet / image (core gravatar avatars excepted)', wp_json_encode( $bad ) );
+$js = gs109d_attrs( $pxp, '//script[contains(@src,"gs-dashboard-standalone.js")]', 'src' );
+$cs = gs109d_attrs( $pxp, '//link[contains(@href,"gs-dashboard-standalone.css")]', 'href' );
+gs109_assert( 1 === count( $js ) && 1 === count( $cs ) && preg_match( '/ver=[0-9.]+\.\d{9,}/', $js[0] . ' ' . $cs[0] ), 'dash-unpaired-assets', 'local gs-dashboard-standalone.js + .css enqueued with filemtime versions', wp_json_encode( array( $js, $cs ) ) );
 gs109d_part( 'standalone-unpaired', true );
+
+// ---------------------------------------------------------------------------------------- part standalone-paired
+gs109d_part( 'standalone-paired' );
+if ( ! function_exists( 'gs109d_clear' ) ) {
+	/** Every dashboard cache + the health status, so the next render fetches the current scenario. */
+	function gs109d_clear() {
+		gs109p_clear_caches();
+		foreach ( array( 'gend_society_gas_cache', 'gend_society_backups_status_cache', 'gend_society_connection_health' ) as $o ) {
+			delete_option( $o );
+		}
+		unset( $GLOBALS['gend_society_dashboard_routes'] );
+		wp_cache_delete( 'alloptions', 'options' );
+	}
+
+	/** Fixture body for a route in $scenario (generated contract, 109-fixtures). */
+	function gs109d_fx( $scenario, $file ) {
+		$j = gs109_fixture_json( $scenario, $file );
+		return is_array( $j ) ? $j : null;
+	}
+
+	/** Install routes the hub answered since $mark (gs109-http.log), e.g. ['GET membership', 'GET gas']. */
+	function gs109d_hub_routes_since( $mark ) {
+		$out = array();
+		foreach ( array_filter( explode( "\n", gs109p_httplog_since( $mark ) ) ) as $l ) {
+			$j = json_decode( $l, true );
+			if ( is_array( $j ) && preg_match( '#/wp-json/gdc-app-manager/v1/install/[^/]+/([^?]+)#', (string) ( $j['url'] ?? '' ), $m ) ) {
+				$out[] = strtoupper( (string) ( $j['method'] ?? 'GET' ) ) . ' ' . trim( $m[1], '/' );
+			}
+		}
+		return $out;
+	}
+
+	/** Stat value of the gas hero by its label. */
+	function gs109d_stat( DOMXPath $xp, $label ) {
+		return gs109d_text( $xp, '//div[contains(@class,"gs-bcg-hero")]//div[contains(@class,"gs-bcg-stat")][div[@class="k" and normalize-space(.)="' . $label . '"]]/div[@class="v"]' );
+	}
+}
+
+$fxp = gs109p_pair( 'connected' );
+if ( ! $fxp ) {
+	gs109d_part( 'standalone-paired', true );
+	return;
+}
+$token = $fxp['token'];
+$hub   = $fxp['hub'];
+wp_set_current_user( $admin );
+
+// ------------------------------------------------------------------ connected (free Connected install)
+gs109d_clear();
+$mem   = gs109d_fx( 'connected', 'membership.json' );
+$gas   = gs109d_fx( 'connected', 'gas.json' );
+$mark  = gs109p_httplog_mark();
+$pg    = gs109d_get( $sess, admin_url( 'index.php' ) );
+$first = gs109d_hub_routes_since( $mark );
+$mark2 = gs109p_httplog_mark();
+$pg2   = gs109d_get( $sess, admin_url( 'index.php' ) );
+$again = gs109d_hub_routes_since( $mark2 );
+$xp    = gs109d_xp( $pg['body'] );
+$cnt   = array_count_values( $first );
+gs109_assert( 200 === $pg['status'] && 1 === ( $cnt['GET membership'] ?? 0 ) && 1 === ( $cnt['GET gas'] ?? 0 ) && 1 === ( $cnt['GET backups-status'] ?? 0 ) && ! preg_grep( '#hosting/#', $first ), 'dash-paired-requests', 'connected, first load: one GET each for membership, gas, backups-status; no hosting/* route', wp_json_encode( $first ) );
+gs109_assert( ! preg_grep( '#^GET (membership|gas|backups-status)$#', $again ), 'dash-paired-cache', 'second load within cache_seconds: 0 membership / gas / backups-status requests', wp_json_encode( $again ) );
+gs109_assert( 'GS109 Business Group' === gs109d_text( $xp, '//div[contains(@class,"gs-mship-cell--group")]//div[contains(@class,"gs-mship-plan-name")]' ) && in_array( $hub . '/groups/gs109-business-group/', gs109d_attrs( $xp, '//div[contains(@class,"gs-mship-cell--group")]//a[contains(@class,"gs-mship-hub-visit-btn")]', 'href' ), true ), 'dash-paired-hub-card', 'Integration Hub card: group name + Visit Hub on the paired hub' );
+gs109_assert( 'Manage connection' === gs109d_text( $xp, '//div[contains(@class,"gs-mship-cell--group")]//button[@data-gs-connect-open]' ), 'dash-paired-connect-button', 'paired: the Integration Hub button reads "Manage connection"' );
+$up_href = gs109d_attrs( $xp, '//a[@data-gs-popup and contains(@class,"gs-dash-sa-upgrade")]', 'href' );
+$expect  = (string) $mem['membership_url'] . '?ui=embed&plan_only=1&group=dashboard';
+gs109_assert( array( $expect ) === $up_href && 'Upgrade' === gs109d_text( $xp, '//a[contains(@class,"gs-dash-sa-upgrade")]' ) && '_blank' === ( gs109d_attrs( $xp, '//a[contains(@class,"gs-dash-sa-upgrade")]', 'target' )[0] ?? '' ), 'dash-paired-upgrade', 'UPGRADE = [data-gs-popup] to gend.me Change Plan (' . $expect . '), target _blank fallback', wp_json_encode( $up_href ) );
+gs109_assert( 0 === gs109d_count( $xp, '//*[@id="gs-mship-root"]//*[contains(@href,"page=gs-plan")]' ) && 0 === gs109d_count( $xp, '//*[@data-gs-mship="upgrade-plan"]' ), 'dash-paired-upgrade-not-gs-plan', 'the dashboard panel has no link to the gs-plan page (109-30 removes the page) and no inline plan picker' );
+$plan_txt = (string) gs109d_text( $xp, '//div[contains(@class,"gs-mship-plan-col")]' );
+gs109_assert( false !== strpos( $plan_txt, 'Connected' ) && false !== strpos( $plan_txt, 'Free' ), 'dash-paired-plan-connected', 'membership card: "Connected" / "Free"', $plan_txt );
+gs109_assert( 'Active' === gs109d_text( $xp, '//span[contains(@class,"gs-mship-status-badge")]' ), 'dash-paired-status', 'status badge: Active' );
+$stats = array(
+	'Earned'       => '0.00 DGEN',
+	'Server Costs' => 'From $95.00',
+	'Owed Balance' => '0.000000 GAS',
+	'Next Bill'    => (string) $gas['billing']['next_run'],
+	'Change'       => 'No usage yet',
+);
+$got = array();
+foreach ( $stats as $k => $v ) {
+	$got[ $k ] = (string) gs109d_stat( $xp, $k );
+}
+gs109_assert( $stats === $got, 'dash-paired-gas-stats', 'gas panel from /gas: Earned, Server Costs, Owed, Next Bill = gas billing date (not the membership renewal), Change', wp_json_encode( $got ) );
+$add = gs109d_attrs( $xp, '//div[contains(@class,"gs-bcg-actions")]//a[@data-gs-popup]', 'href' );
+gs109_assert( array( (string) $gas['servers']['add_server_url'] ) === $add && 2 === gs109d_count( $xp, '//div[contains(@class,"gs-bcg-actions")]//button[@data-gs-gas-open]' ), 'dash-paired-gas-actions', 'History + Connected Devices buttons; ADD SERVER = [data-gs-popup] to /gas servers.add_server_url', wp_json_encode( $add ) );
+gs109_assert( 'After migration' === gs109d_text( $xp, '//div[contains(@class,"gs-bk-hero")]//span[contains(@class,"gs-bk-badge")]' ) && 0 === gs109d_count( $xp, '//div[contains(@class,"gs-bk-hero")]//*[@data-gs-mship="backup-now" or @data-gs-hosting-goto="backups" or @data-gs-upgrade-open or @data-gs-popup]' ) && array( (string) $mem['membership_url'] ) === gs109d_attrs( $xp, '//div[contains(@class,"gs-bk-hero")]//a[contains(.,"Learn more")]', 'href' ), 'dash-paired-backups', 'Backups (D33): "After migration", no Backup now / Manage Backups / Choose a plan, Learn more -> the membership page (new tab)' );
+gs109_assert( 0 === gs109d_count( $xp, '//*[@id="gs-hosting-root-hosting"]//section[@data-panel="backups"]//button[@data-gs-hosting="backup-now"]' ) && false !== strpos( (string) gs109d_text( $xp, '//*[@id="gs-hosting-root-hosting"]//section[@data-panel="backups"]' ), 'After migration' ), 'dash-paired-hosting-backups', 'Hosting > Backups sub-tab: After migration, no Backup now' );
+$caps = array();
+foreach ( array( '20 GB', '5 GB', '2 GB', 'Included in your plan' ) as $c ) {
+	if ( false !== strpos( (string) gs109d_text( $xp, '//div[contains(@class,"gs-mship-cell")]//div[contains(@class,"gs-hosting__resources-grid")]' ), $c ) ) {
+		$caps[] = $c;
+	}
+}
+gs109_assert( ! $caps, 'dash-paired-storage', 'storage cards: no container caps', wp_json_encode( $caps ) );
+$hrefs = gs109d_attrs( $xp, '//a', 'href' );
+gs109_assert( 0 === gs109d_count( $xp, '//iframe' ) && false === stripos( $pg['body'], '<iframe' ) && 0 === gs109d_count( $xp, '//*[contains(@src,"qrserver") or contains(@href,"qrserver") or contains(@data-src,"qrserver")]' ), 'dash-paired-no-iframe', 'whole page: 0 <iframe (DOM and raw HTML), nothing loads from api.qrserver.com' );
+gs109_assert( false === strpos( $pg['body'], $token ) && ! preg_grep( '/' . preg_quote( $token, '/' ) . '/', $hrefs ), 'dash-paired-no-token', 'the install token is in no href and nowhere in the page (' . count( $hrefs ) . ' links)' );
+$popups = gs109d_attrs( $xp, '//a[@data-gs-popup]', 'href' );
+$offhub = array_values( array_filter( $popups, function ( $u ) use ( $hub ) { return 0 !== strpos( $u, $hub . '/' ); } ) );
+gs109_assert( count( $popups ) >= 2 && ! $offhub, 'dash-paired-popups-hub', 'every [data-gs-popup] link (' . count( $popups ) . ') points at the paired hub', wp_json_encode( $offhub ) );
+$bad = array();
+foreach ( array( '//script[@src]' => 'src', '//link[@rel="stylesheet"]' => 'href' ) as $q => $attr ) {
+	foreach ( gs109d_attrs( $xp, $q, $attr ) as $u ) {
+		$h = strtolower( (string) wp_parse_url( $u, PHP_URL_HOST ) );
+		if ( '' !== $h && ! ( 'localhost' === $h && 8909 === (int) wp_parse_url( $u, PHP_URL_PORT ) ) ) {
+			$bad[] = $u;
+		}
+	}
+}
+gs109_assert( ! $bad, 'dash-paired-no-remote-code', 'paired page: no remote script / stylesheet', wp_json_encode( $bad ) );
+$cfg = null;
+foreach ( $xp->query( '//script' ) as $s ) {
+	if ( preg_match( '/var gendSocietyDashboard = (\{.*?\});/s', (string) $s->textContent, $m ) ) {
+		$cfg = json_decode( $m[1], true );
+	}
+}
+gs109_assert( is_array( $cfg ) && $hub === ( $cfg['hubOrigin'] ?? '' ) && (string) get_option( 'gend_society_install_id' ) === ( $cfg['installId'] ?? '' ) && '' !== ( $cfg['nonce'] ?? '' ) && false === strpos( wp_json_encode( $cfg ), $token ), 'dash-paired-js-config', 'popup script config: hub origin, install id, refresh nonce; no token', wp_json_encode( $cfg ) );
+$dbg = is_readable( WP_CONTENT_DIR . '/debug.log' ) ? (string) file_get_contents( WP_CONTENT_DIR . '/debug.log' ) : '';
+gs109_assert( false === strpos( $dbg, 'gdc_gas_ledger' ), 'dash-paired-no-ledger-errors', 'debug.log: no gdc_gas_ledger DB error' );
+
+// AJAX: Connected Devices + Hosting > Compute Gas come from /gas (no psoo_*, no ledger, no hosting/compute-gas call).
+gs109p_require_modules();
+gs109p_http_capture();
+gs109p_http( true );
+$dev = gs109p_call( function () { do_action( 'wp_ajax_gend_society_compute_gas_devices' ); }, 'POST', array(), array( '_ajax_nonce' => wp_create_nonce( 'gs_membership_action' ) ), true );
+$cg  = gs109p_call( function () { do_action( 'wp_ajax_gend_society_hosting_compute_gas' ); }, 'POST', array(), array( 'nonce' => wp_create_nonce( 'gs_membership_action' ) ), true );
+$tg  = gs109p_call( function () { do_action( 'wp_ajax_gend_society_hosting_toggles_get' ); }, 'POST', array(), array( 'nonce' => wp_create_nonce( 'gs_membership_action' ) ), true );
+$ar  = gs109p_hub_requests( gs109p_http( true ) );
+gs109_assert( ! empty( $dev['json']['success'] ) && array() === $dev['json']['data']['devices'] && ! empty( $cg['json']['success'] ) && '0.000000 GAS' === ( $cg['json']['data']['unbilled_gas_label'] ?? '' ) && ! empty( $tg['json']['success'] ), 'dash-paired-ajax', 'devices AJAX (0 devices), compute-gas AJAX (owed 0.000000 GAS) and toggles AJAX answer from /gas / local data' );
+gs109_assert( ! array_filter( $ar, function ( $r ) { return false !== strpos( $r['url'], '/hosting/' ); } ), 'dash-paired-ajax-no-hosting-route', 'AJAX: no hosting/* request (the hub has none)', wp_json_encode( array_map( function ( $r ) { return $r['method'] . ' ' . $r['url']; }, $ar ) ) );
+
+// ------------------------------------------------------------------ store-owner (paid, gas usage, pending bill, 1 device)
+gs109_fixture_scenario( 'store-owner' );
+gs109d_clear();
+$mem = gs109d_fx( 'store-owner', 'membership.json' );
+$gas = gs109d_fx( 'store-owner', 'gas.json' );
+$pg  = gs109d_get( $sess, admin_url( 'index.php' ) );
+$xp  = gs109d_xp( $pg['body'] );
+$plan_txt = (string) gs109d_text( $xp, '//div[contains(@class,"gs-mship-plan-col")]' );
+gs109_assert( false !== strpos( $plan_txt, 'Store Owner' ) && false !== strpos( $plan_txt, '$29.99 every month' ) && false !== strpos( $plan_txt, (string) $mem['dates']['renews'] ) && false === strpos( $plan_txt, 'Free' ), 'dash-so-plan', 'store-owner: plan, price and renewal from /membership', $plan_txt );
+// Expected values come from the scenario's /gas fixture (generated contract, 109-28).
+$srv   = (array) ( $gas['servers'] ?? array() );
+$stats = array(
+	'Earned'       => (string) $gas['earned']['label'],
+	'Server Costs' => ! empty( $srv['current']['label'] ) ? $srv['current']['label'] . ( ! empty( $srv['current']['unit'] ) ? ' / ' . $srv['current']['unit'] : '' ) : 'From ' . (string) ( $srv['from']['label'] ?? '' ),
+	'Owed Balance' => (string) $gas['owed']['label'],
+	'Next Bill'    => ! empty( $gas['billing']['pending'] ) ? 'Ready to pay' : (string) $gas['billing']['next_run'],
+	'Change'       => (string) $gas['used']['change_label'],
+);
+$got = array();
+foreach ( $stats as $k => $v ) {
+	$got[ $k ] = (string) gs109d_stat( $xp, $k );
+}
+$owed = gs109d_text( $xp, '//div[contains(@class,"gs-bcg-stat")][div[@class="k" and normalize-space(.)="Owed Balance"]]' );
+gs109_assert( ! empty( $gas['billing']['pending'] ) && $stats === $got, 'dash-so-gas-stats', 'store-owner gas from /gas: Earned, Server Costs, Owed, Next Bill "Ready to pay" (pending bill), Change', wp_json_encode( array( 'want' => $stats, 'got' => $got ) ) );
+$pay  = gs109d_attrs( $xp, '//div[contains(@class,"gs-bcg-stat")]//a[@data-gs-popup]', 'href' );
+$payl = 'Pay ' . (string) $gas['billing']['pending']['total_label'];
+gs109_assert( array( (string) $gas['billing']['pending']['pay_url'] ) === $pay && false !== strpos( (string) $owed, $payl ), 'dash-so-pay', '"' . $payl . '" = [data-gs-popup] to the hub order-pay page', wp_json_encode( $pay ) );
+gs109_assert( count( (array) $gas['history'] ) > 0 && count( (array) $gas['history'] ) === gs109d_count( $xp, '//table[@id="gs-gas-history-table"]/tbody/tr' ), 'dash-so-history', 'History popup: one row per /gas history entry (' . count( (array) $gas['history'] ) . ')' );
+file_put_contents( WP_CONTENT_DIR . '/gs109-standalone-dashboard.html', $pg['body'] );
+gs109_info( 'paired store-owner dashboard HTML saved: ' . strlen( $pg['body'] ) . ' bytes (wp-content/gs109-standalone-dashboard.html)' );
+gs109d_clear();
+$dev = gs109p_call( function () { do_action( 'wp_ajax_gend_society_compute_gas_devices' ); }, 'POST', array(), array( '_ajax_nonce' => wp_create_nonce( 'gs_membership_action' ) ), true );
+$d0  = $dev['json']['data']['devices'][0] ?? array();
+$g0  = (array) ( $gas['devices'][0] ?? array() );
+gs109_assert( count( (array) $gas['devices'] ) === count( (array) ( $dev['json']['data']['devices'] ?? array() ) ) && '' !== (string) ( $g0['name'] ?? '' ) && $g0['name'] === ( $d0['label'] ?? '' ) && $g0['kind'] === ( $d0['type'] ?? '' ) && (bool) $g0['online'] === ( $d0['online'] ?? null ) && (int) ( $d0['last_seen'] ?? 0 ) > 0, 'dash-so-devices', 'Connected Devices AJAX: the /gas device (label, type, online, last seen)', wp_json_encode( $d0 ) );
+
+// ------------------------------------------------------------------ inherited (group plan, PLAN-07)
+gs109_fixture_scenario( 'inherited' );
+gs109d_clear();
+$pg = gs109d_get( $sess, admin_url( 'index.php' ) );
+$xp = gs109d_xp( $pg['body'] );
+gs109_assert( 'Included through GS109 Business Group' === gs109d_text( $xp, '//*[@data-gs-dash-inherit]' ) && false !== strpos( (string) gs109d_text( $xp, '//div[contains(@class,"gs-mship-plan-col")]' ), 'Social Connector' ), 'dash-inherited', 'inherited: Social Connector + "Included through GS109 Business Group"' );
+
+// ------------------------------------------------------------------ revoked (401 on every route)
+gs109_fixture_scenario( 'revoked' );
+gs109d_clear();
+$pg  = gs109d_get( $sess, admin_url( 'index.php' ) );
+$pg  = gs109d_get( $sess, admin_url( 'index.php' ) ); // the 401 sets the health status on the first load
+$xp  = gs109d_xp( $pg['body'] );
+$dbg = is_readable( WP_CONTENT_DIR . '/debug.log' ) ? (string) file_get_contents( WP_CONTENT_DIR . '/debug.log' ) : '';
+gs109_assert( 200 === $pg['status'] && 1 === gs109d_count( $xp, '//*[@id="gs-mship-root"]' ) && 1 === gs109d_count( $xp, '//*[@data-gs-dash-reconnect]//button[@data-gs-connect-open]' ) && 'Reconnect' === gs109d_text( $xp, '//div[contains(@class,"gs-mship-cell--group")]//button[@data-gs-connect-open]' ) && 0 === gs109d_count( $xp, '//a[@data-gs-popup]' ), 'dash-revoked', 'revoked (401): the panel renders with the Reconnect state, no popup links' );
+gs109_assert( false === stripos( $dbg, 'PHP Fatal' ), 'dash-revoked-no-fatal', 'no PHP fatal in debug.log' );
+
+// ------------------------------------------------------------------ hub down (timeout on every request to the hub)
+gs109_fixture_scenario( 'connected' );
+gs109d_clear();
+$down = function ( $pre, $args, $url ) use ( $hub ) {
+	return 0 === strpos( (string) $url, $hub . '/' ) ? new WP_Error( 'http_request_failed', 'cURL error 28: Operation timed out' ) : $pre;
+};
+add_filter( 'pre_http_request', $down, 1, 3 );
+$html = gs109d_render( $admin );
+remove_filter( 'pre_http_request', $down, 1 );
+$fx = gs109d_xpf( $html );
+gs109_assert( 1 === gs109d_count( $fx, '//*[@id="gs-mship-root"]' ) && false !== strpos( (string) gs109d_text( $fx, '//div[contains(@class,"gs-bcg-hero")]//p[contains(@class,"gs-bcg-sub")]' ), 'Could not reach gend.me' ) && 'Unavailable' === gs109d_text( $fx, '//div[contains(@class,"gs-bk-hero")]//span[contains(@class,"gs-bk-badge")]' ), 'dash-hub-down', 'hub down: the panel renders; gas says "Could not reach gend.me", backups "Unavailable"; no fatal' );
+
+// ------------------------------------------------------------------ hosted record (backups-status hosted true)
+gs109d_clear();
+$off  = gs109p_inject( 'backups-status', 200, array( 'hosted' => true, 'plan' => null, 'lapse' => null, 'retention_days' => 30, 'choose_url' => $hub . '/my-account/memberships/?gdc_open_modal=9101&gdc_open_backups=1', 'last_backup' => null, 'actions' => array( 'backup_now' => true, 'restore' => true ), 'cache_seconds' => 300 ) );
+$html = gs109d_render( $admin );
+$off();
+$fx = gs109d_xpf( $html );
+gs109_assert( array( $hub . '/my-account/memberships/?gdc_open_modal=9101&gdc_open_backups=1' ) === gs109d_attrs( $fx, '//div[contains(@class,"gs-bk-hero")]//a[@data-gs-popup]', 'href' ) && 1 === gs109d_count( $fx, '//div[contains(@class,"gs-bk-hero")]//button[@data-gs-mship="backup-now"]' ) && 1 === gs109d_count( $fx, '//div[contains(@class,"gs-bk-hero")]//button[@data-gs-hosting-goto="backups"]' ) && 'No Active Plan' === gs109d_text( $fx, '//div[contains(@class,"gs-bk-hero")]//span[contains(@class,"gs-bk-badge")]' ), 'dash-hosted-backups', 'hosted record: Choose a plan popup (choose_url), Backup now, Manage Backups' );
+
+// Off-hub URLs from the hub are never printed (choose_url / add_server_url on another host).
+gs109d_clear();
+$off1 = gs109p_inject( 'backups-status', 200, array( 'hosted' => true, 'choose_url' => 'https://evil.example/x', 'actions' => array( 'backup_now' => true ), 'cache_seconds' => 300 ) );
+$g2   = gs109d_fx( 'connected', 'gas.json' );
+$g2['servers']['add_server_url'] = 'javascript:alert(1)';
+unset( $g2['rev'] );
+$off2 = gs109p_inject( 'gas', 200, $g2 );
+$html = gs109d_render( $admin );
+$off1();
+$off2();
+gs109_assert( false === strpos( $html, 'evil.example' ) && false === stripos( $html, 'javascript:alert' ), 'dash-offhub-urls', 'choose_url / add_server_url off the paired hub are dropped' );
+
+// Browser: UPGRADE really opens a popup on gend.me, the hub signal / closing it refreshes (dash.js popup).
+$bf = WP_CONTENT_DIR . '/gs109-dash-popup.json';
+$bj = is_readable( $bf ) ? json_decode( (string) file_get_contents( $bf ), true ) : null;
+gs109_assert(
+	is_array( $bj ) && ( time() - (int) filemtime( $bf ) ) < 3600 && md5_file( GEND_SOCIETY_DIR . 'assets/gs-dashboard-standalone.js' ) === ( $bj['plugin_md5'] ?? '' )
+		&& ! empty( $bj['upgrade_popup'] ) && ! empty( $bj['signal_refresh'] ) && ! empty( $bj['foreign_ignored'] ) && ! empty( $bj['close_refresh'] ) && ! empty( $bj['blocked_link'] ) && 0 === (int) ( $bj['iframes'] ?? 1 ),
+	'dash-browser-popup',
+	'browser (this build, < 1 h): UPGRADE opens the Change Plan URL in a popup; the hub signal refreshes; a foreign-origin message is ignored; closing Add Server refreshes; a blocked popup shows a new-tab link; 0 iframes',
+	is_array( $bj ) ? wp_json_encode( $bj ) : 'no ' . basename( $bf )
+);
+// Browser page renders (dash.js page; wp-content/gs109-dash-page-{unpaired,paired}.json): what a person sees.
+$pu = is_readable( WP_CONTENT_DIR . '/gs109-dash-page-unpaired.json' ) ? json_decode( (string) file_get_contents( WP_CONTENT_DIR . '/gs109-dash-page-unpaired.json' ), true ) : null;
+$pp = is_readable( WP_CONTENT_DIR . '/gs109-dash-page-paired.json' ) ? json_decode( (string) file_get_contents( WP_CONTENT_DIR . '/gs109-dash-page-paired.json' ), true ) : null;
+$ext_ok = function ( $j, $allow_uploads ) {
+	foreach ( array_keys( (array) ( $j['external'] ?? array() ) ) as $k ) {
+		if ( 0 === strpos( $k, 'image secure.gravatar.com/' ) || ( $allow_uploads && 0 === strpos( $k, 'image gend.me/wp-content/uploads/' ) ) ) {
+			continue;
+		}
+		return false;
+	}
+	return true;
+};
+$du = is_array( $pu ) ? (array) ( $pu['dom'] ?? array() ) : array();
+$dp = is_array( $pp ) ? (array) ( $pp['dom'] ?? array() ) : array();
+gs109_assert(
+	1 === (int) ( $du['skin'] ?? 0 ) && 1 === (int) ( $du['mship'] ?? 0 ) && array( 'Connect to gend.me' ) === ( $du['connectBtn'] ?? null ) && false === stripos( (string) ( $du['gas'] ?? '' ), 'earned' ) && false !== strpos( (string) ( $du['gas'] ?? '' ), 'Connect to gend.me' )
+		&& 0 === (int) ( $du['iframes'] ?? 1 ) && 0 === (int) ( $du['hostingIframes'] ?? 1 ) && array() === ( $du['scriptsRemote'] ?? null ) && array() === ( $du['stylesRemote'] ?? null ) && $ext_ok( $pu, false ),
+	'dash-browser-unpaired',
+	'browser, unpaired: skin + panel, "Connect to gend.me" button, gas shows only the connect text (stats/actions not visible), 0 iframes (Hosting tab opened too), no remote script/style, external requests only core gravatar',
+	wp_json_encode( array( 'dom' => $du, 'external' => $pu['external'] ?? null ) )
+);
+$vis = array_filter(
+	(array) ( $du['noticesVisible'] ?? array() ),
+	function ( $t ) {
+		return false !== strpos( (string) $t, 'turned on the GenD dashboard' ) && false !== strpos( (string) $t, 'Switch back to standard WordPress' );
+	}
+);
+gs109_assert( 1 === count( $vis ), 'dash-browser-firstrun-notice-visible', 'browser, option unset: the first-run notice naming "Switch back to standard WordPress" is visible on the dashboard', wp_json_encode( $du['noticesVisible'] ?? null ) );
+$want_nav = array( 'Compute Gas', 'Backups', 'Media', 'Codebase', 'Tables' );
+gs109_assert(
+	5 === count( (array) ( $dp['groupNav'] ?? array() ) ) && 0 === strpos( (string) ( $dp['groupNav'][0] ?? '' ), 'Business Plan -> http://localhost:8919/groups/gs109-business-group/' ) && array( home_url( '/' ) ) === ( $dp['viewSite'] ?? null )
+		&& array( 'App', 'Hosting', 'Projects' ) === ( $dp['tabs'] ?? null ) && ! array_diff( $want_nav, (array) ( $dp['hostingNav'] ?? array() ) )
+		&& 0 === (int) ( $dp['iframes'] ?? 1 ) && 0 === (int) ( $dp['hostingIframes'] ?? 1 ) && array() === ( $dp['scriptsRemote'] ?? null ) && array() === ( $dp['stylesRemote'] ?? null ) && $ext_ok( $pp, true ),
+	'dash-browser-paired',
+	'browser, paired store-owner: top nav = the gend.me group tabs, View Site = home_url, APP / HOSTING / PROJECTS, Hosting sub-nav Compute Gas / Backups / Media / Codebase / Tables, 0 iframes, no remote script/style, external requests only gravatar + consented gend.me images',
+	wp_json_encode( array( 'dom' => $dp, 'external' => $pp['external'] ?? null ) )
+);
+gs109d_clear();
+gs109d_part( 'standalone-paired', true );
 
 if ( 0 === (int) $GLOBALS['gs109_uat']['fail'] ) {
 	echo 'dashboard: ALL PASS (' . (int) $GLOBALS['gs109_uat']['pass'] . ")\n";

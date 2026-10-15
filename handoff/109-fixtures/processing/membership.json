@@ -59,7 +59,9 @@
     "id": 4101,
     "name": "GS109 Business Group",
     "slug": "gs109-business-group",
-    "avatar": ""
+    "avatar": "",
+    "cover": "",
+    "url": "http://localhost:8919/groups/gs109-business-group/"
   },
   "orders": [],
   "backups": [],
@@ -80,5 +82,14 @@
     21,
     22,
     23
-  ]
+  ],
+  "connection": {
+    "connected_at": 1760300000,
+    "via": "redirect",
+    "approved_by": {
+      "display_name": "GS109 Owner"
+    },
+    "install_id": "0b1c9f3e-5d2a-4e8b-9a61-109c0ffee001"
+  },
+  "hosted": false
 }

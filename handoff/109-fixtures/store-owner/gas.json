@@ -1,0 +1,77 @@
+{
+  "currency": "GAS",
+  "peg": "CAD",
+  "earned": {
+    "total": 0.125,
+    "label": "0.13 DGEN",
+    "events": 1,
+    "last": "2026-10-14 09:12:00"
+  },
+  "used": {
+    "total": 0.8125,
+    "label": "0.812500 GAS",
+    "this_month": 0.5,
+    "last_month": 0.25,
+    "change_label": "+100%",
+    "direction": "up"
+  },
+  "owed": {
+    "unbilled": 0.5,
+    "label": "0.500000 GAS",
+    "below_minimum": true,
+    "minimum_cad": 1.0
+  },
+  "billing": {
+    "enabled": true,
+    "next_run": "2026-11-01",
+    "period": "2026-10",
+    "pending": {
+      "order_id": 4242,
+      "total_label": "$2.50",
+      "pay_url": "http://localhost:8919/checkout/order-pay/4242/?pay_for_order=true&key=wc_order_x",
+      "due": "2026-10-08"
+    },
+    "paused": false
+  },
+  "servers": {
+    "current": null,
+    "from": {
+      "label": "$95.00",
+      "unit": "month"
+    },
+    "add_server_url": "http://localhost:8919/my-account/memberships/?gdc_open_modal=9101"
+  },
+  "history": [
+    {
+      "direction": "used",
+      "label": "Web App Dynamic Request / SSR API (Web App Backend)",
+      "amount_label": "0.500000 GAS",
+      "status": "recorded",
+      "created_at": "2026-10-14 09:10:00"
+    },
+    {
+      "direction": "earned",
+      "label": "Web App Dynamic Request / SSR API (Web App Backend)",
+      "amount_label": "0.125000 GAS",
+      "status": "recorded",
+      "created_at": "2026-10-14 09:12:00"
+    }
+  ],
+  "devices": [
+    {
+      "device_id": "dsk-0b1c9f3e",
+      "name": "Studio desktop",
+      "kind": "desktop",
+      "online": true,
+      "last_seen": "2026-10-15T11:58:00Z",
+      "owner": "self"
+    }
+  ],
+  "add_device_urls": {
+    "mobile": "http://localhost:8919/gas-station/mobile/",
+    "desktop": "http://localhost:8919/gas-station/desktop/"
+  },
+  "cache_seconds": 300,
+  "generated_at": "2026-10-15T12:00:00Z",
+  "rev": "f7dba1ccc6c9c1b8741b6eca9d7aeb375c84d261"
+}
