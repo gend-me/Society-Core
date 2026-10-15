@@ -943,9 +943,9 @@ function gend_society_render_profile_header() {
     }
 
     // ── Canonical nav order (desktop AND phone base order): Overview,
-    // App Projects (groups), Calendar, Connections (friends), Contracts
-    // (invest), Wallet. Anything unlisted keeps its relative order after.
-    $gdc_nav_order = [ 'overview' => 1, 'groups' => 2, 'member-calendar' => 3, 'friends' => 4, 'invest' => 5, 'member-wallet' => 6 ];
+    // App Projects (groups), Contracts (invest), Calendar, Connections
+    // (friends), Wallet. Anything unlisted keeps its relative order after.
+    $gdc_nav_order = [ 'overview' => 1, 'groups' => 2, 'invest' => 3, 'member-calendar' => 4, 'friends' => 5, 'member-wallet' => 6 ];
     $gdc_nav_pos   = 0;
     foreach ( $nav_items as $it ) {
         // Stable sort: remember each item's source index as the tiebreaker.
@@ -1502,9 +1502,8 @@ function gend_society_render_profile_header() {
         //   - the social plugin is active (so the sidebar already mirrors these tabs)
         // Backend-access users always see the strip; non-backend users still see
         // it on OTHER members' profiles, where the sidebar is "their" menu.
-        $gs_hide_profile_nav = function_exists( 'gend_society_frontend_bar_is_profile_mode' )
-            && gend_society_frontend_bar_is_profile_mode()
-            && bp_is_my_profile();
+        // Shown to every member on every profile, their own included (user decision 2026-10-15).
+        $gs_hide_profile_nav = (bool) apply_filters( 'gend_society_hide_profile_nav', false );
         ?>
         <?php if ( ! $gs_hide_profile_nav ) : ?>
         <nav class="gdc-profile-nav" id="gdc-profile-nav" aria-label="Profile navigation">

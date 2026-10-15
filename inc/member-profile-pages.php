@@ -1721,17 +1721,22 @@ function gend_society_invest_profile_screen_content() {
             </form>
         </div>
         <?php echo gend_society_render_web_apps_you_manage( $topup_uid ); // phpcs:ignore ?>
-        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" checked>
+        <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" checked>
+        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio">
         <input type="radio" name="gci-tab" id="gci-tab-completed" class="gci-radio">
         <div class="gci-tabs" role="tablist">
+            <label for="gci-tab-commissions" class="gci-tab"><?php esc_html_e( 'Commissions', 'gend-society' ); ?></label>
             <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
             <label for="gci-tab-hold"      class="gci-tab"><?php esc_html_e( 'Currency Hold', 'gend-society' ); ?></label>
             <label for="gci-tab-growth"    class="gci-tab"><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
             <label for="gci-tab-projects"  class="gci-tab"><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
             <label for="gci-tab-completed" class="gci-tab"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></label>
+        </div>
+        <div class="gci-panel gci-panel--commissions" role="tabpanel">
+            <?php echo shortcode_exists( 'affiliate_sales_dashboard' ) ? do_shortcode( '[affiliate_sales_dashboard]' ) : ''; // Sales Team commission dashboard ?>
         </div>
         <div class="gci-panel gci-panel--fund" role="tabpanel">
             <?php echo do_shortcode( '[gend_wallet]' ); ?>
@@ -1822,6 +1827,7 @@ function gend_society_invest_footer_assets() {
         .gci-tab:hover { color:#fff; transform:translateY(-2px); }
         .gci-panel { display:none !important; }
         /* active panel via :checked ~ sibling */
+        #gci-tab-commissions:checked ~ .gci-panel--commissions,
         #gci-tab-fund:checked      ~ .gci-panel--fund,
         #gci-tab-tasks:checked     ~ .gci-panel--tasks,
         #gci-tab-hold:checked      ~ .gci-panel--hold,
@@ -1829,6 +1835,7 @@ function gend_society_invest_footer_assets() {
         #gci-tab-projects:checked  ~ .gci-panel--projects,
         #gci-tab-completed:checked ~ .gci-panel--completed { display:block !important; animation: gciFade .45s cubic-bezier(.16,1,.3,1); }
         /* active tab look via :checked ~ label */
+        #gci-tab-commissions:checked ~ .gci-tabs label[for="gci-tab-commissions"],
         #gci-tab-fund:checked      ~ .gci-tabs label[for="gci-tab-fund"],
         #gci-tab-tasks:checked     ~ .gci-tabs label[for="gci-tab-tasks"],
         #gci-tab-hold:checked      ~ .gci-tabs label[for="gci-tab-hold"],
@@ -1838,6 +1845,7 @@ function gend_society_invest_footer_assets() {
             color:#fff; border-color: rgba(0,210,255,.5);
             box-shadow: 0 14px 32px -16px rgba(0,210,255,.55), inset 0 0 0 1px rgba(0,210,255,.2);
         }
+        #gci-tab-commissions:checked ~ .gci-tabs label[for="gci-tab-commissions"]::before,
         #gci-tab-fund:checked      ~ .gci-tabs label[for="gci-tab-fund"]::before,
         #gci-tab-tasks:checked     ~ .gci-tabs label[for="gci-tab-tasks"]::before,
         #gci-tab-hold:checked      ~ .gci-tabs label[for="gci-tab-hold"]::before,
