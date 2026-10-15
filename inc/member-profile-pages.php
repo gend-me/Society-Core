@@ -1708,18 +1708,7 @@ function gend_society_invest_profile_screen_content() {
         $topup_uid = (int) bp_displayed_user_id();
         $topup_bal = function_exists( 'mycred_get_users_balance' ) ? (float) mycred_get_users_balance( $topup_uid, 'transact' ) : 0.0;
         ?>
-        <div class="gci-topup-bar gi-reveal">
-            <div class="gci-topup-info">
-                <span class="gci-topup-label"><?php esc_html_e( 'Your DGEN balance', 'gend-society' ); ?></span>
-                <span class="gci-topup-value"><?php echo esc_html( number_format_i18n( $topup_bal, 2 ) ); ?> <small>DGEN</small></span>
-            </div>
-            <form class="gci-topup-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <input type="hidden" name="action" value="gend_buy_dgen">
-                <?php wp_nonce_field( 'gend_buy_dgen' ); ?>
-                <input type="number" name="amount" min="1" step="0.01" placeholder="<?php esc_attr_e( 'Amount', 'gend-society' ); ?>" class="gci-topup-input" required>
-                <button type="submit" class="gci-topup-btn"><?php esc_html_e( 'Top Up DGEN', 'gend-society' ); ?></button>
-            </form>
-        </div>
+        <?php // The DGEN balance / top-up bar was removed from this screen (2026-10-15). ?>
         <?php // "Web Apps You Manage", Currency Hold and Completed Contracts were removed from this screen (2026-10-15). ?>
         <?php // autocomplete="off": browsers otherwise restore the last-picked tab on reload instead of Commissions. ?>
         <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" autocomplete="off" checked>
