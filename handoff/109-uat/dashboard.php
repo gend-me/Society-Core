@@ -160,13 +160,16 @@ if ( 'standalone' !== $gs109d_mode ) {
 		$uid = 1;
 	}
 	gs109p_http_capture();
+	// The FIRST render of the process is the one compared (it also prints the stylesheets the Media sub-tab
+	// enqueues; later renders in the same process do not reprint them), so stability is checked on renders 2 + 3.
 	$r1 = gs109d_render( $uid );
 	$r2 = gs109d_render( $uid );
+	$r3 = gs109d_render( $uid );
 	gs109p_http( true );
 	$n1 = gs109d_normalize( $r1 );
-	$n2 = gs109d_normalize( $r2 );
-	gs109_assert( '' !== $r1 && $n1 === $n2, 'dash-' . $gs109d_mode . '-render-stable', $gs109d_mode . ': custom dashboard renders and two renders normalise to the same bytes (' . strlen( $r1 ) . ' bytes)' );
+	gs109_assert( '' !== $r1 && gs109d_normalize( $r2 ) === gs109d_normalize( $r3 ), 'dash-' . $gs109d_mode . '-render-stable', $gs109d_mode . ': custom dashboard renders and repeated renders normalise to the same bytes (' . strlen( $r1 ) . ' bytes)' );
 	gs109_info( 'dashboard render md5: ' . $gs109d_mode . ' bytes ' . strlen( $n1 ) . ' combined ' . md5( $n1 ) );
+	@file_put_contents( sys_get_temp_dir() . '/gs109-dash-render.html', $n1 ); // regress script copies it out for a diff
 	// The standalone-only pieces never appear here (absent functions count as absent: the fork-point tree has none).
 	$slot = 0;
 	$sf   = function () use ( &$slot ) {
