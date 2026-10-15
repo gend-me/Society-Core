@@ -37,7 +37,7 @@ function gend_society_enqueue_admin_assets()
     $ver = GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/admin-style.css');
     wp_enqueue_style('gs-admin-style', GEND_SOCIETY_URL . 'assets/admin-style.css', ['dashicons'], $ver);
     wp_enqueue_style('gs-animation-utilities', GEND_SOCIETY_URL . 'assets/animation-utilities.css', [], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/animation-utilities.css'));
-    wp_enqueue_script('gs-admin-script', GEND_SOCIETY_URL . 'assets/admin-script.js', [], $ver, true);
+    wp_enqueue_script('gs-admin-script', GEND_SOCIETY_URL . 'assets/admin-script.js', [], GEND_SOCIETY_VERSION . '.' . filemtime(GEND_SOCIETY_DIR . 'assets/admin-script.js'), true);
 
     $current_user = wp_get_current_user();
 
@@ -69,7 +69,7 @@ function gend_society_enqueue_admin_assets()
         // Curated subset (avatar is rendered separately): the four
         // most-used profile sections.
         'gendProfileMenu' => [
-            ['label' => 'App Projects', 'url' => $members_base . 'groups/',      'icon' => 'dashicons-screenoptions'],
+            ['label' => 'Projects', 'url' => $members_base . 'groups/',      'icon' => 'dashicons-screenoptions'],
             ['label' => 'Connections',  'url' => $members_base . 'friends/',     'icon' => 'dashicons-networking'],
             ['label' => 'Wallet',       'url' => $members_base . 'member-wallet/', 'icon' => 'dashicons-money-alt'],
             ['label' => 'Messages',     'url' => $members_base . 'messages/',    'icon' => 'dashicons-email'],

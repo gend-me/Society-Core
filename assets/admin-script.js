@@ -22,7 +22,7 @@
         var profileMenu = (data && Array.isArray(data.gendProfileMenu) && data.gendProfileMenu.length)
             ? data.gendProfileMenu
             : [
-                { label: 'App Projects', url: base + 'groups/',       icon: 'dashicons-screenoptions' },
+                { label: 'Projects', url: base + 'groups/',       icon: 'dashicons-screenoptions' },
                 { label: 'Connections',  url: base + 'friends/',      icon: 'dashicons-networking' },
                 { label: 'Wallet',       url: base + 'member-wallet/', icon: 'dashicons-money-alt' },
                 { label: 'Messages',     url: base + 'messages/',     icon: 'dashicons-email' }
