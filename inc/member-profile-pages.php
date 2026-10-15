@@ -1720,32 +1720,25 @@ function gend_society_invest_profile_screen_content() {
                 <button type="submit" class="gci-topup-btn"><?php esc_html_e( 'Top Up DGEN', 'gend-society' ); ?></button>
             </form>
         </div>
-        <?php echo gend_society_render_web_apps_you_manage( $topup_uid ); // phpcs:ignore ?>
-        <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" checked>
-        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-completed" class="gci-radio">
+        <?php // "Web Apps You Manage", Currency Hold and Completed Contracts were removed from this screen (2026-10-15). ?>
+        <?php // autocomplete="off": browsers otherwise restore the last-picked tab on reload instead of Commissions. ?>
+        <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" autocomplete="off" checked>
+        <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio" autocomplete="off">
+        <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio" autocomplete="off">
+        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" autocomplete="off">
         <div class="gci-tabs" role="tablist">
             <label for="gci-tab-commissions" class="gci-tab"><?php esc_html_e( 'Commissions', 'gend-society' ); ?></label>
-            <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
-            <label for="gci-tab-hold"      class="gci-tab"><?php esc_html_e( 'Currency Hold', 'gend-society' ); ?></label>
             <label for="gci-tab-growth"    class="gci-tab"><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
             <label for="gci-tab-projects"  class="gci-tab"><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
-            <label for="gci-tab-completed" class="gci-tab"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></label>
+            <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
         </div>
         <div class="gci-panel gci-panel--commissions" role="tabpanel">
             <?php echo shortcode_exists( 'affiliate_sales_dashboard' ) ? do_shortcode( '[affiliate_sales_dashboard]' ) : ''; // Sales Team commission dashboard ?>
         </div>
-        <div class="gci-panel gci-panel--fund" role="tabpanel">
-            <?php echo do_shortcode( '[gend_wallet]' ); ?>
-        </div>
-        <div class="gci-panel gci-panel--hold" role="tabpanel"><?php echo gend_society_render_currency_hold( (int) bp_displayed_user_id() ); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gend_society_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gend_society_render_growth_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gend_society_render_project_market(); // phpcs:ignore ?></div>
-        <div class="gci-panel gci-panel--completed" role="tabpanel">
-            <?php if ( function_exists( 'gend_society_render_completed_contracts_panel' ) ) gend_society_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
+        <div class="gci-panel gci-panel--fund" role="tabpanel">
+            <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
     </div>
     <?php
