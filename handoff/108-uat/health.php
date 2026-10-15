@@ -305,8 +305,8 @@ gend_society_connection_health_render_notice();
 gs108_assert( '' === ob_get_clean(), 'health-notice-subscriber', 'subscriber: no notice' );
 $html = $page();
 gs108_assert( false !== strpos( $html, 'gs-connection-health-notice' ) && false !== strpos( $html, 'no longer recognises this site&#039;s connection.' ), 'health-http-notice', 'next wp-admin page load (HTTP) shows the Reconnect notice' );
-$html = $page( 'index.php?page=gs-portal-connect' );
-gs108_assert( false === strpos( $html, 'gs-connection-health-notice' ) && false !== strpos( $html, 'Reconnect to gend.me' ), 'health-http-connect-screen', 'Connect screen: no duplicate notice, the card shows its Reconnect button' );
+$html = $page( 'index.php?gs_connect=1' );
+gs108_assert( false === strpos( $html, 'gs-connection-health-notice' ) && false !== strpos( $html, 'Reconnect to gend.me' ), 'health-http-connect-screen', 'dashboard with the Connect popup open (109-30): no duplicate notice, the popup shows its Reconnect button' );
 
 // --- dismiss.
 $h1 = gend_society_connection_health_get();

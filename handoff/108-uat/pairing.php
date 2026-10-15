@@ -58,14 +58,16 @@ foreach ( array( 'abcdef', 'ABCDE1', 'ABCDEFG', 'ABC<b>', 'ABCDE0', '' ) as $i =
 gs108_assert_eq( array(), gs108_http_log(), 'pairing-render-no-request', 'rendering the Connect screen made no HTTP request' );
 gs108_assert( null === gs108c_opt( 'gend_society_consent', null ), 'pairing-render-no-consent', 'no consent recorded by rendering' );
 
-// Card styles: only on this screen in standalone mode.
-wp_dequeue_style( 'gend-society-connect' );
+// Card styles (109-30: merged into the popup's gs-connect-modal.css): only on the dashboard in standalone mode.
+wp_set_current_user( $admin );
+wp_dequeue_style( 'gend-society-connect-modal' );
+gend_society_portal_connect_enqueue( 'edit.php' );
+$other = wp_style_is( 'gend-society-connect-modal', 'enqueued' );
 gend_society_portal_connect_enqueue( 'index.php' );
-$other = wp_style_is( 'gend-society-connect', 'enqueued' );
-gend_society_portal_connect_enqueue( 'dashboard_page_gs-portal-connect' );
-gs108_assert( ! $other && wp_style_is( 'gend-society-connect', 'enqueued' ) && false !== strpos( (string) wp_styles()->registered['gend-society-connect']->src, 'assets/gs-connect.css' ), 'pairing-css', 'assets/gs-connect.css enqueued on the Connect screen only' );
-gs108_assert( is_readable( dirname( __DIR__, 2 ) . '/assets/gs-connect.css' ) || is_readable( WP_PLUGIN_DIR . '/gend-society/assets/gs-connect.css' ), 'pairing-css-file', 'static CSS file shipped' );
-wp_dequeue_style( 'gend-society-connect' );
+gs108_assert( ! $other && wp_style_is( 'gend-society-connect-modal', 'enqueued' ) && false !== strpos( (string) wp_styles()->registered['gend-society-connect-modal']->src, 'assets/gs-connect-modal.css' ) && wp_script_is( 'gend-society-connect-modal', 'enqueued' ), 'pairing-css', 'assets/gs-connect-modal.css + .js enqueued on the dashboard (the popup) only' );
+gs108_assert( is_readable( dirname( __DIR__, 2 ) . '/assets/gs-connect-modal.css' ) || is_readable( WP_PLUGIN_DIR . '/gend-society/assets/gs-connect-modal.css' ), 'pairing-css-file', 'static CSS file shipped' );
+wp_dequeue_style( 'gend-society-connect-modal' );
+wp_dequeue_script( 'gend-society-connect-modal' );
 
 // --- 2. Submit without consent: refused, 0 requests.
 $GLOBALS['gs108_uat']['http'] = array();

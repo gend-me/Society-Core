@@ -7,7 +7,7 @@
  *     button = gend.me's Change Plan page in a popup (109-21; no per-tier Choose, no launcher), After
  *     migration "Runs on your gend.me container after migration" + an outbound link to the hub
  *     (new tab, noopener, no Choose), Included links to the hub page; the Upgrade and After migration strings
- *     differ and equal the Plan & features card copy for the same areas (109-06 copy list)
+ *     differ (the Plan & features card they were compared with is gone since 109-30; Included opens the dashboard)
  *   - revoked -> Reconnect; inherited -> Projects included; unknown area copy
  *   - the Refresh AJAX (gs_view=upgrade) returns #gs-feature-upgrade re-rendered after a plan change
  *   - real loopback page: no <iframe>, gs-plan.js/css local with refreshView upgrade, no inline script/style in
@@ -42,10 +42,6 @@ $fx = gs109pl_start( 'connected' );
 if ( ! $fx || ! gs109_assert( function_exists( 'gend_society_feature_upgrade_render_standalone' ), 'upgrade-loaded', 'standalone upgrade renderer present' ) ) {
 	return;
 }
-$hp = GEND_SOCIETY_DIR . 'inc/hub-embed.php';
-if ( ! function_exists( 'gend_society_hub_area_fetch' ) && is_readable( $hp ) ) {
-	require_once $hp;
-}
 $token = $fx['token'];
 $frag  = function ( $area, $vm ) {
 	return gend_society_feature_upgrade_fragment( $area, $vm );
@@ -53,13 +49,11 @@ $frag  = function ( $area, $vm ) {
 
 // ── connected ─────────────────────────────────────────────────────────────────────────────────────────
 $vm   = gs109pl_vm( 'connected' );
-$card = gs109pl_xp( gend_society_plan_render_areas_card( $vm ) );
 
 $xp = gs109pl_xp( $frag( 'projects', $vm ) );
 $up = gs109pl_text( $xp, '//*[@data-gs-up-copy="upgrade"]' );
 gs109_assert_eq( 'upgrade', gs109pl_attrs( $xp, '//div[@data-gs-up-area="projects"]', 'data-gs-up-state' )[0] ?? '', 'upgrade-projects-state', 'projects: Upgrade state' );
 gs109_assert_eq( 'Available with Social Connector', $up, 'upgrade-projects-copy', 'projects: "Available with Social Connector"' );
-gs109_assert_eq( gs109pl_text( $card, '//li[@data-gs-plan-area="projects"]/a[@class="gs-plan-area__state"]' ), $up, 'upgrade-copy-matches-card', 'Upgrade copy == the Plan & features card copy (109-06 list)' );
 gs109_assert( gs109pl_popup_is( gs109pl_popup( $xp ), gs109pl_change_url( 'connected' ), 'Choose a plan on gend.me' ) && array() === gs109pl_choose( $xp ), 'upgrade-projects-choose', 'one "Choose a plan on gend.me" button: the Change Plan page, target _blank, rel noopener (gs-plan.js popup); no per-tier Choose', gs109pl_popup( $xp ) );
 gs109_assert( false !== strpos( (string) gs109pl_text( $xp, '//div[@data-gs-up-area="projects"]' ), 'once this site is on Social Connector' ), 'upgrade-projects-names-plan', 'the copy still names the unlocking plan (Social Connector)' );
 gs109_assert( 1 === gs109pl_count( $xp, '//button[@data-gs-plan-refresh]' ), 'upgrade-refresh-button', 'Refresh button (gs-plan.js)' );
@@ -67,7 +61,6 @@ gs109_assert( 1 === gs109pl_count( $xp, '//button[@data-gs-plan-refresh]' ), 'up
 $xp = gs109pl_xp( $frag( 'write', $vm ) );
 $am = gs109pl_text( $xp, '//*[@data-gs-up-copy="after_migration"]' );
 gs109_assert_eq( 'Runs on your gend.me container after migration', $am, 'upgrade-write-copy', 'write: After migration copy' );
-gs109_assert_eq( gs109pl_text( $card, '//li[@data-gs-plan-area="write"]/span[@class="gs-plan-area__state"]' ), $am, 'upgrade-after-matches-card', 'After migration copy == the Plan & features card copy' );
 gs109_assert( $up !== $am, 'upgrade-copy-differs', 'Upgrade and After migration copy differ' );
 $ob = $xp->query( '//a[@data-gs-up-outbound]' );
 gs109_assert( 1 === $ob->length && 'http://localhost:8919/my-account/memberships/' === $ob->item( 0 )->getAttribute( 'href' ) && '_blank' === $ob->item( 0 )->getAttribute( 'target' ) && 'noopener' === $ob->item( 0 )->getAttribute( 'rel' ) && 'See container plans on gend.me' === trim( $ob->item( 0 )->textContent ), 'upgrade-write-outbound', 'After migration: "See container plans on gend.me" on the hub, new tab, noopener' );
@@ -76,7 +69,7 @@ gs109_assert_eq( 'Content', gs109pl_text( $xp, '//div[@data-gs-up-area="write"]/
 
 $xp = gs109pl_xp( $frag( 'groups', $vm ) );
 $op = gs109pl_attrs( $xp, '//div[@data-gs-up-area="groups"]//a[contains(@class,"button-primary")]', 'href' );
-gs109_assert( 'Included with your plan' === gs109pl_text( $xp, '//*[@data-gs-up-copy="included"]' ) && $op && html_entity_decode( $op[0] ) === admin_url( 'admin.php?page=gs-hub-groups' ), 'upgrade-groups-included', 'groups: Included, links to GenD > Groups', $op );
+gs109_assert( 'Included with your plan' === gs109pl_text( $xp, '//*[@data-gs-up-copy="included"]' ) && $op && html_entity_decode( $op[0] ) === admin_url( 'index.php' ), 'upgrade-groups-included', 'groups: Included, links to the dashboard (109-30: GenD > Groups is gone; the group is the Integration Hub card)', $op );
 
 $xp = gs109pl_xp( $frag( 'nosuch', $vm ) );
 gs109_assert_eq( 'unknown', gs109pl_attrs( $xp, '//div[@data-gs-up-area="nosuch"]', 'data-gs-up-state' )[0] ?? '', 'upgrade-unknown', 'unknown area: neutral copy' );

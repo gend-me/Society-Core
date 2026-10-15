@@ -47,11 +47,11 @@ if ( ! function_exists( 'gend_society_welcome_page_url' ) ) {
 
 if ( ! function_exists( 'gend_society_connect_url' ) ) {
 	/**
-	 * Where the Connect button goes. Phase 108 swaps the target via the
-	 * gend_society_connect_url filter.
+	 * Where the Connect button goes: the dashboard with the Connect popup open on the Integration Hub card
+	 * (Phase 109-30, D29; the separate Connect page is gone). Filterable via gend_society_connect_url.
 	 */
 	function gend_society_connect_url(): string {
-		return (string) apply_filters( 'gend_society_connect_url', admin_url( 'index.php?page=gs-portal-connect' ) );
+		return (string) apply_filters( 'gend_society_connect_url', admin_url( 'index.php?gs_connect=1' ) . '#gs-connect' );
 	}
 }
 

@@ -34,10 +34,8 @@ $log_file  = WP_CONTENT_DIR . '/gs108-http.log';
 $log_lines = is_readable( $log_file ) ? count( file( $log_file ) ) : 0;
 wp_set_current_user( $admin );
 gend_society_connect_expire_pending();
-if ( function_exists( 'gend_society_portal_connect_render_page' ) ) {
-	ob_start();
-	gend_society_portal_connect_render_page();
-	ob_end_clean();
+if ( function_exists( 'gend_society_portal_connect_modal_html' ) ) { // 109-30: the Connect UI is the dashboard popup
+	gend_society_portal_connect_modal_html( 'slot' );
 }
 $req = new WP_REST_Request( 'POST', '/gs/v1/connect/challenge' );
 $req->set_body_params(

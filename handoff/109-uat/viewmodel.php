@@ -97,7 +97,7 @@ $proj = array_values( array_filter( $vm['areas'], function ( $a ) { return 'proj
 gs109_assert( $proj && array( 'id' => 23, 'slug' => 'social-connector', 'name' => 'Social Connector' ) === $proj[0]['unlock_plan'] && '' === $proj[0]['admin_url'], 'vm-connected-unlock', 'projects unlock_plan {23, social-connector, Social Connector}, no admin_url', wp_json_encode( $proj ) );
 gs109_assert_eq( array( 'app', 'hosting', 'reward', 'social', 'store', 'write' ), $by_state( $vm, 'after_migration' ), 'vm-connected-after', 'all container_only areas are after_migration' );
 $grp = array_values( array_filter( $vm['areas'], function ( $a ) { return 'groups' === $a['slug']; } ) );
-gs109_assert( $grp && 0 === strpos( $grp[0]['admin_url'], admin_url() ) && null === $grp[0]['unlock_plan'] && array( 'Group overview', 'Members', 'Recent activity' ) === $grp[0]['features'], 'vm-connected-groups', 'groups: local admin_url, no unlock plan, feature list', wp_json_encode( $grp ) );
+gs109_assert( $grp && '' === $grp[0]['admin_url'] && null === $grp[0]['unlock_plan'] && array( 'Group overview', 'Members', 'Recent activity' ) === $grp[0]['features'], 'vm-connected-groups', 'groups: no local admin_url (109-30: the gs-hub-* pages are gone), no unlock plan, feature list', wp_json_encode( $grp ) );
 gs109_assert_eq( array( 'content-builder', 'store-owner', 'social-connector' ), $allowed( $vm ), 'vm-connected-tiers', 'all three paid tiers checkout_allowed (rank order)' );
 $t21 = $tier( $vm, 'content-builder' );
 gs109_assert( 21 === (int) ( $t21['id'] ?? 0 ) && '$14.99 / month' === ( $t21['price_label'] ?? '' ) && ! array_key_exists( 'launcher_url', $t21 ), 'vm-connected-tier-row', 'tier rows carry the price and no launcher_url (109-21)', wp_json_encode( $t21 ) );

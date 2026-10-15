@@ -1,6 +1,7 @@
 <?php
 /**
- * Phase 109 plugin battery: helpers for the plan 109-06 sections (card, compare, page-assets, consent).
+ * Phase 109 plugin battery: helpers for the plan sections (popup, upgrade-page, consent, connect-modal; the 109-06
+ * card / compare / page-assets sections were retired in 109-30 with the Plan & features page).
  *
  * Builds on _planaccess.php (pairing with the fixture hub, request capture, loopback requests with a real
  * session). Rendered HTML is inspected with DOMXPath, never with regular expressions on markup.
@@ -11,13 +12,16 @@
 defined( 'ABSPATH' ) || exit;
 require_once __DIR__ . '/_planaccess.php';
 
-/** Require inc/pages/plan.php when this process did not load it (it is loaded at boot on standalone). */
+/**
+ * Require inc/pages/plan.php when this process did not load it (it is loaded at boot on standalone). Since 109-30 it
+ * only holds the gs-plan asset helpers the upgrade page uses (the Plan & features page is gone).
+ */
 function gs109pl_require_page() {
 	$p = GEND_SOCIETY_DIR . 'inc/pages/plan.php';
-	if ( ! function_exists( 'gend_society_plan_fragments' ) && is_readable( $p ) ) {
+	if ( ! function_exists( 'gend_society_plan_assets_enqueue' ) && is_readable( $p ) ) {
 		require_once $p;
 	}
-	return function_exists( 'gend_society_plan_fragments' ) && function_exists( 'gend_society_plan_page_render' );
+	return function_exists( 'gend_society_plan_assets_enqueue' ) && function_exists( 'gend_society_plan_page_url' );
 }
 
 /** Pair with a fixture scenario, load plan-access + the page, start from empty caches, act as the admin. */
@@ -27,7 +31,7 @@ function gs109pl_start( $scenario = 'connected' ) {
 	if ( ! $fx ) {
 		return array();
 	}
-	if ( ! gs109_assert( gs109pl_require_page(), 'page-loaded', 'inc/pages/plan.php loaded (standalone)' ) ) {
+	if ( ! gs109_assert( gs109pl_require_page(), 'page-loaded', 'inc/pages/plan.php helpers loaded (standalone)' ) ) {
 		return array();
 	}
 	wp_set_current_user( gs109p_admin_id() );

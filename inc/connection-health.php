@@ -107,11 +107,13 @@ if ( ! function_exists( 'gend_society_connection_health_is_due' ) ) {
 
 if ( ! function_exists( 'gend_society_connection_health_on_connect_screen' ) ) {
 	/**
-	 * The Connect screen shows its own Reconnect warning and button.
+	 * The Connect popup shows its own Reconnect warning and button: true on the dashboard when the request
+	 * opens it (gs_connect=1, the target of gend_society_connect_url()).
 	 */
 	function gend_society_connection_health_on_connect_screen(): bool {
 		$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
-		return $screen && 'dashboard_page_gs-portal-connect' === $screen->id;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+		return $screen && 'dashboard' === $screen->id && ! empty( $_GET['gs_connect'] );
 	}
 }
 
@@ -216,7 +218,7 @@ if ( ! function_exists( 'gend_society_connection_health_notice_html' ) ) {
 	 * @param array $health Result from gend_society_connection_health_get().
 	 */
 	function gend_society_connection_health_notice_html( array $health ): string {
-		$url = function_exists( 'gend_society_connect_url' ) ? gend_society_connect_url() : admin_url( 'index.php?page=gs-portal-connect' );
+		$url = function_exists( 'gend_society_connect_url' ) ? gend_society_connect_url() : admin_url( 'index.php?gs_connect=1' ) . '#gs-connect';
 		return '<div class="notice notice-warning is-dismissible gs-connection-health-notice" data-gs-health-checked="' . esc_attr( (string) (int) ( $health['checked_at'] ?? 0 ) ) . '"><p>'
 			. esc_html__( "gend.me no longer recognises this site's connection.", 'gend-society' )
 			. ' <a href="' . esc_url( $url ) . '">' . esc_html__( 'Reconnect', 'gend-society' ) . '</a></p></div>';

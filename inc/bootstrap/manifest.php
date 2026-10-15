@@ -534,7 +534,7 @@ return array(
 			'file'  => 'inc/portal-connect.php',
 			'tier'  => 'customer',
 			'needs' => array(),
-			'note'  => 'gend.me portal handshake.',
+			'note'  => 'gend.me portal handshake. 109-30: no page; standalone Connect popup on the dashboard Integration Hub card (assets/gs-connect-modal.js/.css), old page URLs redirect to the dashboard.',
 		),
 		array(
 			'file'  => 'inc/connect-flow.php',
@@ -553,12 +553,6 @@ return array(
 			'tier'  => 'customer',
 			'needs' => array( 'standalone', 'paired' ),
 			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, gend.me Change Plan URL. Standalone, connected only.',
-		),
-		array(
-			'file'  => 'inc/hub-embed.php',
-			'tier'  => 'customer',
-			'needs' => array( 'standalone', 'paired' ),
-			'note'  => 'Phase 109: GenD > Groups / Feature Suite / Projects rendered locally from hub JSON (no iframe, local assets). Standalone, connected only; after plan-access.php.',
 		),
 		array(
 			'file'  => 'inc/support-access.php',
@@ -652,7 +646,7 @@ return array(
 			'file'  => 'inc/pages/plan.php',
 			'tier'  => 'customer',
 			'needs' => array( 'standalone' ),
-			'note'  => 'Phase 109: GenD > Plan & features (membership card, Feature Access, comparison, popup checkout). Standalone only.',
+			'note'  => 'Phase 109: gs-plan.css/.js helpers for the standalone upgrade page (the Plan & features page was removed in 109-30). Standalone only.',
 		),
 		array(
 			'file'  => 'inc/theme-download-notice.php',

@@ -4,7 +4,9 @@
  *
  *   wp eval-file 109-uat-plan.php <mode> <section> [<section> ...]
  *   modes:    hub | container | standalone
- *   sections: nolock fetch refresh popup viewmodel card compare page-assets embed upgrade-page output consent
+ *   sections: nolock fetch refresh popup viewmodel upgrade-page output consent dashboard connect-modal
+ *             (109-30 retired card, compare, page-assets and embed with the Plan & features / GenD hub pages; their
+ *             surviving assertions moved to connect-modal, dashboard and popup)
  *   GS109_READONLY=1 wp eval-file 109-uat-plan.php hub <section>      (any run on a live install)
  *   GS109_HUB=fixture (default) | integration
  *     fixture:     the bed mu-plugin gs109-hub-fixture.php answers the hub routes from handoff/109-fixtures/<scenario>/

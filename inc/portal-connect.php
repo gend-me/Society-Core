@@ -26,153 +26,13 @@ if (!defined('ABSPATH')) {
 //
 // All under_score keys for grep-ability.
 
-add_action('admin_menu', 'gend_society_portal_connect_register_menu', 50);
 add_action('admin_post_gend_society_portal_connect_submit', 'gend_society_portal_connect_handle_submit');
 add_action('admin_enqueue_scripts', 'gend_society_portal_connect_enqueue');
-
-function gend_society_portal_connect_register_menu() {
-    // Add as a submenu under Settings since gend-society removes options-general,
-    // we instead attach to the Dashboard top-level so it's findable before pairing.
-    add_submenu_page(
-        'index.php',
-        __('Connect to gend.me', 'gend-society'),
-        __('Connect to gend.me', 'gend-society'),
-        'manage_options',
-        'gs-portal-connect',
-        'gend_society_portal_connect_render_page'
-    );
-}
-
-function gend_society_portal_connect_render_page() {
-
-    if (!current_user_can('manage_options')) {
-        wp_die(esc_html__('Forbidden.', 'gend-society'));
-    }
-
-    // Phase 108: standalone installs get the Connect / Connected cards; hub and container output is unchanged.
-    if (gend_society_portal_connect_standalone_ready()) {
-        gend_society_portal_connect_render_standalone();
-        return;
-    }
-
-    $install_id    = (string) get_option('gend_society_install_id', '');
-    $install_token = (string) get_option('gend_society_install_token', '');
-    $gend_base     = (string) get_option('gend_society_gend_base_url', '');
-    $connected_at  = (int) get_option('gend_society_connected_at', 0);
-    $is_connected  = $install_id !== '' && $install_token !== '';
-
-    $notice_cls = '';
-    $message    = '';
-    if (isset($_GET['gs_connect_status'])) {
-        $status = sanitize_text_field((string) $_GET['gs_connect_status']);
-        $message = isset($_GET['gs_connect_message']) ? sanitize_text_field((string) $_GET['gs_connect_message']) : '';
-        $notice_cls = $status === 'success' ? 'notice-success' : 'notice-error';
-    }
-
-    ?>
-    <div class="wrap">
-        <h1><?php esc_html_e('Connect to gend.me', 'gend-society'); ?></h1>
-        <?php if ($notice_cls !== '') : ?><div class="notice <?php echo esc_attr($notice_cls); ?>"><p><?php echo esc_html($message); ?></p></div><?php endif; ?>
-
-        <?php if ($is_connected) : ?>
-            <p><strong><?php esc_html_e('This site is connected.', 'gend-society'); ?></strong></p>
-            <table class="widefat striped" style="max-width:780px;">
-                <tbody>
-                    <tr><th><?php esc_html_e('gend.me Portal', 'gend-society'); ?></th><td><a href="<?php echo esc_url($gend_base); ?>" target="_blank" rel="noopener"><?php echo esc_html($gend_base); ?></a></td></tr>
-                    <tr><th><?php esc_html_e('Install ID', 'gend-society'); ?></th><td><code><?php echo esc_html($install_id); ?></code></td></tr>
-                    <tr><th><?php esc_html_e('Connected At', 'gend-society'); ?></th><td><?php echo $connected_at ? esc_html(wp_date(get_option('date_format') . ' ' . get_option('time_format'), $connected_at)) : '—'; ?></td></tr>
-                </tbody>
-            </table>
-
-            <h2><?php esc_html_e('Disconnect', 'gend-society'); ?></h2>
-            <p><?php esc_html_e('Disconnecting clears the local install identity. You will need a new pairing code from gend.me to reconnect.', 'gend-society'); ?></p>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                <?php wp_nonce_field('gs_portal_connect_disconnect', 'gs_portal_connect_nonce'); ?>
-                <input type="hidden" name="action" value="gend_society_portal_connect_submit" />
-                <input type="hidden" name="op" value="disconnect" />
-                <?php submit_button(__('Disconnect', 'gend-society'), 'delete', 'submit', false); ?>
-            </form>
-
-        <?php else : ?>
-<?php
-/*
- * RUN-02: on standalone installs only, disclose exactly what the Connect request sends
- * (it matches the JSON body built in gend_society_portal_connect_handle_submit()) and
- * require the consent checkbox. Containers auto-pair through oauth-login and the hub
- * never pairs, so their screen output stays byte-identical to before Phase 106: the
- * conditional PHP tags below sit at column 0 so they emit no whitespace.
- */
-$gend_society_needs_consent = gend_society_portal_connect_requires_consent();
-if ($gend_society_needs_consent) {
-    $gend_society_disclosure = function_exists('gend_society_consent_disclosure_items') ? gend_society_consent_disclosure_items() : array();
-    $gend_society_disclosure['pairing_code'] = __('The pairing code you paste below', 'gend-society');
-    $gend_society_terms   = function_exists('gend_society_terms_url') ? gend_society_terms_url() : 'https://gend.me/terms-of-service/';
-    $gend_society_privacy = function_exists('gend_society_privacy_url') ? gend_society_privacy_url() : 'https://gend.me/privacy-policy/';
-}
-?>
-            <p><?php esc_html_e('Pair this WordPress install to your gend.me account. From your gend.me dashboard, copy the pairing code shown for your Self-Hosted app and paste it below.', 'gend-society'); ?></p>
-
-<?php if ($gend_society_needs_consent) : ?>
-            <h2><?php esc_html_e('What is sent when you connect', 'gend-society'); ?></h2>
-            <ul style="list-style:disc;padding-left:20px;">
-                <?php foreach ($gend_society_disclosure as $gend_society_label) : ?>
-                    <li><?php echo esc_html($gend_society_label); ?></li>
-                <?php endforeach; ?>
-            </ul>
-            <p>
-                <a href="<?php echo esc_url($gend_society_terms); ?>" target="_blank" rel="noopener"><?php esc_html_e('Terms of Service', 'gend-society'); ?></a>
-                &middot;
-                <a href="<?php echo esc_url($gend_society_privacy); ?>" target="_blank" rel="noopener"><?php esc_html_e('Privacy Policy', 'gend-society'); ?></a>
-            </p>
-            <p>
-                <?php esc_html_e('Prefer to look around first? Nothing is sent until you press Connect.', 'gend-society'); ?>
-                <?php if (function_exists('gend_society_welcome_page_url')) : ?>
-                    <a href="<?php echo esc_url(gend_society_welcome_page_url()); ?>"><?php esc_html_e('Back to the GenD page', 'gend-society'); ?></a>
-                <?php endif; ?>
-            </p>
-
-<?php endif; ?>
-            <form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>">
-                <?php wp_nonce_field('gs_portal_connect_submit', 'gs_portal_connect_nonce'); ?>
-                <input type="hidden" name="action" value="gend_society_portal_connect_submit" />
-                <input type="hidden" name="op" value="connect" />
-
-                <table class="form-table">
-                    <tbody>
-                        <tr>
-                            <th><label for="gs_gend_base_url"><?php esc_html_e('gend.me URL', 'gend-society'); ?></label></th>
-                            <td>
-                                <input type="url" id="gs_gend_base_url" name="gend_base_url" class="regular-text"
-                                    value="<?php echo esc_attr($gend_base !== '' ? $gend_base : 'https://gend.me'); ?>"
-                                    required />
-                                <p class="description"><?php esc_html_e('The base URL of your gend.me portal.', 'gend-society'); ?></p>
-                            </td>
-                        </tr>
-                        <tr>
-                            <th><label for="gs_pairing_code"><?php esc_html_e('Pairing Code', 'gend-society'); ?></label></th>
-                            <td>
-                                <input type="text" id="gs_pairing_code" name="pairing_code" class="regular-text"
-                                    style="font-size:1.5em;letter-spacing:0.2em;text-transform:uppercase;" maxlength="12" required />
-                            </td>
-                        </tr>
-                    </tbody>
-                </table>
-<?php if ($gend_society_needs_consent) : ?>
-                    <p>
-                        <label for="gend_society_consent">
-                            <input type="checkbox" id="gend_society_consent" name="gend_society_consent" value="1" required />
-                            <?php echo esc_html(function_exists('gend_society_consent_text') ? gend_society_consent_text() : __('I agree to send the items listed above to gend.me.', 'gend-society')); ?>
-                            (<a href="<?php echo esc_url($gend_society_terms); ?>" target="_blank" rel="noopener"><?php esc_html_e('Terms of Service', 'gend-society'); ?></a>,
-                            <a href="<?php echo esc_url($gend_society_privacy); ?>" target="_blank" rel="noopener"><?php esc_html_e('Privacy Policy', 'gend-society'); ?></a>)
-                        </label>
-                    </p>
-<?php endif; ?>
-                <?php submit_button(__('Connect', 'gend-society')); ?>
-            </form>
-        <?php endif; ?>
-    </div>
-    <?php
-}
+// Phase 109-30 (D29): the "Connect to gend.me" page is gone; old links (bookmarks, the gend.me /pair short link)
+// redirect to the dashboard, where the Connect popup on the Integration Hub card took its place. The hook is the one
+// core fires (wp-admin/includes/menu.php) right before it refuses an unregistered page, which is before admin_init.
+add_action('admin_page_access_denied', 'gend_society_portal_connect_legacy_redirect', 1);
+add_action('init', 'gend_society_portal_connect_modal_hooks');
 
 function gend_society_portal_connect_handle_submit() {
 
@@ -340,16 +200,22 @@ if (!function_exists('gend_society_portal_connect_standalone_ready')) {
 
 if (!function_exists('gend_society_portal_connect_enqueue')) {
 	/**
-	 * Card styles, only on the Connect screen of a standalone install.
+	 * Connect popup assets (local files, no inline script or style), only on the dashboard of a standalone
+	 * install and only for administrators (who get the popup).
 	 *
 	 * @param string $hook_suffix Current admin page hook.
 	 */
 	function gend_society_portal_connect_enqueue($hook_suffix) {
-		if ('dashboard_page_gs-portal-connect' !== $hook_suffix || !gend_society_portal_connect_standalone_ready()) {
+		if ('index.php' !== $hook_suffix || !gend_society_portal_connect_standalone_ready() || !current_user_can('manage_options')) {
 			return;
 		}
-		$base = defined('GEND_SOCIETY_URL') ? GEND_SOCIETY_URL : plugin_dir_url(dirname(__DIR__) . '/gend-society.php');
-		wp_enqueue_style('gend-society-connect', $base . 'assets/gs-connect.css', array(), defined('GEND_SOCIETY_VERSION') ? GEND_SOCIETY_VERSION : '1');
+		$dir = defined('GEND_SOCIETY_DIR') ? GEND_SOCIETY_DIR : plugin_dir_path(dirname(__DIR__) . '/gend-society.php');
+		$url = defined('GEND_SOCIETY_URL') ? GEND_SOCIETY_URL : plugin_dir_url(dirname(__DIR__) . '/gend-society.php');
+		$ver = defined('GEND_SOCIETY_VERSION') ? GEND_SOCIETY_VERSION : '1';
+		$css = 'assets/gs-connect-modal.css';
+		$js  = 'assets/gs-connect-modal.js';
+		wp_enqueue_style('gend-society-connect-modal', $url . $css, array(), $ver . '.' . (file_exists($dir . $css) ? filemtime($dir . $css) : 0));
+		wp_enqueue_script('gend-society-connect-modal', $url . $js, array(), $ver . '.' . (file_exists($dir . $js) ? filemtime($dir . $js) : 0), true);
 	}
 }
 
@@ -762,7 +628,8 @@ if (!function_exists('gend_society_portal_connect_standalone_owner')) {
 
 if (!function_exists('gend_society_portal_connect_render_notice')) {
 	/**
-	 * Status notice from the query string (set by the handlers above and by connect-flow).
+	 * Status notice from the query string (set by the handlers above and by connect-flow). "inline" keeps
+	 * core's common.js from moving it out of the Connect popup.
 	 */
 	function gend_society_portal_connect_render_notice() {
 		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- display only.
@@ -773,27 +640,159 @@ if (!function_exists('gend_society_portal_connect_render_notice')) {
 		$message = isset($_GET['gs_connect_message']) ? sanitize_text_field(wp_unslash((string) $_GET['gs_connect_message'])) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Recommended
 		printf(
-			'<div class="notice %1$s"><p>%2$s</p></div>',
+			'<div class="notice %1$s inline"><p>%2$s</p></div>',
 			esc_attr('success' === $status ? 'notice-success' : 'notice-error'),
 			esc_html($message)
 		);
 	}
 }
 
-if (!function_exists('gend_society_portal_connect_render_standalone')) {
+/*
+ * ---------------------------------------------------------------------------
+ * Phase 109-30 (D29, D32): the Connect / Connected cards above live in a popup
+ * on the dashboard's Integration Hub card instead of their own page. The popup
+ * is printed through 109-29's gend_society_integration_hub_card_slot (hidden),
+ * opened by button[data-gs-connect-open] (assets/gs-connect-modal.js) and uses
+ * the dashboard's own popup markup (gs-gas-modal: overlay, dialog, header,
+ * close, body). Every form inside still posts to the 108 admin-post actions
+ * with the 108 nonces. Standalone installs only; nothing here is requested
+ * from gend.me while rendering.
+ * ---------------------------------------------------------------------------
+ */
+
+if (!function_exists('gend_society_portal_connect_modal_hooks')) {
 	/**
-	 * The standalone Connect screen: Connect card or Connected card.
+	 * init: hook the popup on standalone installs (connect-flow loads after this file).
 	 */
-	function gend_society_portal_connect_render_standalone() {
-		echo '<div class="wrap gend-society-connect">';
-		echo '<h1>' . esc_html__('Connect to gend.me', 'gend-society') . '</h1>';
-		gend_society_portal_connect_render_notice();
-		if ('' !== (string) get_option('gend_society_install_token', '') && '' !== (string) get_option('gend_society_install_id', '')) {
-			gend_society_portal_connect_render_connected();
-		} else {
-			gend_society_portal_connect_render_connect();
+	function gend_society_portal_connect_modal_hooks() {
+		if (!gend_society_portal_connect_standalone_ready()) {
+			return;
 		}
-		echo '</div>';
+		add_action('gend_society_integration_hub_card_slot', 'gend_society_portal_connect_modal_slot', 10);
+		add_action('admin_footer', 'gend_society_portal_connect_modal_footer');
+	}
+}
+
+if (!function_exists('gend_society_portal_connect_code_param')) {
+	/**
+	 * The pairing code from ?gend_society_code (the gend.me /pair short link) when it has the code
+	 * pattern, else ''. It only pre-fills the field; consent and the click are still required.
+	 *
+	 * @return string
+	 */
+	function gend_society_portal_connect_code_param() {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- pre-fill only, validated by the pattern.
+		$code = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? (string) wp_unslash($_GET['gend_society_code']) : '';
+		return preg_match('/^[A-HJ-NP-Z2-9]{6}$/', $code) ? $code : '';
+	}
+}
+
+if (!function_exists('gend_society_portal_connect_modal_html')) {
+	/**
+	 * The Connect popup: Connect card (not connected) or Connected card, with the handlers' status notice.
+	 *
+	 * @param string $context 'slot' (dashboard Integration Hub card: the dashboard's gs-gas-modal look) or
+	 *                        'footer' (native WordPress dashboard: plain look).
+	 * @return string '' for anyone but an administrator of a standalone install.
+	 */
+	function gend_society_portal_connect_modal_html($context = 'slot') {
+		if (!gend_society_portal_connect_standalone_ready() || !current_user_can('manage_options')) {
+			return '';
+		}
+		$dash = 'slot' === $context;
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+		$auto = !empty($_GET['gs_connect']) || isset($_GET['gs_connect_status']) || '' !== gend_society_portal_connect_code_param();
+		$cls  = function ($name) use ($dash) {
+			return 'gs-connect-modal' . $name . ($dash ? ' gs-gas-modal' . $name : '');
+		};
+		ob_start();
+		?>
+<div id="gs-connect-modal" class="<?php echo esc_attr($cls('')); ?>" data-gs-connect-modal data-gs-connect-autoopen="<?php echo $auto ? '1' : '0'; ?>" hidden aria-hidden="true">
+	<div class="<?php echo esc_attr($cls('__overlay')); ?>" data-gs-connect-close></div>
+	<div class="<?php echo esc_attr($cls('__dialog')); ?>" role="dialog" aria-modal="true" aria-labelledby="gs-connect-modal-title" tabindex="-1">
+		<header class="<?php echo esc_attr($cls('__header')); ?>">
+			<h3 id="gs-connect-modal-title"><?php esc_html_e('Connect to gend.me', 'gend-society'); ?></h3>
+			<button type="button" class="<?php echo esc_attr($cls('__close')); ?>" data-gs-connect-close aria-label="<?php esc_attr_e('Close', 'gend-society'); ?>">&times;</button>
+		</header>
+		<div class="<?php echo esc_attr($cls('__body')); ?> gend-society-connect">
+			<?php
+			gend_society_portal_connect_render_notice();
+			if ('' !== (string) get_option('gend_society_install_token', '') && '' !== (string) get_option('gend_society_install_id', '')) {
+				gend_society_portal_connect_render_connected();
+			} else {
+				gend_society_portal_connect_render_connect();
+			}
+			?>
+		</div>
+	</div>
+</div>
+		<?php
+		return (string) ob_get_clean();
+	}
+}
+
+if (!function_exists('gend_society_portal_connect_modal_slot')) {
+	/**
+	 * gend_society_integration_hub_card_slot (109-29, standalone dashboard): print the popup in the card.
+	 */
+	function gend_society_portal_connect_modal_slot() {
+		echo gend_society_portal_connect_modal_html('slot'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+	}
+}
+
+if (!function_exists('gend_society_portal_connect_modal_footer')) {
+	/**
+	 * admin_footer on the dashboard when the GenD dashboard did not render (the admin chose standard
+	 * WordPress): the same popup, so Connect stays reachable.
+	 */
+	function gend_society_portal_connect_modal_footer() {
+		$screen = function_exists('get_current_screen') ? get_current_screen() : null;
+		if (!$screen || 'dashboard' !== $screen->id || did_action('gend_society_integration_hub_card_slot')) {
+			return;
+		}
+		echo gend_society_portal_connect_modal_html('footer'); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+	}
+}
+
+if (!function_exists('gend_society_portal_connect_legacy_redirect')) {
+	/**
+	 * admin_page_access_denied: the removed pages' URLs (bookmarks, notices of older versions, the gend.me /pair short link
+	 * index.php?page=gs-portal-connect&gend_society_code=...) go to the dashboard. The Connect page lands on the
+	 * popup (standalone) keeping a valid code and the 108 status arguments; on standalone the removed
+	 * Plan & features and hub area pages land on the dashboard itself.
+	 */
+	function gend_society_portal_connect_legacy_redirect() {
+		global $pagenow;
+		// phpcs:disable WordPress.Security.NonceVerification.Recommended -- navigation only, nothing is changed.
+		if (!in_array($pagenow, array('admin.php', 'index.php'), true) || !isset($_GET['page']) || !is_string($_GET['page'])) {
+			return;
+		}
+		$page       = sanitize_key(wp_unslash($_GET['page']));
+		$standalone = gend_society_portal_connect_requires_consent();
+		$connect    = 'gs-portal-connect' === $page;
+		$other      = $standalone && in_array($page, array('gs-plan', 'gs-hub-groups', 'gs-hub-feature-suite', 'gs-hub-projects'), true);
+		if ((!$connect && !$other) || !current_user_can('manage_options')) {
+			return;
+		}
+		$args = array();
+		$code = gend_society_portal_connect_code_param();
+		if ('' !== $code) {
+			$args['gend_society_code'] = $code;
+		}
+		$base = admin_url('index.php');
+		if ($connect) {
+			foreach (array('gs_connect_status', 'gs_connect_message', 'gs_disconnect_failed') as $key) {
+				if (isset($_GET[$key]) && is_string($_GET[$key])) {
+					$args[$key] = rawurlencode(sanitize_text_field(wp_unslash($_GET[$key])));
+				}
+			}
+			if ($standalone && function_exists('gend_society_connect_url')) {
+				$base = gend_society_connect_url();
+			}
+		}
+		// phpcs:enable WordPress.Security.NonceVerification.Recommended
+		wp_safe_redirect($args ? add_query_arg($args, $base) : $base);
+		exit;
 	}
 }
 
