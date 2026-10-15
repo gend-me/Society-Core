@@ -15,7 +15,7 @@
  * unchecked legacy membership-changed message (popup close is the signal).
  * Standalone installs get gend_society_feature_upgrade_page_standalone()
  * instead: copy from the plan view-model (Upgrade vs After migration),
- * the Plan & features popup checkout (assets/gs-plan.js) and Refresh.
+ * gend.me's own Change Plan page in a popup (assets/gs-plan.js) and Refresh.
  *
  * @package GenD_Society
  */
@@ -289,8 +289,8 @@ add_action( 'wp_ajax_gend_society_features_refresh', function () {
  * Phase 109 (PLAN-05): the upgrade page on standalone installs.
  *
  * One page, two kinds of copy, both from gend_society_plan_view_model():
- *   - Upgrade:          "Available with <plan>" and that plan's Choose button (the 109-06 markup, so
- *                       assets/gs-plan.js opens the same-origin checkout launcher in a popup);
+ *   - Upgrade:          "Available with <plan>" and one "Choose a plan on gend.me" button: gend.me's own
+ *                       Change Plan page (view-model change_plan_url), opened by assets/gs-plan.js in a popup;
  *   - After migration:  "Runs on your gend.me container after migration" and an outbound link (new tab).
  * Included areas link to their hub page (GenD > Groups / Feature Suite / Projects) or Plan & features.
  * gend_society_feature_upgrade_render_standalone() is shared with the hub-embed pages (402 / 409 states).
@@ -398,11 +398,10 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 					$tier = $t;
 				}
 			}
-			$h .= '<p class="gs-up-actions">';
-			if ( $tier && ! empty( $tier['checkout_allowed'] ) && '' !== (string) $tier['launcher_url'] ) {
-				$h .= '<a class="button button-primary" href="' . esc_url( (string) $tier['launcher_url'] ) . '" target="_blank" rel="opener" data-gs-plan-checkout="' . esc_attr( (string) (int) $tier['id'] ) . '">';
-				/* translators: %s: plan name. */
-				$h .= esc_html( sprintf( __( 'Choose %s', 'gend-society' ), (string) $tier['name'] ) ) . '</a> ';
+			$change = (string) ( $vm['change_plan_url'] ?? '' );
+			$h     .= '<p class="gs-up-actions">';
+			if ( '' !== $change && ( ! $tier || ! empty( $tier['checkout_allowed'] ) ) ) {
+				$h .= '<a class="button button-primary" href="' . esc_url( $change ) . '" target="_blank" rel="noopener" data-gs-plan-popup="1">' . esc_html__( 'Choose a plan on gend.me', 'gend-society' ) . '</a> ';
 			} else {
 				$h .= '<span class="gs-up-note">' . esc_html__( 'This plan cannot be bought from this site right now.', 'gend-society' ) . '</span> ';
 			}

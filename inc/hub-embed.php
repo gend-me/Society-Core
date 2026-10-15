@@ -465,8 +465,8 @@ if ( ! function_exists( 'gend_society_hub_embed_page_render' ) ) {
 
 if ( ! function_exists( 'gend_society_hub_embed_enqueue' ) ) {
 	/**
-	 * Local CSS/JS on the hub-embed pages only (filemtime versions). gs-plan.js drives the Choose popup of the
-	 * upgrade state; gs-hub-embed.js the Refresh button.
+	 * Local CSS/JS on the hub-embed pages only (filemtime versions). gs-plan.js opens gend.me's Change Plan
+	 * popup from the upgrade state; gs-hub-embed.js drives the Refresh button.
 	 *
 	 * @param string $hook_suffix Current admin page hook.
 	 */

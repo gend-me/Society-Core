@@ -151,30 +151,22 @@ function gend_society_register_admin_menu()
     }
 
 
-    // ── FEATURES ──────────────────────────────────────────────────────────────
-    add_menu_page(
-        __('Features', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-admin-plugins"></span><span class="gs-menu-label">' . __('Features', 'gend-society') . '</span>',
-        'activate_plugins',
-        'gs-features',
-        function () {
-            require GEND_SOCIETY_DIR . 'inc/pages/features.php';
-        },
-        'none',
-        8
-    );
-    add_submenu_page('gs-features', __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'activate_plugins', 'gs-shortcodes', function () {
+    // ── FEATURES — removed from the sidebar (with its Shortcodes / Code
+    //    Packages / Updates submenus). The gs-features and gs-shortcodes URLs
+    //    stay registered as hidden pages so existing deep links still resolve;
+    //    plugins.php / update-core.php are core screens and stay reachable.
+    add_submenu_page(null, __('Features', 'gend-society'), __('Features', 'gend-society'), 'activate_plugins', 'gs-features', function () {
+        require GEND_SOCIETY_DIR . 'inc/pages/features.php';
+    });
+    add_submenu_page(null, __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'activate_plugins', 'gs-shortcodes', function () {
         require GEND_SOCIETY_DIR . 'inc/pages/shortcodes.php';
     });
-    add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'activate_plugins', 'plugins.php', '');
-    add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'update_core', 'update-core.php', '');
 
     // Permalinks used to be a standalone App submenu (options-permalink.php);
     // its settings now render at the bottom of the Dashboard's Settings tab
     // — see gs_render_permalink_settings_form() in inc/pages/dashboard.php.
 
     // Prevent redundant submenus from being added inside the Dashboard rendering engine by removing them late in another hook
-    remove_submenu_page('gs-features', 'gs-features');
     if (gend_society_plugin_active('online-store/online-store.php')) {
         remove_submenu_page('gs-store', 'gs-store');
     }
@@ -218,25 +210,14 @@ function gend_society_register_network_admin_menu()
         require GEND_SOCIETY_DIR . 'inc/pages/feature-access.php';
     });
 
-    // ── FEATURES ──────────────────────────────────────────────────────────────
-    add_menu_page(
-        __('Features', 'gend-society'),
-        '<span class="gs-menu-icon dashicons dashicons-admin-plugins"></span><span class="gs-menu-label">' . __('Features', 'gend-society') . '</span>',
-        'manage_network_plugins',
-        'gs-features',
-        function () {
-            require GEND_SOCIETY_DIR . 'inc/pages/features.php';
-        },
-        'none',
-        8
-    );
-    add_submenu_page('gs-features', __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'manage_network_plugins', 'gs-shortcodes', function () {
+    // ── FEATURES — removed from the network sidebar too; hidden pages keep
+    //    the gs-features / gs-shortcodes deep links working.
+    add_submenu_page(null, __('Features', 'gend-society'), __('Features', 'gend-society'), 'manage_network_plugins', 'gs-features', function () {
+        require GEND_SOCIETY_DIR . 'inc/pages/features.php';
+    });
+    add_submenu_page(null, __('Shortcodes', 'gend-society'), __('Shortcodes', 'gend-society'), 'manage_network_plugins', 'gs-shortcodes', function () {
         require GEND_SOCIETY_DIR . 'inc/pages/shortcodes.php';
     });
-    add_submenu_page('gs-features', __('Code Packages', 'gend-society'), __('Code Packages', 'gend-society'), 'manage_network_plugins', 'plugins.php', '');
-    add_submenu_page('gs-features', __('Updates', 'gend-society'), __('Updates', 'gend-society'), 'manage_network_plugins', 'update-core.php', '');
-
-    remove_submenu_page('gs-features', 'gs-features');
 }
 
 /**

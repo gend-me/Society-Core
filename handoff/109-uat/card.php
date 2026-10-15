@@ -5,12 +5,12 @@
  *
  *   connected    "Connected - Free - No renewal - Active"; Feature Access: exactly groups + feature-suite
  *                Included (D11), projects Upgrade "Available with Social Connector", the rest After migration;
- *                Choose buttons for all three tiers on the admin-post launcher (target _blank, rel opener);
- *                owner line (D3)
- *   store-owner  "<plan> - <price_label> - Renews <date> - Active" from next_renewal; only Social Connector
- *   inherited    banner "Your group <group> already has <plan> - you inherit it."; no Choose button at or
- *                below the inherited rank (fixture: rank 3 -> none; injected rank 1 -> only ranks 2-3, even when
- *                the hub flags rank 1 as purchasable)
+ *                one "Choose a plan" button = gend.me's Change Plan page (<membership_url>?ui=embed&plan_only=1
+ *                &group=dashboard, target _blank rel noopener, data-gs-plan-popup), no per-tier Choose buttons
+ *                and no admin-post launcher (109-21); owner line (D3)
+ *   store-owner  "<plan> - <price_label> - Renews <date> - Active" from next_renewal; one "Change plan" button
+ *   inherited    banner "Your group <group> already has <plan> - you inherit it."; the button only when a
+ *                higher tier can still be bought (fixture: rank 3 -> none; injected rank 1 -> "Change plan")
  *   processing   "Payment processing - this can take a minute." + Refresh
  *   revoked      reconnect copy, no areas / comparison
  *   unreachable  stale data + "Could not reach gend.me"
@@ -26,6 +26,7 @@ require_once __DIR__ . '/_plan.php';
 
 if ( 'standalone' !== gs109_mode() ) {
 	gs109_assert( ! function_exists( 'gend_society_plan_fragments' ) && ! function_exists( 'gend_society_plan_page_render' ), 'card-absent', 'Plan & features page not loaded on ' . gs109_mode() );
+	gs109_assert( ! function_exists( 'gend_society_plan_disconnect_billing' ), 'd23-absent', 'disconnect billing warning helper not loaded on ' . gs109_mode() );
 	return;
 }
 
@@ -64,14 +65,11 @@ foreach ( $xp->query( '//ul[@data-gs-plan-group="after_migration"]/li' ) as $li 
 	$after_ok = $after_ok && false !== strpos( $li->textContent, 'Runs on your gend.me container after migration' ) && 0 === $li->getElementsByTagName( 'a' )->length;
 }
 gs109_assert( $after_ok, 'card-after-copy', 'After migration rows: "Runs on your gend.me container after migration", no link' );
-$ch = gs109pl_choose( $xp );
-gs109_assert_eq( array( 21, 22, 23 ), array_keys( $ch ), 'card-connected-choose', 'Choose buttons for plans 21, 22, 23' );
-$launch_ok = true;
-foreach ( $ch as $pid => $c ) {
-	$launch_ok = $launch_ok && (string) $pid === gs109pl_launcher_plan( $c['href'] ) && '_blank' === $c['target'] && 'opener' === $c['rel'] && 0 === strpos( $c['text'], 'Choose ' );
-}
-gs109_assert( $launch_ok, 'card-choose-launcher', 'each Choose is a target=_blank rel=opener link to admin-post gend_society_plan_checkout for its plan (works without JS)', $ch );
-gs109_assert_eq( 'Choose Store Owner', $ch[22]['text'] ?? '', 'card-choose-copy', '"Choose Store Owner"' );
+$pop = gs109pl_popup( $xp );
+gs109_assert( gs109pl_popup_is( $pop, gs109pl_change_url( 'connected' ), 'Choose a plan' ), 'card-connected-popup', 'one "Choose a plan" button: gend.me Change Plan page (membership_url?ui=embed&plan_only=1&group=dashboard), target _blank rel noopener', $pop );
+gs109_assert( 1 === gs109pl_count( $xp, '//div[@id="gs-plan-membership"]//a[@data-gs-plan-popup]' ), 'card-popup-in-card', 'the button sits in the membership card' );
+gs109_assert_eq( array(), gs109pl_choose( $xp ), 'card-connected-no-choose', 'no per-tier Choose buttons (1.5.0 picker removed)' );
+gs109_assert( false === strpos( $html, 'admin-post.php' ) && false === strpos( $html, 'gend_society_plan_checkout' ), 'card-no-launcher', 'no admin-post launcher anywhere in the cards' );
 gs109_assert_eq(
 	"Plan changes are paid from GS109 Owner's gend.me account. They need to be signed in to gend.me in the window that opens.",
 	gs109pl_text( $xp, '//p[@data-gs-plan-field="owner"]' ),
@@ -88,7 +86,7 @@ $all .= $html;
 $xp   = gs109pl_xp( $html );
 $exp  = 'Store Owner - $29.99 / month - Renews ' . gs109pl_date( '2026-11-12' ) . ' - Active';
 gs109_assert_eq( $exp, gs109pl_text( $xp, '//div[@class="gs-plan-summary"]' ), 'card-store-summary', 'store-owner: plan - price - Renews <next_renewal> - Active' );
-gs109_assert_eq( array( 23 ), array_keys( gs109pl_choose( $xp ) ), 'card-store-choose', 'store-owner: only Choose Social Connector' );
+gs109_assert( gs109pl_popup_is( gs109pl_popup( $xp ), gs109pl_change_url( 'store-owner' ), 'Change plan' ) && array() === gs109pl_choose( $xp ), 'card-store-popup', 'store-owner: one "Change plan" button to the Change Plan page, no per-tier Choose', gs109pl_popup( $xp ) );
 gs109_assert_eq( array( 'groups', 'feature-suite' ), gs109pl_area_group( $xp, 'included' ), 'card-store-included', 'store-owner: Groups + Feature Suite included' );
 
 // ── inherited (fixture: group has Social Connector, rank 3) ─────────────────────────────────────────────
@@ -98,7 +96,7 @@ $all .= $html;
 $xp   = gs109pl_xp( $html );
 gs109_assert_eq( 'Your group GS109 Business Group already has Social Connector - you inherit it.', gs109pl_text( $xp, '//div[@id="gs-plan-inherit"]' ), 'card-inherit-banner', 'inherit banner copy' );
 gs109_assert( 0 === gs109pl_count( $xp, '//div[@id="gs-plan-inherit"][@hidden]' ), 'card-inherit-visible', 'banner visible' );
-gs109_assert_eq( array(), array_keys( gs109pl_choose( $xp ) ), 'card-inherit-no-choose', 'inherited rank 3: no Choose button' );
+gs109_assert( array() === gs109pl_popup( $xp ) && array() === gs109pl_choose( $xp ) && 0 === gs109pl_count( $xp, '//p[@data-gs-plan-field="owner"]' ), 'card-inherit-no-choose', 'inherited rank 3: no Change plan button, no owner line' );
 gs109_assert_eq( array( 'groups', 'feature-suite', 'projects' ), gs109pl_area_group( $xp, 'included' ), 'card-inherit-included', 'inherited: Projects included too' );
 
 // ── inherited content-builder (rank 1), hub flags every tier purchasable: local guard hides rank <= 1 ───
@@ -120,7 +118,8 @@ $xp   = gs109pl_xp( implode( '', gend_society_plan_fragments( $vm ) ) );
 $o1();
 $o2();
 gs109_assert_eq( 'Your group GS109 Business Group already has Content Builder - you inherit it.', gs109pl_text( $xp, '//div[@id="gs-plan-inherit"]' ), 'card-inherit-low-banner', 'inherited Content Builder banner' );
-gs109_assert_eq( array( 22, 23 ), array_keys( gs109pl_choose( $xp ) ), 'card-inherit-low-choose', 'inherited rank 1: Choose only for ranks 2-3 (rank 1 hidden although the hub allowed it)' );
+gs109_assert( gs109pl_popup_is( gs109pl_popup( $xp ), gs109pl_change_url( 'inherited' ), 'Change plan' ), 'card-inherit-low-choose', 'inherited rank 1: "Change plan" button (ranks 2-3 can still be bought)', gs109pl_popup( $xp ) );
+gs109_assert( array( 22, 23 ) === array_values( array_map( 'intval', array_column( array_filter( $vm['tiers'], function ( $t ) { return ! empty( $t['checkout_allowed'] ); } ), 'id' ) ) ), 'card-inherit-low-guard', 'local guard: only ranks 2-3 checkout_allowed although the hub allowed rank 1' );
 gs109_assert( 1 === gs109pl_count( $xp, '//th[@data-gs-plan-tier="content-builder"][contains(@class,"is-inherited")]' ), 'card-inherit-low-column', 'Content Builder column marked inherited' );
 
 // ── processing ─────────────────────────────────────────────────────────────────────────────────────────
@@ -139,7 +138,7 @@ $xp   = gs109pl_xp( $html );
 gs109_assert_eq( 'revoked', $vm['state'], 'card-revoked-state', 'revoked: state revoked' );
 $rl = gs109pl_attrs( $xp, '//div[@id="gs-plan-membership"]//a', 'href' );
 gs109_assert( false !== strpos( $html, 'Reconnect to gend.me' ) && $rl && html_entity_decode( $rl[0] ) === gend_society_connect_url(), 'card-revoked-copy', 'revoked: reconnect copy linking the Connect page', $rl );
-gs109_assert( 1 === gs109pl_count( $xp, '//div[@id="gs-plan-areas"][@hidden]' ) && 1 === gs109pl_count( $xp, '//div[@id="gs-plan-compare"][@hidden]' ) && array() === gs109pl_choose( $xp ), 'card-revoked-empty', 'revoked: no areas, no comparison, no Choose' );
+gs109_assert( 1 === gs109pl_count( $xp, '//div[@id="gs-plan-areas"][@hidden]' ) && 1 === gs109pl_count( $xp, '//div[@id="gs-plan-compare"][@hidden]' ) && array() === gs109pl_choose( $xp ) && array() === gs109pl_popup( $xp ), 'card-revoked-empty', 'revoked: no areas, no comparison, no plan button' );
 
 // ── unreachable (stale payloads) ───────────────────────────────────────────────────────────────────────
 gs109pl_vm( 'connected' );
@@ -172,6 +171,54 @@ gs109_assert( 1 === gs109pl_count( $xp, '//div[@id="gs-plan-blocked"][@hidden]//
 gs109_assert( 0 === gs109pl_count( $xp, '//iframe' ) && false === stripos( $p['output'], '<script' ) && false === stripos( $p['output'], '<style' ), 'card-page-no-inline', 'page body: no iframe, no inline script or style' );
 $all .= $p['output'];
 gs109_assert( false === strpos( $all, $token ), 'card-no-token', 'install token absent from every rendered card' );
+
+// ── 109-21b (D23): Disconnect warns that a paid plan keeps billing (Connect screen, cached membership only) ──
+$gs109d_render = function ( $scenario ) {
+	gs109pl_vm( $scenario ); // fills the membership cache from the fixture
+	gs109_http_record();
+	$r = gs109p_call( 'gend_society_portal_connect_render_connected', 'GET' );
+	return array( $r['output'], gs109_http_log() );
+};
+if ( gs109_assert( function_exists( 'gend_society_portal_connect_render_connected' ) && function_exists( 'gend_society_plan_disconnect_billing' ), 'd23-loaded', 'Connected card + disconnect billing helper loaded (standalone)' ) ) {
+	$hub_host = (string) wp_parse_url( gend_society_plan_identity()['base'], PHP_URL_HOST );
+	list( $out, $http ) = $gs109d_render( 'store-owner' );
+	$xp   = gs109pl_xp( $out );
+	$mu   = (string) ( gs109_fixture_json( 'store-owner', 'membership.json' )['membership_url'] ?? '' );
+	$warn = '//div[@data-gs-disconnect-billing]';
+	gs109_assert_eq( 'Your Store Owner plan on gend.me keeps billing after you disconnect. Manage or cancel it on gend.me.', gs109pl_text( $xp, $warn ), 'd23-paid-copy', 'store-owner (paid): billing warning copy' );
+	$lk = gs109pl_attrs( $xp, $warn . '//a', 'href' );
+	gs109_assert( 1 === count( $lk ) && html_entity_decode( $lk[0] ) === $mu, 'd23-paid-link', 'link = the hub membership_url, unchanged', $lk );
+	gs109_assert( $lk && $hub_host === (string) wp_parse_url( html_entity_decode( $lk[0] ), PHP_URL_HOST ) && '' !== $hub_host, 'd23-paid-link-host', 'link is on the paired hub host (' . $hub_host . ')', $lk );
+	gs109_assert( 1 === gs109pl_count( $xp, $warn . '//a[@target="_blank"][@rel="noopener"]' ), 'd23-paid-link-tab', 'link opens a new tab (target _blank rel noopener)' );
+	gs109_assert( false === strpos( $out, $token ) && ( ! $lk || ( false === strpos( $lk[0], 'token' ) && false === strpos( $lk[0], '_wpnonce' ) ) ), 'd23-paid-no-token', 'no install token anywhere in the card; no token/nonce in the link' );
+	$order = $xp->query( $warn . '/following::input[@name="op"][@value="disconnect"]' );
+	gs109_assert( $order && 1 === $order->length, 'd23-paid-before-button', 'warning sits before the Disconnect button' );
+	gs109_assert_eq( array(), $http, 'd23-paid-no-request', 'rendering the card makes no request (cached membership only)' );
+	gs109_assert( false === stripos( $out, '<script' ) && false === stripos( $out, '<style' ) && false === stripos( $out, 'style=' ), 'd23-no-inline', 'no inline script or style in the Connected card' );
+
+	list( $out, $http ) = $gs109d_render( 'connected' );
+	$xp = gs109pl_xp( $out );
+	gs109_assert( 0 === gs109pl_count( $xp, $warn ) && false === strpos( $out, 'keeps billing' ) && 1 === gs109pl_count( $xp, '//input[@name="op"][@value="disconnect"]' ), 'd23-free-none', 'connected (free): no billing warning, Disconnect button still there' );
+
+	list( $out, $http ) = $gs109d_render( 'inherited' );
+	gs109_assert( 0 === gs109pl_count( gs109pl_xp( $out ), $warn ), 'd23-inherited-none', 'inherited (group pays, own billing 0): no billing warning' );
+
+	// Off-hub membership_url: the warning stays, without a link.
+	$mem                   = gs109_fixture_json( 'store-owner', 'membership.json' );
+	$mem['membership_url'] = 'https://evil.example/my-account/membership/9101/';
+	unset( $mem['rev'] );
+	$o1 = gs109p_inject( 'membership', 200, $mem );
+	list( $out, $http ) = $gs109d_render( 'store-owner' );
+	$o1();
+	$xp = gs109pl_xp( $out );
+	gs109_assert( 1 === gs109pl_count( $xp, $warn ) && 0 === gs109pl_count( $xp, $warn . '//a' ) && false === strpos( $out, 'evil.example' ), 'd23-offhub-nolink', 'membership_url off the paired hub: warning without a link' );
+
+	// No cached membership: no warning, no request.
+	gs109p_clear_caches();
+	gs109_http_record();
+	$r = gs109p_call( 'gend_society_portal_connect_render_connected', 'GET' );
+	gs109_assert( false === strpos( $r['output'], 'keeps billing' ) && array() === gs109_http_log(), 'd23-nocache-none', 'no cached membership: no warning and no request' );
+}
 
 // ── subscriber cannot see it ───────────────────────────────────────────────────────────────────────────
 wp_set_current_user( gs109p_user( 'subscriber' ) );

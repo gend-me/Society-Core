@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.5.0
+Stable tag: 1.5.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -86,7 +86,7 @@ This plugin connects to outside services only after a site administrator chooses
    * **Plan and features** (`/wp-json/gdc-app-manager/v1/install/<install ID>/features` and `.../membership`): your gend.me plan, its price and renewal date, the plan owner's display name, and which features the plan includes, so the GenD and Plan & features pages can show them. The answers are kept for up to an hour, and fetched again when an administrator logs in or clicks Refresh.
    * **Plan catalogue** (`.../install/<install ID>/catalog`): the gend.me plans you can choose, with prices and features, for the plan comparison.
    * **Groups, Feature Suite and Projects pages** (`.../install/<install ID>/hub/<area>`): your business group's name, description, member names and pictures, recent group activity, feature list and (on plans that include it) project list. The plugin shows them with its own templates and keeps them for up to five minutes.
-   * **Choosing a plan:** when an administrator clicks Choose on a plan, the site sends the chosen plan ID to gend.me and receives a gend.me checkout address. The checkout opens in a gend.me window in your browser, and payment details are entered on gend.me, never on your site. When the checkout finishes, the gend.me window sends your admin page a short message (plan changed, with the install ID), and the page fetches the plan again.
+   * **Choosing a plan:** when an administrator clicks Choose a plan (or Change plan), the plugin opens your membership's Change Plan page on gend.me in a popup window (you sign in to gend.me there); no data is sent by the popup itself. The address is your membership's page on gend.me; it holds no token. Payment details are entered on gend.me, never on your site. When the checkout finishes, the gend.me window sends your admin page a short message (plan changed, with the install ID), and the page fetches the plan again.
    * membership panel actions that you start from the GenD screens;
    * a list of the site's active plugins, sent when a plugin is activated or deactivated and once a day;
    * mail relay through gend.me, only if an administrator chooses gend.me mail.
@@ -102,6 +102,10 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.5.1 =
+* Choose a plan now opens your gend.me Change Plan page in a popup; the separate plan launcher was removed.
+* Disconnect now warns when your paid gend.me plan keeps billing, with a link to manage or cancel it on gend.me.
 
 = 1.5.0 =
 * New: see your gend.me plan, its price and renewal date in wp-admin (GenD > Plan & features).

@@ -35,7 +35,7 @@ $page = gs109p_web( 'GET', admin_url( 'admin.php?page=gs-plan' ), $sess );
 $core = gs109p_web( 'GET', admin_url( 'options-general.php' ), $sess );
 gs109_assert( 200 === $page['status'] && false !== strpos( $page['body'], 'gend-society-plan' ), 'assets-page-200', 'admin.php?page=gs-plan: 200 with the page', $page['status'] . ' ' . $page['error'] );
 gs109_assert( 200 === $core['status'], 'assets-core-200', 'options-general.php: 200 (baseline)', $core['status'] );
-gs109_assert( false !== strpos( $page['body'], 'data-gs-plan-checkout="22"' ), 'assets-page-cards', 'page carries the cards (Choose Store Owner)' );
+gs109_assert( false !== strpos( $page['body'], 'data-gs-plan-popup="1"' ) && false === strpos( $page['body'], 'data-gs-plan-checkout' ) && false === strpos( $page['body'], 'gs-plan-launcher' ), 'assets-page-cards', 'page carries the cards (one Change Plan popup button, no per-tier Choose, no launcher asset)' );
 
 $xp = gs109pl_xp_page( $page['body'] );
 gs109_assert( 0 === gs109pl_count( $xp, '//iframe' ) && false === stripos( $page['body'], '<iframe' ), 'assets-no-iframe', 'no <iframe>' );
@@ -93,4 +93,4 @@ gs109_assert( 0 === gs109pl_count( $cx, '//script[@id="gend-society-plan-js"]' )
 // Subscriber: no page.
 $sub = gs109p_session( gs109p_user( 'subscriber' ) );
 $sp  = gs109p_web( 'GET', admin_url( 'admin.php?page=gs-plan' ), $sub );
-gs109_assert( 200 !== $sp['status'] || false === strpos( $sp['body'], 'data-gs-plan-checkout' ), 'assets-subscriber', 'subscriber: no Plan & features page', $sp['status'] );
+gs109_assert( 200 !== $sp['status'] || false === strpos( $sp['body'], 'data-gs-plan-popup' ), 'assets-subscriber', 'subscriber: no Plan & features page', $sp['status'] );

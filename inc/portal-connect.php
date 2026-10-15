@@ -973,6 +973,24 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 			</table>
 
 			<h3><?php esc_html_e('Disconnect', 'gend-society'); ?></h3>
+			<?php $billing = function_exists('gend_society_plan_disconnect_billing') ? gend_society_plan_disconnect_billing() : null; ?>
+			<?php if ($billing) : ?>
+				<div class="gend-society-connect-warning gend-society-connect-billing" data-gs-disconnect-billing>
+					<p>
+						<strong>
+						<?php
+						/* translators: %s: gend.me plan name, e.g. Store Owner. */
+						echo esc_html(sprintf(__('Your %s plan on gend.me keeps billing after you disconnect.', 'gend-society'), $billing['plan_name']));
+						?>
+						</strong>
+						<?php if ('' !== $billing['membership_url']) : ?>
+							<a href="<?php echo esc_url($billing['membership_url']); ?>" target="_blank" rel="noopener"><?php esc_html_e('Manage or cancel it on gend.me.', 'gend-society'); ?></a>
+						<?php else : ?>
+							<?php esc_html_e('Manage or cancel it on gend.me.', 'gend-society'); ?>
+						<?php endif; ?>
+					</p>
+				</div>
+			<?php endif; ?>
 			<p><?php esc_html_e('gend.me is told to stop accepting this site\'s token first; only then is the connection removed here. This site keeps its install ID, so connecting again later restores the same record.', 'gend-society'); ?></p>
 			<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="gend-society-connect-inline">
 				<?php wp_nonce_field('gs_portal_connect_disconnect', 'gs_portal_connect_nonce'); ?>

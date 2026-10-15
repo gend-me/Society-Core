@@ -96,7 +96,7 @@ function gs109pl_area_group( DOMXPath $xp, $state ) {
 	return gs109pl_attrs( $xp, '//ul[@data-gs-plan-group="' . $state . '"]/li', 'data-gs-plan-area' );
 }
 
-/** Choose buttons: plan id => href. */
+/** Legacy 1.5.0 per-tier Choose buttons (removed in 1.5.1; sections assert there are none): plan id => href. */
 function gs109pl_choose( DOMXPath $xp ) {
 	$out = array();
 	foreach ( $xp->query( '//a[@data-gs-plan-checkout]' ) as $a ) {
@@ -111,12 +111,27 @@ function gs109pl_choose( DOMXPath $xp ) {
 	return $out;
 }
 
-/** Plan id and nonce action of a launcher URL ('' when it is not the admin-post launcher on this site). */
-function gs109pl_launcher_plan( $href ) {
-	$href = html_entity_decode( (string) $href, ENT_QUOTES, 'UTF-8' );
-	if ( 0 !== strpos( $href, admin_url( 'admin-post.php' ) ) ) {
-		return '';
+/** gend.me Change Plan popup buttons (109-21): list of {href, target, rel, text}. */
+function gs109pl_popup( DOMXPath $xp ) {
+	$out = array();
+	foreach ( $xp->query( '//a[@data-gs-plan-popup]' ) as $a ) {
+		$out[] = array(
+			'href'   => (string) $a->getAttribute( 'href' ),
+			'target' => (string) $a->getAttribute( 'target' ),
+			'rel'    => (string) $a->getAttribute( 'rel' ),
+			'text'   => trim( preg_replace( '/\s+/u', ' ', $a->textContent ) ),
+		);
 	}
-	parse_str( (string) wp_parse_url( $href, PHP_URL_QUERY ), $q );
-	return ( $q['action'] ?? '' ) === 'gend_society_plan_checkout' && ! empty( $q['_wpnonce'] ) ? (string) ( $q['plan'] ?? '' ) : '';
+	return $out;
+}
+
+/** The exact Change Plan URL for a scenario: the hub's membership_url + ?ui=embed&plan_only=1&group=dashboard. */
+function gs109pl_change_url( $scenario ) {
+	$m = gs109_fixture_json( $scenario, 'membership.json' );
+	return (string) ( $m['membership_url'] ?? '' ) . '?ui=embed&plan_only=1&group=dashboard';
+}
+
+/** True when $buttons is exactly one popup button to $url, new tab without opener (no JS), with $text. */
+function gs109pl_popup_is( array $buttons, $url, $text ) {
+	return 1 === count( $buttons ) && $url === $buttons[0]['href'] && '_blank' === $buttons[0]['target'] && 'noopener' === $buttons[0]['rel'] && $text === $buttons[0]['text'];
 }
