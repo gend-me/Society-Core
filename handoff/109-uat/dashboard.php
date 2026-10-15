@@ -141,10 +141,18 @@ if ( ! function_exists( 'gs109d_part' ) ) {
 		return (string) ob_get_clean();
 	}
 
-	/** Render bytes with per-run noise removed (nonces, "N seconds ago"), for the md5 comparison. */
+	/**
+	 * Render bytes with per-run noise removed, for the md5 comparison: nonces, "N seconds ago", random element ids
+	 * (invite editor UUIDs, psoo-ppb-<n>) and live sizes (data-used bytes, "12.3 MB" labels; the clone's tables
+	 * and logs grow between runs). Seen on the hub clone in 109-29 (tools/norm-check.py on dumped renders).
+	 */
 	function gs109d_normalize( $html ) {
 		$html = preg_replace( '/\b\d+ (?:second|sec|min|minute|hour|day|week|month|year)s? ago\b/', 'N ago', (string) $html );
 		$html = preg_replace( '/(["\'=:])[0-9a-f]{10}(["\'&])/', '$1NONCE$2', $html );
+		$html = preg_replace( '/(?<![0-9a-f])[0-9a-f]{8}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{4}[-_][0-9a-f]{12}(?![0-9a-f])/', 'UUID', $html );
+		$html = preg_replace( '/\bpsoo-ppb-\d+/', 'psoo-ppb-N', $html );
+		$html = preg_replace( '/data-used="\d+"/', 'data-used="N"', $html );
+		$html = preg_replace( '/\b\d+(?:\.\d+)? (?:B|KB|MB|GB|TB)\b/', 'N B', $html );
 		return $html;
 	}
 }
@@ -169,7 +177,7 @@ if ( 'standalone' !== $gs109d_mode ) {
 	$n1 = gs109d_normalize( $r1 );
 	gs109_assert( '' !== $r1 && gs109d_normalize( $r2 ) === gs109d_normalize( $r3 ), 'dash-' . $gs109d_mode . '-render-stable', $gs109d_mode . ': custom dashboard renders and repeated renders normalise to the same bytes (' . strlen( $r1 ) . ' bytes)' );
 	gs109_info( 'dashboard render md5: ' . $gs109d_mode . ' bytes ' . strlen( $n1 ) . ' combined ' . md5( $n1 ) );
-	@file_put_contents( sys_get_temp_dir() . '/gs109-dash-render.html', $n1 ); // regress script copies it out for a diff
+	@file_put_contents( WP_CONTENT_DIR . '/gs109-dash-render.html', $n1 ); // tools/109-29-regress.sh copies it out for a diff
 	// The standalone-only pieces never appear here (absent functions count as absent: the fork-point tree has none).
 	$slot = 0;
 	$sf   = function () use ( &$slot ) {
