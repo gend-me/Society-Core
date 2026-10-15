@@ -280,9 +280,14 @@ if ( ! function_exists( 'gend_society_admin_experience' ) ) {
 	 *
 	 * hub        always 'gend' (the option is ignored).
 	 * container  site option gend_society_admin_experience; default 'gend'.
-	 * standalone site option gend_society_admin_experience; default 'native'
-	 *            (a plain install keeps the stock WordPress admin until the
-	 *            owner opts in).
+	 * standalone site option gend_society_admin_experience; default 'gend'
+	 *            (Phase 109 D28/D34: the same GenD dashboard as gend.me on
+	 *            every build, with "Switch back to standard WordPress"
+	 *            always visible). An explicit stored 'native' wins, so a
+	 *            site that switched back earlier stays native on update.
+	 *            The standalone default is filterable
+	 *            (gend_society_admin_experience_default) for a build that
+	 *            needs to ship native-first.
 	 * Values other than 'gend' / 'native' are ignored (default applies).
 	 *
 	 * @return string 'gend' | 'native'.
@@ -292,7 +297,10 @@ if ( ! function_exists( 'gend_society_admin_experience' ) ) {
 		if ( 'hub' === $mode ) {
 			return 'gend';
 		}
-		$default = ( 'container' === $mode ) ? 'gend' : 'native';
+		$default = 'gend';
+		if ( 'standalone' === $mode && function_exists( 'apply_filters' ) ) {
+			$default = 'native' === apply_filters( 'gend_society_admin_experience_default', 'gend' ) ? 'native' : 'gend';
+		}
 		$value   = function_exists( 'get_option' ) ? get_option( 'gend_society_admin_experience', '' ) : '';
 		if ( is_string( $value ) && in_array( $value, array( 'gend', 'native' ), true ) ) {
 			return $value;
