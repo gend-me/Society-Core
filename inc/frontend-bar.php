@@ -701,17 +701,8 @@ function gend_society_build_frontend_nav()
 
   // Note: Rewards is listed under Social children above, not as a top-level item.
 
-  $items[] = [
-    'label' => __('Features', 'gend-society'),
-    'url' => admin_url('admin.php?page=gs-features'),
-    'icon' => 'dashicons-admin-plugins',
-    'cap' => 'activate_plugins',
-    'children' => [
-      ['label' => __('Shortcodes', 'gend-society'), 'url' => admin_url('admin.php?page=gs-shortcodes')],
-      ['label' => __('Code Packages', 'gend-society'), 'url' => admin_url('plugins.php')],
-      ['label' => __('Updates', 'gend-society'), 'url' => admin_url('update-core.php')],
-    ],
-  ];
+  // Features (Shortcodes / Code Packages / Updates) was removed from the bar,
+  // matching the wp-admin sidebar.
 
   // Filter by capability and feature access
   $final_items = [];
