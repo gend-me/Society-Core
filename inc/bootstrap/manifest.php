@@ -536,6 +536,12 @@ return array(
 			'note'  => 'Contracts → Growth Investments: app picker + embedded group Marketing → Advertising page.',
 		),
 		array(
+			'file'  => 'inc/profile-board-tabs.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Projects → My Projects: Calendar + My Connections tabs (top-nav items removed).',
+		),
+		array(
 			'file'  => 'inc/login-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),

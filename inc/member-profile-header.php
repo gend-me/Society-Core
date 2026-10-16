@@ -957,6 +957,12 @@ function gend_society_render_profile_header() {
         return ( $oa - $ob ) ?: ( $a->_src - $b->_src );
     } );
 
+    // ── Calendar + Connections moved under Projects → My Projects (tabs right of My Tasks, own profile — see
+    // inc/profile-board-tabs.php). Their routes stay (the tabs frame them), only the top-nav items go.
+    $nav_items = array_values( array_filter( $nav_items, function ( $it ) {
+        return ! in_array( isset( $it->slug ) ? $it->slug : '', array( 'member-calendar', 'friends' ), true );
+    } ) );
+
     $current_component = bp_current_component();
 
     // ── Cover photo ───────────────────────────────────────────────────────────
