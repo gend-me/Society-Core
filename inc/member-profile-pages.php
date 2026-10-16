@@ -1796,7 +1796,12 @@ function gend_society_invest_footer_assets() {
         /* CSS-ONLY radio tabs — switching needs no JS (JS only force-checks the radio as insurance). */
         .gend-contracts-tabbed { padding-top: 34px; }
         .gend-invest-screen .gci-radio { position:absolute; width:1px; height:1px; opacity:0; clip:rect(0 0 0 0); }
-        .gci-tabs { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:30px; padding: 4px 2px; }
+        .gci-tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-bottom:30px; padding: 4px 2px; }
+        /* Commissions dashboard: centre each top tab's header copy (Sales Team, Payments & Analytics) above its sub tabs */
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-card { text-align: center !important; }
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-card p { margin-left: auto !important; margin-right: auto !important; }
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-badge { margin-left: auto; margin-right: auto; }
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-footer { display: flex !important; flex-wrap: wrap; justify-content: center !important; gap: 8px 18px; }
         .gci-tab {
             display:inline-flex; align-items:center;
             background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));

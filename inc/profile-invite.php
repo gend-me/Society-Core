@@ -258,6 +258,23 @@ function gend_society_invite_render_panel( $share = array() ) {
     $social_settings_url = function_exists( 'youzify_get_profile_settings_url' )
         ? youzify_get_profile_settings_url( 'social-networks' )
         : '';
+
+    // ── Social tab, current connector: the member's Content Campaigns channels (the same accounts as the
+    // profile Social tab) + the member app's Composer with this invite/share link as the post link. Falls back to
+    // the Youzify DM list above when Content Campaigns isn't active.
+    $gs_cc_social = class_exists( 'BM_Social_DB' ) && class_exists( 'BM_Member_App' );
+    $gs_cc_channels = array();
+    $gs_cc_app = $gs_cc_manage = '';
+    if ( $gs_cc_social ) {
+        $rules = class_exists( 'BM_Publisher' ) ? BM_Publisher::rules() : array();
+        foreach ( (array) BM_Social_DB::get_accounts( $user_id ) as $a ) {
+            if ( $rules && ! isset( $rules[ $a->platform ] ) ) continue;   // social networks only (no analytics / ads)
+            $r = isset( $rules[ $a->platform ] ) ? $rules[ $a->platform ] : array( 'label' => ucfirst( $a->platform ), 'color' => '#64748b', 'icon' => 'share' );
+            $gs_cc_channels[] = array( 'name' => (string) $a->name, 'network' => $r['label'], 'color' => $r['color'], 'icon' => $r['icon'], 'picture' => (string) $a->picture );
+        }
+        $gs_cc_app    = add_query_arg( array( 'embed' => '1', 'subtab' => 'composer', 'bm_link' => rawurlencode( $invite_url ) ), BM_Member_App::url() );
+        $gs_cc_manage = BM_Member_App::return_url( $user_id );
+    }
     ?>
     <div id="<?php echo esc_attr( $wrap_id ); ?>" class="gs-invite-wrap" data-gs-invite
          data-rest-root="<?php echo esc_attr( $rest_root ); ?>"
@@ -404,6 +421,31 @@ function gend_society_invite_render_panel( $share = array() ) {
 
         <!-- ── Social panel — DM your invite link from your own accounts ── -->
         <div class="gs-invite-tabpanel" data-gs-tab-panel="social" role="tabpanel">
+            <?php if ( $gs_cc_social ) : ?>
+            <section class="gs-invite-card gs-invite-social gs-invite-cc">
+                <h3><?php echo $is_share ? esc_html__( 'Share From Your Social Accounts', 'gend-society' ) : esc_html__( 'Invite Through Your Social Accounts', 'gend-society' ); ?></h3>
+                <?php if ( $gs_cc_channels ) : ?>
+                <div class="gs-invite-cc-channels">
+                    <?php foreach ( $gs_cc_channels as $c ) : ?>
+                    <span class="gs-invite-cc-chan" style="--c:<?php echo esc_attr( $c['color'] ); ?>">
+                        <span class="gs-invite-cc-chan__av"><?php if ( $c['picture'] ) : ?><img src="<?php echo esc_url( $c['picture'] ); ?>" alt="" referrerpolicy="no-referrer"><?php endif; ?><i class="dashicons dashicons-<?php echo esc_attr( $c['icon'] ); ?>"></i></span>
+                        <span><b><?php echo esc_html( $c['name'] ); ?></b><small><?php echo esc_html( $c['network'] ); ?></small></span>
+                    </span>
+                    <?php endforeach; ?>
+                    <a class="gs-invite-cc-chan is-add" href="<?php echo esc_url( $gs_cc_manage ); ?>"><span class="dashicons dashicons-plus-alt2"></span><span><b><?php esc_html_e( 'Manage channels', 'gend-society' ); ?></b><small><?php esc_html_e( 'On your profile’s Social tab', 'gend-society' ); ?></small></span></a>
+                </div>
+                <p class="gs-invite-help" style="margin:0 0 12px !important;"><?php echo $is_share
+                    ? esc_html__( 'The link to this post is already in the composer, with your tracking on it — post it to any of your channels now or schedule it.', 'gend-society' )
+                    : esc_html__( 'Your invite link is already in the post, with your tracking on it — post it to any of your channels now or schedule it. Any gend.me link you share from here carries it automatically.', 'gend-society' ); ?></p>
+                <iframe class="gs-invite-cc-app" data-gs-src="<?php echo esc_url( $gs_cc_app ); ?>" title="<?php esc_attr_e( 'Compose a social post', 'gend-society' ); ?>"></iframe>
+                <?php else : ?>
+                <div class="gs-invite-cc-empty">
+                    <p><?php esc_html_e( 'Connect your social accounts on your profile’s Social tab — then come back here to post your invite link to all of them at once, schedule posts and track who joins.', 'gend-society' ); ?></p>
+                    <a class="gs-invite-btn gs-invite-btn--primary" href="<?php echo esc_url( $gs_cc_manage ); ?>"><?php esc_html_e( 'Connect your channels', 'gend-society' ); ?></a>
+                </div>
+                <?php endif; ?>
+            </section>
+            <?php else : ?>
             <section class="gs-invite-card gs-invite-social">
                 <h3><?php echo $is_share ? esc_html__( 'Share From Your Social Accounts', 'gend-society' ) : esc_html__( 'Invite Through Your Social Accounts', 'gend-society' ); ?></h3>
                 <p class="gs-invite-help" style="margin:0 0 14px !important;">
@@ -454,6 +496,7 @@ function gend_society_invite_render_panel( $share = array() ) {
 
                 <div class="gs-invite-status" data-gs-social-status aria-live="polite" style="margin-top:12px;"></div>
             </section>
+            <?php endif; ?>
         </div><!-- /tabpanel:social -->
 
         <!-- ── Invitations panel — the complete tracking list ───────────── -->
@@ -656,6 +699,22 @@ function gend_society_invite_render_panel( $share = array() ) {
 
     /* Copy button inside the invite-link pill */
     .gs-invite-copy-btn { flex: 0 0 auto; padding: 6px 12px !important; }
+
+    /* Social tab — Content Campaigns channels + composer */
+    .gs-invite-cc-channels { display: flex; flex-wrap: wrap; gap: 10px; margin: 6px 0 14px; }
+    .gs-invite-cc-chan { display: inline-flex; align-items: center; gap: 10px; padding: 8px 14px 8px 8px; border-radius: 14px; border: 1px solid rgba(255,255,255,0.1); background: rgba(11,14,20,0.55); color: #e2e8f0; text-decoration: none; }
+    .gs-invite-cc-chan b { display: block; font-size: 0.85rem; color: #f8fafc; }
+    .gs-invite-cc-chan small { display: block; font-size: 0.7rem; color: #94a3b8; letter-spacing: 0.04em; }
+    .gs-invite-cc-chan__av { position: relative; width: 34px; height: 34px; border-radius: 50%; background: var(--c, #64748b); display: inline-flex; align-items: center; justify-content: center; overflow: hidden; flex: 0 0 34px; }
+    .gs-invite-cc-chan__av img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+    .gs-invite-cc-chan__av .dashicons { color: #fff; font-size: 18px; width: 18px; height: 18px; }
+    .gs-invite-cc-chan__av img + .dashicons { position: absolute; right: -2px; bottom: -2px; width: 16px; height: 16px; font-size: 11px; line-height: 16px; border-radius: 50%; background: var(--c, #64748b); }
+    .gs-invite-cc-chan.is-add { border-style: dashed; border-color: rgba(182,8,201,0.45); }
+    .gs-invite-cc-chan.is-add > .dashicons { width: 34px; height: 34px; font-size: 22px; line-height: 34px; text-align: center; color: #e11fd7; }
+    .gs-invite-cc-chan.is-add:hover { border-color: #e11fd7; }
+    .gs-invite-cc-app { display: block; width: 100%; height: 640px; border: 0; border-radius: 14px; background: transparent; }
+    .gs-invite-cc-empty { text-align: center; padding: 18px 10px; }
+    .gs-invite-cc-empty p { color: #cbd5e1; margin: 0 auto 14px; max-width: 560px; }
 
     /* Social network rows */
     .gs-invite-social-list { display: flex; flex-direction: column; gap: 10px; margin-top: 14px; }
@@ -1613,6 +1672,14 @@ function gend_society_invite_render_panel( $share = array() ) {
 
             var inviteLink = wrap.getAttribute('data-invite-link') || '';
 
+            // The embedded Content Campaigns app reports its height so it never scrolls inside itself.
+            window.addEventListener('message', function ( e ) {
+                if ( e.origin !== location.origin || ! e.data || e.data.bmMemberApp !== 'height' ) return;
+                wrap.querySelectorAll('iframe.gs-invite-cc-app').forEach(function ( f ) {
+                    if ( f.contentWindow === e.source ) f.style.height = Math.max( 500, +e.data.h || 0 ) + 'px';
+                });
+            });
+
             // ── Main tab switcher ────────────────────────────────────
             var tabs   = wrap.querySelectorAll('.gs-invite-tab');
             var panels = wrap.querySelectorAll('.gs-invite-tabpanel');
@@ -1626,6 +1693,12 @@ function gend_society_invite_render_panel( $share = array() ) {
                     panels.forEach(function ( p ) {
                         p.classList.toggle('is-active', p.getAttribute('data-gs-tab-panel') === target);
                     });
+                    // Social: load the Content Campaigns composer the first time the tab opens.
+                    if ( target === 'social' ) {
+                        wrap.querySelectorAll('iframe[data-gs-src]').forEach(function ( f ) {
+                            if ( ! f.getAttribute('src') ) f.setAttribute('src', f.getAttribute('data-gs-src'));
+                        });
+                    }
                     // Mobile: land at the top of the freshly opened panel.
                     if ( window.matchMedia && window.matchMedia('(max-width: 720px)').matches ) {
                         var y = wrap.getBoundingClientRect().top + window.pageYOffset - 12;
