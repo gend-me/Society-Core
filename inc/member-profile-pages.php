@@ -4181,7 +4181,7 @@ function gend_society_member_friends_tabs_open() {
                     role="tab"
                     aria-selected="false">
                 <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('referral-sales') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'Referral Sales', 'gend-society' ); ?></span>
+                <span class="gs-tab-label"><?php esc_html_e( 'Referrals', 'gend-society' ); ?></span>
             </button>
             <button type="button"
                     class="gs-member-friends-tab"
