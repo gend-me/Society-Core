@@ -796,7 +796,7 @@ function gend_society_build_frontend_profile_nav()
 
   // App Projects (BP Groups → renamed to App Projects)
   if ($bp_active && bp_is_active('groups')) {
-    $items[] = ['label' => __('App Projects', 'gend-society'), 'url' => $base . 'groups/', 'icon' => 'dashicons-screenoptions'];
+    $items[] = ['label' => __('Projects', 'gend-society'), 'url' => $base . 'groups/', 'icon' => 'dashicons-screenoptions'];
   }
 
   // Activity

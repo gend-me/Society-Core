@@ -861,9 +861,9 @@ function gend_society_render_profile_header() {
 
     // Apply requested society stylings modifications to the nav array
     foreach ( $nav_items as $index => $item ) {
-        // Change "Groups" to "App Projects"
-        if ( $item->slug === 'groups' && strpos( $item->name, 'App Projects' ) === false ) {
-            $item->name = str_replace( 'Groups', 'App Projects', $item->name );
+        // Show the groups tab as "Projects" (was "App Projects", originally "Groups").
+        if ( $item->slug === 'groups' ) {
+            $item->name = str_replace( array( 'App Projects', 'Groups' ), 'Projects', $item->name );
         }
     }
 

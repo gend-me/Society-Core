@@ -1708,44 +1708,26 @@ function gend_society_invest_profile_screen_content() {
         $topup_uid = (int) bp_displayed_user_id();
         $topup_bal = function_exists( 'mycred_get_users_balance' ) ? (float) mycred_get_users_balance( $topup_uid, 'transact' ) : 0.0;
         ?>
-        <div class="gci-topup-bar gi-reveal">
-            <div class="gci-topup-info">
-                <span class="gci-topup-label"><?php esc_html_e( 'Your DGEN balance', 'gend-society' ); ?></span>
-                <span class="gci-topup-value"><?php echo esc_html( number_format_i18n( $topup_bal, 2 ) ); ?> <small>DGEN</small></span>
-            </div>
-            <form class="gci-topup-form" method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
-                <input type="hidden" name="action" value="gend_buy_dgen">
-                <?php wp_nonce_field( 'gend_buy_dgen' ); ?>
-                <input type="number" name="amount" min="1" step="0.01" placeholder="<?php esc_attr_e( 'Amount', 'gend-society' ); ?>" class="gci-topup-input" required>
-                <button type="submit" class="gci-topup-btn"><?php esc_html_e( 'Top Up DGEN', 'gend-society' ); ?></button>
-            </form>
-        </div>
-        <?php echo gend_society_render_web_apps_you_manage( $topup_uid ); // phpcs:ignore ?>
-        <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" checked>
-        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-hold"      class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio">
-        <input type="radio" name="gci-tab" id="gci-tab-completed" class="gci-radio">
+        <?php // The DGEN balance / top-up bar was removed from this screen (2026-10-15). ?>
+        <?php // "Web Apps You Manage", Currency Hold and Completed Contracts were removed from this screen (2026-10-15). ?>
+        <?php // autocomplete="off": browsers otherwise restore the last-picked tab on reload instead of Commissions. ?>
+        <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" autocomplete="off" checked>
+        <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio" autocomplete="off">
+        <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio" autocomplete="off">
+        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" autocomplete="off">
         <div class="gci-tabs" role="tablist">
             <label for="gci-tab-commissions" class="gci-tab"><?php esc_html_e( 'Commissions', 'gend-society' ); ?></label>
-            <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
-            <label for="gci-tab-hold"      class="gci-tab"><?php esc_html_e( 'Currency Hold', 'gend-society' ); ?></label>
             <label for="gci-tab-growth"    class="gci-tab"><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
             <label for="gci-tab-projects"  class="gci-tab"><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
-            <label for="gci-tab-completed" class="gci-tab"><?php esc_html_e( 'Completed Contracts', 'gend-society' ); ?></label>
+            <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
         </div>
         <div class="gci-panel gci-panel--commissions" role="tabpanel">
             <?php echo shortcode_exists( 'affiliate_sales_dashboard' ) ? do_shortcode( '[affiliate_sales_dashboard]' ) : ''; // Sales Team commission dashboard ?>
         </div>
-        <div class="gci-panel gci-panel--fund" role="tabpanel">
-            <?php echo do_shortcode( '[gend_wallet]' ); ?>
-        </div>
-        <div class="gci-panel gci-panel--hold" role="tabpanel"><?php echo gend_society_render_currency_hold( (int) bp_displayed_user_id() ); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gend_society_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gend_society_render_growth_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gend_society_render_project_market(); // phpcs:ignore ?></div>
-        <div class="gci-panel gci-panel--completed" role="tabpanel">
-            <?php if ( function_exists( 'gend_society_render_completed_contracts_panel' ) ) gend_society_render_completed_contracts_panel( (int) bp_displayed_user_id() ); ?>
+        <div class="gci-panel gci-panel--fund" role="tabpanel">
+            <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
     </div>
     <?php
@@ -1814,7 +1796,12 @@ function gend_society_invest_footer_assets() {
         /* CSS-ONLY radio tabs — switching needs no JS (JS only force-checks the radio as insurance). */
         .gend-contracts-tabbed { padding-top: 34px; }
         .gend-invest-screen .gci-radio { position:absolute; width:1px; height:1px; opacity:0; clip:rect(0 0 0 0); }
-        .gci-tabs { display:flex; flex-wrap:wrap; gap:12px; margin-bottom:30px; padding: 4px 2px; }
+        .gci-tabs { display:flex; flex-wrap:wrap; justify-content:center; gap:12px; margin-bottom:30px; padding: 4px 2px; }
+        /* Commissions dashboard: centre each top tab's header copy (Sales Team, Payments & Analytics) above its sub tabs */
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-card { text-align: center !important; }
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-card p { margin-left: auto !important; margin-right: auto !important; }
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-badge { margin-left: auto; margin-right: auto; }
+        .gend-invest-screen .aas-dashboard-panel > .aas-panel-header-section .aas-phs-footer { display: flex !important; flex-wrap: wrap; justify-content: center !important; gap: 8px 18px; }
         .gci-tab {
             display:inline-flex; align-items:center;
             background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
@@ -3029,7 +3016,9 @@ function gend_society_member_groups_tabs_open() {
         // Memberships, Hubs (the BP groups list), Activity. Visitors on
         // someone else's profile default to Hubs — the My Projects PM
         // dashboard and Memberships are own-profile surfaces.
-        $gs_default_panel = ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile() ) ? 'projects' : 'groups';
+        // The Hubs tab was removed (2026-10-16): My Projects is the default for everyone. The Hubs panel below stays
+        // in the markup (hidden) because the page's BuddyPress groups loop renders into it.
+        $gs_default_panel = 'projects';
         ?>
         <div class="gs-member-groups-tabs" role="tablist">
             <button type="button"
@@ -3050,14 +3039,6 @@ function gend_society_member_groups_tabs_open() {
                 <span class="gs-tab-label"><?php esc_html_e( 'Memberships', 'gend-society' ); ?></span>
             </button>
             <?php endif; ?>
-            <button type="button"
-                    class="gs-member-groups-tab<?php echo 'groups' === $gs_default_panel ? ' is-active' : ''; ?>"
-                    data-gs-panel="groups"
-                    role="tab"
-                    aria-selected="<?php echo 'groups' === $gs_default_panel ? 'true' : 'false'; ?>">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('groups') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'Hubs', 'gend-society' ); ?></span>
-            </button>
             <button type="button"
                     class="gs-member-groups-tab"
                     data-gs-panel="activity"
@@ -3092,6 +3073,7 @@ function gend_society_member_groups_tabs_open() {
         // Decline are the standard nonce-protected BP action links. This
         // mini bp_has_groups loop completes before the page's main groups
         // loop starts, so the template globals are handed over clean.
+        ob_start();   // printed at the top of My Projects (the Hubs tab is gone)
         if ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile()
              && function_exists( 'bp_has_groups' )
              && bp_has_groups( array(
@@ -3122,6 +3104,7 @@ function gend_society_member_groups_tabs_open() {
             <?php endwhile; ?>
         </div>
         <?php endif; ?>
+        <?php $GLOBALS['gend_society_hub_invites_html'] = ob_get_clean(); ?>
     <?php
 }
 
@@ -3130,14 +3113,15 @@ function gend_society_member_groups_tabs_close() {
         return;
     }
 
-    // Resolve a group_id so [psoo_pm_group_projects] renders correctly.
-    // Use the displayed user's most recently active group.
+    // Resolve a group_id so [psoo_pm_group_projects] renders correctly: the VIEWING member's most recently active
+    // group (the board shows the viewer's own workspaces — see scope="profile"), else the displayed user's.
     $displayed_user_id = (int) bp_displayed_user_id();
     $group_id          = 0;
+    $gs_board_user     = is_user_logged_in() ? get_current_user_id() : $displayed_user_id;
 
-    if ( $displayed_user_id > 0 && function_exists( 'groups_get_groups' ) ) {
+    if ( $gs_board_user > 0 && function_exists( 'groups_get_groups' ) ) {
         $result = groups_get_groups( [
-            'user_id'             => $displayed_user_id,
+            'user_id'             => $gs_board_user,
             'per_page'            => 1,
             'orderby'             => 'last_activity',
             'order'               => 'DESC',
@@ -3151,12 +3135,13 @@ function gend_society_member_groups_tabs_close() {
     ?>
         </div><!-- /panel:groups -->
 
-        <div class="gs-member-groups-panel<?php echo ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile() ) ? ' is-active' : ''; ?>" data-gs-panel="projects" role="tabpanel">
+        <div class="gs-member-groups-panel is-active" data-gs-panel="projects" role="tabpanel">
             <?php
+            echo isset( $GLOBALS['gend_society_hub_invites_html'] ) ? $GLOBALS['gend_society_hub_invites_html'] : ''; // phpcs:ignore -- pending hub invitations (own profile)
             if ( $group_id && shortcode_exists( 'psoo_pm_group_projects' ) ) {
-                // Render the full native PM dashboard (All Projects / My Tasks / Calendar / Reports / Settings)
-                // for the member's most recently active group.
-                echo do_shortcode( '[psoo_pm_group_projects group_id="' . $group_id . '"]' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                // The native PM board in profile scope: the viewer's workspaces across their groups with a group
+                // filter, no Calendar tab (projects plugin, shortcode-group-projects.php).
+                echo do_shortcode( '[psoo_pm_group_projects group_id="' . $group_id . '" scope="profile"]' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             } elseif ( shortcode_exists( 'psoo_pm_group_projects' ) ) {
                 echo '<p class="psoo-pm-empty">' . esc_html__( 'Join a group to view your Projects dashboard here.', 'gend-society' ) . '</p>';
             } else {
