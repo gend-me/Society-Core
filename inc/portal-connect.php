@@ -684,7 +684,7 @@ if (!function_exists('gend_society_portal_connect_code_param')) {
 	 */
 	function gend_society_portal_connect_code_param() {
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- pre-fill only, validated by the pattern.
-		$code = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? (string) wp_unslash($_GET['gend_society_code']) : '';
+		$code = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? sanitize_text_field(wp_unslash($_GET['gend_society_code'])) : '';
 		return preg_match('/^[A-HJ-NP-Z2-9]{6}$/', $code) ? $code : '';
 	}
 }
