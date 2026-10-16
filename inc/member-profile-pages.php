@@ -4242,7 +4242,15 @@ function gend_society_member_friends_tabs_close() {
 
         <div class="gs-member-friends-panel" data-gs-panel="invite" role="tabpanel">
             <?php
-            if ( function_exists( 'gend_society_invite_render_panel' ) ) {
+            // Same content as Contracts → Commissions → Referrals → Tracking URLs (sales-team [affiliate_link]); the
+            // email invite panel lives in its Email popup. Falls back to the plain invite panel.
+            if ( shortcode_exists( 'affiliate_link' ) ) {
+                if ( defined( 'AAS_PLUGIN_URL' ) ) {
+                    $gs_dash_css = WP_PLUGIN_DIR . '/sales-team/assets/dashboard-gend.css';
+                    wp_enqueue_style( 'aas-dashboard-gend', AAS_PLUGIN_URL . 'assets/dashboard-gend.css', array(), GEND_SOCIETY_VERSION . '.' . @filemtime( $gs_dash_css ) );
+                }
+                echo '<div class="aas-affiliate-dashboard gs-invite-tracking">' . do_shortcode( '[affiliate_link]' ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+            } elseif ( function_exists( 'gend_society_invite_render_panel' ) ) {
                 gend_society_invite_render_panel();
             } else {
                 echo '<p class="psoo-pm-empty">' . esc_html__( 'Invite UI not available.', 'gend-society' ) . '</p>';
