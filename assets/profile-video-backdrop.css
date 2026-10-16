@@ -1,23 +1,30 @@
 /* Profile tab video backdrop (gend-society inc/profile-video-backdrop.php) */
 .gs-vbg-host { position: relative; isolation: isolate; }
+/* clip box = the tab content; the stage inside is pinned to the viewport, so the scene's bottom-right corner stays on
+   the screen's bottom-right while the tab's edges scroll over it (clip-path also clips fixed descendants) */
 .gs-vbg {
-    position: sticky; top: 0; z-index: -1;
-    height: 100vh; margin-bottom: -100vh;
-    border-radius: 24px; overflow: hidden; pointer-events: none;
+    position: absolute; inset: 0; z-index: -1;
+    pointer-events: none;
+    -webkit-clip-path: inset(0 round 24px);
+    clip-path: inset(0 round 24px);
     background: #05070c;
 }
-.gs-vbg__video { display: block; width: 100%; height: 100%; object-fit: cover; opacity: .92; filter: saturate(1.08) contrast(1.04); }
+.gs-vbg__stage { position: fixed; inset: 0; }
+.gs-vbg__canvas { display: block; width: 100%; height: 100%; opacity: .92; filter: saturate(1.08) contrast(1.04); }
 .gs-vbg__shade {
     position: absolute; inset: 0;
     background:
-        radial-gradient(120% 80% at 50% 20%, rgba(5, 7, 12, .10), rgba(5, 7, 12, .62) 70%),
-        linear-gradient(180deg, rgba(5, 7, 12, .45), rgba(5, 7, 12, .20) 35%, rgba(5, 7, 12, .55));
+        radial-gradient(120% 90% at var(--gs-vbg-ax, 100%) var(--gs-vbg-ay, 100%), rgba(5, 7, 12, 0), rgba(5, 7, 12, .55) 75%),
+        linear-gradient(180deg, rgba(5, 7, 12, .45), rgba(5, 7, 12, .18) 40%, rgba(5, 7, 12, .40));
 }
-/* glass panels layered over the video */
+/* fallback when an ancestor transform turns position:fixed into absolute: stick to the top instead */
+.gs-vbg--sticky { position: absolute; inset: 0; }
+.gs-vbg--sticky .gs-vbg__stage { position: sticky; top: 0; height: 100vh; }
+/* glass panels layered over the scene */
 .gs-vbg-host .gs-vglass {
     -webkit-backdrop-filter: blur(16px) saturate(1.25);
     backdrop-filter: blur(16px) saturate(1.25);
     border-color: rgba(255, 255, 255, .12) !important;
     box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 24px 60px -32px rgba(0, 0, 0, .75) !important;
 }
-@media (max-width: 720px) { .gs-vbg { border-radius: 16px; } }
+@media (max-width: 720px) { .gs-vbg { -webkit-clip-path: inset(0 round 16px); clip-path: inset(0 round 16px); } }
