@@ -95,20 +95,16 @@
             ctx.globalAlpha = 1;
         }
 
-        // ---- scroll → frame position: steady growth per pixel, shrink over the last stretch when there's room
+        // ---- scroll → frame position: a steady ping-pong loop (grow, shrink, grow, …) over the scroll distance; a short
+        // tab just opens as far as it goes
         function docTop(el) { var r = el.getBoundingClientRect(); return r.top + window.pageYOffset; }
         function targetPos() {
             var vh = window.innerHeight;
-            var y = window.pageYOffset;
-            var top = docTop(host), bottom = top + host.offsetHeight;
-            var maxY = Math.max(0, document.documentElement.scrollHeight - vh);
-            var start = Math.max(0, top - vh * 0.85);            // begins as the tab's top edge rises into view
-            var end = Math.min(maxY, Math.max(start, bottom - vh));
-            var openPx = Math.max(700, vh * 1.5);                 // pixels of scroll for a full open
-            var g = Math.max(0, y - start) / openPx;
-            if (end - start >= openPx * 2) g = Math.min(g, Math.max(0, end - y) / openPx);   // long tab: close at the end
-            g = Math.min(1, g);
-            g = g * g * (3 - 2 * g);                               // soft start and finish
+            var start = Math.max(0, docTop(host) - vh * 0.85);   // begins as the tab's top edge rises into view
+            var openPx = Math.max(700, vh * 1.5);                 // pixels of scroll for one open (or one close)
+            var ph = (Math.max(0, window.pageYOffset - start) / openPx) % 2;
+            var g = ph <= 1 ? ph : 2 - ph;
+            g = g * g * (3 - 2 * g);                               // soft turnaround at both ends
             return floor + g * (last - floor);
         }
 
