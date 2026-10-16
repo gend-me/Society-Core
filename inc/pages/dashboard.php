@@ -207,16 +207,18 @@ function gend_society_dashboard_enqueue_standalone()
     $url = GEND_SOCIETY_URL . 'assets/';
     $css = 'gs-dashboard-standalone.css';
     $js  = 'gs-dashboard-standalone.js';
-    wp_enqueue_style('gend-society-dashboard-standalone', $url . $css, array(), GEND_SOCIETY_VERSION . '.' . (file_exists($dir . $css) ? filemtime($dir . $css) : 0));
+    $css_ver = file_exists($dir . $css) ? GEND_SOCIETY_VERSION . '.' . filemtime($dir . $css) : GEND_SOCIETY_VERSION . '.0';
+    $js_ver  = file_exists($dir . $js) ? GEND_SOCIETY_VERSION . '.' . filemtime($dir . $js) : GEND_SOCIETY_VERSION . '.0';
+    wp_enqueue_style('gend-society-dashboard-standalone', $url . $css, array(), $css_ver);
     $deps = array();
     foreach (array('woocommerce/assets/js/jquery-qrcode/jquery.qrcode.min.js', 'online-store/plugins/woocommerce/assets/js/jquery-qrcode/jquery.qrcode.min.js') as $rel) {
         if (defined('WP_PLUGIN_DIR') && file_exists(WP_PLUGIN_DIR . '/' . $rel)) {
-            wp_register_script('gend-society-jquery-qrcode', plugins_url($rel), array('jquery'), (string) filemtime(WP_PLUGIN_DIR . '/' . $rel), true);
+            wp_register_script('gend-society-jquery-qrcode', plugins_url($rel), array('jquery'), GEND_SOCIETY_VERSION . '.' . filemtime(WP_PLUGIN_DIR . '/' . $rel), true);
             $deps[] = 'gend-society-jquery-qrcode';
             break;
         }
     }
-    wp_enqueue_script('gend-society-dashboard-standalone', $url . $js, $deps, GEND_SOCIETY_VERSION . '.' . (file_exists($dir . $js) ? filemtime($dir . $js) : 0), true);
+    wp_enqueue_script('gend-society-dashboard-standalone', $url . $js, $deps, $js_ver, true);
     $paired = function_exists('gend_society_dashboard_standalone_paired') && gend_society_dashboard_standalone_paired();
     wp_localize_script('gend-society-dashboard-standalone', 'gendSocietyDashboard', array(
         'ajaxUrl'   => $paired && function_exists('gend_society_plan_refresh_ajax') ? admin_url('admin-ajax.php') : '',

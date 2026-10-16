@@ -214,8 +214,10 @@ if (!function_exists('gend_society_portal_connect_enqueue')) {
 		$ver = defined('GEND_SOCIETY_VERSION') ? GEND_SOCIETY_VERSION : '1';
 		$css = 'assets/gs-connect-modal.css';
 		$js  = 'assets/gs-connect-modal.js';
-		wp_enqueue_style('gend-society-connect-modal', $url . $css, array(), $ver . '.' . (file_exists($dir . $css) ? filemtime($dir . $css) : 0));
-		wp_enqueue_script('gend-society-connect-modal', $url . $js, array(), $ver . '.' . (file_exists($dir . $js) ? filemtime($dir . $js) : 0), true);
+		$css_ver = file_exists($dir . $css) ? $ver . '.' . filemtime($dir . $css) : $ver . '.0';
+		$js_ver  = file_exists($dir . $js) ? $ver . '.' . filemtime($dir . $js) : $ver . '.0';
+		wp_enqueue_style('gend-society-connect-modal', $url . $css, array(), $css_ver);
+		wp_enqueue_script('gend-society-connect-modal', $url . $js, array(), $js_ver, true);
 	}
 }
 
