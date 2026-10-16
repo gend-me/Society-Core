@@ -124,3 +124,8 @@
     .gdc-cv-timeline::before { left: 27px; }
     .gdc-cv-job__logo { flex-basis: 48px; width: 48px; height: 48px; }
 }
+
+/* The theme styles every h2/p (display font, tight line-height) — pin the hero text so name and headline never overlap. */
+.gdc-cv .gdc-cv-hero__name { display: block !important; margin: 0 !important; padding: 0 !important; height: auto !important; font-family: "Inter", sans-serif !important; font-size: clamp(1.8rem, 3.4vw, 2.6rem) !important; font-weight: 900 !important; line-height: 1.15 !important; letter-spacing: -.02em !important; text-transform: none !important; color: #fff !important; }
+.gdc-cv .gdc-cv-hero__headline { display: block !important; margin: 10px 0 0 !important; padding: 0 !important; font-family: "Inter", sans-serif !important; font-size: 1.05rem !important; line-height: 1.45 !important; }
+.gdc-cv .gdc-cv-section > h3, .gdc-cv h4 { font-family: "Inter", sans-serif !important; line-height: 1.3 !important; }
