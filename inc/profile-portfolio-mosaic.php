@@ -5,11 +5,13 @@
  * Posts and Playlists filters show the former Posts and Playlists sub-tabs (gend_society_portfolio_render_posts(),
  * blog-manager's bm_render_library_section()).
  *
- * Owners get "Add new": choose a type, then its own flow —
- *   Photo / Video / Audio / File → upload (gend_society_portfolio_upload): a media-library attachment authored by the
- *     member, registered in Youzify's media table (component user) so it also shows in their Youzify gallery
- *   Blog post → a short composer (gend_society_portfolio_post): published when the member can publish posts,
- *     otherwise submitted for review
+ * Owners get "Add new" — a popup of type cards, each opening its own dashboard:
+ *   Photo / Video / Audio / File → drag-and-drop upload dashboard (gend_society_portfolio_upload): media-library
+ *     attachments authored by the member, registered in Youzify's media table (component user)
+ *   Blog post → posts dashboard + the WordPress block editor (categories, featured image, gend-society SEO panel)
+ *     in the popup. Members without edit rights get a scoped editing session (gend_society_member_post_*): a signed
+ *     4-hour cookie that lets them write their OWN drafts — never publish, edit published or others' posts — and
+ *     only on the post editor screens, the core editor REST routes and the editor's own AJAX actions
  *   Playlist → the Playlists filter's own New Playlist flow
  *
  * Assets: assets/profile-portfolio.css + .js.
@@ -160,8 +162,24 @@ function gend_society_render_portfolio_panel( $user_id, $is_own ) {
     );
     if ( $has_playlists ) $filters['playlist'] = __( 'Playlists', 'gend-society' );
     $types = gend_society_portfolio_types();
+    $upload_cap = (int) floor( wp_max_upload_size() / MB_IN_BYTES );
+    $type_meta = array();
+    $plural = array( 'image' => __( 'Photos', 'gend-society' ), 'video' => __( 'Videos', 'gend-society' ), 'audio' => __( 'Audio', 'gend-society' ), 'file' => __( 'Files', 'gend-society' ) );
+    $blurb = array(
+        'image' => __( 'Show your work in pictures — screenshots, designs, events and products.', 'gend-society' ),
+        'video' => __( 'Demos, walkthroughs and highlight reels that play right on your profile.', 'gend-society' ),
+        'audio' => __( 'Podcasts, interviews, music and voice notes for your audience.', 'gend-society' ),
+        'file'  => __( 'Decks, case studies, one-pagers and documents people can open.', 'gend-society' ),
+    );
+    foreach ( $types as $k => $t ) {
+        $type_meta[ $k ] = array( 'label' => $t['label'], 'plural' => $plural[ $k ], 'accept' => $t['accept'], 'max' => min( $t['max'], $upload_cap ),
+            'blurb' => $blurb[ $k ], 'formats' => strtoupper( implode( ', ', array_map( function ( $x ) { return str_replace( '|', ' / ', $x ); }, array_keys( $t['mimes'] ) ) ) ), 'count' => $counts[ $k ] );
+    }
+    $own_posts = $is_own ? get_posts( array( 'post_type' => 'post', 'author' => $user_id, 'post_status' => array( 'publish', 'pending', 'draft' ), 'posts_per_page' => 40 ) ) : array();
+    $post_counts = array( 'publish' => 0, 'pending' => 0, 'draft' => 0 );
+    foreach ( $own_posts as $op ) $post_counts[ $op->post_status ]++;
     ?>
-    <div class="gs-pf" data-gs-pf data-ajax="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( $is_own ? wp_create_nonce( 'gs_portfolio' ) : '' ); ?>">
+    <div class="gs-pf" data-gs-pf data-ajax="<?php echo esc_url( admin_url( 'admin-ajax.php' ) ); ?>" data-nonce="<?php echo esc_attr( $is_own ? wp_create_nonce( 'gs_portfolio' ) : '' ); ?>"<?php if ( $is_own ) : ?> data-types="<?php echo esc_attr( wp_json_encode( $type_meta ) ); ?>"<?php endif; ?>>
         <div class="gs-pf-bar">
             <div class="gs-pf-filters" role="tablist">
                 <?php foreach ( $filters as $k => $l ) : $n = $k === 'all' ? count( $items ) : $counts[ $k ]; ?>
@@ -171,18 +189,7 @@ function gend_society_render_portfolio_panel( $user_id, $is_own ) {
                 <?php endforeach; ?>
             </div>
             <?php if ( $is_own ) : ?>
-            <div class="gs-pf-add">
-                <button type="button" class="gs-pf-add__btn" data-gs-pf-add aria-haspopup="true" aria-expanded="false">+ <?php esc_html_e( 'Add new', 'gend-society' ); ?></button>
-                <div class="gs-pf-add__menu" data-gs-pf-add-menu hidden>
-                    <?php foreach ( $types as $k => $t ) : ?>
-                    <label class="gs-pf-add__item"><input type="file" accept="<?php echo esc_attr( $t['accept'] ); ?>" data-gs-pf-upload="<?php echo esc_attr( $k ); ?>" hidden><span><?php echo esc_html( $t['label'] ); ?></span><small><?php echo esc_html( sprintf( __( 'Upload · up to %d MB', 'gend-society' ), min( $t['max'], (int) floor( wp_max_upload_size() / MB_IN_BYTES ) ) ) ); ?></small></label>
-                    <?php endforeach; ?>
-                    <button type="button" class="gs-pf-add__item" data-gs-pf-new-post><span><?php esc_html_e( 'Blog post', 'gend-society' ); ?></span><small><?php echo current_user_can( 'publish_posts' ) ? esc_html__( 'Write and publish', 'gend-society' ) : esc_html__( 'Write and submit for review', 'gend-society' ); ?></small></button>
-                    <?php if ( $has_playlists ) : ?>
-                    <button type="button" class="gs-pf-add__item" data-gs-pf-new-playlist><span><?php esc_html_e( 'Playlist', 'gend-society' ); ?></span><small><?php esc_html_e( 'Create a playlist', 'gend-society' ); ?></small></button>
-                    <?php endif; ?>
-                </div>
-            </div>
+            <button type="button" class="gs-pf-add__btn" data-gs-pf-open="addnew"><span aria-hidden="true">+</span> <?php esc_html_e( 'Add new', 'gend-society' ); ?></button>
             <?php endif; ?>
         </div>
         <p class="gs-pf-status" data-gs-pf-status aria-live="polite"></p>
@@ -204,19 +211,131 @@ function gend_society_render_portfolio_panel( $user_id, $is_own ) {
 
         <div class="gs-pf-zoom" data-gs-pf-zoom-box hidden><button type="button" aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button><img alt=""></div>
 
-        <?php if ( $is_own ) : ?>
-        <div class="gs-pf-modal" data-gs-pf-post-modal hidden role="dialog" aria-modal="true" aria-label="<?php esc_attr_e( 'New blog post', 'gend-society' ); ?>">
-            <form class="gs-pf-modal__box" data-gs-pf-post-form>
-                <button type="button" class="gs-pf-modal__x" data-gs-pf-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
-                <h3><?php esc_html_e( 'New blog post', 'gend-society' ); ?></h3>
-                <label><?php esc_html_e( 'Title', 'gend-society' ); ?><input type="text" name="title" maxlength="200" required></label>
-                <label><?php esc_html_e( 'Featured image (optional)', 'gend-society' ); ?><input type="file" name="image" accept="image/jpeg,image/png,image/gif,image/webp"></label>
-                <label><?php esc_html_e( 'Post', 'gend-society' ); ?><textarea name="content" rows="10" required placeholder="<?php esc_attr_e( 'Write your post… blank lines start new paragraphs.', 'gend-society' ); ?>"></textarea></label>
-                <p class="gs-pf-modal__note"><?php echo current_user_can( 'publish_posts' ) ? esc_html__( 'Your post is published on gend.me straight away.', 'gend-society' ) : esc_html__( 'Your post is sent to the gend.me team for review and appears publicly once approved.', 'gend-society' ); ?></p>
-                <div class="gs-pf-modal__actions"><button type="submit" class="gs-pf-add__btn"><?php echo current_user_can( 'publish_posts' ) ? esc_html__( 'Publish', 'gend-society' ) : esc_html__( 'Submit for review', 'gend-society' ); ?></button></div>
-            </form>
+        <?php if ( $is_own ) gend_society_portfolio_owner_popups( $type_meta, $own_posts, $post_counts, $has_playlists, $counts ); ?>
+    </div>
+    <?php
+}
+
+/** Inline SVG icon for a type card. */
+function gend_society_portfolio_icon( $k ) {
+    $paths = array(
+        'image'    => '<rect x="3" y="4" width="18" height="16" rx="3"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+        'video'    => '<rect x="2.5" y="5" width="14" height="14" rx="3"/><path d="m16.5 10 5-3v10l-5-3"/>',
+        'audio'    => '<path d="M9 18V6l11-2v12"/><circle cx="6.5" cy="18" r="2.5"/><circle cx="17.5" cy="16" r="2.5"/>',
+        'file'     => '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5M9 13h6M9 17h6"/>',
+        'post'     => '<path d="M4 20h4L19 9l-4-4L4 16z"/><path d="m13 7 4 4"/><path d="M14 20h6"/>',
+        'playlist' => '<path d="M3 6h12M3 11h12M3 16h7"/><path d="m16 14 5 3-5 3z"/>',
+    );
+    return '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $paths[ $k ] . '</svg>';
+}
+
+/** Owner popups: Add new (type cards), media upload dashboard, blog post dashboard + block editor. */
+function gend_society_portfolio_owner_popups( $type_meta, $own_posts, $post_counts, $has_playlists, $counts ) {
+    $cards = array();
+    foreach ( $type_meta as $k => $t ) $cards[ $k ] = array( 'title' => $t['label'], 'text' => $t['blurb'], 'n' => $t['count'], 'open' => 'media:' . $k );
+    $cards['post'] = array( 'title' => __( 'Blog post', 'gend-society' ), 'text' => __( 'Write in the full block editor with categories, a featured image and SEO settings.', 'gend-society' ), 'n' => $counts['post'], 'open' => 'post' );
+    if ( $has_playlists ) $cards['playlist'] = array( 'title' => __( 'Playlist', 'gend-society' ), 'text' => __( 'Curate videos, tracks and posts into a collection people can follow.', 'gend-society' ), 'n' => $counts['playlist'], 'open' => 'playlist' );
+    $can_publish = current_user_can( 'publish_posts' );
+    ?>
+    <div class="gs-pf-modal" data-gs-pf-modal="addnew" hidden role="dialog" aria-modal="true" aria-label="<?php esc_attr_e( 'Add to your portfolio', 'gend-society' ); ?>">
+        <div class="gs-pf-modal__box gs-pf-modal__box--wide">
+            <button type="button" class="gs-pf-modal__x" data-gs-pf-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+            <header class="gs-pf-hero">
+                <span class="gs-pf-hero__eyebrow"><?php esc_html_e( 'Portfolio studio', 'gend-society' ); ?></span>
+                <h3><?php esc_html_e( 'What would you like to add?', 'gend-society' ); ?></h3>
+                <p><?php esc_html_e( 'Everything you add shows in your Portfolio mosaic for visitors to explore.', 'gend-society' ); ?></p>
+            </header>
+            <div class="gs-pf-types">
+                <?php foreach ( $cards as $k => $c ) : ?>
+                <button type="button" class="gs-pf-type gs-pf-type--<?php echo esc_attr( $k ); ?>" data-gs-pf-open="<?php echo esc_attr( $c['open'] ); ?>">
+                    <span class="gs-pf-type__icon"><?php echo gend_society_portfolio_icon( $k ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+                    <span class="gs-pf-type__title"><?php echo esc_html( $c['title'] ); ?></span>
+                    <span class="gs-pf-type__text"><?php echo esc_html( $c['text'] ); ?></span>
+                    <span class="gs-pf-type__foot"><span class="gs-pf-type__n"><?php echo esc_html( sprintf( _n( '%d in portfolio', '%d in portfolio', (int) $c['n'], 'gend-society' ), (int) $c['n'] ) ); ?></span><span class="gs-pf-type__go" aria-hidden="true">→</span></span>
+                </button>
+                <?php endforeach; ?>
+            </div>
         </div>
-        <?php endif; ?>
+    </div>
+
+    <div class="gs-pf-modal" data-gs-pf-modal="media" hidden role="dialog" aria-modal="true" aria-labelledby="gs-pf-media-title">
+        <div class="gs-pf-modal__box gs-pf-modal__box--wide gs-pf-dash" data-gs-pf-media-dash>
+            <button type="button" class="gs-pf-modal__x" data-gs-pf-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+            <button type="button" class="gs-pf-back" data-gs-pf-open="addnew">← <?php esc_html_e( 'All types', 'gend-society' ); ?></button>
+            <header class="gs-pf-dash__head">
+                <span class="gs-pf-dash__icon" data-gs-pf-media-icon></span>
+                <div>
+                    <h3 id="gs-pf-media-title" data-gs-pf-media-title></h3>
+                    <p data-gs-pf-media-blurb></p>
+                </div>
+                <div class="gs-pf-dash__stats">
+                    <div><strong data-gs-pf-media-count>0</strong><span><?php esc_html_e( 'in portfolio', 'gend-society' ); ?></span></div>
+                    <div><strong data-gs-pf-media-session>0</strong><span><?php esc_html_e( 'added now', 'gend-society' ); ?></span></div>
+                </div>
+            </header>
+            <label class="gs-pf-drop" data-gs-pf-drop>
+                <input type="file" multiple data-gs-pf-files hidden>
+                <span class="gs-pf-drop__icon" data-gs-pf-drop-icon></span>
+                <strong><?php esc_html_e( 'Drag & drop files here', 'gend-society' ); ?></strong>
+                <span><?php esc_html_e( 'or click to choose from your device', 'gend-society' ); ?></span>
+                <small data-gs-pf-media-rules></small>
+            </label>
+            <ul class="gs-pf-queue" data-gs-pf-queue></ul>
+            <section class="gs-pf-recent">
+                <h4><?php esc_html_e( 'Recently added', 'gend-society' ); ?></h4>
+                <div class="gs-pf-recent__grid" data-gs-pf-recent></div>
+            </section>
+        </div>
+    </div>
+
+    <div class="gs-pf-modal" data-gs-pf-modal="post" hidden role="dialog" aria-modal="true" aria-label="<?php esc_attr_e( 'Blog posts', 'gend-society' ); ?>">
+        <div class="gs-pf-modal__box gs-pf-modal__box--wide gs-pf-dash" data-gs-pf-post-dash>
+            <button type="button" class="gs-pf-modal__x" data-gs-pf-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+            <button type="button" class="gs-pf-back" data-gs-pf-open="addnew">← <?php esc_html_e( 'All types', 'gend-society' ); ?></button>
+            <header class="gs-pf-dash__head">
+                <span class="gs-pf-dash__icon gs-pf-type--post"><?php echo gend_society_portfolio_icon( 'post' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+                <div>
+                    <h3><?php esc_html_e( 'Blog posts', 'gend-society' ); ?></h3>
+                    <p><?php echo $can_publish ? esc_html__( 'Write in the WordPress block editor — set categories, a featured image and SEO, then publish.', 'gend-society' ) : esc_html__( 'Write in the WordPress block editor — set categories, a featured image and SEO, then submit for review. The gend.me team approves posts before they go public.', 'gend-society' ); ?></p>
+                </div>
+                <div class="gs-pf-dash__stats">
+                    <div><strong><?php echo (int) $post_counts['publish']; ?></strong><span><?php esc_html_e( 'published', 'gend-society' ); ?></span></div>
+                    <div><strong><?php echo (int) $post_counts['pending']; ?></strong><span><?php esc_html_e( 'in review', 'gend-society' ); ?></span></div>
+                    <div><strong><?php echo (int) $post_counts['draft']; ?></strong><span><?php esc_html_e( 'drafts', 'gend-society' ); ?></span></div>
+                </div>
+            </header>
+            <button type="button" class="gs-pf-start" data-gs-pf-editor="0">
+                <span class="gs-pf-start__icon"><?php echo gend_society_portfolio_icon( 'post' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped ?></span>
+                <span><strong><?php esc_html_e( 'Start a new post', 'gend-society' ); ?></strong><small><?php esc_html_e( 'Opens the block editor right here', 'gend-society' ); ?></small></span>
+                <span class="gs-pf-type__go" aria-hidden="true">→</span>
+            </button>
+            <?php if ( $own_posts ) : ?>
+            <ul class="gs-pf-postlist">
+                <?php foreach ( $own_posts as $op ) :
+                    $st = $op->post_status;
+                    $label = array( 'publish' => __( 'Published', 'gend-society' ), 'pending' => __( 'In review', 'gend-society' ), 'draft' => __( 'Draft', 'gend-society' ) )[ $st ];
+                ?>
+                <li>
+                    <span class="gs-pf-postlist__thumb"<?php $th = get_the_post_thumbnail_url( $op, 'thumbnail' ); echo $th ? ' style="background-image:url(' . esc_url( $th ) . ')"' : ''; ?>></span>
+                    <span class="gs-pf-postlist__meta"><b><?php echo esc_html( get_the_title( $op ) ?: __( '(no title)', 'gend-society' ) ); ?></b><small><?php echo esc_html( get_the_modified_date( 'M j, Y', $op ) ); ?></small></span>
+                    <span class="gs-pf-badge<?php echo $st === 'publish' ? '' : ' is-review'; ?>"><?php echo esc_html( $label ); ?></span>
+                    <?php if ( $st === 'publish' ) : ?>
+                        <a class="gs-pf-mini" href="<?php echo esc_url( get_permalink( $op ) ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'View', 'gend-society' ); ?></a>
+                    <?php else : ?>
+                        <button type="button" class="gs-pf-mini" data-gs-pf-editor="<?php echo (int) $op->ID; ?>"><?php esc_html_e( 'Continue editing', 'gend-society' ); ?></button>
+                    <?php endif; ?>
+                </li>
+                <?php endforeach; ?>
+            </ul>
+            <?php endif; ?>
+        </div>
+        <div class="gs-pf-editor" data-gs-pf-editor-stage hidden>
+            <div class="gs-pf-editor__bar">
+                <button type="button" class="gs-pf-back" data-gs-pf-editor-close>← <?php esc_html_e( 'Back to my posts', 'gend-society' ); ?></button>
+                <span><?php echo $can_publish ? esc_html__( 'Publish from the editor’s top bar when you’re ready.', 'gend-society' ) : esc_html__( 'Use “Submit for Review” in the editor’s top bar when you’re ready.', 'gend-society' ); ?></span>
+            </div>
+            <iframe class="gs-pf-editor__frame" data-gs-pf-editor-frame title="<?php esc_attr_e( 'Block editor', 'gend-society' ); ?>"></iframe>
+        </div>
     </div>
     <?php
 }
@@ -274,21 +393,92 @@ add_action( 'wp_ajax_gend_society_portfolio_remove', function () {
     wp_send_json_success();
 } );
 
-add_action( 'wp_ajax_gend_society_portfolio_post', function () {
-    $uid = gend_society_portfolio_require_owner();
-    $title = isset( $_POST['title'] ) ? sanitize_text_field( wp_unslash( $_POST['title'] ) ) : '';
-    $body  = isset( $_POST['content'] ) ? wp_kses_post( wp_unslash( $_POST['content'] ) ) : '';
-    if ( $title === '' || trim( wp_strip_all_tags( $body ) ) === '' ) wp_send_json_error( array( 'message' => __( 'Add a title and some text.', 'gend-society' ) ), 400 );
-    $status = user_can( $uid, 'publish_posts' ) ? 'publish' : 'pending';
-    $pid = wp_insert_post( array( 'post_type' => 'post', 'post_status' => $status, 'post_title' => $title, 'post_content' => wpautop( $body ), 'post_author' => $uid ), true );
-    if ( is_wp_error( $pid ) ) wp_send_json_error( array( 'message' => $pid->get_error_message() ), 400 );
-    if ( ! empty( $_FILES['image'] ) && empty( $_FILES['image']['error'] ) ) {
-        $img = gend_society_portfolio_store_upload( 'image', gend_society_portfolio_types()['image']['mimes'], 10, $uid, $pid );
-        if ( ! is_wp_error( $img ) ) set_post_thumbnail( $pid, $img );
+// (The short composer endpoint was replaced by the block editor — see the member editing session below.)
+
+// ── Member editing session: blog posts in the WordPress block editor ───────────────────────────────────────────
+// Members who can't already write posts get, while a signed 4-hour cookie is valid, `edit_posts` / `upload_files` /
+// `delete_posts` — enough for their OWN drafts and "Submit for Review" (never publish_posts, edit_published_posts or
+// edit_others_posts) — and only on the post editor screens, the core editor REST routes and the editor's AJAX actions.
+const GEND_SOCIETY_MEMBER_POST_COOKIE = 'gs_member_post';
+
+function gend_society_member_post_token( $uid, $exp ) {
+    return $uid . '|' . $exp . '|' . hash_hmac( 'sha256', 'gs_member_post|' . $uid . '|' . $exp, wp_salt( 'auth' ) );
+}
+
+function gend_society_member_post_session( $uid ) {
+    $raw = isset( $_COOKIE[ GEND_SOCIETY_MEMBER_POST_COOKIE ] ) ? (string) wp_unslash( $_COOKIE[ GEND_SOCIETY_MEMBER_POST_COOKIE ] ) : '';
+    $parts = explode( '|', $raw );
+    if ( count( $parts ) !== 3 || (int) $parts[0] !== (int) $uid || (int) $parts[1] < time() ) return false;
+    return hash_equals( gend_society_member_post_token( (int) $parts[0], (int) $parts[1] ), $raw );
+}
+
+/** Is this request one the post editor makes? */
+function gend_society_member_post_context() {
+    global $pagenow;
+    if ( wp_doing_ajax() ) {
+        $action = isset( $_REQUEST['action'] ) ? sanitize_key( wp_unslash( $_REQUEST['action'] ) ) : '';
+        return in_array( $action, array( 'heartbeat', 'query-attachments', 'upload-attachment', 'save-attachment', 'save-attachment-compat', 'get-attachment',
+            'send-attachment-to-editor', 'wp-remove-post-lock', 'sample-permalink', 'image-editor', 'imgedit-preview', 'crop-image', 'get-post-thumbnail-html',
+            'set-post-thumbnail', 'meta-box-order', 'closed-postboxes', 'parse-embed', 'oembed-cache', 'wp-link-ajax' ), true );
     }
-    $p = get_post( $pid );
-    $it = array( 'kind' => 'post', 'id' => $pid, 'title' => get_the_title( $p ), 'thumb' => (string) get_the_post_thumbnail_url( $p, 'medium_large' ), 'full' => (string) get_permalink( $p ),
-        'date' => get_the_date( 'M j, Y', $p ), 'excerpt' => wp_trim_words( wp_strip_all_tags( $p->post_content ), 18, '…' ), 'status' => $status, 'mine' => false );
-    wp_send_json_success( array( 'html' => gend_society_portfolio_tile( $it ), 'status' => $status,
-        'message' => $status === 'publish' ? __( 'Post published.', 'gend-society' ) : __( 'Post submitted for review.', 'gend-society' ) ) );
+    if ( is_admin() ) return in_array( $pagenow, array( 'post.php', 'post-new.php', 'async-upload.php', 'media-upload.php' ), true );
+    $uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+    foreach ( array( '/wp/v2/', '/wp-block-editor/v1/', '/oembed/1.0/' ) as $route ) {
+        if ( strpos( $uri, '/wp-json' . $route ) !== false || strpos( $uri, 'rest_route=' . rawurlencode( $route ) ) !== false || strpos( $uri, 'rest_route=' . $route ) !== false ) return true;
+    }
+    return false;
+}
+
+add_filter( 'user_has_cap', function ( $allcaps, $caps, $args, $user ) {
+    if ( empty( $user->ID ) || ! empty( $allcaps['edit_posts'] ) || (int) $user->ID !== get_current_user_id() ) return $allcaps;
+    if ( ! array_intersect( (array) $caps, array( 'read', 'edit_posts', 'upload_files', 'delete_posts' ) ) ) return $allcaps;
+    if ( ! gend_society_member_post_session( (int) $user->ID ) || ! gend_society_member_post_context() ) return $allcaps;
+    foreach ( array( 'read', 'edit_posts', 'upload_files', 'delete_posts' ) as $c ) $allcaps[ $c ] = true;
+    return $allcaps;
+}, 20, 4 );
+
+// In a session, the media library shows only the member's own uploads.
+add_filter( 'ajax_query_attachments_args', function ( $q ) {
+    $uid = get_current_user_id();
+    if ( $uid && gend_society_member_post_session( $uid ) && ! current_user_can( 'edit_others_posts' ) ) $q['author'] = $uid;
+    return $q;
+} );
+
+// Owner: open the block editor (new post, or one of their own drafts / posts in review) — starts the session.
+add_action( 'wp_ajax_gend_society_portfolio_editor', function () {
+    $uid = gend_society_portfolio_require_owner();
+    $pid = isset( $_POST['post_id'] ) ? absint( $_POST['post_id'] ) : 0;
+    if ( $pid ) {
+        $p = get_post( $pid );
+        if ( ! $p || $p->post_type !== 'post' || (int) $p->post_author !== $uid || ! in_array( $p->post_status, array( 'draft', 'pending', 'auto-draft' ), true ) ) {
+            wp_send_json_error( array( 'message' => __( 'That post can’t be edited here.', 'gend-society' ) ), 403 );
+        }
+        $url = admin_url( 'post.php?post=' . $pid . '&action=edit&gdc_embed=1' );
+    } else {
+        $url = admin_url( 'post-new.php?post_type=post&gdc_embed=1' );
+    }
+    $exp = time() + 4 * HOUR_IN_SECONDS;
+    setcookie( GEND_SOCIETY_MEMBER_POST_COOKIE, gend_society_member_post_token( $uid, $exp ), array(
+        'expires' => $exp, 'path' => COOKIEPATH ? COOKIEPATH : '/', 'domain' => COOKIE_DOMAIN ? COOKIE_DOMAIN : '', 'secure' => is_ssl(), 'httponly' => true, 'samesite' => 'Lax',
+    ) );
+    wp_send_json_success( array( 'url' => $url ) );
+} );
+
+// The editor inside the popup: no wp-admin chrome, full-screen editing surface.
+add_action( 'admin_head', function () {
+    global $pagenow, $typenow;
+    if ( ! in_array( $pagenow, array( 'post.php', 'post-new.php' ), true ) || ( $typenow ?: 'post' ) !== 'post' ) return;
+    $framed = ! empty( $_GET['gdc_embed'] ) || ( isset( $_SERVER['HTTP_SEC_FETCH_DEST'] ) && $_SERVER['HTTP_SEC_FETCH_DEST'] === 'iframe' && gend_society_member_post_session( get_current_user_id() ) );
+    if ( ! $framed ) return;
+    ?>
+    <style id="gs-member-post-embed">
+        #wpadminbar, #adminmenumain, #adminmenuback, #adminmenuwrap, #wpfooter, #main-3d-header, .header-anchor-wrap, .gdc-topbar,
+        .edit-post-fullscreen-mode-close, .editor-header__back, .edit-post-header__back, #wpbody-content > .notice, #wpbody-content > .error { display: none !important; }
+        html.wp-toolbar { padding-top: 0 !important; }
+        :root, html, body { --gs-header-h: 0px !important; }
+        #wpcontent, #wpbody-content { margin-left: 0 !important; }
+        #wpbody { padding-top: 0 !important; }
+    </style>
+    <script>document.addEventListener('DOMContentLoaded', function () { document.body.classList.add('is-fullscreen-mode'); });</script>
+    <?php
 } );
