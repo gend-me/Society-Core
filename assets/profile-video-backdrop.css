@@ -14,7 +14,7 @@
 .gs-vbg__shade {
     position: absolute; inset: 0;
     background:
-        radial-gradient(120% 90% at 100% 100%, rgba(5, 7, 12, 0), rgba(5, 7, 12, .55) 75%),
+        radial-gradient(120% 90% at var(--gs-vbg-ax, 100%) var(--gs-vbg-ay, 100%), rgba(5, 7, 12, 0), rgba(5, 7, 12, .55) 75%),
         linear-gradient(180deg, rgba(5, 7, 12, .45), rgba(5, 7, 12, .18) 40%, rgba(5, 7, 12, .40));
 }
 /* fallback when an ancestor transform turns position:fixed into absolute: stick to the top instead */

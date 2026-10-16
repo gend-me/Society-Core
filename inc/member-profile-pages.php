@@ -1717,7 +1717,14 @@ function gend_society_invest_profile_screen_content() {
         <div class="gci-panel gci-panel--commissions" role="tabpanel">
             <?php echo shortcode_exists( 'affiliate_sales_dashboard' ) ? do_shortcode( '[affiliate_sales_dashboard]' ) : ''; // Sales Team commission dashboard ?>
         </div>
-        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php echo gend_society_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gend_society_render_growth_market(); // phpcs:ignore ?></div>
+        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php
+            // Owner: pick an app you admin → its Marketing → Advertising page (inc/profile-growth-apps.php). Visitors: the growth marketplace.
+            if ( function_exists( 'gend_society_growth_apps_panel' ) && gend_society_growth_apps_can_view( (int) bp_displayed_user_id() ) ) {
+                echo gend_society_growth_apps_panel( (int) bp_displayed_user_id() ); // phpcs:ignore
+            } else {
+                echo gend_society_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gend_society_render_growth_market(); // phpcs:ignore
+            }
+        ?></div>
         <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gend_society_render_project_market(); // phpcs:ignore ?></div>
         <div class="gci-panel gci-panel--fund" role="tabpanel">
             <?php echo do_shortcode( '[gend_wallet]' ); ?>

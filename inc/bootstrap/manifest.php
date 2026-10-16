@@ -530,6 +530,12 @@ return array(
 			'note'  => 'Scroll-scrubbed video backdrop + glass panels on the Contracts and Projects profile tabs.',
 		),
 		array(
+			'file'  => 'inc/profile-growth-apps.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Contracts → Growth Investments: app picker + embedded group Marketing → Advertising page.',
+		),
+		array(
 			'file'  => 'inc/login-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),
