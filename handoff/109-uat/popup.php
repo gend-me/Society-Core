@@ -9,6 +9,7 @@
  *     protocol-relative, credentials, another port) or membership_id is 0 / missing
  *   - no token in change_plan_url, in any href or in the rendered HTML; no change-plan POST from the plugin
  *   - the old admin-post URL no longer redirects anywhere (real loopback request)
+ *   (109-30b) the dashboard's inline memberUrl is the hub-checked membership_url ("" when off the paired hub)
  *   (109-30) the button checks run on the dashboard membership card's UPGRADE (a.gs-dash-sa-upgrade[data-gs-popup]);
  *   the Plan & features page they used to read is gone
  *
@@ -118,7 +119,20 @@ foreach ( array( 'evil' => 'https://evil.example/my-account/membership/9101/', '
 	$xp   = gs109pl_xp( $html );
 	$pops = gs109pl_attrs( $xp, '//a[@data-gs-popup]', 'href' );
 	gs109_assert( '' === $v['change_plan_url'] && 0 === gs109pl_count( $xp, '//a[contains(@class,"gs-dash-sa-upgrade")]' ) && false === stripos( implode( ' ', $pops ), 'evil.example' ) && false === stripos( implode( ' ', $pops ), 'javascript:' ) && false === stripos( implode( ' ', array_merge( gs109pl_attrs( $xp, '//*[@href]', 'href' ), gs109pl_attrs( $xp, '//*[@src]', 'src' ) ) ), 'evil.example' ), 'popup-off-hub-card-' . $k, 'membership_url ' . $k . ': no UPGRADE on the dashboard membership card, the URL is in no link / src' );
+	// 109-30b: the inline script's memberUrl goes through the hub-host check too (it echoed the raw membership_url).
+	$mu_js = preg_match( '/var memberUrl = (.*?);
+/', $html, $mm ) ? $mm[1] : null;
+	gs109_assert( '""' === $mu_js && false === stripos( $html, 'evil.example' ) && false === stripos( $html, 'javascript:alert' ), 'popup-off-hub-memberurl-' . $k, 'membership_url ' . $k . ': inline memberUrl is "" and the URL is nowhere in the page', $mu_js );
 }
+$m = $mem;
+unset( $m['rev'] );
+$off   = gs109p_inject( 'membership', 200, $m );
+gs109pl_vm( 'connected' );
+$html  = gs109pu_dash( $admin );
+$off();
+$mu_js = preg_match( '/var memberUrl = (.*?);
+/', $html, $mm ) ? $mm[1] : null;
+gs109_assert( wp_json_encode( (string) $mem['membership_url'] ) === $mu_js, 'popup-memberurl-on-hub', 'on-hub membership_url: inline memberUrl = the JSON-encoded hub URL', $mu_js );
 $m                  = $mem;
 $m['membership_id'] = 0;
 unset( $m['rev'] );

@@ -2245,7 +2245,7 @@ function gend_society_render_membership_panel( $payload = null ) {
         if (!root) return;
         var ajax = <?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>;
         var nonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>;
-        var memberUrl = <?php echo wp_json_encode( $membership_url ); ?>;
+        var memberUrl = <?php echo wp_json_encode( esc_url_raw( $gs_sa ? gend_society_dashboard_standalone_url( $membership_url ) : $membership_url ) ); ?>;
 
         function toast(msg, kind) {
             var el = document.createElement('div');
