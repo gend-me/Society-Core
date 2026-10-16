@@ -219,19 +219,16 @@ function gend_society_ajax_resume_upload() {
 /** Enqueue the resume assets (once). */
 function gend_society_resume_assets( $is_own ) {
     static $css_done = false, $js_done = false;
-    $dir = defined( 'GEND_SOCIETY_DIR' ) ? GEND_SOCIETY_DIR : plugin_dir_path( __DIR__ );
-    $url = defined( 'GEND_SOCIETY_URL' ) ? GEND_SOCIETY_URL : plugin_dir_url( __DIR__ );
-    $ver = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '1';
-    $css = $dir . 'assets/profile-resume.css';
+    $css = GEND_SOCIETY_DIR . 'assets/profile-resume.css';
     // Printed here (the panel renders after wp_head) so the styles apply without a flash.
     if ( ! $css_done ) {
         $css_done = true;
-        echo '<link rel="stylesheet" id="gend-society-resume-css" href="' . esc_url( $url . 'assets/profile-resume.css?ver=' . $ver . '.' . ( file_exists( $css ) ? filemtime( $css ) : '0' ) ) . '" media="all" />';
+        echo '<link rel="stylesheet" id="gend-society-resume-css" href="' . esc_url( GEND_SOCIETY_URL . 'assets/profile-resume.css?ver=' . GEND_SOCIETY_VERSION . '.' . ( file_exists( $css ) ? filemtime( $css ) : '0' ) ) . '" media="all" />';
     }
     if ( $is_own && ! $js_done ) {
         $js_done = true;
-        $js = $dir . 'assets/profile-resume.js';
-        wp_enqueue_script( 'gend-society-resume', $url . 'assets/profile-resume.js', array(), $ver . '.' . ( file_exists( $js ) ? filemtime( $js ) : '0' ), true );
+        $js = GEND_SOCIETY_DIR . 'assets/profile-resume.js';
+        wp_enqueue_script( 'gend-society-resume', GEND_SOCIETY_URL . 'assets/profile-resume.js', array(), GEND_SOCIETY_VERSION . '.' . @filemtime( $js ), true );
     }
 }
 
