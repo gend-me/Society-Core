@@ -524,6 +524,12 @@ return array(
 			'needs' => array( 'bp' ),
 		),
 		array(
+			'file'  => 'inc/profile-video-backdrop.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Scroll-scrubbed video backdrop + glass panels on the Contracts and Projects profile tabs.',
+		),
+		array(
 			'file'  => 'inc/login-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),
