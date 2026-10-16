@@ -3016,7 +3016,9 @@ function gend_society_member_groups_tabs_open() {
         // Memberships, Hubs (the BP groups list), Activity. Visitors on
         // someone else's profile default to Hubs — the My Projects PM
         // dashboard and Memberships are own-profile surfaces.
-        $gs_default_panel = ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile() ) ? 'projects' : 'groups';
+        // The Hubs tab was removed (2026-10-16): My Projects is the default for everyone. The Hubs panel below stays
+        // in the markup (hidden) because the page's BuddyPress groups loop renders into it.
+        $gs_default_panel = 'projects';
         ?>
         <div class="gs-member-groups-tabs" role="tablist">
             <button type="button"
@@ -3037,14 +3039,6 @@ function gend_society_member_groups_tabs_open() {
                 <span class="gs-tab-label"><?php esc_html_e( 'Memberships', 'gend-society' ); ?></span>
             </button>
             <?php endif; ?>
-            <button type="button"
-                    class="gs-member-groups-tab<?php echo 'groups' === $gs_default_panel ? ' is-active' : ''; ?>"
-                    data-gs-panel="groups"
-                    role="tab"
-                    aria-selected="<?php echo 'groups' === $gs_default_panel ? 'true' : 'false'; ?>">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('groups') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'Hubs', 'gend-society' ); ?></span>
-            </button>
             <button type="button"
                     class="gs-member-groups-tab"
                     data-gs-panel="activity"
@@ -3079,6 +3073,7 @@ function gend_society_member_groups_tabs_open() {
         // Decline are the standard nonce-protected BP action links. This
         // mini bp_has_groups loop completes before the page's main groups
         // loop starts, so the template globals are handed over clean.
+        ob_start();   // printed at the top of My Projects (the Hubs tab is gone)
         if ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile()
              && function_exists( 'bp_has_groups' )
              && bp_has_groups( array(
@@ -3109,6 +3104,7 @@ function gend_society_member_groups_tabs_open() {
             <?php endwhile; ?>
         </div>
         <?php endif; ?>
+        <?php $GLOBALS['gend_society_hub_invites_html'] = ob_get_clean(); ?>
     <?php
 }
 
@@ -3117,14 +3113,15 @@ function gend_society_member_groups_tabs_close() {
         return;
     }
 
-    // Resolve a group_id so [psoo_pm_group_projects] renders correctly.
-    // Use the displayed user's most recently active group.
+    // Resolve a group_id so [psoo_pm_group_projects] renders correctly: the VIEWING member's most recently active
+    // group (the board shows the viewer's own workspaces — see scope="profile"), else the displayed user's.
     $displayed_user_id = (int) bp_displayed_user_id();
     $group_id          = 0;
+    $gs_board_user     = is_user_logged_in() ? get_current_user_id() : $displayed_user_id;
 
-    if ( $displayed_user_id > 0 && function_exists( 'groups_get_groups' ) ) {
+    if ( $gs_board_user > 0 && function_exists( 'groups_get_groups' ) ) {
         $result = groups_get_groups( [
-            'user_id'             => $displayed_user_id,
+            'user_id'             => $gs_board_user,
             'per_page'            => 1,
             'orderby'             => 'last_activity',
             'order'               => 'DESC',
@@ -3138,12 +3135,13 @@ function gend_society_member_groups_tabs_close() {
     ?>
         </div><!-- /panel:groups -->
 
-        <div class="gs-member-groups-panel<?php echo ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile() ) ? ' is-active' : ''; ?>" data-gs-panel="projects" role="tabpanel">
+        <div class="gs-member-groups-panel is-active" data-gs-panel="projects" role="tabpanel">
             <?php
+            echo isset( $GLOBALS['gend_society_hub_invites_html'] ) ? $GLOBALS['gend_society_hub_invites_html'] : ''; // phpcs:ignore -- pending hub invitations (own profile)
             if ( $group_id && shortcode_exists( 'psoo_pm_group_projects' ) ) {
-                // Render the full native PM dashboard (All Projects / My Tasks / Calendar / Reports / Settings)
-                // for the member's most recently active group.
-                echo do_shortcode( '[psoo_pm_group_projects group_id="' . $group_id . '"]' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
+                // The native PM board in profile scope: the viewer's workspaces across their groups with a group
+                // filter, no Calendar tab (projects plugin, shortcode-group-projects.php).
+                echo do_shortcode( '[psoo_pm_group_projects group_id="' . $group_id . '" scope="profile"]' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped
             } elseif ( shortcode_exists( 'psoo_pm_group_projects' ) ) {
                 echo '<p class="psoo-pm-empty">' . esc_html__( 'Join a group to view your Projects dashboard here.', 'gend-society' ) . '</p>';
             } else {
