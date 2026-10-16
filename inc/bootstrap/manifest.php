@@ -509,6 +509,11 @@ return array(
 			'needs' => array( 'bp' ),
 		),
 		array(
+			'file'  => 'inc/profile-portfolio-mosaic.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+		),
+		array(
 			'file'  => 'inc/profile-resume.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),

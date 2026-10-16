@@ -1,0 +1,131 @@
+/* Member Resume — editor + visitor view (gend-society inc/profile-resume.php). Obsidian / magenta palette. */
+.gdc-resume-wrap { padding: 8px clamp(16px, 3vw, 40px) 24px; box-sizing: border-box; }
+.gdc-resume { color: #cbd5e1; font-family: "Inter", sans-serif; padding-top: 6px; }
+.gdc-resume [hidden] { display: none !important; }
+.gdc-resume-bar { display: flex; align-items: flex-start; justify-content: space-between; gap: 16px; flex-wrap: wrap; margin-bottom: 6px; }
+.gdc-resume-bar__actions { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gdc-resume-title { color: #fff; font-size: 1.25rem; font-weight: 900; margin: 0; letter-spacing: .5px; }
+.gdc-resume-sub { color: #64748b; font-size: .85rem; margin: 4px 0 0; }
+.gdc-resume-mode { display: inline-flex; padding: 4px; border-radius: 100px; background: rgba(11, 14, 20, .7); border: 1px solid rgba(255, 255, 255, .12); }
+.gdc-resume-mode button { all: unset; cursor: pointer; padding: 8px 16px; border-radius: 100px; font-size: .74rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; color: #94a3b8 !important; }
+.gdc-resume-mode button.is-active { background: rgba(182, 8, 201, .22); color: #fff !important; box-shadow: inset 0 0 0 1px rgba(182, 8, 201, .55); }
+.gdc-resume-save { background: #b608c9; border: 0; color: #fff; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; font-size: .78rem; padding: 12px 24px; border-radius: 100px; cursor: pointer; transition: transform .18s, box-shadow .18s, opacity .18s; }
+.gdc-resume-save:hover { transform: translateY(-2px); box-shadow: 0 10px 24px rgba(182, 8, 201, .35); }
+.gdc-resume-save[disabled] { opacity: .55; cursor: default; transform: none; box-shadow: none; }
+.gdc-resume-status { min-height: 18px; font-size: .82rem; margin: 8px 0 18px; color: #89C2E0; }
+.gdc-resume-status.is-error { color: #f87171; }
+.gdc-resume-preview__note { color: #94a3b8; font-size: .82rem; margin: 0 0 14px; }
+.gdc-resume-hint { color: #64748b; font-size: .82rem; margin: 10px 0 0; }
+
+.gdc-resume-field { margin-bottom: 18px; }
+.gdc-resume-field > label, .gdc-resume-company > label { display: block; color: #94a3b8; font-size: .72rem; font-weight: 700; letter-spacing: 1.4px; text-transform: uppercase; margin-bottom: 7px; }
+.gdc-resume-field--row { margin-bottom: 12px; }
+.gdc-resume input[type="text"], .gdc-resume input[type="url"], .gdc-resume textarea {
+    width: 100%; box-sizing: border-box; background: rgba(11, 14, 20, .7); border: 1px solid rgba(255, 255, 255, .12);
+    border-radius: 10px; padding: 11px 14px; color: #f8fafc; font-size: .92rem; font-family: inherit;
+}
+.gdc-resume input:focus, .gdc-resume textarea:focus { outline: none; border-color: rgba(182, 8, 201, .55); }
+.gdc-resume textarea { resize: vertical; }
+
+.gdc-resume-builder { margin: 26px 0; border-top: 1px solid rgba(255, 255, 255, .07); padding-top: 18px; }
+.gdc-resume-builder-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 12px; }
+.gdc-resume-builder-head h3 { color: #fff; font-size: 1rem; font-weight: 800; margin: 0; letter-spacing: .5px; }
+.gdc-resume-add { background: rgba(182, 8, 201, .12); border: 1px solid rgba(182, 8, 201, .4); color: #d56ee0; font-weight: 700; font-size: .78rem; padding: 7px 16px; border-radius: 8px; cursor: pointer; }
+.gdc-resume-add:hover { background: rgba(182, 8, 201, .22); color: #fff; }
+
+.gdc-resume-rows { display: flex; flex-direction: column; gap: 14px; }
+.gdc-resume-row { position: relative; background: rgba(11, 14, 20, .45); border: 1px solid rgba(255, 255, 255, .08); border-radius: 16px; padding: 18px 48px 16px 18px; }
+.gdc-resume-row-grid { display: grid; grid-template-columns: repeat(2, 1fr); gap: 12px; }
+.gdc-resume-row-grid--3 { grid-template-columns: 1.2fr 1.2fr .6fr; }
+.gdc-resume-row--inline { display: flex; gap: 10px; align-items: center; padding: 12px 48px 12px 14px; }
+.gdc-resume-row--inline input { flex: 1 1 auto; }
+.gdc-resume-row--edu { display: grid; grid-template-columns: auto 1fr; gap: 14px; align-items: center; }
+.gdc-resume-remove { position: absolute; top: 12px; right: 12px; width: 28px; height: 28px; line-height: 1; background: transparent; border: 1px solid rgba(255, 255, 255, .14); color: #94a3b8; border-radius: 8px; cursor: pointer; font-size: 1rem; }
+.gdc-resume-remove:hover { color: #fff; border-color: #f87171; background: rgba(248, 113, 113, .12); }
+
+/* Company picker */
+.gdc-resume-company { margin-bottom: 14px; }
+.gdc-resume-company__search { position: relative; }
+.gdc-resume-company__results { position: absolute; z-index: 20; left: 0; right: 0; top: calc(100% + 6px); margin: 0; padding: 6px; list-style: none; max-height: 300px; overflow-y: auto; border-radius: 14px; border: 1px solid rgba(255, 255, 255, .12); background: #0f1420; box-shadow: 0 18px 40px rgba(0, 0, 0, .5); }
+.gdc-resume-company__results button { all: unset; box-sizing: border-box; display: flex; align-items: center; gap: 12px; width: 100%; padding: 8px 10px; border-radius: 10px; cursor: pointer; color: #f8fafc !important; }
+.gdc-resume-company__results button:hover, .gdc-resume-company__results button:focus { background: rgba(182, 8, 201, .16); }
+.gdc-resume-company__results small { display: block; color: #94a3b8; font-size: .72rem; }
+.gdc-resume-company__chosen { display: flex; align-items: center; gap: 14px; padding: 10px 14px; border-radius: 14px; border: 1px solid rgba(182, 8, 201, .45); background: rgba(182, 8, 201, .08); }
+.gdc-resume-company__img { flex: 0 0 44px; width: 44px; height: 44px; border-radius: 12px; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; color: #fff; background: linear-gradient(135deg, #b608c9, #0e7490) center / cover no-repeat; }
+.gdc-resume-company__img.is-new { background: rgba(255, 255, 255, .08); color: #d56ee0; font-size: 1.3rem; }
+.gdc-resume-company__name { color: #fff; font-weight: 800; font-size: 1rem; }
+.gdc-resume-company__tag { color: #67e8f9; font-size: .7rem; letter-spacing: 1px; text-transform: uppercase; }
+.gdc-resume-company__change { all: unset; margin-left: auto; cursor: pointer; color: #d56ee0 !important; font-weight: 700; font-size: .8rem; }
+.gdc-resume-company [data-company-logo] { margin-top: 10px; }
+
+/* Logo field */
+.gdc-resume-logo { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.gdc-resume-logo__img { width: 56px; height: 56px; border-radius: 14px; border: 1px dashed rgba(255, 255, 255, .22); background: rgba(255, 255, 255, .04) center / cover no-repeat; }
+.gdc-resume-logo__btn { cursor: pointer; color: #89C2E0; font-size: .8rem; font-weight: 700; padding: 7px 14px; border-radius: 8px; border: 1px solid rgba(137, 194, 224, .35); }
+.gdc-resume-logo__btn:hover { color: #fff; border-color: #b608c9; }
+.gdc-resume-logo__clear { all: unset; cursor: pointer; color: #94a3b8 !important; font-size: .78rem; }
+
+/* ═══ Visitor view — the published resume ═══════════════════════════════════ */
+.gdc-cv { --cv-accent: #b608c9; --cv-accent2: #00d2ff; color: #cbd5e1; font-family: "Inter", sans-serif; max-width: 1040px; margin: 0 auto; }
+.gdc-cv--empty p { color: #94a3b8; text-align: center; padding: 30px 0; }
+.gdc-cv-hero { position: relative; overflow: hidden; display: flex; align-items: center; gap: 28px; flex-wrap: wrap; padding: 34px clamp(20px, 4vw, 44px); border-radius: 26px; border: 1px solid rgba(255, 255, 255, .1); background: linear-gradient(135deg, rgba(182, 8, 201, .22), rgba(0, 210, 255, .08) 60%, rgba(11, 14, 20, .9)); }
+.gdc-cv-hero__glow { position: absolute; inset: -40% -10% auto auto; width: 420px; height: 420px; border-radius: 50%; background: radial-gradient(circle, rgba(0, 210, 255, .28), transparent 65%); pointer-events: none; }
+.gdc-cv-hero__avatar { position: relative; width: 120px; height: 120px; border-radius: 50%; object-fit: cover; border: 3px solid rgba(255, 255, 255, .85); box-shadow: 0 0 0 6px rgba(182, 8, 201, .35), 0 20px 40px rgba(0, 0, 0, .45); }
+.gdc-cv-hero__text { position: relative; flex: 1 1 320px; min-width: 0; }
+.gdc-cv-hero__name { margin: 0; color: #fff; font-size: clamp(1.8rem, 3.4vw, 2.6rem); font-weight: 900; letter-spacing: -.02em; line-height: 1.05; }
+.gdc-cv-hero__headline { margin: 10px 0 0; font-size: 1.05rem; font-weight: 700; letter-spacing: .5px; background: linear-gradient(90deg, #f0abfc, #67e8f9); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.gdc-cv-hero__links { display: flex; flex-wrap: wrap; gap: 8px; margin-top: 16px; }
+.gdc-cv-hero__links a { color: #e2e8f0; text-decoration: none; font-size: .8rem; font-weight: 600; padding: 7px 14px; border-radius: 100px; background: rgba(255, 255, 255, .08); border: 1px solid rgba(255, 255, 255, .14); }
+.gdc-cv-hero__links a:hover { background: rgba(182, 8, 201, .25); border-color: var(--cv-accent); color: #fff; }
+
+.gdc-cv-section { margin: 30px 0 0; padding: 26px clamp(18px, 3vw, 32px); border-radius: 22px; border: 1px solid rgba(255, 255, 255, .08); background: linear-gradient(160deg, rgba(255, 255, 255, .045), rgba(255, 255, 255, .012)); }
+.gdc-cv-section > h3 { display: flex; align-items: center; gap: 12px; margin: 0 0 20px; color: #fff; font-size: .78rem; font-weight: 900; letter-spacing: 3px; text-transform: uppercase; }
+.gdc-cv-section > h3::after { content: ""; flex: 1 1 auto; height: 1px; background: linear-gradient(90deg, rgba(182, 8, 201, .6), transparent); }
+.gdc-cv-summary p { margin: 0; font-size: 1.02rem; line-height: 1.75; color: #e2e8f0; }
+
+.gdc-cv-apps { display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr)); gap: 14px; }
+.gdc-cv-app { display: flex; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 18px; border: 1px solid rgba(0, 210, 255, .22); background: rgba(0, 210, 255, .06); }
+.gdc-cv-app img { width: 52px; height: 52px; border-radius: 14px; object-fit: cover; flex: 0 0 52px; }
+.gdc-cv-app__meta { flex: 1 1 auto; min-width: 0; }
+.gdc-cv-app__meta strong { display: block; color: #fff; font-size: .98rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gdc-cv-app__meta small { display: block; color: #67e8f9; font-size: .76rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gdc-cv-btn { flex: 0 0 auto; color: #fff !important; text-decoration: none !important; font-size: .74rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 9px 14px; border-radius: 100px; background: linear-gradient(135deg, #e11fd7, #b608c9 55%, #6d28d9); box-shadow: 0 10px 22px -10px rgba(182, 8, 201, .8); }
+.gdc-cv-btn:hover { filter: brightness(1.1); }
+
+.gdc-cv-timeline { list-style: none; margin: 0; padding: 0 0 0 4px; position: relative; }
+.gdc-cv-timeline::before { content: ""; position: absolute; left: 31px; top: 10px; bottom: 10px; width: 2px; background: linear-gradient(180deg, var(--cv-accent), rgba(0, 210, 255, .5), transparent); }
+.gdc-cv-job { position: relative; display: flex; gap: 20px; padding: 0 0 26px; }
+.gdc-cv-job:last-child { padding-bottom: 0; }
+.gdc-cv-job__logo { position: relative; z-index: 1; flex: 0 0 56px; width: 56px; height: 56px; border-radius: 16px; overflow: hidden; display: inline-flex; align-items: center; justify-content: center; font-weight: 900; font-size: 1.3rem; color: #fff; background: linear-gradient(135deg, #b608c9, #0e7490); box-shadow: 0 0 0 4px #0b0e14, 0 10px 24px rgba(0, 0, 0, .4); }
+.gdc-cv-job__logo img { width: 100%; height: 100%; object-fit: cover; }
+.gdc-cv-job__body { flex: 1 1 auto; min-width: 0; padding: 4px 0 0; }
+.gdc-cv-job__head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; }
+.gdc-cv-job__head h4, .gdc-cv-school h4 { margin: 0; color: #fff; font-size: 1.08rem; font-weight: 800; }
+.gdc-cv-job__company { display: block; color: #f0abfc; font-weight: 700; font-size: .9rem; margin-top: 3px; }
+.gdc-cv-dates { color: #67e8f9; font-size: .74rem; font-weight: 800; letter-spacing: 1px; text-transform: uppercase; padding: 5px 12px; border-radius: 100px; background: rgba(0, 210, 255, .08); border: 1px solid rgba(0, 210, 255, .22); white-space: nowrap; }
+.gdc-cv-job__about { margin: 10px 0 0; color: #94a3b8; font-size: .9rem; line-height: 1.6; font-style: italic; }
+.gdc-cv-job__notes { margin: 10px 0 0; color: #cbd5e1; font-size: .92rem; line-height: 1.65; }
+.gdc-cv-job__points { margin: 10px 0 0; padding: 0; list-style: none; }
+.gdc-cv-job__points li { position: relative; padding-left: 20px; margin: 6px 0; color: #cbd5e1; font-size: .92rem; line-height: 1.55; }
+.gdc-cv-job__points li::before { content: ""; position: absolute; left: 2px; top: .6em; width: 8px; height: 8px; border-radius: 2px; transform: rotate(45deg); background: linear-gradient(135deg, #e11fd7, #00d2ff); }
+
+.gdc-cv-edu { display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr)); gap: 14px; }
+.gdc-cv-school { display: flex; align-items: center; gap: 16px; padding: 16px; border-radius: 18px; border: 1px solid rgba(255, 255, 255, .08); background: rgba(11, 14, 20, .45); }
+.gdc-cv-school .gdc-cv-dates { display: inline-block; margin-top: 8px; }
+.gdc-cv-chips { display: flex; flex-wrap: wrap; gap: 10px; }
+.gdc-cv-chips span { display: inline-flex; align-items: center; gap: 8px; color: #e2e8f0; font-size: .86rem; font-weight: 700; padding: 9px 16px; border-radius: 12px; border: 1px solid rgba(182, 8, 201, .35); background: linear-gradient(135deg, rgba(182, 8, 201, .16), rgba(0, 210, 255, .06)); }
+.gdc-cv-chips span::before { content: "\2713"; color: #34d399; font-weight: 900; }
+
+@media (max-width: 680px) {
+    .gdc-resume-row-grid, .gdc-resume-row-grid--3 { grid-template-columns: 1fr; }
+    .gdc-resume-row--edu { grid-template-columns: 1fr; }
+    .gdc-cv-hero { flex-direction: column; text-align: center; }
+    .gdc-cv-hero__links { justify-content: center; }
+    .gdc-cv-timeline::before { left: 27px; }
+    .gdc-cv-job__logo { flex-basis: 48px; width: 48px; height: 48px; }
+}
+
+/* The theme styles every h2/p (display font, tight line-height) — pin the hero text so name and headline never overlap. */
+.gdc-cv .gdc-cv-hero__name { display: block !important; margin: 0 !important; padding: 0 !important; height: auto !important; font-family: "Inter", sans-serif !important; font-size: clamp(1.8rem, 3.4vw, 2.6rem) !important; font-weight: 900 !important; line-height: 1.15 !important; letter-spacing: -.02em !important; text-transform: none !important; color: #fff !important; }
+.gdc-cv .gdc-cv-hero__headline { display: block !important; margin: 10px 0 0 !important; padding: 0 !important; font-family: "Inter", sans-serif !important; font-size: 1.05rem !important; line-height: 1.45 !important; }
+.gdc-cv .gdc-cv-section > h3, .gdc-cv h4 { font-family: "Inter", sans-serif !important; line-height: 1.3 !important; }
