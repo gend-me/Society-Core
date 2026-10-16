@@ -14,12 +14,18 @@
  */
 if ( ! defined( 'ABSPATH' ) ) exit;
 
-/** [bp component => ['frames' => folder url of f001.webp…, 'count' => frames, 'host' => CSS selector of the tab's content wrapper]] */
+/**
+ * [bp component => ['frames' => folder url of f001.webp…, 'count' => frames, 'host' => CSS selector of the tab's content
+ * wrapper, 'anchor' => 'right bottom' (default) | 'center top' | 'center center' — the scene corner pinned to the
+ * viewport, 'start' => fraction of the clip the scrub starts at (default 0.12)]]
+ */
 function gend_society_profile_backdrops() {
     $base = content_url( 'uploads/gend-society-backdrops/' );
     return (array) apply_filters( 'gend_society_profile_backdrops', array(
         'invest' => array( 'frames' => $base . 'contracts-vines/', 'count' => 120, 'host' => '.gend-invest-screen' ),
         'groups' => array( 'frames' => $base . 'projects-backdrop/', 'count' => 120, 'host' => '.gs-member-groups-wrap' ),
+        // Wallet: the drop falls from the top and fills the tank, so the scene is pinned top-centre.
+        'member-wallet' => array( 'frames' => $base . 'wallet-flow/', 'count' => 120, 'host' => '#gend-wallet', 'anchor' => 'center top', 'start' => 0.02 ),
     ) );
 }
 
@@ -37,5 +43,11 @@ add_action( 'wp_enqueue_scripts', function () {
     $js  = GEND_SOCIETY_DIR . 'assets/profile-video-backdrop.js';
     wp_enqueue_style( 'gend-society-video-backdrop', GEND_SOCIETY_URL . 'assets/profile-video-backdrop.css', array(), GEND_SOCIETY_VERSION . '.' . @filemtime( $css ) );
     wp_enqueue_script( 'gend-society-video-backdrop', GEND_SOCIETY_URL . 'assets/profile-video-backdrop.js', array(), GEND_SOCIETY_VERSION . '.' . @filemtime( $js ), true );
-    wp_localize_script( 'gend-society-video-backdrop', 'GS_VIDEO_BACKDROP', array( 'frames' => esc_url_raw( $b['frames'] ), 'count' => (int) $b['count'], 'host' => (string) $b['host'] ) );
+    wp_localize_script( 'gend-society-video-backdrop', 'GS_VIDEO_BACKDROP', array(
+        'frames' => esc_url_raw( $b['frames'] ),
+        'count'  => (int) $b['count'],
+        'host'   => (string) $b['host'],
+        'anchor' => isset( $b['anchor'] ) ? (string) $b['anchor'] : 'right bottom',
+        'start'  => isset( $b['start'] ) ? (float) $b['start'] : 0.12,
+    ) );
 }, 30 );

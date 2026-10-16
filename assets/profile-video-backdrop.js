@@ -32,7 +32,14 @@
         var ctx = canvas.getContext('2d');
 
         var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-        var floor = Math.round(count * 0.12);   // the first ~1s is near-black: start where the seed is visible
+        var startAt = CFG.start != null && !isNaN(parseFloat(CFG.start)) ? parseFloat(CFG.start) : 0.12;
+        var floor = Math.round(count * startAt);   // default: the first ~1s is near-black, start where the seed is visible
+        // which point of the scene stays pinned to the viewport: x/y as 0..1 (right bottom = 1,1; center top = .5,0)
+        var AX = { left: 0, center: 0.5, right: 1 }, AY = { top: 0, center: 0.5, bottom: 1 };
+        var anc = String(CFG.anchor || 'right bottom').split(/\s+/);
+        var ax = AX[anc[0]] != null ? AX[anc[0]] : 1, ay = AY[anc[1] || anc[0]] != null ? AY[anc[1] || anc[0]] : 1;
+        clip.style.setProperty('--gs-vbg-ax', (ax * 100) + '%');
+        clip.style.setProperty('--gs-vbg-ay', (ay * 100) + '%');
         var last = count - 1;
 
         // ---- frames: load coarse-to-fine (every 16th, then 8th, 4th, 2nd, all) so scrubbing works almost at once
@@ -76,7 +83,7 @@
             if (!iw || !ih) return;
             var s = Math.max(cw / iw, ch / ih), dw = iw * s, dh = ih * s;
             ctx.globalAlpha = alpha;
-            ctx.drawImage(im, cw - dw, ch - dh, dw, dh);
+            ctx.drawImage(im, (cw - dw) * ax, (ch - dh) * ay, dw, dh);
         }
         var drawn = -1, dirty = true;
         function draw(pos) {
