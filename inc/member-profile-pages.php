@@ -342,11 +342,8 @@ function gend_society_inject_profile_page_embed() {
             <button type="button" class="gs-overview-tab is-active" data-gs-ov-tab="cover" role="tab" aria-selected="true"><?php esc_html_e( 'Cover', 'gend-society' ); ?></button>
             <button type="button" class="gs-overview-tab" data-gs-ov-tab="resume" role="tab" aria-selected="false"><?php esc_html_e( 'Resume', 'gend-society' ); ?></button>
             <button type="button" class="gs-overview-tab" data-gs-ov-tab="social" role="tab" aria-selected="false"><?php esc_html_e( 'Social', 'gend-society' ); ?></button>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="posts" role="tab" aria-selected="false"><?php esc_html_e( 'Posts', 'gend-society' ); ?></button>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="media" role="tab" aria-selected="false"><?php esc_html_e( 'Media', 'gend-society' ); ?></button>
-            <?php if ( $has_playlists ) : ?>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="playlists" role="tab" aria-selected="false"><?php esc_html_e( 'Playlists', 'gend-society' ); ?></button>
-            <?php endif; ?>
+            <?php // Media → Portfolio (2026-10-16); Posts and Playlists are now Portfolio filters (inc/profile-portfolio-mosaic.php). ?>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="media" role="tab" aria-selected="false"><?php esc_html_e( 'Portfolio', 'gend-society' ); ?></button>
         </div>
 
         <div class="gs-overview-panel is-active" data-gs-ov-panel="cover" role="tabpanel">
@@ -361,19 +358,15 @@ function gend_society_inject_profile_page_embed() {
             <?php if ( function_exists( 'gend_society_portfolio_render_schedule' ) ) gend_society_portfolio_render_schedule( $is_own_profile ); ?>
         </div>
 
-        <div class="gs-overview-panel" data-gs-ov-panel="posts" role="tabpanel">
-            <?php if ( function_exists( 'gend_society_portfolio_render_posts' ) ) gend_society_portfolio_render_posts(); ?>
-        </div>
-
         <div class="gs-overview-panel" data-gs-ov-panel="media" role="tabpanel">
-            <iframe class="gs-overview-media-frame" src="<?php echo esc_url( $media_url ); ?>" title="<?php esc_attr_e( 'Media', 'gend-society' ); ?>" loading="lazy"></iframe>
+            <?php
+            if ( function_exists( 'gend_society_render_portfolio_panel' ) ) {
+                gend_society_render_portfolio_panel( $viewed_user_id, $is_own_profile );
+            } else {
+                echo '<iframe class="gs-overview-media-frame" src="' . esc_url( $media_url ) . '" title="' . esc_attr__( 'Media', 'gend-society' ) . '" loading="lazy"></iframe>';
+            }
+            ?>
         </div>
-
-        <?php if ( $has_playlists ) : ?>
-        <div class="gs-overview-panel" data-gs-ov-panel="playlists" role="tabpanel">
-            <?php bm_render_library_section(); ?>
-        </div>
-        <?php endif; ?>
 
     </div>
     <?php
