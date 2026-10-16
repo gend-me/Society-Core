@@ -3169,7 +3169,8 @@ function gend_society_member_groups_tabs_close() {
                     $gs_act_url = bp_core_get_user_domain( $displayed_user_id );
                 }
                 if ( $gs_act_url ) {
-                    $gs_act_url = add_query_arg( 'gdc_tab_only', '1', trailingslashit( $gs_act_url ) . 'activity/' );
+                    // Opens on the Integration Hubs (groups) filter — the first one.
+                    $gs_act_url = add_query_arg( 'gdc_tab_only', '1', trailingslashit( $gs_act_url ) . 'activity/groups/' );
                 }
             }
             if ( $gs_act_url ) :
@@ -3611,6 +3612,46 @@ function gend_society_tab_only_strip_chrome() {
         html body.gdc-tab-only .yzpr-bar-item { background: transparent !important; }
         html body.gdc-tab-only .yzpr-bar-item img { filter: none !important; }
     </style>
+    <?php
+}
+
+// ─── Activity filters: "Groups" → "Integration Hubs", listed first ───────────────
+add_action( 'bp_setup_nav', 'gend_society_activity_hubs_subnav', 1000 );
+function gend_society_activity_hubs_subnav() {
+    if ( ! function_exists( 'buddypress' ) || ! bp_is_active( 'activity' ) || ! bp_is_active( 'groups' ) ) return;
+    $nav = buddypress()->members->nav ?? null;
+    if ( ! $nav || ! method_exists( $nav, 'edit_nav' ) ) return;
+    $slug = function_exists( 'bp_get_groups_slug' ) ? bp_get_groups_slug() : 'groups';
+    $nav->edit_nav( array( 'name' => __( 'Integration Hubs', 'gend-society' ), 'position' => 5 ), $slug, bp_get_activity_slug() );
+}
+
+// Inside the iframed feed, links that stay on this member's activity keep ?gdc_tab_only=1 (so the filters don't load
+// the whole profile again inside the frame); every other link opens in the main window.
+add_action( 'wp_footer', 'gend_society_tab_only_keep_links', 99 );
+function gend_society_tab_only_keep_links() {
+    if ( empty( $_GET['gdc_tab_only'] ) || ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
+    $base = function_exists( 'bp_displayed_user_url' ) ? bp_displayed_user_url() : ( function_exists( 'bp_displayed_user_domain' ) ? bp_displayed_user_domain() : '' );
+    if ( ! $base ) return;
+    $path = wp_parse_url( trailingslashit( $base ) . bp_get_activity_slug() . '/', PHP_URL_PATH );
+    ?>
+    <script id="gdc-tab-only-links">
+    (function () {
+        var keep = <?php echo wp_json_encode( (string) $path ); ?>;
+        document.addEventListener('click', function (e) {
+            var a = e.target && e.target.closest ? e.target.closest('a[href]') : null;
+            if (!a || e.defaultPrevented || a.target === '_blank') return;
+            var href = a.getAttribute('href') || '';
+            if (href.charAt(0) === '#' || /^(javascript|mailto|tel):/i.test(href)) return;
+            var u; try { u = new URL(a.href, location.href); } catch (err) { return; }
+            if (u.origin === location.origin && u.pathname.indexOf(keep) === 0) {
+                if (!u.searchParams.has('gdc_tab_only')) { u.searchParams.set('gdc_tab_only', '1'); a.href = u.toString(); }
+                a.target = '_self';
+            } else {
+                a.target = '_top';
+            }
+        }, true);
+    })();
+    </script>
     <?php
 }
 
