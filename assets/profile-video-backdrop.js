@@ -139,11 +139,14 @@
             return p.length > 3 ? parseFloat(p[3]) : 1;
         }
         function rgbOf(c) { var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return m ? [m[1], m[2], m[3]] : [10, 14, 24]; }
+        var KEEP = '.aas-grow-cta, .aas-grow-cta-link, button, a, [role="button"], .button, .gs-vbg-keep';
         function glassify() {
             var nodes = host.querySelectorAll('*');
             for (var i = 0; i < nodes.length; i++) {
                 var el = nodes[i];
                 if (el.dataset.gsGlass || clip.contains(el)) continue;
+                // keep branded colour: the Invite by email / Share on social cards, buttons and links
+                if (el.closest(KEEP)) continue;
                 var tag = el.tagName;
                 if (tag === 'IMG' || tag === 'VIDEO' || tag === 'SVG' || tag === 'svg' || tag === 'CANVAS' || tag === 'IFRAME' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') continue;
                 var w = el.offsetWidth, h = el.offsetHeight;
