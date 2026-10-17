@@ -279,13 +279,13 @@ if ( ! function_exists( 'gend_society_connect_abort' ) ) {
 
 if ( ! function_exists( 'gend_society_connect_notice_url' ) ) {
 	/**
-	 * The Connect screen URL with a status notice.
+	 * The Connect popup URL (dashboard, popup open) with a status notice.
 	 *
 	 * @param string $status  'success' or 'error'.
 	 * @param string $message Plain-text message.
 	 */
 	function gend_society_connect_notice_url( string $status, string $message ): string {
-		$base = function_exists( 'gend_society_connect_url' ) ? gend_society_connect_url() : admin_url( 'index.php?page=gs-portal-connect' );
+		$base = function_exists( 'gend_society_connect_url' ) ? gend_society_connect_url() : admin_url( 'index.php?gs_connect=1' ) . '#gs-connect';
 		return add_query_arg(
 			array(
 				'gs_connect_status'  => 'success' === $status ? 'success' : 'error',

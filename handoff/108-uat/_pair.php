@@ -91,16 +91,17 @@ function gs108p_connect( $uid ) {
 	return $r;
 }
 
-/** Render the Connect screen as $uid with $get; returns the HTML. */
+/**
+ * Render the Connect UI as $uid with $get; returns the HTML. Since 109-30 (D29) that is the Connect popup on the
+ * dashboard's Integration Hub card (the same 108 Connect / Connected cards, moved), not a page of its own.
+ */
 function gs108p_render( $uid, array $get = array() ) {
 	wp_set_current_user( $uid );
-	$_GET     = wp_slash( array_merge( array( 'page' => 'gs-portal-connect' ), $get ) );
+	$_GET     = wp_slash( array_merge( array( 'gs_connect' => '1' ), $get ) );
 	$_REQUEST = $_GET;
-	ob_start();
 	try {
-		gend_society_portal_connect_render_page();
+		$html = (string) gend_society_portal_connect_modal_html( 'slot' );
 	} finally {
-		$html     = (string) ob_get_clean();
 		$_GET     = array();
 		$_REQUEST = array();
 	}

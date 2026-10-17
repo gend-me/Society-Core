@@ -23,6 +23,14 @@
       "status": 200,
       "file": "catalog.json"
     },
+    "gas": {
+      "status": 200,
+      "file": "gas.json"
+    },
+    "backups-status": {
+      "status": 200,
+      "file": "backups-status.json"
+    },
     "hub/groups": {
       "status": 200,
       "file": "hub-groups.json"

@@ -102,7 +102,7 @@
             groupNav +
             cluster +
             '<div class="visit-site-slot">' +
-                '<a href="/" class="btn-visit-site" target="_blank" rel="noopener">View Site</a>' +
+                '<a href="' + escapeHtml(data.viewSiteUrl || '/') + '" class="btn-visit-site" target="_blank" rel="noopener">View Site</a>' +
             '</div>';
     }
 

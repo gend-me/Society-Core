@@ -36,6 +36,31 @@ add_action( 'wp_ajax_gend_society_compute_gas_devices', function () {
     if ( ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => __( 'You are not authorized to view connected devices.', 'gend-society' ) ), 403 );
     }
+    // Phase 109-29: a standalone install lists its gend.me group's Gas Station devices from GET /install/{id}/gas
+    // (names, kind, online, last seen; no tokens or IPs) - there is no local device registry.
+    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+        $gas  = gend_society_dashboard_standalone_gas();
+        $list = array();
+        foreach ( ( is_array( $gas['payload'] ) && isset( $gas['payload']['devices'] ) && is_array( $gas['payload']['devices'] ) ) ? $gas['payload']['devices'] : array() as $d ) {
+            if ( ! is_array( $d ) ) {
+                continue;
+            }
+            $seen   = isset( $d['last_seen'] ) ? ( is_numeric( $d['last_seen'] ) ? (int) $d['last_seen'] : (int) strtotime( (string) $d['last_seen'] ) ) : 0;
+            $list[] = array(
+                'device_id'       => sanitize_text_field( (string) ( $d['device_id'] ?? '' ) ),
+                'label'           => sanitize_text_field( (string) ( $d['name'] ?? '' ) ),
+                'type'            => sanitize_key( (string) ( $d['kind'] ?? '' ) ),
+                'online'          => ! empty( $d['online'] ),
+                'last_seen'       => $seen > 0 ? $seen : 0,
+                'owner'           => sanitize_key( (string) ( $d['owner'] ?? '' ) ),
+                'ai_integrations' => array(),
+            );
+        }
+        if ( 'not_connected' === $gas['state'] ) {
+            wp_send_json_error( array( 'message' => __( 'Connect to gend.me to see your connected devices.', 'gend-society' ) ), 409 );
+        }
+        wp_send_json_success( array( 'devices' => $list ) );
+    }
     if ( ! function_exists( 'psoo_device_get_records' ) ) {
         wp_send_json_error( array( 'message' => __( 'The connected-device service is unavailable.', 'gend-society' ) ), 503 );
     }
@@ -121,6 +146,221 @@ function gend_society_remote_membership_invalidate() {
 }
 add_action( 'wp_login', 'gend_society_remote_membership_invalidate' );
 add_action( 'gs_remote_membership_invalidate', 'gend_society_remote_membership_invalidate' );
+
+// ────────────────────────────────────────────────────────────────────────
+// Phase 109-29 (D28/D29/D32/D33): standalone data for the EXISTING panels
+// ────────────────────────────────────────────────────────────────────────
+// A standalone install renders this same dashboard; only its data comes from gend.me's install-token routes
+// (GET /install/{id}/gas, /backups-status; contract 109-27) through plan-access.php's cached, ETag-aware
+// fetcher. Nothing is requested before Connect + consent, and hub/container never take these paths.
+
+const GEND_SOCIETY_DASHBOARD_GAS_CACHE_OPTION     = 'gend_society_gas_cache';
+const GEND_SOCIETY_DASHBOARD_BACKUPS_CACHE_OPTION = 'gend_society_backups_status_cache';
+
+if ( ! function_exists( 'gend_society_dashboard_is_standalone' ) ) {
+    /**
+     * True on a plain (standalone) WordPress install.
+     */
+    function gend_society_dashboard_is_standalone(): bool {
+        return function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode();
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_paired' ) ) {
+    /**
+     * Standalone + connected to gend.me (install id, token and hub stored) + consent given.
+     */
+    function gend_society_dashboard_standalone_paired(): bool {
+        if ( ! gend_society_dashboard_is_standalone() ) {
+            return false;
+        }
+        if ( '' === (string) get_option( 'gend_society_install_id', '' ) || '' === (string) get_option( 'gend_society_install_token', '' ) || '' === (string) get_option( 'gend_society_gend_base_url', '' ) ) {
+            return false;
+        }
+        return ! function_exists( 'gend_society_remote_allowed' ) || gend_society_remote_allowed( 'membership' );
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_route' ) ) {
+    /**
+     * One install route for the standalone panels: cached (option, cache_seconds, ETag/304), fetched at most once
+     * per request. state: ok | not_connected | revoked | unreachable; payload: the (possibly stale) answer or null.
+     *
+     * @param string $route  Route after /install/{id}/.
+     * @param string $option Cache option.
+     * @return array{state:string,payload:?array}
+     */
+    function gend_society_dashboard_standalone_route( string $route, string $option ): array {
+        if ( ! gend_society_dashboard_standalone_paired() || ! function_exists( 'gend_society_plan_hub_get' ) ) {
+            return array( 'state' => 'not_connected', 'payload' => null );
+        }
+        if ( ! isset( $GLOBALS['gend_society_dashboard_routes'] ) || ! is_array( $GLOBALS['gend_society_dashboard_routes'] ) ) {
+            $GLOBALS['gend_society_dashboard_routes'] = array();
+        }
+        if ( ! isset( $GLOBALS['gend_society_dashboard_routes'][ $route ] ) ) {
+            $r = gend_society_plan_hub_get( $route, $option );
+            $GLOBALS['gend_society_dashboard_routes'][ $route ] = array(
+                'state'   => (string) $r['state'],
+                'payload' => is_array( $r['payload'] ) ? $r['payload'] : null,
+            );
+        }
+        return $GLOBALS['gend_society_dashboard_routes'][ $route ];
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_gas' ) ) {
+    /**
+     * GET /install/{id}/gas (the gend.me account's compute gas: earned, used, owed, billing, servers, devices).
+     *
+     * @return array{state:string,payload:?array}
+     */
+    function gend_society_dashboard_standalone_gas(): array {
+        return gend_society_dashboard_standalone_route( 'gas', GEND_SOCIETY_DASHBOARD_GAS_CACHE_OPTION );
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_backups' ) ) {
+    /**
+     * GET /install/{id}/backups-status.
+     *
+     * @return array{state:string,payload:?array}
+     */
+    function gend_society_dashboard_standalone_backups(): array {
+        return gend_society_dashboard_standalone_route( 'backups-status', GEND_SOCIETY_DASHBOARD_BACKUPS_CACHE_OPTION );
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_url' ) ) {
+    /**
+     * $url when it is an absolute URL on the paired gend.me hub, else ''.
+     *
+     * @param mixed $url Candidate.
+     */
+    function gend_society_dashboard_standalone_url( $url ): string {
+        $url = is_string( $url ) ? trim( $url ) : '';
+        if ( '' === $url || ! function_exists( 'gend_society_plan_is_hub_url' ) || ! gend_society_plan_is_hub_url( $url ) ) {
+            return '';
+        }
+        return $url;
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_action_url' ) ) {
+    /**
+     * gend.me page for a panel action, opened in a popup / new tab (D14), never in a frame. '' when unavailable.
+     *
+     * @param string $what add_server | pay_gas | choose_backups | membership.
+     */
+    function gend_society_dashboard_standalone_action_url( string $what ): string {
+        if ( ! gend_society_dashboard_standalone_paired() ) {
+            return '';
+        }
+        if ( 'add_server' === $what || 'pay_gas' === $what ) {
+            $gas = gend_society_dashboard_standalone_gas();
+            $p   = is_array( $gas['payload'] ) ? $gas['payload'] : array();
+            if ( 'add_server' === $what ) {
+                return gend_society_dashboard_standalone_url( $p['servers']['add_server_url'] ?? '' );
+            }
+            return gend_society_dashboard_standalone_url( $p['billing']['pending']['pay_url'] ?? '' );
+        }
+        if ( 'choose_backups' === $what ) {
+            $bk = gend_society_dashboard_standalone_backups();
+            return gend_society_dashboard_standalone_url( is_array( $bk['payload'] ) ? ( $bk['payload']['choose_url'] ?? '' ) : '' );
+        }
+        if ( 'membership' === $what ) {
+            $m = get_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_OPTION, null );
+            return gend_society_dashboard_standalone_url( is_array( $m ) ? ( $m['membership_url'] ?? '' ) : '' );
+        }
+        return '';
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
+    /**
+     * What the existing Backups panels show on a standalone install (D33).
+     *
+     * @return array{state:string,hosted:bool,badge:string,text:string,backup_now:bool,choose_url:string,learn_url:string,plan:string}
+     */
+    function gend_society_dashboard_standalone_backups_view(): array {
+        $bk = gend_society_dashboard_standalone_backups();
+        $p  = is_array( $bk['payload'] ) ? $bk['payload'] : array();
+        $v  = array(
+            'state'      => (string) $bk['state'],
+            'hosted'     => ! empty( $p['hosted'] ),
+            'badge'      => __( 'After migration', 'gend-society' ),
+            'text'       => __( 'Backups run on gend.me hosting. Your site keeps its own backups until you move it.', 'gend-society' ),
+            'backup_now' => ! empty( $p['hosted'] ) && ! empty( $p['actions']['backup_now'] ),
+            'choose_url' => '',
+            'learn_url'  => gend_society_dashboard_standalone_action_url( 'membership' ),
+            'plan'       => '',
+        );
+        if ( 'not_connected' === $bk['state'] ) {
+            $v['badge'] = __( 'Not connected', 'gend-society' );
+            $v['text']  = __( 'Connect to gend.me to see backups. Your site keeps its own backups until you move it to gend.me hosting.', 'gend-society' );
+        } elseif ( ! $p ) {
+            $v['badge'] = __( 'Unavailable', 'gend-society' );
+            $v['text']  = 'revoked' === $bk['state']
+                ? __( 'gend.me no longer accepts this site\'s connection. Reconnect to see backups.', 'gend-society' )
+                : __( 'Could not reach gend.me. Backups will show again once it answers.', 'gend-society' );
+        } elseif ( $v['hosted'] ) {
+            $names       = isset( $p['plan']['names'] ) && is_array( $p['plan']['names'] ) ? array_map( 'strval', $p['plan']['names'] ) : array();
+            $v['plan']   = implode( ' + ', $names );
+            $v['badge']  = '' !== $v['plan'] ? sprintf( /* translators: %s: Backup plan name. */ __( 'Active: %s', 'gend-society' ), $v['plan'] ) : __( 'No Active Plan', 'gend-society' );
+            $v['text']   = __( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' );
+            $v['choose_url'] = gend_society_dashboard_standalone_url( $p['choose_url'] ?? '' );
+        }
+        return $v;
+    }
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_invalidate' ) ) {
+    /**
+     * Drop the gas + backups caches (kept as the offline fallback) when the plan caches are invalidated
+     * (Refresh, popup closed / plan changed signal, login).
+     */
+    function gend_society_dashboard_standalone_invalidate(): void {
+        unset( $GLOBALS['gend_society_dashboard_routes'] );
+        if ( function_exists( 'gend_society_plan_cache_expire' ) ) {
+            gend_society_plan_cache_expire( GEND_SOCIETY_DASHBOARD_GAS_CACHE_OPTION, true );
+            gend_society_plan_cache_expire( GEND_SOCIETY_DASHBOARD_BACKUPS_CACHE_OPTION, true );
+        }
+    }
+    add_action( 'gend_society_plan_invalidated', 'gend_society_dashboard_standalone_invalidate' );
+}
+
+if ( ! function_exists( 'gend_society_dashboard_standalone_local_payload' ) ) {
+    /**
+     * The panel payload for a standalone install that has no gend.me membership data (not connected yet, or the
+     * hub has not answered): this site's own title and URL only, so the same dashboard renders with its
+     * "Connect to gend.me" states instead of the Site Administrators fallback. No request, no group.
+     *
+     * @return array
+     */
+    function gend_society_dashboard_standalone_local_payload(): array {
+        return array(
+            'install_id'     => (string) get_option( 'gend_society_install_id', '' ),
+            'membership_id'  => 0,
+            'membership_url' => '',
+            'embed_url'      => '',
+            'hub_url'        => '',
+            'app_url'        => home_url( '/' ),
+            'app_title'      => (string) get_bloginfo( 'name' ),
+            'status'         => '',
+            'status_label'   => '',
+            'billing'        => array( 'amount' => 0, 'currency' => '', 'unit' => '', 'label' => '' ),
+            'dates'          => array( 'created' => '', 'activated' => '', 'expires' => '', 'renews' => '' ),
+            'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array() ),
+            'dashboard_plan' => null,
+            'hosting_plan'   => null,
+            'customer'       => null,
+            'group'          => null,
+            'orders'         => array(),
+            'backups'        => array(),
+            'domains'        => array(),
+            'cache_seconds'  => 0,
+        );
+    }
+}
 
 // ────────────────────────────────────────────────────────────────────────
 // Container-side AJAX proxies → gend.me install-token REST endpoints
@@ -760,6 +1000,17 @@ function gend_society_render_membership_panel( $payload = null ) {
     $backups        = isset( $payload['backups'] ) && is_array( $payload['backups'] ) ? $payload['backups'] : array();
     $domains        = isset( $payload['domains'] ) && is_array( $payload['domains'] ) ? $payload['domains'] : array();
 
+    // Phase 109-29 (D28/D29/D32): standalone renders this same panel from install-token data. On hub/container every
+    // $gs_sa* value is false/'' and each standalone branch below sits behind column-0 control lines, so their output
+    // stays byte-identical.
+    $gs_sa         = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
+    $gs_sa_paired  = $gs_sa && gend_society_dashboard_standalone_paired();
+    $gs_sa_health  = ( $gs_sa_paired && function_exists( 'gend_society_connection_health_get' ) ) ? (string) gend_society_connection_health_get()['status'] : '';
+    $gs_sa_revoked = 'unauthorized' === $gs_sa_health;
+    $gs_sa_change  = ( $gs_sa_paired && ! $gs_sa_revoked && function_exists( 'gend_society_plan_change_plan_url' ) ) ? gend_society_plan_change_plan_url( $payload ) : '';
+    $gs_sa_inherit = ( $gs_sa && 'group' === ( $payload['plan_source'] ?? '' ) && is_array( $payload['inherited_from'] ?? null ) ) ? (string) ( $payload['inherited_from']['group_name'] ?? '' ) : '';
+    $gs_sa_connect = $gs_sa_revoked ? __( 'Reconnect', 'gend-society' ) : ( $gs_sa_paired ? __( 'Manage connection', 'gend-society' ) : __( 'Connect to gend.me', 'gend-society' ) );
+
     ob_start();
     ?>
     <style>
@@ -1128,6 +1379,9 @@ function gend_society_render_membership_panel( $payload = null ) {
                     <div class="gs-mship-status-col">
                         <?php
                             $g_link = ( $group && ! empty( $group['id'] ) && $hub_url !== '' ) ? trailingslashit( $hub_url ) . 'groups/' . sanitize_title( $group['slug'] ?: $group['id'] ) . '/' : '';
+                            if ( $gs_sa && $group && ! empty( $group['id'] ) && function_exists( 'gend_society_dashboard_standalone_url' ) && '' !== gend_society_dashboard_standalone_url( $group['url'] ?? '' ) ) {
+                                $g_link = gend_society_dashboard_standalone_url( $group['url'] );
+                            }
                         ?>
                         <!-- Integration Hub (was "Business Group") — moved here from its own row above. -->
                         <div class="gs-mship-cell gs-mship-cell--group"<?php echo ( $group && ! empty( $group['cover'] ) ) ? ' style="background-image:linear-gradient(180deg, rgba(11,14,20,.35), rgba(11,14,20,.92) 78%), url(' . esc_url( $group['cover'] ) . ');background-size:cover;background-position:center;"' : ''; ?>>
@@ -1149,11 +1403,24 @@ function gend_society_render_membership_panel( $payload = null ) {
                                     <div class="gs-mship-plan-name"><?php echo esc_html( $group['name'] ?? '' ); ?></div>
                                 </a>
                             <?php else : ?>
+<?php if ( $gs_sa ) : ?>
+                                <div class="gs-mship-empty"><?php echo esc_html( $gs_sa_paired ? __( 'No group linked.', 'gend-society' ) : __( 'Not connected to gend.me yet.', 'gend-society' ) ); ?></div>
+<?php else : ?>
                                 <div class="gs-mship-empty"><?php esc_html_e( 'No group linked.', 'gend-society' ); ?></div>
+<?php endif; ?>
                             <?php endif; ?>
+<?php if ( $gs_sa ) : ?>
+                            <button type="button" class="gs-mship-action-btn gs-ih-connect" data-gs-connect-open><?php echo esc_html( $gs_sa_connect ); ?></button>
+<?php do_action( 'gend_society_integration_hub_card_slot' ); ?>
+<?php endif; ?>
                         </div>
                     </div>
                     <div class="gs-mship-plan-col">
+<?php if ( $gs_sa && ! $gs_sa_paired ) : ?>
+                        <div class="gs-mship-empty gs-dash-sa-plan-empty"><?php esc_html_e( 'Connect to gend.me to see your dashboard plan and upgrade it.', 'gend-society' ); ?></div>
+<?php elseif ( $gs_sa_revoked ) : ?>
+                        <div class="gs-mship-empty gs-dash-sa-plan-empty" data-gs-dash-reconnect><?php esc_html_e( 'gend.me no longer accepts this site\'s connection. Reconnect to see and change your plan.', 'gend-society' ); ?> <button type="button" class="gs-mship-action-btn" data-gs-connect-open><?php esc_html_e( 'Reconnect', 'gend-society' ); ?></button></div>
+<?php endif; ?>
                         <?php if ( ! empty( $dates['expires'] ) || ! empty( $dates['renews'] ) ) : ?>
                             <!-- Next Renewal — moved up here from its own full-width row below the grid. -->
                             <div class="gs-mship-renewal" style="max-width: 420px; margin: 10px auto 0; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; background: rgba(255,255,255,0.04); border: 1px solid rgba(255,255,255,0.08);">
@@ -1178,13 +1445,19 @@ function gend_society_render_membership_panel( $payload = null ) {
                                     <?php if ( ! empty( $dash_plan['amount_label'] ) ) : ?>
                                         <div class="gs-mship-plan-price"><?php echo esc_html( $dash_plan['amount_label'] ); ?> <?php echo ! empty( $dash_plan['duration_unit'] ) ? esc_html( sprintf( /* translators: %s: Billing period unit, e.g. month. */ __( 'every %s', 'gend-society' ), $dash_plan['duration_unit'] ) ) : ''; ?></div>
                                     <?php endif; ?>
+<?php if ( $gs_sa && empty( $dash_plan['amount_label'] ) && (float) ( $dash_plan['amount'] ?? 0 ) <= 0 ) : ?>
+                                        <div class="gs-mship-plan-price"><?php esc_html_e( 'Free', 'gend-society' ); ?></div>
+<?php endif; ?>
+<?php if ( '' !== $gs_sa_inherit ) : ?>
+                                        <div class="gs-dash-sa-inherit" data-gs-dash-inherit><?php echo esc_html( sprintf( /* translators: %s: gend.me group name. */ __( 'Included through %s', 'gend-society' ), $gs_sa_inherit ) ); ?></div>
+<?php endif; ?>
                                 </div>
                             </div>
-<?php /* Phase 109: standalone installs choose plans on GenD > Plan & features (popup checkout); control lines at column 0 keep hub/container output byte-identical. */ ?>
-<?php if ( function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() && function_exists( 'gend_society_plan_page_url' ) ) : ?>
-                            <a class="gs-mship-action-btn" href="<?php echo esc_url( gend_society_plan_page_url() ); ?>" style="display: block; width: 100%; max-width: 420px; margin: 12px auto 0; text-align: center;">
-                                <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
-                            </a>
+<?php /* Phase 109-29: standalone UPGRADE opens gend.me's own Change Plan page (membership_url + ?ui=embed&plan_only=1&group=dashboard) in a popup (D14); control lines at column 0 keep hub/container output byte-identical. */ ?>
+<?php if ( $gs_sa ) : ?>
+<?php if ( '' !== $gs_sa_change ) : ?>
+                            <a class="gs-mship-action-btn gs-dash-sa-upgrade" data-gs-popup href="<?php echo esc_url( $gs_sa_change ); ?>" target="_blank" rel="opener"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></a>
+<?php endif; ?>
 <?php else : ?>
                             <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="dashboard" style="display: block; width: 100%; max-width: 420px; margin: 12px auto 0;" aria-expanded="false" aria-controls="gs-plan-picker-membership-top">
                                 <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
@@ -1294,15 +1567,36 @@ function gend_society_render_membership_panel( $payload = null ) {
                     $gs_bcg_next_bill = $gs_gas_pending_payment
                         ? __( 'Ready to pay', 'gend-society' )
                         : ( ! empty( $dates['renews'] ) ? $dates['renews'] : __( 'Not scheduled', 'gend-society' ) );
+                    // Phase 109-29: on standalone every value above comes from GET /install/{id}/gas (the data helpers
+                    // in dashboard-hosting.php branch on the runtime); Next Bill is the gas billing run, not the
+                    // membership renewal.
+                    $gs_sa_gas      = $gs_sa && function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'state' => '', 'payload' => null );
+                    $gs_sa_gas_ok   = $gs_sa && is_array( $gs_sa_gas['payload'] );
+                    $gs_sa_gas_note = $gs_sa && ! $gs_sa_gas_ok && function_exists( 'gend_society_hosting_standalone_gas_data' ) ? (string) gend_society_hosting_standalone_gas_data()['message'] : '';
+                    $gs_sa_add_url  = $gs_sa && function_exists( 'gend_society_dashboard_standalone_action_url' ) ? gend_society_dashboard_standalone_action_url( 'add_server' ) : '';
+                    if ( $gs_sa ) {
+                        $gs_sa_billing    = $gs_sa_gas_ok && isset( $gs_sa_gas['payload']['billing'] ) && is_array( $gs_sa_gas['payload']['billing'] ) ? $gs_sa_gas['payload']['billing'] : array();
+                        $gs_bcg_next_bill = $gs_gas_pending_payment
+                            ? __( 'Ready to pay', 'gend-society' )
+                            : ( ! empty( $gs_sa_billing['next_run'] ) ? (string) $gs_sa_billing['next_run'] : __( 'Not scheduled', 'gend-society' ) );
+                    }
                     ?>
                     <div class="gs-bcg-hero">
                         <span class="gs-bcg-badge"><span class="dashicons dashicons-superhero-alt"></span><?php esc_html_e( 'Live Ledger', 'gend-society' ); ?></span>
                         <div class="gs-bcg-head">
                             <div>
                                 <h2 class="gs-bcg-title"><?php esc_html_e( 'Blockchain Compute Gas', 'gend-society' ); ?></h2>
+<?php if ( $gs_sa ) : ?>
+                                <p class="gs-bcg-sub"><?php echo esc_html( $gs_sa_gas_ok ? __( 'Compute gas of your gend.me account.', 'gend-society' ) : $gs_sa_gas_note ); ?></p>
+<?php else : ?>
                                 <p class="gs-bcg-sub"><?php esc_html_e( 'Compute gas consumed by this install.', 'gend-society' ); ?></p>
+<?php endif; ?>
                             </div>
+<?php if ( $gs_sa && ! $gs_sa_gas_ok ) : ?>
+                            <div class="gs-bcg-actions" hidden>
+<?php else : ?>
                             <div class="gs-bcg-actions">
+<?php endif; ?>
                                 <button type="button" class="gs-bcg-btn" data-gs-gas-open="history"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'History', 'gend-society' ); ?></button>
                                 <button type="button" class="gs-bcg-btn" data-gs-gas-open="devices"><span class="dashicons dashicons-database-view"></span><?php esc_html_e( 'Connected Devices', 'gend-society' ); ?></button>
                                 <?php if ( $gs_server_upgrade_attrs !== '' ) : ?>
@@ -1316,9 +1610,16 @@ function gend_society_render_membership_panel( $payload = null ) {
                                         <?php esc_html_e( 'Add Server', 'gend-society' ); ?>
                                     </button>
                                 <?php endif; ?>
+<?php if ( $gs_sa && '' !== $gs_sa_add_url ) : ?>
+                                <a class="gs-bcg-btn gs-bcg-btn--cta" data-gs-popup href="<?php echo esc_url( $gs_sa_add_url ); ?>" target="_blank" rel="opener"><span class="dashicons dashicons-networking"></span><?php esc_html_e( 'Add Server', 'gend-society' ); ?></a>
+<?php endif; ?>
                             </div>
                         </div>
+<?php if ( $gs_sa && ! $gs_sa_gas_ok ) : ?>
+                        <div class="gs-bcg-stats" hidden>
+<?php else : ?>
                         <div class="gs-bcg-stats">
+<?php endif; ?>
                             <div class="gs-bcg-stat" style="--gs-bcg-accent:#22c55e;">
                                 <span class="dashicons dashicons-awards icon"></span>
                                 <div class="k"><?php esc_html_e( 'Earned', 'gend-society' ); ?></div>
@@ -1333,13 +1634,21 @@ function gend_society_render_membership_panel( $payload = null ) {
                                 <?php endif; ?>
                             </div>
                         </div>
+<?php if ( $gs_sa && ! $gs_sa_gas_ok ) : ?>
+                        <div class="gs-bcg-stats" style="margin-top: 14px;" hidden>
+<?php else : ?>
                         <div class="gs-bcg-stats" style="margin-top: 14px;">
+<?php endif; ?>
                             <div class="gs-bcg-stat" style="--gs-bcg-accent:#f59e0b;">
                                 <span class="dashicons dashicons-money-alt icon"></span>
                                 <div class="k"><?php esc_html_e( 'Owed Balance', 'gend-society' ); ?></div>
                                 <div class="v"><?php echo esc_html( $gs_gas_data['unbilled_gas_label'] ?? '0.000000 GAS' ); ?></div>
                                 <?php if ( $gs_gas_pending_payment ) : ?>
+<?php if ( $gs_sa ) : ?>
+                                    <a href="<?php echo esc_url( $gs_gas_pending_payment['pay_url'] ); ?>" class="gs-bcg-btn gs-bcg-btn--cta" style="margin-top: 10px; padding: 6px 14px; font-size: 0.72rem;" data-gs-popup target="_blank" rel="opener">
+<?php else : ?>
                                     <a href="<?php echo esc_url( $gs_gas_pending_payment['pay_url'] ); ?>" class="gs-bcg-btn gs-bcg-btn--cta" style="margin-top: 10px; padding: 6px 14px; font-size: 0.72rem;">
+<?php endif; ?>
                                         <span class="dashicons dashicons-money-alt"></span>
                                         <?php echo esc_html( sprintf( /* translators: %s: Amount due. */ __( 'Pay %s', 'gend-society' ), $gs_gas_pending_payment['total_label'] ) ); ?>
                                     </a>
@@ -1401,9 +1710,16 @@ function gend_society_render_membership_panel( $payload = null ) {
                     }
                     $gs_bk_has_plan     = ! empty( $gs_backup_current_names );
                     $gs_bk_current_name = implode( ' + ', $gs_backup_current_names );
+                    // Phase 109-29 (D33): standalone reads GET /install/{id}/backups-status. A Connected install
+                    // (hosted false) shows "After migration" and no dead buttons; a hosted record gets Choose a plan
+                    // (popup), Backup now and Manage Backups.
+                    $gs_sa_bk = $gs_sa && function_exists( 'gend_society_dashboard_standalone_backups_view' ) ? gend_society_dashboard_standalone_backups_view() : array();
                     ?>
                     <div class="gs-bk-hero">
                         <div class="gs-bk-main">
+<?php if ( $gs_sa ) : ?>
+                                <span class="gs-bk-badge is-neutral" data-gs-dash-backups-state="<?php echo esc_attr( (string) ( $gs_sa_bk['state'] ?? '' ) ); ?>"><span class="dashicons dashicons-backup"></span><?php echo esc_html( (string) ( $gs_sa_bk['badge'] ?? '' ) ); ?></span>
+<?php else : ?>
                             <?php if ( empty( $gs_backup_plans ) ) : ?>
                                 <span class="gs-bk-badge is-neutral"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Backup Plans Configured', 'gend-society' ); ?></span>
                             <?php elseif ( $gs_bk_has_plan ) : ?>
@@ -1411,8 +1727,13 @@ function gend_society_render_membership_panel( $payload = null ) {
                             <?php else : ?>
                                 <span class="gs-bk-badge is-warn"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Active Plan', 'gend-society' ); ?></span>
                             <?php endif; ?>
+<?php endif; ?>
                             <h2 class="gs-bk-title"><?php esc_html_e( 'Backups', 'gend-society' ); ?></h2>
+<?php if ( $gs_sa ) : ?>
+                            <p class="gs-bk-sub"><?php echo esc_html( (string) ( $gs_sa_bk['text'] ?? '' ) ); ?></p>
+<?php else : ?>
                             <p class="gs-bk-sub"><?php esc_html_e( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' ); ?></p>
+<?php endif; ?>
                         </div>
                         <div class="gs-bk-actions">
                             <?php
@@ -1433,8 +1754,22 @@ function gend_society_render_membership_panel( $payload = null ) {
                                     <?php echo esc_html( $gs_bk_has_plan ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?>
                                 </button>
                             <?php endif; ?>
+<?php if ( $gs_sa ) : ?>
+<?php if ( '' !== (string) ( $gs_sa_bk['choose_url'] ?? '' ) ) : ?>
+                            <a class="gs-bk-btn gs-bk-btn--cta" data-gs-popup href="<?php echo esc_url( $gs_sa_bk['choose_url'] ); ?>" target="_blank" rel="opener"><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( '' !== (string) ( $gs_sa_bk['plan'] ?? '' ) ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?></a>
+<?php endif; ?>
+<?php if ( ! empty( $gs_sa_bk['backup_now'] ) ) : ?>
+                            <button type="button" class="gs-bk-btn" data-gs-mship="backup-now"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
+<?php endif; ?>
+<?php if ( ! empty( $gs_sa_bk['hosted'] ) ) : ?>
+                            <button type="button" class="gs-bk-btn" data-gs-hosting-goto="backups"><span class="dashicons dashicons-list-view"></span><?php esc_html_e( 'Manage Backups', 'gend-society' ); ?></button>
+<?php elseif ( '' !== (string) ( $gs_sa_bk['learn_url'] ?? '' ) ) : ?>
+                            <a class="gs-bk-btn" href="<?php echo esc_url( $gs_sa_bk['learn_url'] ); ?>" target="_blank" rel="noopener"><span class="dashicons dashicons-external"></span><?php esc_html_e( 'Learn more', 'gend-society' ); ?></a>
+<?php endif; ?>
+<?php else : ?>
                             <button type="button" class="gs-bk-btn" data-gs-mship="backup-now"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
                             <button type="button" class="gs-bk-btn" data-gs-hosting-goto="backups"><span class="dashicons dashicons-list-view"></span><?php esc_html_e( 'Manage Backups', 'gend-society' ); ?></button>
+<?php endif; ?>
                         </div>
                     </div>
                 </div>
@@ -1847,12 +2182,16 @@ function gend_society_render_membership_panel( $payload = null ) {
                                 <?php esc_html_e( '2. Open Expo Go and scan the QR code below.', 'gend-society' ); ?><br>
                                 <?php esc_html_e( '3. Sign in with this account and enable Gas Station mode to register your phone.', 'gend-society' ); ?>
                             </p>
+<?php if ( $gs_sa ) : ?>
+                            <div class="gs-dash-sa-qr" data-gs-qr="<?php echo esc_attr( 'https://gend.me/gas-station/mobile/' ); ?>" hidden></div>
+<?php else : ?>
                             <?php // RUN-01: the third-party QR image (api.qrserver.com) only loads once the site is connected; the link below always works. ?>
                             <?php if ( ! function_exists( 'gend_society_remote_allowed' ) || gend_society_remote_allowed( 'qr' ) ) : ?>
                             <div style="display: flex; justify-content: center; padding: 16px 0;">
                                 <img src="<?php echo esc_url( 'https://api.qrserver.com/v1/create-qr-code/?size=220x220&margin=10&data=' . rawurlencode( 'https://gend.me/gas-station/mobile/' ) ); ?>" alt="<?php esc_attr_e( 'Scan to open the GenD mobile app', 'gend-society' ); ?>" width="220" height="220" style="border-radius: 12px; background: #fff; padding: 8px;">
                             </div>
                             <?php endif; ?>
+<?php endif; ?>
                             <p style="text-align: center;">
                                 <a href="https://gend.me/gas-station/mobile/" target="_blank" rel="noopener" style="color: #8ab4f8; font-size: 0.82rem;"><?php esc_html_e( 'Or open gend.me/gas-station/mobile on this device', 'gend-society' ); ?></a>
                             </p>
@@ -1887,7 +2226,11 @@ function gend_society_render_membership_panel( $payload = null ) {
                                     <iframe data-gs-gas-server-frame data-src="<?php echo esc_url( $gs_server_embed_url ); ?>" src="about:blank" title="<?php esc_attr_e( 'Server plan checkout', 'gend-society' ); ?>" loading="lazy" style="width: 100%; height: 560px; border: 0; display: block; background: #0b0e14;"></iframe>
                                 </div>
                             <?php else : ?>
+<?php if ( $gs_sa && '' !== $gs_sa_add_url ) : ?>
+                                <p class="gs-dash-sa-center"><a class="gs-mship-action-btn" data-gs-popup href="<?php echo esc_url( $gs_sa_add_url ); ?>" target="_blank" rel="opener"><?php esc_html_e( 'Choose a server plan on gend.me', 'gend-society' ); ?></a></p>
+<?php else : ?>
                                 <p style="color: var(--gs-muted, #94a3b8); font-style: italic; text-align: center;"><?php esc_html_e( 'Server plans are not available for this account right now.', 'gend-society' ); ?></p>
+<?php endif; ?>
                             <?php endif; ?>
                         </div>
                     </div>
@@ -1902,7 +2245,7 @@ function gend_society_render_membership_panel( $payload = null ) {
         if (!root) return;
         var ajax = <?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>;
         var nonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>;
-        var memberUrl = <?php echo wp_json_encode( $membership_url ); ?>;
+        var memberUrl = <?php echo wp_json_encode( esc_url_raw( $gs_sa ? gend_society_dashboard_standalone_url( $membership_url ) : $membership_url ) ); ?>;
 
         function toast(msg, kind) {
             var el = document.createElement('div');
@@ -2099,6 +2442,10 @@ function gend_society_render_membership_panel( $payload = null ) {
         // return back into this one.)
         <?php
         global $wpdb;
+        // Phase 109-29: no local gdc_gas_ledger on a standalone install (this query only logged a DB error there).
+        if ( $gs_sa ) {
+            $gs_mship_gas_earnings = array();
+        } else {
         $gs_mship_gas_ledger   = $wpdb->base_prefix . 'gdc_gas_ledger';
         $gs_mship_gas_earnings = $wpdb->get_results(
             $wpdb->prepare(
@@ -2108,6 +2455,7 @@ function gend_society_render_membership_panel( $payload = null ) {
             ),
             ARRAY_A
         );
+        }
         ?>
         var cgAdminTab = root.querySelector('[data-panel="compute-gas"]');
         var cgAdminDevices = cgAdminTab && cgAdminTab.querySelector('[data-gs-cg-admin-devices]');

@@ -9,6 +9,9 @@
  *     protocol-relative, credentials, another port) or membership_id is 0 / missing
  *   - no token in change_plan_url, in any href or in the rendered HTML; no change-plan POST from the plugin
  *   - the old admin-post URL no longer redirects anywhere (real loopback request)
+ *   (109-30b) the dashboard's inline memberUrl is the hub-checked membership_url ("" when off the paired hub)
+ *   (109-30) the button checks run on the dashboard membership card's UPGRADE (a.gs-dash-sa-upgrade[data-gs-popup]);
+ *   the Plan & features page they used to read is gone
  *
  * @package gend-society
  */
@@ -19,6 +22,24 @@ require_once __DIR__ . '/_plan.php';
 if ( 'standalone' !== gs109_mode() ) {
 	gs109_assert( ! has_action( 'admin_post_gend_society_plan_checkout' ) && ! function_exists( 'gend_society_plan_change_plan_url' ), 'popup-absent', 'no plan launcher and no Change Plan URL builder on ' . gs109_mode() );
 	return;
+}
+
+if ( ! function_exists( 'gs109pu_dash' ) ) {
+	/** The standalone GenD dashboard rendered in-process as $uid (screen 'dashboard'). */
+	function gs109pu_dash( $uid ) {
+		if ( ! function_exists( 'gend_society_render_custom_dashboard_screen' ) ) {
+			return '';
+		}
+		if ( ! function_exists( 'set_current_screen' ) ) {
+			require_once ABSPATH . 'wp-admin/includes/class-wp-screen.php';
+			require_once ABSPATH . 'wp-admin/includes/screen.php';
+		}
+		wp_set_current_user( $uid );
+		set_current_screen( 'dashboard' );
+		ob_start();
+		gend_society_render_custom_dashboard_screen();
+		return (string) ob_get_clean();
+	}
 }
 
 $fx = gs109pl_start( 'connected' );
@@ -86,31 +107,45 @@ $m['membership_url'] = array( 'x' );
 $za                 = gend_society_plan_change_plan_url( $m );
 gs109_assert( '' === $z0 && '' === $zm && '' === $za, 'popup-bad-id', 'membership_id 0 / missing or a non-string membership_url -> no URL' );
 
-// Through the view-model and the card: no button at all.
+// Through the view-model and the dashboard membership card (109-30: the Plan & features page is gone): no UPGRADE.
 foreach ( array( 'evil' => 'https://evil.example/my-account/membership/9101/', 'bed' => $bed, 'js' => 'javascript:alert(1)' ) as $k => $u ) {
 	$m                   = $mem;
 	$m['membership_url'] = $u;
 	unset( $m['rev'] );
 	$off  = gs109p_inject( 'membership', 200, $m );
 	$v    = gs109pl_vm( 'connected' );
+	$html = gs109pu_dash( $admin );
 	$off();
-	$html = implode( '', gend_society_plan_fragments( $v ) );
 	$xp   = gs109pl_xp( $html );
-	gs109_assert( '' === $v['change_plan_url'] && array() === gs109pl_popup( $xp ) && 0 === gs109pl_count( $xp, '//p[@data-gs-plan-field="owner"]' ) && false === stripos( $html, 'evil.example' ) && false === stripos( $html, 'javascript:' ), 'popup-off-hub-card-' . $k, 'membership_url ' . $k . ': no Change Plan button, no owner line, URL not printed' );
+	$pops = gs109pl_attrs( $xp, '//a[@data-gs-popup]', 'href' );
+	gs109_assert( '' === $v['change_plan_url'] && 0 === gs109pl_count( $xp, '//a[contains(@class,"gs-dash-sa-upgrade")]' ) && false === stripos( implode( ' ', $pops ), 'evil.example' ) && false === stripos( implode( ' ', $pops ), 'javascript:' ) && false === stripos( implode( ' ', array_merge( gs109pl_attrs( $xp, '//*[@href]', 'href' ), gs109pl_attrs( $xp, '//*[@src]', 'src' ) ) ), 'evil.example' ), 'popup-off-hub-card-' . $k, 'membership_url ' . $k . ': no UPGRADE on the dashboard membership card, the URL is in no link / src' );
+	// 109-30b: the inline script's memberUrl goes through the hub-host check too (it echoed the raw membership_url).
+	$mu_js = preg_match( '/var memberUrl = (.*?);
+/', $html, $mm ) ? $mm[1] : null;
+	gs109_assert( '""' === $mu_js && false === stripos( $html, 'evil.example' ) && false === stripos( $html, 'javascript:alert' ), 'popup-off-hub-memberurl-' . $k, 'membership_url ' . $k . ': inline memberUrl is "" and the URL is nowhere in the page', $mu_js );
 }
+$m = $mem;
+unset( $m['rev'] );
+$off   = gs109p_inject( 'membership', 200, $m );
+gs109pl_vm( 'connected' );
+$html  = gs109pu_dash( $admin );
+$off();
+$mu_js = preg_match( '/var memberUrl = (.*?);
+/', $html, $mm ) ? $mm[1] : null;
+gs109_assert( wp_json_encode( (string) $mem['membership_url'] ) === $mu_js, 'popup-memberurl-on-hub', 'on-hub membership_url: inline memberUrl = the JSON-encoded hub URL', $mu_js );
 $m                  = $mem;
 $m['membership_id'] = 0;
 unset( $m['rev'] );
 $off = gs109p_inject( 'membership', 200, $m );
 $v   = gs109pl_vm( 'connected' );
 $off();
-gs109_assert( '' === $v['change_plan_url'] && array() === gs109pl_popup( gs109pl_xp( implode( '', gend_society_plan_fragments( $v ) ) ) ), 'popup-id0-card', 'membership_id 0: no Change Plan button' );
+gs109_assert( '' === $v['change_plan_url'] && 0 === gs109pl_count( gs109pl_xp( gs109pu_dash( $admin ) ), '//a[contains(@class,"gs-dash-sa-upgrade")]' ), 'popup-id0-card', 'membership_id 0: no UPGRADE on the dashboard' );
 
 // ---------------------------------------------------------------------------------------- no POST, no token
 gs109p_clear_caches();
 gs109p_http();
 $vm   = gend_society_plan_view_model( true );
-$page = gs109p_call( 'gend_society_plan_page_render', 'GET' );
+$page = array( 'output' => gs109pu_dash( $admin ) );
 $reqs = gs109p_hub_requests( gs109p_http() );
 $post = array_filter(
 	$reqs,
@@ -118,7 +153,7 @@ $post = array_filter(
 		return 'GET' !== $r['method'] || false !== strpos( $r['url'], 'change-plan' );
 	}
 );
-gs109_assert( ! $post, 'popup-no-change-plan-call', 'rendering the page makes no change-plan call and no non-GET hub request (' . count( $reqs ) . ' GETs)', array_values( array_map( function ( $r ) { return $r['method'] . ' ' . $r['url']; }, $post ) ) );
+gs109_assert( ! $post, 'popup-no-change-plan-call', 'rendering the dashboard makes no change-plan call and no non-GET hub request (' . count( $reqs ) . ' GETs)', array_values( array_map( function ( $r ) { return $r['method'] . ' ' . $r['url']; }, $post ) ) );
 $hrefs = gs109pl_attrs( gs109pl_xp( $page['output'] ), '//a', 'href' );
 $tok   = array_filter(
 	$hrefs,
@@ -127,8 +162,9 @@ $tok   = array_filter(
 	}
 );
 gs109_assert( ! $tok && false === strpos( $page['output'], $token ), 'popup-no-token-html', 'no token in any href (' . count( $hrefs ) . ' links) or anywhere in the page' );
-gs109_assert( false === strpos( $page['output'], 'admin-post.php' ) && false === strpos( $page['output'], 'data-gs-plan-checkout' ), 'popup-page-no-launcher', 'page has no admin-post link and no per-tier Choose' );
-gs109_assert( gs109pl_popup_is( gs109pl_popup( gs109pl_xp( $page['output'] ) ), $expect, 'Choose a plan' ), 'popup-page-button', 'page: one "Choose a plan" button to the exact Change Plan URL' );
+gs109_assert( false === strpos( $page['output'], 'gend_society_plan_checkout' ) && false === strpos( $page['output'], 'data-gs-plan-checkout' ), 'popup-page-no-launcher', 'dashboard has no plan launcher action and no per-tier Choose' );
+$upg = gs109pl_attrs( gs109pl_xp( $page['output'] ), '//a[contains(@class,"gs-dash-sa-upgrade")][@data-gs-popup]', 'href' );
+gs109_assert( 1 === count( $upg ) && $expect === html_entity_decode( $upg[0] ), 'popup-page-button', 'dashboard: one UPGRADE popup link to the exact Change Plan URL', $upg );
 
 // ---------------------------------------------------------------------------------------- old URL is dead
 $sa = gs109p_session( $admin );

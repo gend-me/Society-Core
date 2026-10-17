@@ -292,8 +292,9 @@ add_action( 'wp_ajax_gend_society_features_refresh', function () {
  *   - Upgrade:          "Available with <plan>" and one "Choose a plan on gend.me" button: gend.me's own
  *                       Change Plan page (view-model change_plan_url), opened by assets/gs-plan.js in a popup;
  *   - After migration:  "Runs on your gend.me container after migration" and an outbound link (new tab).
- * Included areas link to their hub page (GenD > Groups / Feature Suite / Projects) or Plan & features.
- * gend_society_feature_upgrade_render_standalone() is shared with the hub-embed pages (402 / 409 states).
+ * Included areas link to their hub page or the dashboard; the other states link to the plan on the dashboard
+ * membership card (index.php#gs-mship-root, 109-30b: the Plan & features page is gone).
+ * gend_society_feature_upgrade_render_standalone() also takes a hub 402 / 409 state hint (the hub-embed pages that used it went in 109-30).
  * No iframe, no inline script or style, nothing locked (wordpress.org Guideline 5).
  * ─────────────────────────────────────────────────────────────────────────────────────────────────────── */
 
@@ -337,7 +338,8 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 	 */
 	function gend_society_feature_upgrade_render_standalone( string $area_slug, array $hint = array() ): string {
 		$area_slug = sanitize_key( $area_slug );
-		$plan_url  = function_exists( 'gend_society_plan_page_url' ) ? gend_society_plan_page_url() : admin_url( 'admin.php?page=gs-plan' );
+		$plan_url  = function_exists( 'gend_society_plan_page_url' ) ? gend_society_plan_page_url() : admin_url( 'index.php' );
+		$plan_card = $plan_url . '#gs-mship-root';
 		$connect   = function_exists( 'gend_society_connect_url' ) ? gend_society_connect_url() : admin_url( 'index.php?page=gs-portal-connect' );
 		$refresh   = '<p class="gs-up-actions__refresh"><button type="button" class="button" data-gs-plan-refresh="1">' . esc_html__( 'Refresh', 'gend-society' ) . '</button></p>';
 		$vm        = isset( $hint['vm'] ) && is_array( $hint['vm'] ) ? $hint['vm'] : null;
@@ -405,7 +407,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			} else {
 				$h .= '<span class="gs-up-note">' . esc_html__( 'This plan cannot be bought from this site right now.', 'gend-society' ) . '</span> ';
 			}
-			$h .= '<a class="button" href="' . esc_url( $plan_url . '#gs-plan-compare' ) . '">' . esc_html__( 'Compare plans', 'gend-society' ) . '</a>';
+			$h .= '<a class="button" href="' . esc_url( $plan_card ) . '">' . esc_html__( 'Your plan on the dashboard', 'gend-society' ) . '</a>';
 			$h .= '</p>';
 		} elseif ( 'after_migration' === $state ) {
 			$h .= '<p class="gs-up-state" data-gs-up-copy="after_migration">' . esc_html__( 'Runs on your gend.me container after migration', 'gend-society' ) . '</p>';
@@ -416,7 +418,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			if ( '' !== $out ) {
 				$h .= '<a class="button button-primary" href="' . esc_url( $out ) . '" target="_blank" rel="noopener" data-gs-up-outbound="1">' . esc_html__( 'See container plans on gend.me', 'gend-society' ) . '</a> ';
 			}
-			$h .= '<a class="button" href="' . esc_url( $plan_url ) . '">' . esc_html__( 'Plan & features', 'gend-society' ) . '</a>';
+			$h .= '<a class="button" href="' . esc_url( $plan_card ) . '">' . esc_html__( 'Your plan on the dashboard', 'gend-society' ) . '</a>';
 			$h .= '</p>';
 		} elseif ( 'included' === $state ) {
 			$open = is_array( $area ) && '' !== (string) ( $area['admin_url'] ?? '' ) ? (string) $area['admin_url'] : $plan_url;
@@ -425,7 +427,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			$h   .= '<p class="gs-up-actions"><a class="button button-primary" href="' . esc_url( $open ) . '">' . esc_html( sprintf( __( 'Open %s', 'gend-society' ), $label ) ) . '</a></p>';
 		} else {
 			$h .= '<p class="gs-up-state" data-gs-up-copy="unknown">' . esc_html__( 'gend.me has not listed this area for this site.', 'gend-society' ) . '</p>';
-			$h .= '<p class="gs-up-actions"><a class="button" href="' . esc_url( $plan_url ) . '">' . esc_html__( 'Plan & features', 'gend-society' ) . '</a></p>';
+			$h .= '<p class="gs-up-actions"><a class="button" href="' . esc_url( $plan_card ) . '">' . esc_html__( 'Your plan on the dashboard', 'gend-society' ) . '</a></p>';
 		}
 		$h .= $refresh;
 		return $h . '</div>';
@@ -454,7 +456,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
 			wp_die( esc_html__( 'You are not allowed to view this page.', 'gend-society' ), '', array( 'response' => 403 ) );
 		}
 		$area     = gend_society_feature_upgrade_request_area();
-		$plan_url = function_exists( 'gend_society_plan_page_url' ) ? gend_society_plan_page_url() : admin_url( 'admin.php?page=gs-plan' );
+		$plan_url = function_exists( 'gend_society_plan_page_url' ) ? gend_society_plan_page_url() : admin_url( 'index.php' );
 		echo '<div class="wrap gend-society-plan gend-society-upgrade">';
 		echo '<h1>' . esc_html__( 'Feature access', 'gend-society' ) . '</h1>';
 		echo '<p class="gs-plan-toolbar"><span class="gs-plan-live" role="status" aria-live="polite" data-gs-plan-live="1"></span></p>';
@@ -463,7 +465,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
 		echo '<a href="#" target="_blank" rel="opener" data-gs-plan-blocked-link="1">' . esc_html__( 'Open checkout in a new tab', 'gend-society' ) . '</a>';
 		echo '</p></div>';
 		echo gend_society_feature_upgrade_fragment( $area ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
-		echo '<p class="gs-up-back"><a href="' . esc_url( $plan_url ) . '">' . esc_html__( 'Back to Plan & features', 'gend-society' ) . '</a></p>';
+		echo '<p class="gs-up-back"><a href="' . esc_url( $plan_url ) . '">' . esc_html__( 'Back to the dashboard', 'gend-society' ) . '</a></p>';
 		echo '</div>';
 	}
 }

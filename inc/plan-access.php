@@ -332,7 +332,8 @@ if ( ! function_exists( 'gend_society_plan_invalidate_all' ) ) {
 		gend_society_plan_cache_expire( 'gend_society_features_cache', true );
 		gend_society_plan_cache_expire( 'gend_society_remote_membership_cache', true );
 		gend_society_plan_cache_expire( 'gend_society_plan_catalog_cache', true );
-		$areas = function_exists( 'gend_society_hub_embed_areas' ) ? array_keys( gend_society_hub_embed_areas() ) : array( 'groups', 'feature-suite', 'projects' );
+		// 1.5.x hub-area caches (the gs-hub-* pages were removed in 109-30): still deleted, so stale data never lingers.
+		$areas = array( 'groups', 'feature-suite', 'projects' );
 		foreach ( $areas as $area ) {
 			delete_option( 'gend_society_hub_area_cache_' . sanitize_key( $area ) );
 		}
@@ -602,7 +603,8 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 				'state'       => $state,
 				'unlock_plan' => 'included' === $state ? null : gend_society_plan_unlock( $a['unlock_plan'] ?? null, $tiers ),
 				'features'    => gend_society_plan_strings( $a['features'] ?? array() ),
-				'admin_url'   => ( 'included' === $state && 'hub_embed' === $delivery ) ? admin_url( 'admin.php?page=gs-hub-' . $slug ) : '',
+				// 109-30 (D29): the gs-hub-<area> pages are gone; included hub areas open on gend.me (Integration Hub card).
+				'admin_url'   => '',
 			);
 		}
 

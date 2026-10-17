@@ -85,6 +85,12 @@ $gs108o_norm = function ( $html ) {
 	return preg_replace( '/(name="_wp_http_referer" value=")[^"]*/', '$1REFERER', $html );
 };
 $gs108o_compare = function ( $id, array $get ) use ( $gs108o_render ) {
+	// 109-30 (D29): the Connect page and its renderer are removed everywhere (EXPECTED class "gs-portal-connect page
+	// removed"); the old URL redirects to the dashboard. Only the handler parity below still applies.
+	if ( ! function_exists( 'gend_society_portal_connect_render_page' ) ) {
+		gs108_assert( ! has_action( 'admin_menu', 'gend_society_portal_connect_register_menu' ), $id, 'Connect page removed (109-30, D29): no renderer, no menu registration' );
+		return '';
+	}
 	$old = $gs108o_render( 'gs108old_portal_connect_render_page', $get );
 	$new = $gs108o_render( 'gend_society_portal_connect_render_page', $get );
 	$at = 0;
@@ -95,9 +101,10 @@ $gs108o_compare = function ( $id, array $get ) use ( $gs108o_render ) {
 	return $new;
 };
 
-// Enqueue: the 108 card CSS never loads here.
+// Enqueue: the 108 card CSS / 109-30 popup assets never load here.
 gend_society_portal_connect_enqueue( 'dashboard_page_gs-portal-connect' );
-gs108_assert( ! wp_style_is( 'gend-society-connect', 'enqueued' ) && ! wp_style_is( 'gend-society-connect', 'registered' ), 'output-no-css', 'gs-connect.css not enqueued on ' . $gs108o_mode );
+gend_society_portal_connect_enqueue( 'index.php' );
+gs108_assert( ! wp_style_is( 'gend-society-connect', 'enqueued' ) && ! wp_style_is( 'gend-society-connect', 'registered' ) && ! wp_style_is( 'gend-society-connect-modal', 'enqueued' ) && ! wp_script_is( 'gend-society-connect-modal', 'enqueued' ), 'output-no-css', 'no Connect card / popup assets on ' . $gs108o_mode );
 
 // --- Render of the current state (READ-ONLY safe).
 $gs108o_now = $gs108o_compare( 'output-render-current', array() );

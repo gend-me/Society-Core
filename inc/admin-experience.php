@@ -15,8 +15,12 @@
  *   admin-bar / header link, POST for the toggle form).
  * - gend_society_admin_experience_render_toggle(): the card on the GenD page.
  * - With the skin ON: the core admin bar is made visible again (the skin
- *   hides it), the skin header is moved below it, and "Switch back to native
- *   WordPress admin" sits in both the admin bar and the skin header.
+ *   hides it), the skin header is moved below it, and "Switch back to standard
+ *   WordPress" sits in both the admin bar and the skin header.
+ * - Phase 109 (D28/D34): the skin is ON by default on standalone. While the
+ *   default (no stored choice) is in force, a notice on every skinned screen
+ *   names the switch and offers "Keep the GenD dashboard" (stores gend) or
+ *   "Switch back to standard WordPress" (stores native).
  *
  * The admin-post action and nonce action below are the contract the toggle
  * form, the GenD page and the "Switch back" link all use.
@@ -165,7 +169,7 @@ if ( ! function_exists( 'gend_society_admin_experience_render_toggle' ) ) {
 				if ( $is_on ) {
 					esc_html_e( 'Currently: ON - wp-admin uses the GenD look and menu grouping.', 'gend-society' );
 				} else {
-					esc_html_e( 'Currently: OFF - you are using the native WordPress admin.', 'gend-society' );
+					esc_html_e( 'Currently: OFF - you are using the standard WordPress admin.', 'gend-society' );
 				}
 				?>
 			</p>
@@ -178,7 +182,7 @@ if ( ! function_exists( 'gend_society_admin_experience_render_toggle' ) ) {
 				<button type="submit" class="button <?php echo $is_on ? 'button-secondary' : 'button-primary'; ?> gend-society-admin-experience__button">
 					<?php
 					if ( $is_on ) {
-						esc_html_e( 'Switch back to native WordPress admin', 'gend-society' );
+						esc_html_e( 'Switch back to standard WordPress', 'gend-society' );
 					} else {
 						esc_html_e( 'Turn on the GenD admin experience', 'gend-society' );
 					}
@@ -204,7 +208,7 @@ if ( ! function_exists( 'gend_society_admin_experience_can_switch_back' ) ) {
 
 if ( ! function_exists( 'gend_society_admin_experience_admin_bar' ) ) {
 	/**
-	 * Admin-bar node: "Switch back to native WordPress admin".
+	 * Admin-bar node: "Switch back to standard WordPress".
 	 *
 	 * @param WP_Admin_Bar $wp_admin_bar Admin bar.
 	 */
@@ -215,7 +219,7 @@ if ( ! function_exists( 'gend_society_admin_experience_admin_bar' ) ) {
 		$wp_admin_bar->add_node(
 			array(
 				'id'    => 'gend-society-switch-back',
-				'title' => esc_html__( 'Switch back to native WordPress admin', 'gend-society' ),
+				'title' => esc_html__( 'Switch back to standard WordPress', 'gend-society' ),
 				'href'  => gend_society_admin_experience_switch_url( 'native' ),
 				'meta'  => array( 'class' => 'gend-society-switch-back' ),
 			)
@@ -262,7 +266,7 @@ if ( ! function_exists( 'gend_society_admin_experience_header_link' ) ) {
 		$config = array(
 			// wp_nonce_url() returns an HTML-escaped URL (&amp;); a.href is set from JS, so decode it first.
 			'href'  => esc_url_raw( wp_specialchars_decode( gend_society_admin_experience_switch_url( 'native' ) ) ),
-			'label' => __( 'Switch back to native WordPress admin', 'gend-society' ),
+			'label' => __( 'Switch back to standard WordPress', 'gend-society' ),
 		);
 		$js = '(function(c){'
 			. 'var done=false;'
@@ -297,9 +301,38 @@ if ( ! function_exists( 'gend_society_admin_experience_notice' ) ) {
 		}
 		$is_on   = function_exists( 'gend_society_admin_skin_enabled' ) && gend_society_admin_skin_enabled();
 		$message = $is_on
-			? __( 'The GenD admin experience is on. Use "Switch back to native WordPress admin" in the toolbar at any time.', 'gend-society' )
-			: __( 'You are back on the native WordPress admin.', 'gend-society' );
+			? __( 'The GenD dashboard is on. Use "Switch back to standard WordPress" in the toolbar at any time.', 'gend-society' )
+			: __( 'You are back on the standard WordPress admin.', 'gend-society' );
 		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $message ) . '</p></div>';
 	}
 	add_action( 'admin_notices', 'gend_society_admin_experience_notice' );
+}
+
+if ( ! function_exists( 'gend_society_admin_experience_default_notice' ) ) {
+	/**
+	 * Phase 109 (D28/D34): while the GenD dashboard is on only because of the
+	 * standalone default (no stored choice yet), say so on every skinned
+	 * screen and offer both choices. Either button goes through the same
+	 * nonce'd admin-post handler as the Switch-back link and stores the
+	 * choice, which ends the notice.
+	 */
+	function gend_society_admin_experience_default_notice(): void {
+		if ( ! gend_society_admin_experience_can_switch_back() ) {
+			return;
+		}
+		if ( '' !== (string) get_option( 'gend_society_admin_experience', '' ) ) {
+			return;
+		}
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only flag set by the nonce-checked handler.
+		if ( isset( $_GET['gend_society_experience_updated'] ) ) {
+			return;
+		}
+		echo '<div class="notice notice-info gend-society-skin-default-notice"><p>'
+			. esc_html__( 'GenD Society turned on the GenD dashboard for this site. You can switch back to the standard WordPress admin at any time from the toolbar.', 'gend-society' )
+			. '</p><p>'
+			. '<a class="button button-primary" href="' . esc_url( gend_society_admin_experience_switch_url( 'gend' ) ) . '">' . esc_html__( 'Keep the GenD dashboard', 'gend-society' ) . '</a> '
+			. '<a class="button" href="' . esc_url( gend_society_admin_experience_switch_url( 'native' ) ) . '">' . esc_html__( 'Switch back to standard WordPress', 'gend-society' ) . '</a>'
+			. '</p></div>';
+	}
+	add_action( 'admin_notices', 'gend_society_admin_experience_default_notice' );
 }

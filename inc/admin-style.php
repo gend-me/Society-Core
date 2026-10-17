@@ -31,6 +31,48 @@ add_action('admin_init', function () {
 });
 }
 
+/**
+ * Phase 109-29: the header's connected-group nav on a standalone install - the same five gend.me group tabs the
+ * container header shows (group-embed.php is container-only), linked to the paired hub's group page. Read from
+ * the cached /membership payload only (never a request); empty until connected and linked to a group.
+ *
+ * @return array{items:array,name:string}
+ */
+function gend_society_admin_style_standalone_group_menu()
+{
+    $out = array('items' => array(), 'name' => '');
+    if (!function_exists('gend_society_dashboard_standalone_paired') || !gend_society_dashboard_standalone_paired()) {
+        return $out;
+    }
+    $m = get_option('gend_society_remote_membership_cache', null);
+    $g = is_array($m) && isset($m['group']) && is_array($m['group']) ? $m['group'] : array();
+    if (empty($g['id'])) {
+        return $out;
+    }
+    $link = function_exists('gend_society_dashboard_standalone_url') ? gend_society_dashboard_standalone_url($g['url'] ?? '') : '';
+    if ('' === $link && !empty($m['hub_url']) && function_exists('gend_society_dashboard_standalone_url') && '' !== gend_society_dashboard_standalone_url((string) $m['hub_url'])) {
+        $link = trailingslashit((string) $m['hub_url']) . 'groups/' . sanitize_title(!empty($g['slug']) ? (string) $g['slug'] : (string) $g['id']) . '/';
+    }
+    if ('' === $link) {
+        return $out;
+    }
+    $link = trailingslashit($link);
+    $tabs = array(
+        array('label' => __('Business Plan', 'gend-society'), 'icon' => 'dashicons-media-document', 'cap' => 'manage_options', 'path' => 'business-plan', 'slug' => 'business-plan'),
+        array('label' => __('Organization', 'gend-society'), 'icon' => 'dashicons-groups', 'cap' => 'list_users', 'path' => 'members-hub', 'slug' => 'organization'),
+        array('label' => __('Marketing', 'gend-society'), 'icon' => 'dashicons-megaphone', 'cap' => 'manage_options', 'path' => 'files', 'slug' => 'marketing'),
+        array('label' => __('Contracts', 'gend-society'), 'icon' => 'dashicons-portfolio', 'cap' => 'manage_options', 'path' => 'projects', 'slug' => 'contracts'),
+        array('label' => __('Payments', 'gend-society'), 'icon' => 'dashicons-money-alt', 'cap' => 'manage_options', 'path' => 'payments', 'slug' => 'payments'),
+    );
+    foreach ($tabs as $t) {
+        if (current_user_can($t['cap'])) {
+            $out['items'][] = array('label' => $t['label'], 'icon' => $t['icon'], 'url' => $link . $t['path'] . '/', 'slug' => $t['slug']);
+        }
+    }
+    $out['name'] = (string) ($g['name'] ?? '');
+    return $out;
+}
+
 add_action('admin_enqueue_scripts', 'gend_society_enqueue_admin_assets');
 function gend_society_enqueue_admin_assets()
 {
@@ -51,7 +93,7 @@ function gend_society_enqueue_admin_assets()
     $hub_url       = rtrim($hub_url, '/');
     $members_base  = $hub_url . '/members/me/';
 
-    wp_localize_script('gs-admin-script', 'gsAdminData', [
+    $gs_admin_data = [
         'userName' => $current_user->display_name,
         'logoutUrl' => wp_logout_url(),
         'profileUrl' => admin_url('user-edit.php?user_id=' . $current_user->ID),
@@ -92,7 +134,17 @@ function gend_society_enqueue_admin_assets()
             'contractWallet'  => function_exists('gend_society_remote_asset_url') ? esc_url_raw(gend_society_remote_asset_url('nav_pill_contract_wallet')) : '',
         ],
         'remotePlaceholderCss' => function_exists('gend_society_remote_asset_placeholder_css') ? gend_society_remote_asset_placeholder_css() : '',
-    ]);
+    ];
+    // Phase 109-29 (D28): a standalone install shows the same header as gend.me - View Site goes to this site's
+    // home (also in a subdirectory), and once connected the centre nav links to the gend.me group's own tabs (new
+    // tab, from the cached membership; no request). Hub/container keep exactly the data above.
+    if (function_exists('gend_society_dashboard_is_standalone') && gend_society_dashboard_is_standalone()) {
+        $gs_admin_data['viewSiteUrl'] = home_url('/');
+        $gs_sa_group = gend_society_admin_style_standalone_group_menu();
+        $gs_admin_data['gendGroupMenu'] = $gs_sa_group['items'];
+        $gs_admin_data['gendGroupName'] = $gs_sa_group['name'];
+    }
+    wp_localize_script('gs-admin-script', 'gsAdminData', $gs_admin_data);
 
     global $pagenow;
     if ($pagenow === 'site-editor.php') {
