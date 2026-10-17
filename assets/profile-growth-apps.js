@@ -122,7 +122,9 @@
         // ── Builds itself on scroll: staggered entrance as pieces come into view, exit when they drop back below the
         // screen (scrolling up), entrance again on the way down. The frame's visible slice goes to the embedded
         // Advertising page so its cards do the same (profile-growth-apps.php embed script).
-        var RV = '.gs-growth-apps__head > div, .gs-growth-apps__search, .gs-growth-app, .gs-growth-apps__empty, .gs-growth-apps__stage';
+        // App cards are NOT scroll-revealed: the list re-renders on every open/search and freshly inserted cards must
+        // never wait on an observer to become visible (they pop in with a CSS stagger instead).
+        var RV = '.gs-growth-apps__head > div, .gs-growth-apps__search, .gs-growth-apps__empty, .gs-growth-apps__stage';
         var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
         var io = (!reduce && 'IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
             var enter = entries.filter(function (en) { return en.isIntersecting; })
@@ -142,7 +144,6 @@
             });
         }
         root.classList.add('gs-rv-on');
-        if (window.MutationObserver) new MutationObserver(function () { arm(); }).observe(grid, { childList: true });
         var viewRaf = 0;
         function sendView() {
             viewRaf = 0;
