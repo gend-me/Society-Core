@@ -45,7 +45,8 @@ function gend_society_group_backdrops() {
     $clear = '.psoo-bp, .psoo-brain-section, .members-header-section, .psoo-gm, .psoo-project-manager-tab, .workspace-header-section, .psoo-payments-tab, .psoo-payments-screen, .psoo-pay-activation, .psoo-pay-dashboard';
     return (array) apply_filters( 'gend_society_group_backdrops', array(
         'business-plan' => array( 'frames' => $base . 'biz-hands/', 'count' => 96, 'host' => '#youzify-group-body', 'anchor' => 'center center', 'start' => 0, 'clear' => $clear ),
-        'members-hub'   => array( 'frames' => $base . 'org-city/', 'count' => 80, 'host' => '#youzify-group-body', 'anchor' => 'center center', 'start' => 0, 'clear' => $clear ),
+        // Organization: a semi-transparent black filter over the (bright) city scene.
+        'members-hub'   => array( 'frames' => $base . 'org-city/', 'count' => 80, 'host' => '#youzify-group-body', 'anchor' => 'center center', 'start' => 0, 'clear' => $clear, 'dim' => 0.5 ),
         'files'         => array( 'frames' => $base . 'contracts-vines/', 'count' => 120, 'host' => '#youzify-group-body', 'clear' => $clear ),
         'projects'      => array( 'frames' => $base . 'projects-backdrop/', 'count' => 120, 'host' => '#youzify-group-body', 'clear' => $clear ),
         'payments'      => array( 'frames' => $base . 'wallet-flow/', 'count' => 120, 'host' => '#youzify-group-body', 'anchor' => 'center top', 'start' => 0.02, 'clear' => $clear ),
@@ -79,5 +80,6 @@ add_action( 'wp_enqueue_scripts', function () {
         'anchor' => isset( $b['anchor'] ) ? (string) $b['anchor'] : 'right bottom',
         'start'  => isset( $b['start'] ) ? (float) $b['start'] : 0.12,
         'clear'  => isset( $b['clear'] ) ? (string) $b['clear'] : '',
+        'dim'    => isset( $b['dim'] ) ? max( 0, min( 0.9, (float) $b['dim'] ) ) : 0,   // black filter opacity over the scene
     ) );
 }, 30 );

@@ -31,3 +31,5 @@
 /* Group Payments activation landing: its own background video gives way to the backdrop (matches the activated page) */
 .gs-vbg-host .psoo-pl-bg { display: none !important; }
 .gs-vbg-host .psoo-pl { background: transparent !important; }
+/* optional semi-transparent black filter over the scene (per-backdrop 'dim'; after the shade's background shorthand) */
+.gs-vbg .gs-vbg__shade { background-color: rgba(0, 0, 0, var(--gs-vbg-dim, 0)); }

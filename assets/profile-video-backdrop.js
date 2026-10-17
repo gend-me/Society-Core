@@ -46,6 +46,8 @@
         var ax = AX[anc[0]] != null ? AX[anc[0]] : 1, ay = AY[anc[1] || anc[0]] != null ? AY[anc[1] || anc[0]] : 1;
         clip.style.setProperty('--gs-vbg-ax', (ax * 100) + '%');
         clip.style.setProperty('--gs-vbg-ay', (ay * 100) + '%');
+        var dim = parseFloat(CFG.dim);
+        if (dim > 0) clip.style.setProperty('--gs-vbg-dim', String(Math.min(0.9, dim)));   // semi-transparent black filter
         var last = count - 1;
 
         // ---- frames: load coarse-to-fine (every 16th, then 8th, 4th, 2nd, all) so scrubbing works almost at once
