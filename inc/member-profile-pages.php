@@ -3013,7 +3013,7 @@ function gend_society_member_groups_tabs_open() {
     }
     /* ── Top tabs styled like the Contracts top tabs (.gci-tab): centred glass pills (desktop + tablet) ── */
     @media (min-width: 721px) {
-        .gs-member-groups-tabs { justify-content: center; gap: 12px; border-bottom: 0; margin-bottom: 30px; padding: 4px 2px; flex-wrap: wrap; }
+        .gs-member-groups-tabs { justify-content: center; gap: 12px; border-bottom: 0; margin-bottom: 30px; padding: 30px 2px 4px; flex-wrap: wrap; }
         .gs-member-groups-tab {
             position: relative; overflow: hidden; margin-bottom: 0;
             background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
@@ -3049,6 +3049,9 @@ function gend_society_member_groups_tabs_open() {
     .gs-ms-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center; background: #e11d48; color: #fff; font-size: .66rem; letter-spacing: 0; }
     .gs-ms-panel { display: none; }
     .gs-ms-panel.is-active { display: block; animation: gciFade .4s cubic-bezier(.16,1,.3,1); }
+    /* strip + Joined / Invitations live inside the membership-list column (moved there by the script after the groups panel) */
+    .gdc-memberships-main > .gs-ms-tabs { justify-content: flex-start; margin: 0 0 18px; }
+    .gs-ms-shell { display: block; }
     .gs-ms-empty { padding: 40px 24px; text-align: center; border-radius: 18px; color: #94a3b8; border: 1px dashed rgba(255,255,255,.12); background: rgba(255,255,255,.02); }
     @keyframes gciFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
     </style>
@@ -3200,6 +3203,50 @@ function gend_society_member_groups_tabs_close() {
                 list.classList.add('gs-ms-joined');
                 list.removeAttribute('role');
                 host.appendChild(list);
+            }
+            // The strip and the Joined / Invitations panels go INTO the membership-list column, so switching only
+            // changes that column (the Launch a Web App sidebar stays). The Owned panel becomes the always-visible
+            // shell holding the layout, and the list column's original content becomes the "owned" panel.
+            var outer = document.querySelector('.gs-ms-panel[data-gs-ms-panel="owned"]');
+            var main = outer && outer.querySelector('.gdc-memberships-main');
+            var strip = document.querySelector('.gs-ms-tabs');
+            if (outer && main && strip) {
+                var owned = document.createElement('div');
+                owned.className = 'gs-ms-panel is-active';
+                owned.setAttribute('data-gs-ms-panel', 'owned');
+                while (main.firstChild) owned.appendChild(main.firstChild);
+                main.appendChild(strip);
+                main.appendChild(owned);
+                ['joined', 'invites'].forEach(function (k) {
+                    var pnl = document.querySelector('.gs-ms-panel[data-gs-ms-panel="' + k + '"]');
+                    if (pnl) main.appendChild(pnl);
+                });
+                outer.className = 'gs-ms-shell';
+                outer.removeAttribute('data-gs-ms-panel');
+            }
+            // The memberships section's background pans left as the page scrolls (image sized wider than the box).
+            var sec = outer && outer.querySelector('.woocommerce-gdc-memberships');
+            var bg = sec && getComputedStyle(sec).backgroundImage;
+            var m = bg && /url\(["']?([^"')]+)["']?\)/.exec(bg);
+            if (sec && m && !(window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches)) {
+                var img = new Image(), iw = 0, ih = 0, raf = 0;
+                function pan() {
+                    raf = 0;
+                    if (!iw || !sec.offsetWidth) return;
+                    var w = sec.offsetWidth, h = sec.offsetHeight;
+                    var k = Math.max(h / ih, (w * 1.35) / iw);          // cover the height, 35% wider than the box
+                    var dw = iw * k, dh = ih * k;
+                    var r = sec.getBoundingClientRect();
+                    var p = Math.min(1, Math.max(0, (innerHeight - r.top) / (innerHeight + r.height)));
+                    sec.style.setProperty('background-size', Math.round(dw) + 'px ' + Math.round(dh) + 'px', 'important');
+                    sec.style.setProperty('background-position', Math.round(-(dw - w) * p) + 'px center', 'important');
+                }
+                function kick() { if (!raf) raf = requestAnimationFrame(pan); }
+                img.onload = function () { iw = img.naturalWidth; ih = img.naturalHeight; kick(); };
+                img.src = m[1];
+                addEventListener('scroll', kick, { passive: true });
+                addEventListener('resize', kick);
+                document.addEventListener('click', function () { setTimeout(kick, 60); });
             }
             document.addEventListener('click', function (e) {
                 var t = e.target.closest && e.target.closest('.gs-ms-tab[data-gs-ms]');
