@@ -1709,10 +1709,10 @@ function gend_society_invest_profile_screen_content() {
         <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio" autocomplete="off">
         <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" autocomplete="off">
         <div class="gci-tabs" role="tablist">
-            <label for="gci-tab-commissions" class="gci-tab"><?php esc_html_e( 'Commissions', 'gend-society' ); ?></label>
-            <label for="gci-tab-growth"    class="gci-tab"><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
-            <label for="gci-tab-projects"  class="gci-tab"><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
-            <label for="gci-tab-fund"      class="gci-tab"><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
+            <label for="gci-tab-commissions" class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M15.5 9.6A5.5 5.5 0 1 1 9.6 15.5"/><path d="M9 6.8v4.4M7.4 8.2h2.4a1 1 0 0 1 0 2H8.2a1 1 0 0 0 0 2h2.4"/></svg></span><?php esc_html_e( 'Commissions', 'gend-society' ); ?></label>
+            <label for="gci-tab-growth"    class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
+            <label for="gci-tab-projects"  class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg></span><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
+            <label for="gci-tab-fund"      class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9h9"/><path d="M20.5 15.5A9 9 0 1 1 8.5 3.7"/></svg></span><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
         </div>
         <div class="gci-panel gci-panel--commissions" role="tabpanel">
             <?php echo shortcode_exists( 'affiliate_sales_dashboard' ) ? do_shortcode( '[affiliate_sales_dashboard]' ) : ''; // Sales Team commission dashboard ?>
@@ -1812,6 +1812,10 @@ function gend_society_invest_footer_assets() {
             transition: color .25s, border-color .25s, box-shadow .25s, transform .25s; user-select:none;
         }
         .gci-tab:hover { color:#fff; transform:translateY(-2px); }
+        .gci-tab { gap: 10px; }
+        .gci-tab-ico { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px; background: rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); transition: border-color .25s, background .25s, color .25s; }
+        .gci-tab-ico svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; filter: drop-shadow(0 0 4px currentColor); }
+        .gci-tab:hover .gci-tab-ico { border-color: rgba(0,210,255,.45); }
         .gci-panel { display:none !important; }
         /* active panel via :checked ~ sibling */
         #gci-tab-commissions:checked ~ .gci-panel--commissions,
@@ -2955,13 +2959,13 @@ function gend_society_member_groups_tabs_open() {
     /* ── Groups panel: dark-theme styling for the BP groups loop. The
        member-profile-header.php styles target body.youzify-profile, which
        this install doesn't add — so we restyle here, scoped to our panel. ── */
-    .gs-member-groups-panel[data-gs-panel="groups"] #groups-list,
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] #groups-list,
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list {
         list-style: none !important;
         padding: 0 !important;
         margin: 0 !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list > li {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list > li {
         list-style: none !important;
         background: rgba(255,255,255,0.03) !important;
         border: 1px solid rgba(255,255,255,0.08) !important;
@@ -2973,40 +2977,80 @@ function gend_society_member_groups_tabs_open() {
         gap: 16px !important;
         color: #e2e8f0 !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list > li::marker {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list > li::marker {
         content: '' !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list > li:hover {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list > li:hover {
         background: rgba(255,255,255,0.05) !important;
         border-color: rgba(137,194,224,0.3) !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-avatar img {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item-avatar img {
         width: 56px !important;
         height: 56px !important;
         border-radius: 12px !important;
         object-fit: cover !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item {
         flex: 1 1 auto !important;
         min-width: 0 !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-title,
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-title a {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item-title,
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item-title a {
         color: #f8fafc !important;
         font-weight: 600 !important;
         font-size: 1rem !important;
         text-decoration: none !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-meta,
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item-desc,
-    .gs-member-groups-panel[data-gs-panel="groups"] ul.item-list .item .meta {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item-meta,
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item-desc,
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] ul.item-list .item .meta {
         color: #94a3b8 !important;
         font-size: 0.85rem !important;
     }
-    .gs-member-groups-panel[data-gs-panel="groups"] .pagination {
+    :is(.gs-member-groups-panel, .gs-ms-joined)[data-gs-panel="groups"] .pagination {
         color: #cbd5e1 !important;
         padding: 12px 0 !important;
     }
+    /* ── Top tabs styled like the Contracts top tabs (.gci-tab): centred glass pills (desktop + tablet) ── */
+    @media (min-width: 721px) {
+        .gs-member-groups-tabs { justify-content: center; gap: 12px; border-bottom: 0; margin-bottom: 30px; padding: 4px 2px; flex-wrap: wrap; }
+        .gs-member-groups-tab {
+            position: relative; overflow: hidden; margin-bottom: 0;
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(12px) saturate(1.3); backdrop-filter: blur(12px) saturate(1.3);
+            border: 1px solid rgba(255,255,255,.12); border-radius: 14px; padding: 11px 22px;
+            color: #94a3b8; font-size: .74rem; font-weight: 800; letter-spacing: 1.4px;
+            transition: color .25s, border-color .25s, box-shadow .25s, transform .25s;
+        }
+        .gs-member-groups-tab:hover { color: #fff; transform: translateY(-2px); }
+        .gs-member-groups-tab.is-active {
+            color: #fff; border-color: rgba(0,210,255,.5);
+            box-shadow: 0 14px 32px -16px rgba(0,210,255,.55), inset 0 0 0 1px rgba(0,210,255,.2);
+        }
+        .gs-member-groups-tab.is-active::before {
+            content: ""; position: absolute; left: 0; right: 0; top: 0; height: 2px;
+            background: linear-gradient(90deg, transparent, #00d2ff, transparent);
+        }
+    }
+    /* The BP subnav row (Memberships / Invitations / Order By) is gone: Memberships → Joined / Invitations replace it. */
+    #subnav.item-list-tabs { display: none !important; }
+
+    /* ── Memberships → Owned / Joined / Invitations ── */
+    .gs-ms-tabs { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px; margin: 0 0 22px; }
+    .gs-ms-tab {
+        display: inline-flex; align-items: center; gap: 8px; padding: 9px 18px; border-radius: 999px; cursor: pointer;
+        border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.03); color: #94a3b8;
+        font: 800 .7rem/1 "Inter", sans-serif; letter-spacing: 1.3px; text-transform: uppercase;
+        transition: color .2s, border-color .2s, background .2s;
+    }
+    .gs-ms-tab svg { width: 15px; height: 15px; fill: none; stroke: currentColor; stroke-width: 1.8; stroke-linecap: round; stroke-linejoin: round; }
+    .gs-ms-tab:hover { color: #fff; }
+    .gs-ms-tab.is-active { color: #fff; border-color: rgba(182,8,201,.55); background: rgba(182,8,201,.14); box-shadow: 0 10px 24px -14px rgba(182,8,201,.7); }
+    .gs-ms-count { min-width: 18px; height: 18px; padding: 0 5px; border-radius: 999px; display: inline-grid; place-items: center; background: #e11d48; color: #fff; font-size: .66rem; letter-spacing: 0; }
+    .gs-ms-panel { display: none; }
+    .gs-ms-panel.is-active { display: block; animation: gciFade .4s cubic-bezier(.16,1,.3,1); }
+    .gs-ms-empty { padding: 40px 24px; text-align: center; border-radius: 18px; color: #94a3b8; border: 1px dashed rgba(255,255,255,.12); background: rgba(255,255,255,.02); }
+    @keyframes gciFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
     </style>
 
     <div class="gs-member-groups-wrap">
@@ -3060,20 +3104,33 @@ function gend_society_member_groups_tabs_open() {
             $gs_shared_css_ver  = GEND_SOCIETY_VERSION . '.' . ( file_exists( $gs_shared_css_path ) ? filemtime( $gs_shared_css_path ) : '0' );
             $gs_shared_css      = add_query_arg( 'ver', $gs_shared_css_ver, plugins_url( 'vendor-app-manager/assets/css/gdc-customer-shared.css' ) );
             echo '<link rel="stylesheet" id="gdc-customer-shared-bp-profile" href="' . esc_url( $gs_shared_css ) . '" type="text/css" media="all" />';
-            gdc_render_account_memberships_endpoint();
+            $gs_invites_html  = gend_society_member_hub_invites_html();
+            $gs_invites_count = substr_count( $gs_invites_html, 'class="gs-hub-invite-card"' );
+            $gs_ms_ico        = function ( $k ) { return function_exists( 'gend_society_get_profile_nav_icon' ) ? gend_society_get_profile_nav_icon( $k ) : ''; };
             ?>
+            <div class="gs-ms-tabs" role="tablist">
+                <button type="button" class="gs-ms-tab is-active" data-gs-ms="owned" role="tab" aria-selected="true"><?php echo $gs_ms_ico( 'memberships' ); // phpcs:ignore ?><?php esc_html_e( 'Owned', 'gend-society' ); ?></button>
+                <button type="button" class="gs-ms-tab" data-gs-ms="joined" role="tab" aria-selected="false"><?php echo $gs_ms_ico( 'groups' ); // phpcs:ignore ?><?php esc_html_e( 'Joined', 'gend-society' ); ?></button>
+                <button type="button" class="gs-ms-tab" data-gs-ms="invites" role="tab" aria-selected="false"><?php echo $gs_ms_ico( 'notifications' ); // phpcs:ignore ?><?php esc_html_e( 'Invitations', 'gend-society' ); ?><?php if ( $gs_invites_count ) : ?><span class="gs-ms-count"><?php echo (int) $gs_invites_count; ?></span><?php endif; ?></button>
+            </div>
+            <div class="gs-ms-panel is-active" data-gs-ms-panel="owned"><?php gdc_render_account_memberships_endpoint(); ?></div>
+            <div class="gs-ms-panel" data-gs-ms-panel="joined" data-gs-ms-joined-host></div>
+            <div class="gs-ms-panel" data-gs-ms-panel="invites">
+                <?php echo $gs_invites_html ? $gs_invites_html : '<p class="gs-ms-empty">' . esc_html__( 'No pending invitations.', 'gend-society' ) . '</p>'; // phpcs:ignore ?>
+            </div>
         </div>
         <?php endif; ?>
 
         <div class="gs-member-groups-panel<?php echo 'groups' === $gs_default_panel ? ' is-active' : ''; ?>" data-gs-panel="groups" role="tabpanel">
         <?php
-        // ── Pending group invitations — native render (NO iframe), shown at
-        // the top of the Hubs panel above the joined-hub cards, only on the
-        // viewer's own profile and only when any invitations exist. Accept /
-        // Decline are the standard nonce-protected BP action links. This
-        // mini bp_has_groups loop completes before the page's main groups
-        // loop starts, so the template globals are handed over clean.
-        ob_start();   // printed at the top of My Projects (the Hubs tab is gone)
+        // The page's BuddyPress groups loop (the groups this member is in) renders into this panel; the inline script
+        // after it moves the panel into Projects → Memberships → Joined. Pending invitations are rendered by
+        // gend_society_member_hub_invites_html() into Memberships → Invitations.
+}
+
+/** Pending hub (BP group) invitations for the viewer's own profile — Projects → Memberships → Invitations. */
+function gend_society_member_hub_invites_html() {
+    ob_start();
         if ( function_exists( 'bp_is_my_profile' ) && bp_is_my_profile()
              && function_exists( 'bp_has_groups' )
              && bp_has_groups( array(
@@ -3104,8 +3161,8 @@ function gend_society_member_groups_tabs_open() {
             <?php endwhile; ?>
         </div>
         <?php endif; ?>
-        <?php $GLOBALS['gend_society_hub_invites_html'] = ob_get_clean(); ?>
-    <?php
+        <?php
+    return ob_get_clean();
 }
 
 function gend_society_member_groups_tabs_close() {
@@ -3134,10 +3191,28 @@ function gend_society_member_groups_tabs_close() {
     }
     ?>
         </div><!-- /panel:groups -->
+        <script>
+        (function () {
+            var host = document.querySelector('[data-gs-ms-joined-host]');
+            var list = document.querySelector('.gs-member-groups-panel[data-gs-panel="groups"]');
+            if (host && list) {   // the BP groups loop (groups the member is in) → Memberships → Joined
+                list.classList.remove('gs-member-groups-panel', 'is-active');
+                list.classList.add('gs-ms-joined');
+                list.removeAttribute('role');
+                host.appendChild(list);
+            }
+            document.addEventListener('click', function (e) {
+                var t = e.target.closest && e.target.closest('.gs-ms-tab[data-gs-ms]');
+                if (!t) return;
+                var box = t.closest('.gs-member-groups-panel') || document;
+                box.querySelectorAll('.gs-ms-tab').forEach(function (b) { var on = b === t; b.classList.toggle('is-active', on); b.setAttribute('aria-selected', on ? 'true' : 'false'); });
+                box.querySelectorAll('.gs-ms-panel').forEach(function (p) { p.classList.toggle('is-active', p.getAttribute('data-gs-ms-panel') === t.getAttribute('data-gs-ms')); });
+            });
+        })();
+        </script>
 
         <div class="gs-member-groups-panel is-active" data-gs-panel="projects" role="tabpanel">
             <?php
-            echo isset( $GLOBALS['gend_society_hub_invites_html'] ) ? $GLOBALS['gend_society_hub_invites_html'] : ''; // phpcs:ignore -- pending hub invitations (own profile)
             if ( $group_id && shortcode_exists( 'psoo_pm_group_projects' ) ) {
                 // The native PM board in profile scope: the viewer's workspaces across their groups with a group
                 // filter, no Calendar tab (projects plugin, shortcode-group-projects.php).
