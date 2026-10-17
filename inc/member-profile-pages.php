@@ -339,11 +339,11 @@ function gend_society_inject_profile_page_embed() {
     ?>
     <div class="gs-overview-wrap">
         <div class="gs-overview-tabs" role="tablist">
-            <button type="button" class="gs-overview-tab is-active" data-gs-ov-tab="cover" role="tab" aria-selected="true"><?php esc_html_e( 'Cover', 'gend-society' ); ?></button>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="resume" role="tab" aria-selected="false"><?php esc_html_e( 'Resume', 'gend-society' ); ?></button>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="social" role="tab" aria-selected="false"><?php esc_html_e( 'Social', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab is-active" data-gs-ov-tab="cover" role="tab" aria-selected="true"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></span><?php esc_html_e( 'Cover', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="resume" role="tab" aria-selected="false"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span><?php esc_html_e( 'Resume', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="social" role="tab" aria-selected="false"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6"/></svg></span><?php esc_html_e( 'Social', 'gend-society' ); ?></button>
             <?php // Media → Portfolio (2026-10-16); Posts and Playlists are now Portfolio filters (inc/profile-portfolio-mosaic.php). ?>
-            <button type="button" class="gs-overview-tab" data-gs-ov-tab="media" role="tab" aria-selected="false"><?php esc_html_e( 'Portfolio', 'gend-society' ); ?></button>
+            <button type="button" class="gs-overview-tab" data-gs-ov-tab="media" role="tab" aria-selected="false"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="3" width="7.5" height="7.5" rx="1.2"/><rect x="3" y="13.5" width="7.5" height="7.5" rx="1.2"/><rect x="13.5" y="13.5" width="7.5" height="7.5" rx="1.2"/></svg></span><?php esc_html_e( 'Portfolio', 'gend-society' ); ?></button>
         </div>
 
         <div class="gs-overview-panel is-active" data-gs-ov-panel="cover" role="tabpanel">
@@ -385,6 +385,29 @@ function gend_society_overview_tabs_assets() {
     .gs-overview-tab { background:transparent; border:0; border-bottom:2px solid transparent; padding:12px 22px; color:#64748b; font-family:"Inter",sans-serif; font-size:0.78rem; font-weight:700; letter-spacing:1.5px; text-transform:uppercase; cursor:pointer; transition:color 0.18s, border-color 0.18s; margin-bottom:-1px; }
     .gs-overview-tab:hover { color:rgba(255,255,255,0.75); }
     .gs-overview-tab.is-active { color:#b608c9; border-bottom-color:#b608c9; }
+    /* Same look as the Projects + Contracts top tabs: centred glass pills with icon chips (desktop + tablet). */
+    @media (min-width: 721px) {
+        .gs-overview-tabs { justify-content:center; gap:12px; border-bottom:0; margin-bottom:30px; padding:30px 2px 4px; }
+        .gs-overview-tab {
+            display:inline-flex; align-items:center; gap:10px; position:relative; overflow:hidden; margin-bottom:0;
+            background: linear-gradient(160deg, rgba(255,255,255,.05), rgba(255,255,255,.015));
+            -webkit-backdrop-filter: blur(12px) saturate(1.3); backdrop-filter: blur(12px) saturate(1.3);
+            border:1px solid rgba(255,255,255,.12); border-radius:14px; padding:11px 22px;
+            color:#94a3b8; font-size:.74rem; font-weight:800; letter-spacing:1.4px;
+            transition: color .25s, border-color .25s, box-shadow .25s, transform .25s;
+        }
+        .gs-overview-tab:hover { color:#fff; transform:translateY(-2px); }
+        .gs-overview-tab.is-active {
+            color:#fff; border-color: rgba(0,210,255,.5);
+            box-shadow: 0 14px 32px -16px rgba(0,210,255,.55), inset 0 0 0 1px rgba(0,210,255,.2);
+        }
+        .gs-overview-tab.is-active::before { content:""; position:absolute; left:0; right:0; top:0; height:2px; background: linear-gradient(90deg, transparent, #00d2ff, transparent); }
+    }
+    .gs-ov-ico { display:inline-grid; place-items:center; width:26px; height:26px; border-radius:8px; background:rgba(255,255,255,.04); border:1px solid rgba(255,255,255,.1); transition: border-color .25s, color .25s, background .25s; }
+    .gs-ov-ico svg { width:15px; height:15px; fill:none; stroke:currentColor; stroke-width:1.8; stroke-linecap:round; stroke-linejoin:round; filter: drop-shadow(0 0 4px currentColor); }
+    .gs-overview-tab:hover .gs-ov-ico { border-color: rgba(0,210,255,.45); }
+    .gs-overview-tab.is-active .gs-ov-ico { border-color: rgba(182,8,201,.6); background: rgba(182,8,201,.14); color:#f0abfc; }
+    @media (max-width: 720px) { .gs-ov-ico { width:22px; height:22px; } .gs-overview-tab { display:inline-flex; align-items:center; gap:8px; } }
     /* Phones: center the Overview sub-tab strip */
     @media (max-width:720px) {
         .gs-overview-tabs { justify-content:center; }

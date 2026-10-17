@@ -2183,6 +2183,36 @@ function gend_society_render_profile_header() {
         var CONTENT_SEL = 'main.youzify-page-main-content, .youzify-page-main-content';
         var busy = false;
         var didPjax = false;
+        // Desktop too (2026-10-17): every width swaps only the content. A tab already shown in this page's lifetime
+        // is a normal load instead (plugins that init on page load only — e.g. the PM board — would come back empty).
+        var visited = {};
+        visited[location.pathname] = 1;
+        var serverBodyClasses = (document.body.className || '').split(/\s+/).filter(Boolean);
+        var LAND_KEY = 'gdcNavLand';
+
+        // Put the profile menu at the top of the screen (just under the fixed site header).
+        function headerOffset() {
+            var h = document.querySelector('#main-3d-header, .header-anchor-wrap, header.site-header');
+            if (!h) return 0;
+            var cs = getComputedStyle(h), r = h.getBoundingClientRect();
+            return (cs.position === 'fixed' || cs.position === 'sticky') && r.bottom > 0 && r.bottom < 220 ? r.bottom : 0;
+        }
+        function navTop() {
+            var nav = document.getElementById('gdc-profile-nav');
+            if (!nav) return null;
+            return Math.max(0, nav.getBoundingClientRect().top + window.pageYOffset - headerOffset() - 6);
+        }
+        // A full load that came from a menu click lands on the menu, not on the profile header.
+        (function landAfterLoad() {
+            var flagged = null;
+            try { flagged = sessionStorage.getItem(LAND_KEY); sessionStorage.removeItem(LAND_KEY); } catch (err) {}
+            if (!flagged) return;
+            try { if ('scrollRestoration' in history) history.scrollRestoration = 'manual'; } catch (err) {}
+            function go() { var y = navTop(); if (y !== null) window.scrollTo(0, y); }
+            go();
+            document.addEventListener('DOMContentLoaded', go);
+            window.addEventListener('load', function () { go(); setTimeout(go, 400); });
+        }());
 
         // ── In-memory page cache: bouncing between menu items is instant.
         // Entries refresh in the background after a cache-hit swap.
@@ -2332,6 +2362,12 @@ function gend_society_render_profile_header() {
             });
 
             document.title = doc.title || document.title;
+            // Server body classes (component / action) — CSS on several tabs is scoped by them.
+            var freshBody = (doc.body && doc.body.className || '').split(/\s+/).filter(Boolean);
+            serverBodyClasses.forEach(function (c) { if (freshBody.indexOf(c) === -1) document.body.classList.remove(c); });
+            freshBody.forEach(function (c) { document.body.classList.add(c); });
+            serverBodyClasses = freshBody;
+            visited[url.pathname] = 1;
             markActive(url);
             didPjax = true;
             if (push) { history.pushState({ gdcPjax: 1 }, '', url.href); }
@@ -2346,10 +2382,12 @@ function gend_society_render_profile_header() {
                         window.GendWallet.init();
                     }
                 } catch (err) { /* widget absent — fine */ }
-                // Land at the top of the new content — never back at the top
-                // of the profile header. Re-assert once after late scripts.
+                try { document.dispatchEvent(new CustomEvent('gdc:pjax-load', { detail: { url: url.href } })); } catch (err) {}
+                // Land with the profile menu at the top of the screen — never back on the profile header.
+                // Re-assert once after late scripts.
                 function landAt() {
-                    return imported.getBoundingClientRect().top + window.pageYOffset - 10;
+                    var y = navTop();
+                    return y === null ? imported.getBoundingClientRect().top + window.pageYOffset - 10 : y;
                 }
                 window.scrollTo({ top: Math.max(0, landAt()), behavior: 'smooth' });
                 window.setTimeout(function () {
@@ -2405,13 +2443,22 @@ function gend_society_render_profile_header() {
                     cachePut(url.href, html);
                     doSwap(html, url, push);
                 })
-                .catch(function () { location.assign(url.href); });
+                .catch(function () { try { sessionStorage.setItem(LAND_KEY, '1'); } catch (err) {} location.assign(url.href); });
         }
 
         document.addEventListener('click', function (e) {
-            if (!mq || !mq.matches) return;
             var url = linkFrom(e);
             if (!url) return;
+            if (visited[url.pathname] && url.pathname !== location.pathname) {
+                // shown before in this page's lifetime: normal load, landing on the menu
+                try { sessionStorage.setItem(LAND_KEY, '1'); } catch (err) {}
+                return;
+            }
+            if (url.pathname === location.pathname && !url.search && !url.hash) {
+                e.preventDefault();
+                var y0 = navTop(); if (y0 !== null) window.scrollTo({ top: y0, behavior: 'smooth' });
+                return;
+            }
             e.preventDefault();
             e.stopPropagation();
             // Clear the full-reload scroll flag — PJAX handles the landing.

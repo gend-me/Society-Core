@@ -125,7 +125,73 @@ add_action( 'wp_head', function () {
         #bridge-sticky-bar, #gm-cc, .gm-cc { display: none !important; }
         html { margin-top: 0 !important; padding-top: 0 !important; }
         html, body { background: transparent !important; }
+        /* builds itself as the profile scrolls it into view (the parent posts the frame's visible slice: gsView) */
+        .gs-erv { opacity: 0; translate: 0 28px; scale: .985; transition: opacity .6s cubic-bezier(.16,1,.3,1) var(--gs-rv-d,0ms), translate .7s cubic-bezier(.16,1,.3,1) var(--gs-rv-d,0ms), scale .7s cubic-bezier(.16,1,.3,1) var(--gs-rv-d,0ms); }
+        .gs-erv.is-in { opacity: 1; translate: 0 0; scale: 1; }
+        .gs-eglass { -webkit-backdrop-filter: blur(10px) saturate(1.2); backdrop-filter: blur(10px) saturate(1.2); border-color: rgba(255,255,255,.12) !important; }
+        @media (prefers-reduced-motion: reduce) { .gs-erv { opacity: 1; translate: none; scale: none; transition: none; } }
     </style>
+    <script>
+    (function () {
+        if (window.parent === window) return;
+        var SKIP = /^(SCRIPT|STYLE|SVG|svg|PATH|IMG|VIDEO|CANVAS|IFRAME|INPUT|SELECT|TEXTAREA|OPTION|BR|HR|LINK|META|NOSCRIPT|TEMPLATE)$/;
+        var KEEP = 'button, a, [role="button"], .button, input, select, textarea, label';
+        var targets = [], view = null, got = false;
+        function alpha(c) { var m = /rgba?\(([^)]+)\)/.exec(c || ''); if (!m) return 0; var p = m[1].split(','); return p.length > 3 ? parseFloat(p[3]) : 1; }
+        function boxy(el, cs) {
+            if (cs.position === 'fixed') return false;
+            var bi = cs.backgroundImage && cs.backgroundImage !== 'none';
+            return alpha(cs.backgroundColor) >= 0.03 || bi || (parseFloat(cs.borderTopWidth) > 0 && alpha(cs.borderTopColor) > 0.05) || (cs.boxShadow && cs.boxShadow !== 'none');
+        }
+        // Panels/cards that draw their own box, at most two levels deep (cards inside sections animate too, their
+        // contents ride along). Solid ones also become translucent glass so the profile's video shows through.
+        function collect() {
+            var all = document.body.getElementsByTagName('*'), found = [];
+            for (var i = 0; i < all.length && found.length < 260; i++) {
+                var el = all[i];
+                if (SKIP.test(el.tagName) || el.dataset.gsErv || el.closest(KEEP)) continue;
+                if (el.offsetWidth < 100 || el.offsetHeight < 36 || el.offsetParent === null) continue;
+                var cs = getComputedStyle(el);
+                if (!boxy(el, cs)) continue;
+                var depth = 0;
+                for (var a = el.parentElement; a && a !== document.body; a = a.parentElement) { if (a.dataset.gsErv) depth++; if (getComputedStyle(a).position === 'fixed') { depth = 9; break; } }
+                if (depth > 1) continue;
+                el.dataset.gsErv = '1';
+                if (alpha(cs.backgroundColor) >= 0.6 && !(cs.backgroundImage && cs.backgroundImage.indexOf('url(') !== -1)) {
+                    var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(cs.backgroundColor);
+                    if (m) { el.style.setProperty('background-color', 'rgba(' + m[1] + ',' + m[2] + ',' + m[3] + ',.5)', 'important'); el.classList.add('gs-eglass'); }
+                }
+                el.classList.add('gs-erv');
+                found.push(el);
+            }
+            targets = targets.concat(found);
+            apply();
+        }
+        function apply() {
+            if (!got) return;
+            var enter = [];
+            targets.forEach(function (el) {
+                var r = el.getBoundingClientRect(), top = r.top + window.pageYOffset, bot = top + r.height;
+                var vis = bot > view.top + 30 && top < view.bottom - 30;
+                if (vis && !el.classList.contains('is-in')) enter.push({ el: el, top: top, left: r.left });
+                else if (!vis && top >= view.bottom && el.classList.contains('is-in')) { el.style.setProperty('--gs-rv-d', '0ms'); el.classList.remove('is-in'); }
+            });
+            enter.sort(function (a, b) { return a.top - b.top || a.left - b.left; });
+            enter.forEach(function (it, i) { it.el.style.setProperty('--gs-rv-d', Math.min(i, 12) * 60 + 'ms'); it.el.classList.add('is-in'); });
+        }
+        window.addEventListener('message', function (e) {
+            if (e.source !== window.parent || !e.data || !e.data.gsView) return;
+            view = e.data.gsView; got = true; apply();
+        });
+        document.addEventListener('DOMContentLoaded', function () {
+            collect();
+            setTimeout(collect, 1200); setTimeout(collect, 3500);   // panels filled in by the page's own JS / REST
+            document.addEventListener('click', function () { setTimeout(collect, 300); setTimeout(collect, 1200); });
+            // never leave things hidden if the parent never reports (old profile JS, direct visit)
+            setTimeout(function () { if (!got) targets.forEach(function (el) { el.classList.add('is-in'); }); }, 2500);
+        });
+    })();
+    </script>
     <?php endif; ?>
     <style id="gs-embed-common">#gm-cc, .gm-cc, aipa-widget { display: none !important; } html, body { background: transparent !important; }</style>
     <script>

@@ -8,9 +8,11 @@
  */
 (function () {
     'use strict';
-    var CFG = window.GS_VIDEO_BACKDROP || {};
+    var CFG = {}, lastCfg = null;
 
     function boot() {
+        CFG = window.GS_VIDEO_BACKDROP || {};
+        lastCfg = window.GS_VIDEO_BACKDROP || null;
         var host = CFG.host ? document.querySelector(CFG.host) : null;
         var count = parseInt(CFG.count, 10) || 0;
         if (!host || !CFG.frames || !count || host.dataset.gsVbg) return;
@@ -177,4 +179,6 @@
     }
 
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', boot); else boot();
+    // content-only profile navigation (member-profile-header.php PJAX): boot again when the new page set a fresh config
+    document.addEventListener('gdc:pjax-load', function () { if (window.GS_VIDEO_BACKDROP && window.GS_VIDEO_BACKDROP !== lastCfg) boot(); });
 }());
