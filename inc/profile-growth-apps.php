@@ -125,6 +125,12 @@ add_action( 'wp_head', function () {
         #bridge-sticky-bar, #gm-cc, .gm-cc { display: none !important; }
         html { margin-top: 0 !important; padding-top: 0 !important; }
         html, body { background: transparent !important; }
+        /* no backdrop of its own: the page wrappers (incl. the solid full-width .psoo-brain-section) go transparent so
+           the profile's Contracts video is the only background; the cards on top are the glass layers */
+        .psoo-brain-section, #youzify-group-body, .youzify-group-content, .youzify-inner-content, .youzify-page-main-content,
+        .youzify-main-column, .youzify-right-sidebar-layout, .gdc-foundation-subpanels, .gdc-foundation-subpanel, #page, #content, main {
+            background: transparent !important; background-image: none !important; box-shadow: none !important;
+        }
         /* builds itself as the profile scrolls it into view (the parent posts the frame's visible slice: gsView) */
         .gs-erv { opacity: 0; translate: 0 28px; scale: .985; transition: opacity .6s cubic-bezier(.16,1,.3,1) var(--gs-rv-d,0ms), translate .7s cubic-bezier(.16,1,.3,1) var(--gs-rv-d,0ms), scale .7s cubic-bezier(.16,1,.3,1) var(--gs-rv-d,0ms); }
         .gs-erv.is-in { opacity: 1; translate: 0 0; scale: 1; }
@@ -151,6 +157,7 @@ add_action( 'wp_head', function () {
                 var el = all[i];
                 if (SKIP.test(el.tagName) || el.dataset.gsErv || el.closest(KEEP)) continue;
                 if (el.offsetWidth < 100 || el.offsetHeight < 36 || el.offsetParent === null) continue;
+                if (el.offsetWidth > document.documentElement.clientWidth * 0.92) continue;   // page wrappers, not cards
                 var cs = getComputedStyle(el);
                 if (!boxy(el, cs)) continue;
                 var depth = 0;
