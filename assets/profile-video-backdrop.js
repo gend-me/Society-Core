@@ -31,6 +31,10 @@
         stage.appendChild(canvas); stage.appendChild(shade);
         clip.appendChild(stage);
         host.insertBefore(clip, host.firstChild);
+        // Some tabs swap the host's content in place (group page loaders) — put the scene back if it gets removed.
+        if (window.MutationObserver) new MutationObserver(function () {
+            if (!host.contains(clip)) host.insertBefore(clip, host.firstChild);
+        }).observe(host, { childList: true });
         var ctx = canvas.getContext('2d');
 
         var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
@@ -149,7 +153,22 @@
         }
         function rgbOf(c) { var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return m ? [m[1], m[2], m[3]] : [10, 14, 24]; }
         var KEEP = '.aas-grow-cta, .aas-grow-cta-link, button, a, [role="button"], .button, .gs-vbg-keep';
+        // Tab roots that paint a solid backdrop of their own go transparent: the scene is the only background.
+        function clearRoots() {
+            if (!CFG.clear) return;
+            var roots;
+            try { roots = host.querySelectorAll(CFG.clear); } catch (e) { return; }
+            for (var i = 0; i < roots.length; i++) {
+                var r = roots[i];
+                if (r.dataset.gsCleared) continue;
+                r.dataset.gsCleared = '1';
+                r.dataset.gsGlass = '1';   // never tinted by the glass pass either
+                r.style.setProperty('background', 'transparent', 'important');
+                r.style.setProperty('background-image', 'none', 'important');
+            }
+        }
         function glassify() {
+            clearRoots();
             var nodes = host.querySelectorAll('*');
             for (var i = 0; i < nodes.length; i++) {
                 var el = nodes[i];
