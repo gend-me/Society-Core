@@ -3252,6 +3252,29 @@ function gend_society_member_groups_tabs_close() {
                 addEventListener('resize', kick);
                 document.addEventListener('click', function () { setTimeout(kick, 60); });
             }
+            // Launch a Web App sidebar: sticky in its column, centred vertically on screen. overflow:hidden on the
+            // memberships section made it the sticky's scroll container (so it never stuck) — clip instead.
+            var side = outer && outer.querySelector('.gdc-memberships-sidebar');
+            if (side) {
+                for (var an = side.parentElement; an && an !== document.body; an = an.parentElement) {
+                    var acs = getComputedStyle(an);
+                    if (/(hidden|auto|scroll)/.test(acs.overflowX + acs.overflowY)) an.style.setProperty('overflow', 'clip', 'important');
+                    if (an.classList.contains('gs-member-groups-wrap')) break;
+                }
+                var centre = function () {
+                    if (innerWidth <= 960) {   // stacked layout: the panel CSS makes it static there
+                        side.style.removeProperty('top'); side.style.removeProperty('position'); side.style.removeProperty('align-self');
+                        return;
+                    }
+                    if (!side.offsetHeight) return;
+                    side.style.setProperty('position', 'sticky', 'important');
+                    side.style.setProperty('align-self', 'start', 'important');
+                    side.style.setProperty('top', Math.round(Math.max(90, (innerHeight - side.offsetHeight) / 2)) + 'px', 'important');
+                };
+                centre();
+                addEventListener('resize', centre);
+                document.addEventListener('click', function () { setTimeout(centre, 80); });
+            }
             document.addEventListener('click', function (e) {
                 var t = e.target.closest && e.target.closest('.gs-ms-tab[data-gs-ms]');
                 if (!t) return;
