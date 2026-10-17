@@ -135,7 +135,9 @@ function gend_society_group_hub_tabs() {
 function gend_society_group_embed_menu_items() {
 	$payload = null;
 
-	$gid = (int) get_blog_option( get_current_blog_id(), 'gdc_bp_group_id', 0 );
+	// get_blog_option() exists only on multisite; a single-site container (every migrated
+	// site) reads its own option instead (110-01).
+	$gid = (int) ( is_multisite() ? get_blog_option( get_current_blog_id(), 'gdc_bp_group_id', 0 ) : get_option( 'gdc_bp_group_id', 0 ) );
 	if ( $gid > 0 ) {
 		global $wpdb;
 		$tbl = $wpdb->base_prefix . 'bp_groups';

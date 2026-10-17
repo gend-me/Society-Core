@@ -133,18 +133,28 @@ switch ( $gs110_section ) {
 		};
 		$f0 = $gs110_fatals();
 
-		// 1. The dashboard, then every gend-society menu link it renders.
-		$r    = $get( 'index.php' );
+		// 1. The dashboard. With ?gs110_dump_pages=1 the bed's test mu-plugin (phase110/beds/mu-plugins/
+		//    gs110-admin-pages-dump.php) writes the registered admin page hooks of THIS runtime to gs110-pages.json.
+		$dump = WP_CONTENT_DIR . '/gs110-pages.json';
+		if ( file_exists( $dump ) ) {
+			unlink( $dump );
+		}
+		$r    = $get( 'index.php?gs110_dump_pages=1' );
 		$code = is_wp_error( $r ) ? $r->get_error_message() : wp_remote_retrieve_response_code( $r );
 		$body = is_wp_error( $r ) ? '' : (string) wp_remote_retrieve_body( $r );
 		$gs110_check( 200 === $code && false === stripos( $body, 'critical error' ), 'GET wp-admin/index.php -> 200 (no critical error)', (string) $code );
 
+		// 2. Every registered page whose slug is gend-society's (gs-*, gend-society*, and the gdc-* pages its
+		//    admin-menu.php registers). Dashboard-card links to pages that are NOT registered on this runtime
+		//    (e.g. gs-users -> 403) are a separate finding, not part of this fatal check.
+		$hooks = file_exists( $dump ) ? (array) json_decode( (string) file_get_contents( $dump ), true ) : array();
+		$gs110_check( count( $hooks ) > 0, 'registered admin pages dumped by the bed mu-plugin', count( $hooks ) . ' hook(s)' );
 		$slugs = array();
-		if ( preg_match_all( '#admin\.php\?page=([a-z0-9_\-]+)#i', $body, $m ) ) {
-			foreach ( $m[1] as $s ) {
-				if ( preg_match( '/^(gs[-_]|gend[-_]society|gend-)/i', $s ) ) {
-					$slugs[ $s ] = true;
-				}
+		foreach ( $hooks as $h ) {
+			$p = strpos( (string) $h, '_page_' );
+			$s = false === $p ? '' : substr( (string) $h, $p + 6 );
+			if ( '' !== $s && preg_match( '/^(gs-|gend-society|gdc-)/i', $s ) ) {
+				$slugs[ $s ] = true;
 			}
 		}
 		// Hidden pages (no menu item) that admin-style.php's header still renders on.
