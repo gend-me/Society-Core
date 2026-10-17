@@ -3117,7 +3117,7 @@ function gend_society_member_groups_tabs_open() {
                 <button type="button" class="gs-ms-tab" data-gs-ms="invites" role="tab" aria-selected="false"><?php echo $gs_ms_ico( 'notifications' ); // phpcs:ignore ?><?php esc_html_e( 'Invitations', 'gend-society' ); ?><?php if ( $gs_invites_count ) : ?><span class="gs-ms-count"><?php echo (int) $gs_invites_count; ?></span><?php endif; ?></button>
             </div>
             <div class="gs-ms-panel is-active" data-gs-ms-panel="owned"><?php gdc_render_account_memberships_endpoint(); ?></div>
-            <div class="gs-ms-panel" data-gs-ms-panel="joined" data-gs-ms-joined-host></div>
+            <div class="gs-ms-panel" data-gs-ms-panel="joined"><?php echo function_exists( 'gend_society_joined_groups_panel' ) ? gend_society_joined_groups_panel() : ''; // phpcs:ignore -- group-header cards + AJAX search (profile-joined-groups.php) ?></div>
             <div class="gs-ms-panel" data-gs-ms-panel="invites">
                 <?php echo $gs_invites_html ? $gs_invites_html : '<p class="gs-ms-empty">' . esc_html__( 'No pending invitations.', 'gend-society' ) . '</p>'; // phpcs:ignore ?>
             </div>
@@ -3196,14 +3196,6 @@ function gend_society_member_groups_tabs_close() {
         </div><!-- /panel:groups -->
         <script>
         (function () {
-            var host = document.querySelector('[data-gs-ms-joined-host]');
-            var list = document.querySelector('.gs-member-groups-panel[data-gs-panel="groups"]');
-            if (host && list) {   // the BP groups loop (groups the member is in) → Memberships → Joined
-                list.classList.remove('gs-member-groups-panel', 'is-active');
-                list.classList.add('gs-ms-joined');
-                list.removeAttribute('role');
-                host.appendChild(list);
-            }
             // The strip and the Joined / Invitations panels go INTO the membership-list column, so switching only
             // changes that column (the Launch a Web App sidebar stays). The Owned panel becomes the always-visible
             // shell holding the layout, and the list column's original content becomes the "owned" panel.

@@ -542,6 +542,12 @@ return array(
 			'note'  => 'Projects → My Projects: Calendar + My Connections tabs (top-nav items removed).',
 		),
 		array(
+			'file'  => 'inc/profile-joined-groups.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Projects → Memberships → Joined: group-header cards with AJAX search.',
+		),
+		array(
 			'file'  => 'inc/login-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),
