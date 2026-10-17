@@ -3052,6 +3052,10 @@ function gend_society_member_groups_tabs_open() {
     /* strip + Joined / Invitations live inside the membership-list column (moved there by the script after the groups panel) */
     .gdc-memberships-main > .gs-ms-tabs { justify-content: flex-start; margin: 0 0 18px; }
     .gs-ms-shell { display: block; }
+    .gs-ms-empty { display: grid; justify-items: center; gap: 8px; }
+    .gs-ms-empty strong { color: #fff; font-size: 1rem; }
+    .gs-ms-empty__ico { display: grid; place-items: center; width: 52px; height: 52px; border-radius: 16px; color: #f0abfc; background: rgba(182,8,201,.12); border: 1px solid rgba(182,8,201,.35); }
+    .gs-ms-empty__ico svg { width: 24px; height: 24px; }
     .gs-ms-empty { padding: 40px 24px; text-align: center; border-radius: 18px; color: #94a3b8; border: 1px dashed rgba(255,255,255,.12); background: rgba(255,255,255,.02); }
     @keyframes gciFade { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
     </style>
@@ -3107,7 +3111,7 @@ function gend_society_member_groups_tabs_open() {
             $gs_shared_css_ver  = GEND_SOCIETY_VERSION . '.' . ( file_exists( $gs_shared_css_path ) ? filemtime( $gs_shared_css_path ) : '0' );
             $gs_shared_css      = add_query_arg( 'ver', $gs_shared_css_ver, plugins_url( 'vendor-app-manager/assets/css/gdc-customer-shared.css' ) );
             echo '<link rel="stylesheet" id="gdc-customer-shared-bp-profile" href="' . esc_url( $gs_shared_css ) . '" type="text/css" media="all" />';
-            $gs_invites_html  = gend_society_member_hub_invites_html();
+            $gs_invites_html  = trim( gend_society_member_hub_invites_html() );   // whitespace-only when there are none
             $gs_invites_count = substr_count( $gs_invites_html, 'class="gs-hub-invite-card"' );
             $gs_ms_ico        = function ( $k ) { return function_exists( 'gend_society_get_profile_nav_icon' ) ? gend_society_get_profile_nav_icon( $k ) : ''; };
             ?>
@@ -3119,7 +3123,15 @@ function gend_society_member_groups_tabs_open() {
             <div class="gs-ms-panel is-active" data-gs-ms-panel="owned"><?php gdc_render_account_memberships_endpoint(); ?></div>
             <div class="gs-ms-panel" data-gs-ms-panel="joined"><?php echo function_exists( 'gend_society_joined_groups_panel' ) ? gend_society_joined_groups_panel() : ''; // phpcs:ignore -- group-header cards + AJAX search (profile-joined-groups.php) ?></div>
             <div class="gs-ms-panel" data-gs-ms-panel="invites">
-                <?php echo $gs_invites_html ? $gs_invites_html : '<p class="gs-ms-empty">' . esc_html__( 'No pending invitations.', 'gend-society' ) . '</p>'; // phpcs:ignore ?>
+                <?php
+                if ( '' !== $gs_invites_html ) {
+                    echo $gs_invites_html; // phpcs:ignore
+                } else {
+                    echo '<div class="gs-ms-empty"><span class="gs-ms-empty__ico" aria-hidden="true">' . $gs_ms_ico( 'notifications' ) . '</span>' // phpcs:ignore
+                        . '<strong>' . esc_html__( 'No pending invitations', 'gend-society' ) . '</strong>'
+                        . '<span>' . esc_html__( 'When a hub invites you to join, it will appear here to accept or decline.', 'gend-society' ) . '</span></div>';
+                }
+                ?>
             </div>
         </div>
         <?php endif; ?>
