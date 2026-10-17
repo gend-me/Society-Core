@@ -87,8 +87,46 @@
             }
         });
 
+        // ── Builds itself on scroll: staggered entrance as pieces come into view, exit when they drop back below the
+        // screen (scrolling up), entrance again on the way down. The frame's visible slice goes to the embedded
+        // Advertising page so its cards do the same (profile-growth-apps.php embed script).
+        var RV = '.gs-growth-apps__head > div, .gs-growth-apps__search, .gs-growth-app, .gs-growth-apps__empty, .gs-growth-apps__stage';
+        var reduce = window.matchMedia && matchMedia('(prefers-reduced-motion: reduce)').matches;
+        var io = (!reduce && 'IntersectionObserver' in window) ? new IntersectionObserver(function (entries) {
+            var enter = entries.filter(function (en) { return en.isIntersecting; })
+                .sort(function (a, b) { return a.boundingClientRect.top - b.boundingClientRect.top || a.boundingClientRect.left - b.boundingClientRect.left; });
+            enter.forEach(function (en, i) { en.target.style.setProperty('--gs-rv-d', Math.min(i, 10) * 70 + 'ms'); en.target.classList.add('is-in'); });
+            entries.forEach(function (en) {
+                if (!en.isIntersecting && en.rootBounds && en.boundingClientRect.top > en.rootBounds.bottom) {
+                    en.target.style.setProperty('--gs-rv-d', '0ms'); en.target.classList.remove('is-in');   // below the screen → exit
+                }
+            });
+        }, { threshold: 0.08, rootMargin: '0px 0px -6% 0px' }) : null;
+        function arm(scope) {
+            (scope || root).querySelectorAll(RV).forEach(function (el) {
+                if (el.dataset.gsRv) return;
+                el.dataset.gsRv = '1';
+                if (io) io.observe(el); else el.classList.add('is-in');
+            });
+        }
+        root.classList.add('gs-rv-on');
+        if (window.MutationObserver) new MutationObserver(function () { arm(); }).observe(grid, { childList: true });
+        var viewRaf = 0;
+        function sendView() {
+            viewRaf = 0;
+            if (!frame.contentWindow || !frame.getAttribute('src') || frame.offsetParent === null) return;
+            var r = frame.getBoundingClientRect();
+            frame.contentWindow.postMessage({ gsView: { top: Math.max(0, -r.top), bottom: Math.max(0, Math.min(r.height, innerHeight - r.top)) } }, cfg.origin);
+        }
+        function kickView() { if (!viewRaf) viewRaf = requestAnimationFrame(sendView); }
+        addEventListener('scroll', kickView, { passive: true });
+        addEventListener('resize', kickView);
+        frame.addEventListener('load', function () { setTimeout(sendView, 200); setTimeout(sendView, 900); });
+        window.addEventListener('message', function (e) { if (e.source === frame.contentWindow && e.data && e.data.gsEmbedHeight) kickView(); });
+
         var apps = cfg.apps || [];
         render(apps);
+        arm();
         var pick = grid.querySelector('.gs-growth-app[data-id="' + current + '"]') || grid.querySelector('.gs-growth-app');
         // only load the frame once the Growth tab is opened (the panel is display:none until then)
         function maybeLoad() { if (root.offsetParent !== null && !frame.getAttribute('src')) select(pick); }
@@ -99,4 +137,5 @@
 
     function all() { document.querySelectorAll('[data-gs-growth-apps]').forEach(boot); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+    document.addEventListener('gdc:pjax-load', all);   // content-only profile navigation (member-profile-header.php)
 }());

@@ -72,4 +72,5 @@
 
     function all() { document.querySelectorAll('[data-gs-joined]').forEach(boot); }
     if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', all); else all();
+    document.addEventListener('gdc:pjax-load', all);   // content-only profile navigation (member-profile-header.php)
 }());
