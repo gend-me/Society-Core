@@ -33,17 +33,18 @@ function gend_society_profile_backdrops() {
  * Group menu pages (bp_current_action => entry). Host is #youzify-group-body — the one wrapper every group tab renders into (there is no #item-body here) —
  * and 'clear' lists the tab roots that paint a solid backdrop of their own, which go transparent so the video is the
  * only background (their cards still become glass).
- *   business-plan → earnings-flow (the activated Payments dashboard's Earnings heading video)
+ *   business-plan → biz-hands (the video the Payments activation landing page used: Smooth_transition_hands_202604051334.mp4)
  *   members-hub   → org-city (the animated city grid behind the Payments landing — the site-wide groups background)
  *   files         → contracts-vines (profile Contracts)
  *   projects      → projects-backdrop (profile Projects)
- *   payments      → wallet-flow (profile Wallet) — both the activation landing and the activated dashboard
+ *   payments      → wallet-flow (profile Wallet) — both the activation landing (its own .psoo-pl-bg video is hidden while
+ *                   the backdrop runs, so the landing matches the activated page) and the activated dashboard
  */
 function gend_society_group_backdrops() {
     $base  = content_url( 'uploads/gend-society-backdrops/' );
     $clear = '.psoo-bp, .psoo-brain-section, .members-header-section, .psoo-gm, .psoo-project-manager-tab, .workspace-header-section, .psoo-payments-tab, .psoo-payments-screen, .psoo-pay-activation, .psoo-pay-dashboard';
     return (array) apply_filters( 'gend_society_group_backdrops', array(
-        'business-plan' => array( 'frames' => $base . 'earnings-flow/', 'count' => 120, 'host' => '#youzify-group-body', 'anchor' => 'center center', 'start' => 0, 'clear' => $clear ),
+        'business-plan' => array( 'frames' => $base . 'biz-hands/', 'count' => 96, 'host' => '#youzify-group-body', 'anchor' => 'center center', 'start' => 0, 'clear' => $clear ),
         'members-hub'   => array( 'frames' => $base . 'org-city/', 'count' => 80, 'host' => '#youzify-group-body', 'anchor' => 'center center', 'start' => 0, 'clear' => $clear ),
         'files'         => array( 'frames' => $base . 'contracts-vines/', 'count' => 120, 'host' => '#youzify-group-body', 'clear' => $clear ),
         'projects'      => array( 'frames' => $base . 'projects-backdrop/', 'count' => 120, 'host' => '#youzify-group-body', 'clear' => $clear ),
