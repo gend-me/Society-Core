@@ -23,8 +23,10 @@
         var current = 0;
         try { current = parseInt(localStorage.getItem(KEY), 10) || 0; } catch (e) {}
 
+        var known = {}, lastList = (cfg.apps || []).slice(), open = false;
         function esc(s) { var d = document.createElement('div'); d.textContent = s == null ? '' : String(s); return d.innerHTML; }
         function render(apps) {
+            apps.forEach(function (a) { known[a.id] = a; });
             grid.innerHTML = apps.map(function (a) {
                 var on = a.id === current;
                 var initial = esc((a.name || '?').charAt(0).toUpperCase());
@@ -51,18 +53,47 @@
                 frame.style.height = '';
                 frame.setAttribute('src', btn.dataset.embed);
             }
+            closeList();
         }
+        // The list only opens from the search box; closed, just the chosen app's card shows under the search bar.
+        function showSelected() {
+            render(current && known[current] ? [known[current]] : []);
+            none.hidden = true;
+        }
+        function openList() {
+            if (open) return;
+            open = true;
+            root.classList.add('is-open');
+            if (q.value.trim()) runSearch(); else render(lastList);
+        }
+        function closeList() {
+            open = false;
+            root.classList.remove('is-open');
+            showSelected();
+        }
+        q.addEventListener('focus', openList);
+        q.addEventListener('click', openList);
+        q.addEventListener('keydown', function (e) { if (e.key === 'Escape') { q.blur(); closeList(); } });
+        document.addEventListener('click', function (e) {
+            if (open && !e.target.closest('.gs-growth-apps__search, [data-gs-growth-grid]')) closeList();
+        });
         frame.addEventListener('load', function () { loading.hidden = true; });
 
         grid.addEventListener('click', function (e) {
             var b = e.target.closest('.gs-growth-app');
-            if (b) select(b);
+            if (!b) return;
+            e.stopPropagation();   // re-rendering detaches the clicked card — keep the outside-click closer out of it
+            if (!open) { openList(); q.focus(); return; }   // the chosen card reopens the list
+            select(b);
         });
 
         var timer = 0, seq = 0;
         q.addEventListener('input', function () {
+            if (!open) openList();
             clearTimeout(timer);
-            timer = setTimeout(function () {
+            timer = setTimeout(runSearch, 250);
+        });
+        function runSearch() {
                 var my = ++seq;
                 var body = new URLSearchParams({ action: 'gend_society_growth_apps', nonce: cfg.nonce, user_id: cfg.user, q: q.value.trim() });
                 root.classList.add('is-searching');
@@ -70,12 +101,13 @@
                     .then(function (r) { return r.json(); })
                     .then(function (res) {
                         if (my !== seq) return;
-                        render(res && res.success && res.data ? res.data.apps : []);
+                        var list = res && res.success && res.data ? res.data.apps : [];
+                        if (!q.value.trim()) lastList = list;
+                        if (open) render(list); else list.forEach(function (a) { known[a.id] = a; });
                     })
                     .catch(function () {})
                     .then(function () { if (my === seq) root.classList.remove('is-searching'); });
-            }, 250);
-        });
+        }
 
         // the embedded page reports its height, and where a popup opened inside it
         window.addEventListener('message', function (e) {
@@ -125,11 +157,16 @@
         window.addEventListener('message', function (e) { if (e.source === frame.contentWindow && e.data && e.data.gsEmbedHeight) kickView(); });
 
         var apps = cfg.apps || [];
-        render(apps);
+        apps.forEach(function (a) { known[a.id] = a; });
+        if (!known[current] && apps.length) current = apps[0].id;
+        showSelected();
         arm();
-        var pick = grid.querySelector('.gs-growth-app[data-id="' + current + '"]') || grid.querySelector('.gs-growth-app');
         // only load the frame once the Growth tab is opened (the panel is display:none until then)
-        function maybeLoad() { if (root.offsetParent !== null && !frame.getAttribute('src')) select(pick); }
+        function maybeLoad() {
+            if (root.offsetParent === null || frame.getAttribute('src')) return;
+            var btn = grid.querySelector('.gs-growth-app[data-id="' + current + '"]');
+            if (btn) select(btn);
+        }
         var radio = document.getElementById('gci-tab-growth');
         if (radio) radio.addEventListener('change', maybeLoad);
         maybeLoad();
