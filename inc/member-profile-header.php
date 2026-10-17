@@ -957,6 +957,12 @@ function gend_society_render_profile_header() {
         return ( $oa - $ob ) ?: ( $a->_src - $b->_src );
     } );
 
+    // ── Calendar + Connections moved under Projects → My Projects (tabs right of My Tasks, own profile — see
+    // inc/profile-board-tabs.php). Their routes stay (the tabs frame them), only the top-nav items go.
+    $nav_items = array_values( array_filter( $nav_items, function ( $it ) {
+        return ! in_array( isset( $it->slug ) ? $it->slug : '', array( 'member-calendar', 'friends' ), true );
+    } ) );
+
     $current_component = bp_current_component();
 
     // ── Cover photo ───────────────────────────────────────────────────────────
@@ -3352,6 +3358,26 @@ body.bp-user .youzify-inline-mobile-nav {
         opacity: 1 !important;
         transform: none !important;
     }
+}
+
+/* ══ Bigger, centred main nav (desktop + tablet) ═════════════════════════
+   With four items (Overview / Projects / Contracts / Wallet) spreading them edge to edge left wide gaps; they now sit
+   as a centred group with larger labels and icon chips. Phones keep the chip grid below.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (min-width: 721px) {
+    .gdc-profile-nav-inner {
+        justify-content: center;
+        column-gap: clamp(28px, 4.5vw, 72px);
+    }
+    .gdc-profile-nav .gdc-nav-item {
+        gap: 12px;
+        padding: 24px 4px;
+        font-size: clamp(0.85rem, 1vw, 1.02rem);
+        letter-spacing: 1.8px;
+        border-bottom-width: 3px;
+    }
+    .gdc-profile-nav .gdc-nav-icon { width: 38px; height: 38px; border-radius: 11px; }
+    .gdc-profile-nav .gdc-nav-icon svg { width: 19px; height: 19px; }
 }
 
 /* ══ Mobile — switch nav to a 4-col chip grid ════════════════════════════

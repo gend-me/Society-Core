@@ -105,9 +105,18 @@ add_action( 'wp_enqueue_scripts', function () {
     wp_enqueue_script( 'gend-society-growth-apps', GEND_SOCIETY_URL . 'assets/profile-growth-apps.js', array(), GEND_SOCIETY_VERSION . '.' . @filemtime( $js ), true );
 }, 30 );
 
-/** Inside the embed: hide the group nav + Marketing sub-tabs, report height to the parent profile. */
+/** Embed modes framed into profile tabs: advertising (this file), calendar + connections (profile-board-tabs.php). */
+function gend_society_embed_mode() {
+    if ( empty( $_GET['gdc_tab_only'] ) || empty( $_GET['gs_embed'] ) ) return '';
+    $m = sanitize_key( wp_unslash( $_GET['gs_embed'] ) );
+    return in_array( $m, array( 'advertising', 'calendar', 'connections' ), true ) ? $m : '';
+}
+
+/** Inside an embed: hide the chrome (advertising: group nav + Marketing sub-tabs), report height to the parent profile. */
 add_action( 'wp_head', function () {
-    if ( empty( $_GET['gdc_tab_only'] ) || empty( $_GET['gs_embed'] ) || 'advertising' !== $_GET['gs_embed'] ) return;
+    $mode = gend_society_embed_mode();
+    if ( ! $mode ) return;
+    if ( 'advertising' === $mode ) :
     ?>
     <style id="gs-embed-advertising">
         /* group pages don't carry the gdc-tab-only body class, so no body prefix (this block only prints in embed mode) */
@@ -117,6 +126,8 @@ add_action( 'wp_head', function () {
         html { margin-top: 0 !important; padding-top: 0 !important; }
         html, body { background: transparent !important; }
     </style>
+    <?php endif; ?>
+    <style id="gs-embed-common">#gm-cc, .gm-cc, aipa-widget { display: none !important; } html, body { background: transparent !important; }</style>
     <script>
     (function () {
         if (window.parent === window) return;
