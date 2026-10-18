@@ -567,7 +567,7 @@ if ( ! function_exists( 'gend_society_readiness_render_card' ) ) {
 if ( ! function_exists( 'gend_society_readiness_render_card_remote' ) ) {
 	/**
 	 * Read-only card for gend.me's front end (the hub shows what the site reported). Same table markup as the
-	 * local card; no form and no admin-only functions; one scoped <style> block per request.
+	 * local card; no form and no admin-only functions; one scoped inline style block per request.
 	 *
 	 * @param array|null $result Reported result.
 	 */
