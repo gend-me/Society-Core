@@ -761,7 +761,7 @@ function gend_society_chat_tabs_footer() {
 				<select data-agent-field="billing_account" data-gs-billing-select>
 				  <option value=""><?php echo $esc_html( __( '(me) - default', 'gend-society' ) ); ?></option>
 				</select>
-				<p class="gs-agent-help"><?php echo $esc_html( __( 'Leo Credits + Gas Compute for gend.me runs are charged to this member.', 'gend-society' ) ); ?></p>
+				<p class="gs-agent-help"><?php echo $esc_html( __( 'AI Builder Tokens + Gas Compute for gend.me runs are charged to this member.', 'gend-society' ) ); ?></p>
 			  </div>
 			</section>
 
@@ -3564,7 +3564,7 @@ function gend_society_rest_agent_list( $req ) {
  * GET gs/v1/group-members — list a group's HUMAN members.
  *
  * Powers the "Billing account" dropdown in the Add-new-Agent popup so a new
- * agent's gend.me runs (Leo Credits + Gas Compute) can be charged to a chosen
+ * agent's gend.me runs (AI Builder Tokens + Gas Compute) can be charged to a chosen
  * member. Resolves the group's members BY ID (mirrors gs_rest_agent_list),
  * EXCLUDES agents (gs_user_is_agent when present, else the _aipa_is_agent meta),
  * and returns { ok, members:[ { id:(int), name } ] }.
