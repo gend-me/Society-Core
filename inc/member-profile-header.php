@@ -684,6 +684,125 @@ function gend_society_rest_profile_avatar_update( WP_REST_Request $request ) {
     ], 200 );
 }
 
+// ─── Connected group: Compute Gas owed + Gas Station earnings ────────────────
+// Owed  = the group's web app (site) GAS usage not yet paid: unbilled ledger
+//         rows + pending "GAS compute usage" WP Ultimo invoices (the same
+//         sources as the Compute Gas tab / gend_society_hosting_compute_gas_real_data()).
+// Earned = owner_amount on ledger rows served by devices of the group's device
+//         owners (psoo_group_device_owner_uids: group admins, + super admins for
+//         the hub group), paid out in DGEN.
+function gend_society_profile_group_gas_site_id( $group_id ) {
+    global $wpdb;
+    $group_id = (int) $group_id;
+    if ( $group_id <= 0 || ! is_multisite() ) return 0;
+    $blog = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT blog_id FROM {$wpdb->blogmeta} WHERE meta_key = 'gdc_bp_group_id' AND meta_value = %s ORDER BY blog_id ASC LIMIT 1",
+        (string) $group_id
+    ) );
+    if ( $blog <= 0 && function_exists( 'groups_get_groupmeta' ) ) {
+        $blog = (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true );
+    }
+    return ( $blog > 0 && get_blog_details( $blog ) ) ? $blog : 0;
+}
+
+function gend_society_profile_gas_amount( $v, $unit ) {
+    $v = (float) $v;
+    $d = ( $v > 0 && $v < 0.01 ) ? 4 : 2;
+    return number_format( $v, $d ) . ' ' . $unit;
+}
+
+function gend_society_profile_group_gas( $group_id, $group_url ) {
+    global $wpdb;
+    $ledger    = $wpdb->base_prefix . 'gdc_gas_ledger';
+    $group_url = trailingslashit( (string) $group_url );
+    $out = array(
+        'owed'          => 0.0,
+        'owed_label'    => gend_society_profile_gas_amount( 0, 'GAS' ),
+        'owed_sub'      => 'No compute gas used yet',
+        'pay_url'       => $group_url . 'compute-gas/',
+        'pay_title'     => '',
+        'earned_label'  => gend_society_profile_gas_amount( 0, 'DGEN' ),
+        'devices_label' => 'No devices connected',
+        'stations_url'  => $group_url . 'compute-gas/gas-stations/',
+    );
+    if ( $ledger !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $ledger ) ) ) {
+        return $out;
+    }
+
+    // Owed.
+    $site_id  = gend_society_profile_group_gas_site_id( $group_id );
+    $unbilled = 0.0;
+    $pending  = 0.0;
+    $pay_url  = '';
+    if ( $site_id > 0 ) {
+        $unbilled = (float) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(SUM(sales_amount), 0) FROM %i WHERE site_id = %d AND status = 'recorded'",
+            $ledger, $site_id
+        ) );
+        $site        = function_exists( 'wu_get_site' ) ? wu_get_site( $site_id ) : null;
+        $customer_id = $site ? (int) $site->get_customer_id() : 0;
+        if ( $customer_id > 0 && function_exists( 'wu_get_payment' ) ) {
+            $payment_ids = $wpdb->get_col( $wpdb->prepare(
+                "SELECT id FROM {$wpdb->base_prefix}wu_payments WHERE customer_id = %d AND status = 'pending' ORDER BY id DESC LIMIT 20",
+                $customer_id
+            ) );
+            foreach ( (array) $payment_ids as $payment_id ) {
+                $payment = wu_get_payment( (int) $payment_id );
+                if ( ! $payment ) continue;
+                $is_gas = false;
+                foreach ( $payment->get_line_items() as $line_item ) {
+                    if ( strpos( (string) $line_item->get_title(), 'GAS compute usage' ) === 0 ) { $is_gas = true; break; }
+                }
+                if ( ! $is_gas ) continue;
+                $pending += (float) $payment->get_total();
+                if ( '' === $pay_url && $payment->is_payable() ) {
+                    $pay_url = (string) $payment->get_payment_url();
+                }
+            }
+        }
+    }
+    $out['owed']       = $unbilled + $pending;
+    $out['owed_label'] = gend_society_profile_gas_amount( $out['owed'], 'GAS' );
+    if ( $pending > 0 ) {
+        $out['owed_sub'] = 'Invoice ready to pay';
+    } elseif ( $unbilled > 0 ) {
+        $out['owed_sub']  = 'Invoiced at the next daily billing run';
+        $out['pay_title'] = 'Open Compute Gas to review usage and invoices';
+    } elseif ( $site_id > 0 ) {
+        $out['owed_sub'] = 'All compute gas paid';
+    }
+    if ( '' !== $pay_url ) {
+        $out['pay_url'] = $pay_url;
+    }
+
+    // Earned.
+    $owners = function_exists( 'psoo_group_device_owner_uids' )
+        ? array_values( array_filter( array_map( 'intval', (array) psoo_group_device_owner_uids( $group_id ) ) ) )
+        : array();
+    if ( $owners ) {
+        $in     = implode( ',', array_fill( 0, count( $owners ), '%d' ) );
+        $earned = (float) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(SUM(owner_amount), 0) FROM %i WHERE station_user_id IN ($in)", // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+            array_merge( array( $ledger ), $owners )
+        ) );
+        $out['earned_label'] = gend_society_profile_gas_amount( $earned, 'DGEN' );
+        if ( function_exists( 'psoo_device_get_records' ) ) {
+            $devices = 0;
+            $online  = 0;
+            foreach ( $owners as $owner_id ) {
+                foreach ( (array) psoo_device_get_records( $owner_id ) as $record ) {
+                    $devices++;
+                    if ( function_exists( 'psoo_device_online' ) && psoo_device_online( $record ) ) $online++;
+                }
+            }
+            if ( $devices > 0 ) {
+                $out['devices_label'] = sprintf( '%d device%s connected · %d online', $devices, 1 === $devices ? '' : 's', $online );
+            }
+        }
+    }
+    return $out;
+}
+
 // ─── Render header ────────────────────────────────────────────────────────────
 // Hook into youzify_profile_before_header (fires before the <header> element)
 // so our section renders first. The original header + navbar are hidden via CSS.
@@ -734,38 +853,40 @@ function gend_society_render_profile_header() {
         ? (float) mycred_get_users_balance( $user_id, 'mycred_default' )
         : 0.0;
 
-    // Card order: DGEN Balance, Task Credits, Store Credits, AI Builder
-    // Tokens (stagger follows position so the entrance animation stays
+    // Card order: DGEN Coins, AI Builder Tokens, Task Services, Store
+    // Credits (stagger follows position so the entrance animation stays
     // left-to-right).
     $balances = apply_filters( 'gend_society_profile_header_balances', [
         [
-            'label'   => '🇨🇦 DGEN Balance',
-            'value'   => number_format( $dgen_balance ),
-            'color'   => 'var(--gph-green)',
-            'stagger' => 2,
-            'topup'   => 'dgen',
-        ],
-        [
-            'label'   => 'Task Credits',
-            'value'   => number_format( $task_credits ),
-            'color'   => 'var(--gph-magenta)',
-            'stagger' => 3,
-            'topup'   => 'tasks',
-        ],
-        [
-            'label'       => '🇨🇦 Store Credits',
-            'value'       => '$' . number_format( $store_credits, 2 ),
-            'color'       => 'var(--gph-red)',
-            'stagger'     => 4,
-            'topup'       => 'store',
-            'topup_label' => 'Spend',
+            'label'       => '🇨🇦 DGEN Coins',
+            'value'       => number_format( $dgen_balance ),
+            'color'       => 'var(--gph-green)',
+            'stagger'     => 2,
+            'topup'       => 'earn',
+            'topup_label' => 'Earn',
         ],
         [
             'label'   => 'AI Builder Tokens',
             'value'   => number_format( $ai_tokens, 1 ),
             'color'   => 'var(--gph-blue)',
-            'stagger' => 5,
+            'stagger' => 3,
             'topup'   => 'ai',
+        ],
+        [
+            'label'       => 'Task Services',
+            'value'       => number_format( $task_credits ),
+            'color'       => 'var(--gph-magenta)',
+            'stagger'     => 4,
+            'topup'       => 'tasks',
+            'topup_label' => 'Retainers',
+        ],
+        [
+            'label'       => '🇨🇦 Store Credits',
+            'value'       => '$' . number_format( $store_credits, 2 ),
+            'color'       => 'var(--gph-red)',
+            'stagger'     => 5,
+            'topup'       => 'store',
+            'topup_label' => 'Spend',
         ],
     ], $user_id );
 
@@ -789,6 +910,9 @@ function gend_society_render_profile_header() {
         'dgen'  => class_exists( 'Gend_CP_DGEN_TopUp' ),
         // Store credits → "Spend" opens the shop (any WooCommerce store).
         'store' => class_exists( 'WooCommerce' ),
+        // DGEN Coins → "Earn" opens the viewer's own affiliate dashboard
+        // (reward-programs' bare [affiliate_sales_dashboard] embed page).
+        'earn'  => function_exists( 'gend_wallet_affiliate_embed_url' ) && shortcode_exists( 'affiliate_sales_dashboard' ),
     ];
 
     // ── Linked application row ────────────────────────────────────────────────
@@ -836,6 +960,9 @@ function gend_society_render_profile_header() {
             }
         }
     }
+    $admin_group_gas = ( $admin_group && $is_own_profile )
+        ? gend_society_profile_group_gas( (int) $admin_group->id, $admin_group_url )
+        : null;
 
     // ── Action buttons ────────────────────────────────────────────────────────
     $msg_url     = '';
@@ -1464,6 +1591,33 @@ function gend_society_render_profile_header() {
                            style="margin-left:8px;"
                            target="_blank" rel="noopener">View Site</a>
                     </div>
+                    <?php if ( $admin_group_gas ) : ?>
+                    <div class="gdc-group-gas">
+                        <div class="gdc-group-gas__stat gdc-group-gas__stat--owed">
+                            <div class="gdc-group-gas__text">
+                                <span class="gdc-group-gas__label">Gas Owed</span>
+                                <span class="gdc-group-gas__value"><?php echo esc_html( $admin_group_gas['owed_label'] ); ?></span>
+                                <span class="gdc-group-gas__sub"><?php echo esc_html( $admin_group_gas['owed_sub'] ); ?></span>
+                            </div>
+                            <?php if ( $admin_group_gas['owed'] > 0 ) : ?>
+                            <a href="<?php echo esc_url( $admin_group_gas['pay_url'] ); ?>"
+                               class="gdc-group-gas__btn"
+                               title="<?php echo esc_attr( $admin_group_gas['pay_title'] ); ?>">Pay Now</a>
+                            <?php else : ?>
+                            <span class="gdc-group-gas__btn is-done">Paid Up</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="gdc-group-gas__stat gdc-group-gas__stat--earned">
+                            <div class="gdc-group-gas__text">
+                                <span class="gdc-group-gas__label">Gas Station Earnings</span>
+                                <span class="gdc-group-gas__value"><?php echo esc_html( $admin_group_gas['earned_label'] ); ?></span>
+                                <span class="gdc-group-gas__sub"><?php echo esc_html( $admin_group_gas['devices_label'] ); ?></span>
+                            </div>
+                            <a href="<?php echo esc_url( $admin_group_gas['stations_url'] ); ?>"
+                               class="gdc-group-gas__btn gdc-group-gas__btn--ghost">Devices</a>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
 
@@ -1552,6 +1706,8 @@ function gend_society_render_profile_header() {
             'ai'          => ! empty( $topup_enabled['ai'] ),
             'dgen'        => ! empty( $topup_enabled['dgen'] ),
             'store'       => ! empty( $topup_enabled['store'] ),
+            'earn'        => ! empty( $topup_enabled['earn'] ),
+            'earnUrl'     => ! empty( $topup_enabled['earn'] ) ? gend_wallet_affiliate_embed_url() : '',
             'shopUrl'     => function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ),
             'hasWalletCard' => (bool) ( $is_own_profile && shortcode_exists( 'gend_wallet' ) ),
             'sym'         => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$',
@@ -1732,6 +1888,78 @@ function gend_society_render_profile_header() {
             var fb = el('div', 'gdc-tp-foot', 'Store credit applies at checkout &middot; <a href="' + CFG.shopUrl + '" target="_blank" rel="noopener">Open the shop in a new tab &rarr;</a>');
             d.appendChild(fb);
             mount(d, accent);
+        }
+
+        // Big iframe popup shared by Earn + Retainers (same shell as Spend).
+        function openFramePopup(o) {
+            var d = el('div', 'gdc-tp-dialog gdc-tp-dialog--shop');
+            d.style.setProperty('--gph-accent', o.accent);
+            d.appendChild(el('div', 'gdc-tp-scan'));
+            var close = el('button', 'gdc-tp-close', '&times;');
+            close.type = 'button'; close.setAttribute('aria-label', 'Close');
+            close.addEventListener('click', closeOverlay);
+            d.appendChild(close);
+            d.appendChild(el('div', 'gdc-tp-cobar', '<span class="gdc-tp-cobar__dot"></span> ' + o.bar));
+            var loading = el('div', 'gdc-tp-loading', '<div class="gdc-tp-spinner"></div><p class="gdc-tp-loadmsg">' + o.loading + '</p>');
+            d.appendChild(loading);
+            var frame = el('iframe', 'gdc-tp-frame gdc-tp-frame--shop');
+            frame.setAttribute('title', o.title);
+            var revealed = false, poll, hard;
+            function reveal() {
+                if (revealed) return; revealed = true;
+                clearInterval(poll); clearTimeout(hard);
+                loading.style.display = 'none';
+                frame.classList.add('is-loaded');
+                if (o.onReveal) o.onReveal(frame);
+            }
+            // Wait for the real page, not the iframe's initial about:blank.
+            poll = setInterval(function () {
+                var rs;
+                try {
+                    rs = frame.contentWindow.location.href !== 'about:blank' && frame.contentDocument.readyState;
+                } catch (e) { rs = null; }
+                if (rs === 'interactive' || rs === 'complete') reveal();
+            }, 150);
+            frame.addEventListener('load', function () {
+                reveal();
+                if (o.onReveal) o.onReveal(frame);   // re-run once everything has mounted
+            });
+            hard = setTimeout(reveal, 12000);
+            frame.src = o.url;
+            d.appendChild(frame);
+            var fb = el('div', 'gdc-tp-foot', o.foot);
+            d.appendChild(fb);
+            mount(d, o.accent);
+            return fb;
+        }
+
+        // ── DGEN Coins → Earn: the viewer's affiliate (commissions) dashboard ─
+        function openEarn() {
+            openFramePopup({
+                accent: 'var(--gph-green)',
+                url: CFG.earnUrl,
+                title: 'Affiliate dashboard',
+                bar: 'Earn DGEN Coins &middot; your referral links, team and commissions',
+                loading: 'Loading your affiliate dashboard&hellip;',
+                foot: 'Commissions are paid out in DGEN &middot; <a href="' + CFG.earnUrl + '" target="_blank" rel="noopener">Open in a new tab &rarr;</a>'
+            });
+        }
+
+        // ── Task Services → Retainers: the retainer plans product page, with
+        // the one-off task-credit purchase kept one click away. ─
+        function openRetainers() {
+            if (!CFG.retainerUrl) return openTasks();
+            var fb = openFramePopup({
+                accent: 'var(--gph-magenta)',
+                url: CFG.retainerUrl,
+                title: 'Retainers',
+                bar: 'Task Services Retainers &middot; <strong style="color:var(--gph-accent)">' + fmt(CFG.taskBalance) + '</strong> credits available',
+                loading: 'Loading retainer plans&hellip;',
+                foot: 'Need a one-off request? <a href="#" data-gdc-buy-credits="1">Buy individual task credits &rarr;</a>',
+                onReveal: styleShopEmbed
+            });
+            var a = fb.querySelector('[data-gdc-buy-credits]');
+            if (a) a.addEventListener('click', function (e) { e.preventDefault(); openTasks(); });
         }
 
         // ── Helpers ──────────────────────────────────────────────────────
@@ -1930,7 +2158,8 @@ function gend_society_render_profile_header() {
             if (!btn) return;
             e.preventDefault();
             var kind = btn.getAttribute('data-gdc-topup');
-            if (kind === 'tasks' && CFG.tasks) return openTasks();
+            if (kind === 'earn' && CFG.earn) return openEarn();
+            if (kind === 'tasks' && CFG.tasks) return openRetainers();
             if (kind === 'ai' && CFG.ai) return openAI();
             if (kind === 'dgen' && CFG.dgen) return openDGEN();
             if (kind === 'store' && CFG.store) return openShop();
@@ -3214,6 +3443,71 @@ body.bp-user .youzify-inline-mobile-nav {
     background: rgba(137,194,224,0.1) !important;
 }
 
+/* ── Connected group: Gas Owed / Gas Station Earnings ────────────────── */
+.gdc-group-gas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 0 24px 18px;
+}
+.gdc-group-gas__stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    --gas-accent: var(--gph-red);
+}
+.gdc-group-gas__stat--earned { --gas-accent: var(--gph-green); }
+.gdc-group-gas__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.gdc-group-gas__label {
+    font-family: monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+.gdc-group-gas__value {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: var(--gas-accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gdc-group-gas__sub { font-size: 0.62rem; color: #64748b; }
+.gdc-group-gas__btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--gas-accent);
+    background: rgba(255,255,255,0.04);
+    color: var(--gas-accent) !important;
+    font-family: "Inter", sans-serif;
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-decoration: none !important;
+    line-height: 1;
+    transition: background 0.25s, color 0.2s, box-shadow 0.3s, transform 0.3s;
+}
+a.gdc-group-gas__btn:hover,
+a.gdc-group-gas__btn:focus-visible {
+    background: var(--gas-accent);
+    color: #06080d !important;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px -10px var(--gas-accent);
+    outline: none;
+}
+.gdc-group-gas__btn--ghost { border-color: rgba(255,255,255,0.18); color: #cbd5e1 !important; }
+.gdc-group-gas__btn.is-done { border-color: rgba(0,255,136,0.35); color: var(--gph-green) !important; cursor: default; }
+@media (max-width: 720px) {
+    .gdc-group-gas { grid-template-columns: 1fr; padding: 0 16px 16px; }
+}
+
 /* Balance grid */
 .gdc-balance-grid {
     display: grid;
@@ -4183,6 +4477,7 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 .gdc-stagger-2 .gdc-topup-btn { animation-delay: 1.00s; }
 .gdc-stagger-3 .gdc-topup-btn { animation-delay: 1.15s; }
 .gdc-stagger-4 .gdc-topup-btn { animation-delay: 1.30s; }
+.gdc-stagger-5 .gdc-topup-btn { animation-delay: 1.45s; }
 /* Hover: grow the real type + padding (crisp, not a blurry scale) for a
    bigger, easier-to-read pill that lifts and glows on its accent colour. */
 .gdc-topup-btn:hover,
