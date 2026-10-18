@@ -666,6 +666,12 @@ return array(
 			'note'  => 'Local readiness checks; pure functions, reused by Phase 110 pre-flight; no remote call.',
 		),
 		array(
+			'file'  => 'inc/migration-preflight.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Migration pre-flight sizing + report; consent-gated remote (Phase 110-09). Standalone only.',
+		),
+		array(
 			'file'  => 'inc/pages/welcome.php',
 			'tier'  => 'customer',
 			'needs' => array( 'standalone' ),
