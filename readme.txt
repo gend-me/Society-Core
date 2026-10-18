@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.6.0
+Stable tag: 1.6.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -103,6 +103,9 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.6.1 =
+* Fixes a fatal error on single-site installs in the admin menu.
 
 = 1.6.0 =
 * The GenD dashboard is now on by default. "Switch back to standard WordPress" returns you to the normal WordPress admin at any time.
