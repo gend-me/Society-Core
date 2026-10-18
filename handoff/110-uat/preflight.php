@@ -113,9 +113,10 @@ function gs110pf_baseline_check( $key, $md5, $id, $text ) {
 	}
 	gs110pf_assert( $have === $md5, $id, $text . ' (baseline ' . substr( $have, 0, 8 ) . ')', 'now ' . $md5 );
 }
-/** Nonces and other per-tick tokens out of rendered HTML. */
+/** Nonces, other per-tick tokens and relative times ("scanned 43 seconds ago") out of rendered HTML. */
 function gs110pf_norm( $html ) {
 	$html = preg_replace( '/\b[0-9a-f]{10}\b/', 'NONCE', (string) $html );
+	$html = preg_replace( '/\b\d+ (?:second|sec|min|minute|hour|day|week|month|year)s? ago\b/', 'N ago', $html );
 	return $html;
 }
 
@@ -464,6 +465,21 @@ $gs110pf_sections['unpair'] = function () {
 $gs110pf_sections['welcome-unchanged'] = function () {
 	$mode = function_exists( 'gend_society_runtime_mode' ) ? gend_society_runtime_mode() : '?';
 	$tag  = $mode . ( is_multisite() ? '-ms' : '' );
+	// The rest / loopback / basic_auth checks request this site itself; a fixed answer makes collect() comparable
+	// across runs (their code is unchanged; only the environment's live answers vary).
+	$self = function ( $pre, $args, $url ) {
+		$h = wp_parse_url( $url, PHP_URL_HOST );
+		if ( ! is_string( $h ) || ! in_array( strtolower( $h ), gend_society_readiness_self_hosts(), true ) ) {
+			return $pre;
+		}
+		return array( 'headers' => array(), 'body' => '{"namespaces":["wp/v2"]}', 'response' => array( 'code' => 200, 'message' => 'OK' ), 'cookies' => array(), 'filename' => null );
+	};
+	add_filter( 'pre_http_request', $self, 0, 3 );
+	gs110pf_on_cleanup(
+		function () use ( $self ) {
+			remove_filter( 'pre_http_request', $self, 0 );
+		}
+	);
 	$r    = gend_society_readiness_collect();
 	$sig  = array_map(
 		function ( $c ) {
@@ -997,10 +1013,11 @@ $gs110pf_sections['cta-hub-unchanged'] = function () {
 	$mode = gend_society_runtime_mode();
 	gs110pf_assert( in_array( $mode, array( 'hub', 'container' ), true ), 'hubcta-mode', "running on hub or container ({$mode})" );
 	wp_set_current_user( 1 );
-	$html = gs110pf_norm( gs110pf_render( function () {
+	// The card shows live usage (sizes, file counts, "scanned N ago"): numbers are normalised, markup and copy are not.
+	$html = preg_replace( '/\d+(?:[.,]\d+)*/', '#', gs110pf_norm( gs110pf_render( function () {
 		gend_society_hosting_render_storage_resource_cards( array(), array(), array() );
-	} ) );
-	gs110pf_info( 'storage card bytes ' . strlen( $html ) . ' cta=' . ( false !== strpos( $html, 'gdc-migrate-cta' ) ? 'yes' : 'no' ) );
+	} ) ) );
+	gs110pf_info( 'storage card bytes ' . strlen( $html ) . ' (numbers normalised) cta=' . ( false !== strpos( $html, 'gdc-migrate-cta' ) ? 'yes' : 'no' ) );
 	gs110pf_baseline_check( 'storage-' . $mode, md5( $html ), 'hubcta-md5', "Storage card HTML md5 equals main ({$mode})" );
 	if ( function_exists( 'gdc_render_migrate_containers_cta' ) && '1' === (string) getenv( 'GS110PF_CAPTURE' ) ) {
 		echo 'VAMCTA-BEGIN' . gdc_render_migrate_containers_cta( '[[BUTTON]]' ) . "VAMCTA-END\n";
