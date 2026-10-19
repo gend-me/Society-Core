@@ -400,6 +400,10 @@ if ( ! function_exists( 'gend_society_readiness_collect' ) ) {
 				$result['checks'] = array_merge( $checks, (array) $extra['checks'] );
 				$result['totals'] = (array) $extra['totals'];
 			}
+			// Phase 110-15: may visitors download the export staging folder? (fixed id staging_exposed, appended)
+			if ( function_exists( 'gend_society_migration_staging_exposed_check' ) ) {
+				$result['checks'][] = gend_society_migration_staging_exposed_check();
+			}
 		}
 		return $result;
 	}

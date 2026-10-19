@@ -815,6 +815,7 @@ if ( ! function_exists( 'gend_society_migration_receive' ) ) {
 				false
 			);
 		}
+		do_action( 'gend_society_migration_state_received', $answer ); // 110-15: a pending ready report goes out again
 		return $did;
 	}
 }

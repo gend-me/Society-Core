@@ -88,12 +88,39 @@ if ( ! function_exists( 'gend_society_uninstall_like' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_uninstall_migration_staging' ) ) {
+	/**
+	 * Delete the migration export staging folders this site made (Phase 110: the current job's and the remembered
+	 * ones; the dumps hold password hashes). Only folders named gend-society-migration-<16 hex>; links never followed.
+	 */
+	function gend_society_uninstall_migration_staging(): void {
+		$gend_society_dirs = (array) get_option( 'gend_society_migration_staging_made', array() );
+		$gend_society_job  = get_option( 'gend_society_migration_job', array() );
+		if ( is_array( $gend_society_job ) && ! empty( $gend_society_job['staging'] ) ) {
+			$gend_society_dirs[] = (string) $gend_society_job['staging'];
+		}
+		foreach ( array_unique( array_map( 'strval', $gend_society_dirs ) ) as $gend_society_dir ) {
+			if ( ! preg_match( '/^gend-society-migration-[0-9a-f]{16}$/', basename( $gend_society_dir ) ) || is_link( $gend_society_dir ) || ! is_dir( $gend_society_dir ) ) {
+				continue;
+			}
+			$gend_society_it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $gend_society_dir, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST );
+			foreach ( $gend_society_it as $gend_society_f ) {
+				$gend_society_f->isDir() && ! $gend_society_f->isLink() ? @rmdir( $gend_society_f->getPathname() ) : @unlink( $gend_society_f->getPathname() ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions -- uninstall: the plugin's own export staging.
+			}
+			@rmdir( $gend_society_dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_rmdir -- uninstall: the plugin's own export staging.
+		}
+	}
+}
+
 if ( ! function_exists( 'gend_society_uninstall_site' ) ) {
 	/**
 	 * Remove this plugin's options, transients and cron hooks on the current site.
 	 */
 	function gend_society_uninstall_site(): void {
 		global $wpdb;
+
+		// Phase 110-15: the migration export staging (read from the options before they go).
+		gend_society_uninstall_migration_staging();
 
 		// Option prefixes: the plugin's own prefix plus key-map option_prefix entries (old and new).
 		$gend_society_prefixes = array_merge( array( 'gend_society_' ), gend_society_uninstall_names( 'option_prefix' ) );
@@ -118,7 +145,7 @@ if ( ! function_exists( 'gend_society_uninstall_site' ) ) {
 
 		// Cron: every event of each hook, whatever its arguments.
 		$gend_society_hooks = array_merge(
-			array( 'gend_society_feature_state_daily', 'gend_society_mail_storage_report' ),
+			array( 'gend_society_feature_state_daily', 'gend_society_mail_storage_report', 'gend_society_migration_export_tick', 'gend_society_migration_poll', 'gend_society_migration_report_if_stale', 'gend_society_migration_sweep' ),
 			gend_society_uninstall_names( 'cron' )
 		);
 		foreach ( array_unique( $gend_society_hooks ) as $gend_society_hook ) {

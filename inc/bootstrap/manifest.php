@@ -678,6 +678,12 @@ return array(
 			'note'  => 'Chunked migration exporter (Phase 110-13); no exec; staging outside web root when possible.',
 		),
 		array(
+			'file'  => 'inc/migration-serve.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Signed migration file route gs/v1/migration/file (Phase 110-15); HMAC + expiry, no cookie auth.',
+		),
+		array(
 			'file'  => 'inc/pages/welcome.php',
 			'tier'  => 'customer',
 			'needs' => array( 'standalone' ),

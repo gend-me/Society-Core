@@ -157,7 +157,7 @@ if ( ! function_exists( 'gend_society_migration_staging_dir' ) ) {
 			}
 			$dir = $c . '/' . $name;
 			if ( @mkdir( $dir, 0750 ) && wp_is_writable( $dir ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_mkdir
-				return $dir;
+				return gend_society_migration_staging_remember( $dir );
 			}
 		}
 		$dir = wp_normalize_path( WP_CONTENT_DIR ) . '/' . $name;
@@ -172,6 +172,36 @@ if ( ! function_exists( 'gend_society_migration_staging_dir' ) ) {
 		foreach ( $deny as $f => $body ) {
 			file_put_contents( $dir . '/' . $f, $body ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- deny files in the staging dir (wp-content or outside the web root), never the plugin folder.
 		}
+		return gend_society_migration_staging_remember( $dir );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_rmdir' ) ) {
+	/** Delete a staging folder this module made (basename gend-society-migration-<16 hex>) and forget it. */
+	function gend_society_migration_rmdir( string $dir ): bool {
+		if ( ! gend_society_migration_staging_is_ours( $dir ) ) {
+			return false;
+		}
+		$it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST );
+		foreach ( $it as $f ) {
+			$f->isDir() && ! $f->isLink() ? @rmdir( $f->getPathname() ) : @unlink( $f->getPathname() ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions
+		}
+		@rmdir( $dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
+		$made = (array) get_option( 'gend_society_migration_staging_made', array() );
+		$keep = array_values( array_diff( $made, array( wp_normalize_path( $dir ) ) ) );
+		if ( $keep !== $made ) {
+			update_option( 'gend_society_migration_staging_made', $keep, false );
+		}
+		return ! is_dir( $dir );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_staging_remember' ) ) {
+	/** Record a staging folder this site made (the daily sweep only ever looks at these). */
+	function gend_society_migration_staging_remember( string $dir ): string {
+		$made   = (array) get_option( 'gend_society_migration_staging_made', array() );
+		$made[] = wp_normalize_path( $dir );
+		update_option( 'gend_society_migration_staging_made', array_slice( array_values( array_unique( $made ) ), -50 ), false );
 		return $dir;
 	}
 }
@@ -280,6 +310,9 @@ if ( ! function_exists( 'gend_society_migration_export_init' ) ) {
 		gend_society_migration_export_save( $stored );
 		if ( 'db' === $stored['phase'] && ! wp_next_scheduled( 'gend_society_migration_export_tick' ) ) {
 			wp_schedule_single_event( time(), 'gend_society_migration_export_tick' );
+		}
+		if ( ! wp_next_scheduled( 'gend_society_migration_sweep' ) ) {
+			wp_schedule_event( time() + DAY_IN_SECONDS, 'daily', 'gend_society_migration_sweep' ); // 110-15: parts older than 48 h go
 		}
 	}
 }
@@ -1078,6 +1111,169 @@ if ( ! function_exists( 'gend_society_migration_export_dispatch' ) ) {
 	}
 }
 
+/* ---- reports to gend.me (110-15) --------------------------------------------------------------------------- */
+
+if ( ! function_exists( 'gend_society_migration_export_stop' ) ) {
+	/**
+	 * gend.me answered that this job is not (or no longer) the one to export (409 wrong_job / cancelled / not
+	 * running, or 422 transfer refused): stop for good. The staging folder is wiped now; the job option stays as
+	 * phase failed until the next state answer cleans it up (110-12).
+	 */
+	function gend_society_migration_export_stop( array &$job, string $why ): void {
+		gend_society_migration_rmdir( (string) ( $job['staging'] ?? '' ) );
+		$job['phase'] = 'failed';
+		$job['cur']   = null;
+		$job['error'] = $why;
+		wp_clear_scheduled_hook( 'gend_society_migration_export_tick' );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_ready_urls' ) ) {
+	/** The four signed artifact URLs of the ready job (normal or /?rest_route= form). */
+	function gend_society_migration_ready_urls( bool $alt = false ): array {
+		$out = array();
+		foreach ( array( 'db' => 'db.sql.gz', 'users' => 'users.sql.gz', 'uploads' => 'uploads.tar.gz', 'manifest' => 'manifest.json' ) as $k => $f ) {
+			$out[ $k ] = function_exists( 'gend_society_migration_sign_url' ) ? gend_society_migration_sign_url( $f, '', defined( 'GEND_SOCIETY_MIGRATION_URL_TTL' ) ? (int) GEND_SOCIETY_MIGRATION_URL_TTL : DAY_IN_SECONDS, $alt ) : '';
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_report_progress' ) ) {
+	/**
+	 * POST /install/{id}/migration/progress (the 110-16 hub route): progress at most every 30 s, and once the job is
+	 * ready the four signed URLs (+ the /?rest_route= set and alt_base) until gend.me answers 200. A 409 / 422 stops
+	 * the exporter (gend_society_migration_export_stop()). Mutates $job (report state); the caller saves it.
+	 *
+	 * @param array $job   The job.
+	 * @param bool  $force Ignore the 30 s throttle.
+	 * @return string 'sent' | 'throttled' | 'skipped' | 'error' | 'stopped'.
+	 */
+	function gend_society_migration_report_progress( array &$job, bool $force = false ): string {
+		if ( ! function_exists( 'gend_society_remote_membership_call' ) || empty( $job['job_id'] ) || ! in_array( (string) ( $job['phase'] ?? '' ), array( 'db', 'users', 'content', 'manifest', 'ready' ), true ) ) {
+			return 'skipped';
+		}
+		$ready = 'ready' === $job['phase'];
+		if ( $ready && ! empty( $job['ready_reported_at'] ) ) {
+			return 'skipped';
+		}
+		$rep = (array) ( $job['report'] ?? array() );
+		if ( ! $force && (int) ( $rep['at'] ?? 0 ) > time() - 30 ) {
+			return 'throttled';
+		}
+		$t     = (array) ( $job['totals'] ?? array() );
+		$done  = (int) ( $t['db_bytes'] ?? 0 ) + (int) ( $t['content_bytes'] ?? 0 );
+		$size  = function_exists( 'gend_society_migration_sizing_state' ) ? (array) gend_society_migration_sizing_state() : array();
+		$total = max( $done, (int) ( $size['db_bytes'] ?? 0 ) + (int) ( $size['content_bytes'] ?? 0 ) );
+		$body  = array(
+			'job_id'      => (string) $job['job_id'],
+			'phase'       => (string) $job['phase'],
+			'done_bytes'  => $ready ? $total : min( $done, max( 0, $total - 1 ) ),
+			'total_bytes' => $total,
+			'parts'       => array(
+				'db'      => count( (array) ( $job['parts']['db'] ?? array() ) ),
+				'users'   => count( (array) ( $job['parts']['users'] ?? array() ) ),
+				'content' => count( (array) ( $job['parts']['content'] ?? array() ) ),
+			),
+		);
+		if ( $ready ) {
+			$body['ready']    = true;
+			$body['urls']     = gend_society_migration_ready_urls( false );
+			$body['alt_urls'] = gend_society_migration_ready_urls( true );
+			$body['alt_base'] = untrailingslashit( home_url() ) . '/?rest_route=';
+			if ( in_array( '', $body['urls'], true ) ) {
+				return 'skipped';
+			}
+		}
+		$job['report'] = array(
+			'at'    => time(),
+			'phase' => (string) $job['phase'],
+		);
+		// A short timeout: the report runs at the end of a tick that already used its budget (30 s hosts).
+		$short = static function ( $args, $url ) {
+			return false !== strpos( (string) $url, '/migration/progress' ) ? array_merge( $args, array( 'timeout' => 5 ) ) : $args;
+		};
+		add_filter( 'http_request_args', $short, 99, 2 );
+		$r = gend_society_remote_membership_call( 'migration/progress', $body, 'POST' );
+		remove_filter( 'http_request_args', $short, 99 );
+		if ( is_wp_error( $r ) ) {
+			$code = (int) ( is_array( $r->get_error_data() ) ? ( $r->get_error_data()['status'] ?? 0 ) : 0 );
+			if ( 409 === $code || 422 === $code ) {
+				gend_society_migration_export_stop( $job, 'gend.me stopped this export (' . $code . '): ' . $r->get_error_message() );
+				return 'stopped';
+			}
+			$job['report']['error'] = $r->get_error_code();
+			return 'error';
+		}
+		if ( $ready ) {
+			$job['ready_reported_at'] = time();
+		}
+		return 'sent';
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_report_pending' ) ) {
+	/**
+	 * After a state answer from gend.me (110-12 poll, repaint, start / retry): a ready export whose URLs were not
+	 * accepted yet reports again (throttled).
+	 */
+	function gend_society_migration_report_pending(): void {
+		$job = gend_society_migration_export_job();
+		if ( ! is_array( $job ) || 'ready' !== (string) ( $job['phase'] ?? '' ) || ! empty( $job['ready_reported_at'] ) ) {
+			return;
+		}
+		$token = gend_society_migration_lock();
+		if ( '' === $token ) {
+			return;
+		}
+		try {
+			$job = gend_society_migration_export_job();
+			if ( is_array( $job ) && 'ready' === (string) ( $job['phase'] ?? '' ) && empty( $job['ready_reported_at'] ) ) {
+				gend_society_migration_report_progress( $job );
+				gend_society_migration_export_save( $job );
+			}
+		} finally {
+			gend_society_migration_unlock( $token );
+		}
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_sweep' ) ) {
+	/**
+	 * Daily: delete staging folders this site made whose newest file is older than 48 h, except the current job's
+	 * while it runs; an ended job (ready / failed) idle for 48 h loses its parts too. The event goes away when nothing
+	 * is left to watch.
+	 */
+	function gend_society_migration_sweep(): void {
+		$limit = time() - 2 * DAY_IN_SECONDS;
+		$job   = gend_society_migration_export_job();
+		$cur   = is_array( $job ) ? wp_normalize_path( (string) ( $job['staging'] ?? '' ) ) : '';
+		$end   = is_array( $job ) ? (int) ( 'ready' === ( $job['phase'] ?? '' ) ? ( $job['ready_at'] ?? 0 ) : ( $job['last_tick_at'] ?? 0 ) ) : 0;
+		$end   = $end > 0 ? $end : (int) ( is_array( $job ) ? ( $job['started_at'] ?? 0 ) : 0 );
+		$ended = is_array( $job ) && in_array( (string) ( $job['phase'] ?? '' ), array( 'ready', 'failed' ), true ) && $end < $limit;
+		foreach ( (array) get_option( 'gend_society_migration_staging_made', array() ) as $dir ) {
+			$dir = wp_normalize_path( (string) $dir );
+			if ( ! gend_society_migration_staging_is_ours( $dir ) ) {
+				gend_society_migration_rmdir( $dir ); // forgets folders that are already gone
+				continue;
+			}
+			if ( $dir === $cur && ! $ended ) {
+				continue;
+			}
+			$newest = (int) @filemtime( $dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			foreach ( (array) glob( $dir . '/*' ) as $f ) {
+				$newest = max( $newest, (int) @filemtime( $f ) ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+			}
+			if ( $newest < $limit || ( $dir === $cur && $ended ) ) {
+				gend_society_migration_rmdir( $dir );
+			}
+		}
+		if ( ! get_option( 'gend_society_migration_staging_made', array() ) && ! is_array( gend_society_migration_export_job() ) ) {
+			wp_clear_scheduled_hook( 'gend_society_migration_sweep' );
+		}
+	}
+}
+
 /* ---- tick ------------------------------------------------------------------------------------------------ */
 
 if ( ! function_exists( 'gend_society_migration_bytes_of' ) ) {
@@ -1123,6 +1319,9 @@ if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 			return array( 'status' => 'none', 'phase' => '', 'ticks' => 0, 'elapsed' => 0.0, 'peak' => 0 );
 		}
 		if ( ! in_array( $job['phase'], gend_society_migration_export_running_phases(), true ) ) {
+			if ( 'ready' === $job['phase'] && empty( $job['ready_reported_at'] ) ) {
+				gend_society_migration_report_pending(); // 110-15: the URLs have not reached gend.me yet
+			}
 			return array( 'status' => 'idle', 'phase' => (string) $job['phase'], 'ticks' => (int) $job['ticks'], 'elapsed' => 0.0, 'peak' => 0 );
 		}
 		$token = gend_society_migration_lock();
@@ -1186,6 +1385,10 @@ if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 					break;
 				}
 			} while ( microtime( true ) < $deadline && memory_get_usage() < $mem_cap );
+			// 110-15: progress to gend.me (every 30 s at most), the ready URLs once ready; a 409 / 422 stops the job.
+			if ( 'failed' !== $status && 'stopped' === gend_society_migration_report_progress( $job, 'ready' === $job['phase'] ) ) {
+				$status = 'failed';
+			}
 			gend_society_migration_export_save( $job );
 		} finally {
 			gend_society_migration_unlock( $token );
@@ -1252,13 +1455,7 @@ if ( ! function_exists( 'gend_society_migration_export_wipe' ) ) {
 	function gend_society_migration_export_wipe( $job = array() ): void {
 		$job = is_array( $job ) && $job ? $job : (array) gend_society_migration_export_job();
 		$dir = (string) ( $job['staging'] ?? '' );
-		if ( gend_society_migration_staging_is_ours( $dir ) ) {
-			$it = new RecursiveIteratorIterator( new RecursiveDirectoryIterator( $dir, FilesystemIterator::SKIP_DOTS ), RecursiveIteratorIterator::CHILD_FIRST );
-			foreach ( $it as $f ) {
-				$f->isDir() && ! $f->isLink() ? @rmdir( $f->getPathname() ) : @unlink( $f->getPathname() ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions
-			}
-			@rmdir( $dir ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_rmdir
-		}
+		gend_society_migration_rmdir( $dir );
 		delete_option( GEND_SOCIETY_MIGRATION_LOCK_OPTION );
 		wp_clear_scheduled_hook( 'gend_society_migration_export_tick' );
 		$stored = gend_society_migration_export_job();
@@ -1288,3 +1485,5 @@ add_action(
 	}
 );
 add_action( 'wp_ajax_gend_society_migration_tick', 'gend_society_migration_tick_ajax' );
+add_action( 'gend_society_migration_state_received', 'gend_society_migration_report_pending' );
+add_action( 'gend_society_migration_sweep', 'gend_society_migration_sweep' );
