@@ -112,6 +112,15 @@ function gend_society_handle_wallet_topup_purchase() {
         // qty = number of task credits; price each at the per-credit rate.
         WC()->cart->add_to_cart( $extra_pid, $n, 0, [], [ 'gdc_topup_unit_price' => $rate, 'gdc_topup_kind' => 'tasks' ] );
 
+    } elseif ( 'ai' === $kind && ! empty( $_GET['pkg'] ) ) {
+        // AI Builder Tokens package = a variation of leo's AI Builder Tokens product
+        // (Token Pricing page); leo credits its _aipa_token_package_amount on completion.
+        $pkg = absint( wp_unslash( $_GET['pkg'] ) );
+        if ( (int) get_post_meta( $pkg, '_aipa_token_package_amount', true ) <= 0 || 'publish' !== get_post_status( $pkg ) ) {
+            wp_safe_redirect( $back ); exit;
+        }
+        WC()->cart->add_to_cart( $pkg );
+
     } elseif ( 'ai' === $kind ) {
         if ( ! class_exists( 'AIPA_Commerce' ) ) { wp_safe_redirect( $back ); exit; }
         $amt = max( 1, $amount );
@@ -390,6 +399,9 @@ function gend_society_topup_autocomplete( $status, $order_id, $order ) {
         $product = $item->get_product();
         $sku     = $product ? $product->get_sku() : '';
         $pid     = (int) $item->get_product_id();
+        if ( (int) get_post_meta( (int) ( $item->get_variation_id() ?: $pid ), '_aipa_token_package_amount', true ) > 0 ) {
+            return 'completed';
+        }
         if ( 'aipa-credits' === $sku || 'gend-dgen-topup' === $sku || ( $extra_pid && $pid === $extra_pid ) ) {
             return 'completed';
         }
@@ -902,10 +914,25 @@ function gend_society_render_profile_header() {
         $cs_topup       = ST_Contract_Settings::get();
         $task_topup_pid = (int) ( $cs_topup['retainer_product_id'] ?? 0 );
     }
+    // AI Builder Tokens packages, priced on leo's Token Pricing page (variations
+    // of the AI Builder Tokens product). Empty where leo's packages don't exist.
+    $ai_packages = [];
+    if ( function_exists( 'aipa_token_packages' ) ) {
+        foreach ( aipa_token_packages() as $pk ) {
+            if ( $pk['tokens'] <= 0 || $pk['price'] <= 0 ) continue;
+            $pk_label = $pk['parent'] ? (string) get_post_meta( $pk['id'], 'attribute_package', true ) : '';
+            $ai_packages[] = [
+                'id'     => (int) $pk['id'],
+                'label'  => '' !== $pk_label ? $pk_label : (string) $pk['name'],
+                'tokens' => (int) $pk['tokens'],
+                'price'  => (float) $pk['price'],
+            ];
+        }
+    }
     // Which top-up surfaces are actually wired up on this install.
     $topup_enabled = [
         'tasks' => ( $task_topup_pid > 0 ),
-        'ai'    => class_exists( 'AIPA_Commerce' ),
+        'ai'    => class_exists( 'AIPA_Commerce' ) || ! empty( $ai_packages ),
         // DGEN purchase is hub-only; the product/credit hook lives in C&P.
         'dgen'  => class_exists( 'Gend_CP_DGEN_TopUp' ),
         // Store credits → "Spend" opens the shop (any WooCommerce store).
@@ -1713,6 +1740,7 @@ function gend_society_render_profile_header() {
             'sym'         => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$',
             'taskBalance' => (float) $task_credits,
             'aiBalance'   => (float) $ai_tokens,
+            'aiPackages'  => $ai_packages,
             'dgenBalance' => (float) $dgen_balance,
             'storeBalance'=> (float) $store_credits,
             'creditValue' => (float) $gdc_task_credit_rate,
@@ -2081,14 +2109,45 @@ function gend_society_render_profile_header() {
                 '<span class="gdc-tp-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c1.5.5 3 1.8 3 4a4 4 0 0 1-1 2.6A4 4 0 0 1 16 22H8a4 4 0 0 1-2-7.4A4 4 0 0 1 5 12c0-2.2 1.5-3.5 3-4a4 4 0 0 1 4-4z"/><circle cx="9" cy="11" r="1" fill="currentColor"/><circle cx="15" cy="11" r="1" fill="currentColor"/></svg></span>' +
                 '<div><h2>Top Up AI Builder Tokens</h2><p class="gdc-tp-tag">Fuel every build, edit, and generation with more tokens.</p></div>');
             var bal = el('div', 'gdc-tp-balance', 'Current balance &middot; <strong>' + fmt(CFG.aiBalance) + '</strong> tokens');
-            var amtLabel = el('div', 'gdc-tp-label', 'How many tokens would you like?');
             var totalRow = el('div', 'gdc-tp-total', '');
+            var foot = el('div', 'gdc-tp-foot', 'Secure checkout &middot; billed in CAD &middot; tokens credited instantly on payment.');
+            var pkgs = CFG.aiPackages || [];
+            if (pkgs.length) {
+                // Packages + prices come from the Token Pricing page (AI Builder Tokens variations).
+                var money = function (n) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+                var pkgLabel = el('div', 'gdc-tp-label', 'Choose a package');
+                var chips = el('div', 'gdc-tp-chips gdc-tp-chips--pkg');
+                var chosen = null;
+                var pick = function (p, chip) {
+                    chosen = p;
+                    Array.prototype.forEach.call(chips.children, function (c) { c.classList.toggle('is-active', c === chip); });
+                    totalRow.innerHTML = 'Total <strong>' + CFG.sym + money(p.price) + '</strong> <small>' +
+                        CFG.sym + money(p.price / p.tokens * 1000) + ' / 1,000 tokens</small>';
+                };
+                pkgs.forEach(function (p, i) {
+                    var c = el('button', 'gdc-tp-chip');
+                    c.type = 'button';
+                    var name = el('span', 'gdc-tp-pkg-name'); name.textContent = p.label;
+                    var price = el('small'); price.textContent = 'tokens \u00b7 ' + CFG.sym + money(p.price);
+                    c.appendChild(name);
+                    c.appendChild(document.createTextNode(fmt(p.tokens) + ' '));
+                    c.appendChild(price);
+                    c.addEventListener('click', function () { pick(p, c); });
+                    chips.appendChild(c);
+                    if (i === Math.min(1, pkgs.length - 1)) setTimeout(function () { pick(p, c); }, 0);
+                });
+                var goPkg = cta('Continue to Secure Checkout', 'var(--gph-blue)', function () {
+                    if (chosen) goCheckout('ai', { pkg: chosen.id });
+                });
+                mount(dialog('var(--gph-blue)', [head, bal, pkgLabel, chips, totalRow, goPkg, foot]), 'var(--gph-blue)');
+                return;
+            }
+            var amtLabel = el('div', 'gdc-tp-label', 'How many tokens would you like?');
             function paint(v) { totalRow.innerHTML = 'Total <strong>' + CFG.sym + fmt(v) + '</strong> <small>' + CFG.sym + '1.00 / token</small>'; }
             var amt = amountField([500, 1000, 2500, 5000], 'tok', paint);
             var go = cta('Continue to Secure Checkout', 'var(--gph-blue)', function () {
                 goCheckout('ai', { amount: Math.max(1, Math.round(amt.get())) });
             });
-            var foot = el('div', 'gdc-tp-foot', 'Secure checkout &middot; billed in CAD &middot; tokens credited instantly on payment.');
             mount(dialog('var(--gph-blue)', [head, bal, amtLabel, amt.node, totalRow, go, foot]), 'var(--gph-blue)');
         }
 
@@ -4722,6 +4781,17 @@ html.gdc-tp-lock { overflow: hidden !important; }
     box-shadow: inset 0 0 0 1px var(--gph-accent), 0 6px 18px -8px var(--gph-accent);
 }
 .gdc-tp-chip.is-active small { color: var(--gph-accent); }
+.gdc-tp-chips--pkg .gdc-tp-chip { flex: 1 1 140px; text-align: left; padding: 12px 14px; font-size: 1rem; }
+.gdc-tp-pkg-name {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+.gdc-tp-chip.is-active .gdc-tp-pkg-name { color: #e2e8f0; }
 .gdc-tp-custom {
     margin-top: 10px;
     width: 100%;
