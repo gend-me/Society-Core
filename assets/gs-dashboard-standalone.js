@@ -276,6 +276,12 @@
 			}
 			var open = r.querySelector('[data-gs-mig-start-step]');
 			var keep = open && !open.hidden;
+			var was = r.getAttribute('data-state');
+			var now = j.data.migration && j.data.migration.state ? j.data.migration.state : '';
+			if (!keep && now && was && now !== was && (now === 'failed' || now === 'complete')) {
+				reload(); // the status badge (friendly error) and the panels change with it
+				return;
+			}
 			if (typeof j.data.html === 'string' && j.data.html !== '') {
 				var tmp = document.createElement('div');
 				tmp.innerHTML = j.data.html;
