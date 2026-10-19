@@ -2288,6 +2288,8 @@ function gend_society_render_profile_header() {
             if (pkgs.length) {
                 // Packages + prices come from the Token Pricing page (AI Builder Tokens variations).
                 var money = function (n) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+                // CFG.sym is an HTML entity (&#36;); decode it for textContent.
+                var symTxt = (function () { var x = document.createElement('textarea'); x.innerHTML = CFG.sym; return x.value; })();
                 var pkgLabel = el('div', 'gdc-tp-label', 'Choose a package');
                 var chips = el('div', 'gdc-tp-chips gdc-tp-chips--pkg');
                 var chosen = null;
@@ -2301,7 +2303,7 @@ function gend_society_render_profile_header() {
                     var c = el('button', 'gdc-tp-chip');
                     c.type = 'button';
                     var name = el('span', 'gdc-tp-pkg-name'); name.textContent = p.label;
-                    var price = el('small'); price.textContent = 'tokens \u00b7 ' + CFG.sym + money(p.price);
+                    var price = el('small'); price.textContent = 'tokens \u00b7 ' + symTxt + money(p.price);
                     c.appendChild(name);
                     c.appendChild(document.createTextNode(fmt(p.tokens) + ' '));
                     c.appendChild(price);
