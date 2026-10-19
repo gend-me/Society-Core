@@ -1085,7 +1085,13 @@ $S['export-web'] = function () {
 	gs110ec_info( 'export-web: answers ' . wp_json_encode( $tally ) . ', tick work ' . round( $work, 1 ) . ' s, job ticks ' . (int) ( $job['ticks'] ?? 0 ) );
 	gs110ec_info( 'export-web: ' . $n . ' admin-ajax ticks in ' . round( microtime( true ) - $t0, 1 ) . ' s, worst request ' . round( $worst, 2 ) . ' s, peak ' . round( $peak / 1048576, 1 ) . ' MB, content parts ' . count( (array) ( $job['parts']['content'] ?? array() ) ) . ', ' . round( (int) ( $job['totals']['content_bytes'] ?? 0 ) / 1048576 ) . ' MB tar' . ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? ' (DISABLE_WP_CRON)' : '' ) . ', last ' . wp_json_encode( $last ) );
 	gs110ec_assert( 'done' === ( $last['status'] ?? '' ) && 'ready' === ( $job['phase'] ?? '' ), 'export-web', 'admin-ajax ticks (web limits) take the export to ready' );
-	gs110ec_assert( (int) ( $tally['locked'] ?? 0 ) <= 2 && (int) ( $job['ticks'] ?? 0 ) >= (int) ( $tally['running'] ?? 0 ), 'export-web-alone', 'the AJAX driver alone did the work (no WP-Cron tick held the lock)', wp_json_encode( $tally ) );
+	if ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+		gs110ec_assert( 0 === (int) ( $tally['locked'] ?? 0 ) && (int) ( $job['ticks'] ?? 0 ) === (int) ( $tally['running'] ?? 0 ) + (int) ( $tally['done'] ?? 0 ), 'export-web-alone', 'WP-Cron off: the AJAX driver alone did every tick', wp_json_encode( $tally ) );
+	} else {
+		$other = (int) ( $job['ticks'] ?? 0 ) - (int) ( $tally['running'] ?? 0 ) - (int) ( $tally['done'] ?? 0 );
+		gs110ec_info( 'export-web: WP-Cron is on here: ' . $other . ' tick(s) ran from the wp-cron.php loopback (also a web request under the same limits); the AJAX answers meanwhile were locked' );
+		gs110ec_assert( $other >= 0 && ( 0 === $other || (int) ( $tally['locked'] ?? 0 ) > 0 ), 'export-web-exclusive', 'the lock kept the two drivers apart (never two ticks at once)', wp_json_encode( $tally ) );
+	}
 	gs110ec_assert( $worst < 28.0, 'export-web-time', 'every web tick answered inside the 30 s host cut (worst ' . round( $worst, 2 ) . ' s)' );
 	gs110ec_assert( $peak > 0 && $peak < 77 * 1048576, 'export-web-memory', 'peak < 77 MB (60 % of 128M)', (string) $peak );
 };
