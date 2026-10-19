@@ -766,7 +766,10 @@ if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
 			}
 			fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
 		} elseif ( ! is_file( $path ) ) {
-			touch( $path );
+			$fh = fopen( $path, 'ab' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen -- an empty index part in the staging dir.
+			if ( $fh ) {
+				fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+			}
 		}
 		clearstatcache( true, $path );
 		$ix['offset']              = (int) filesize( $path );
