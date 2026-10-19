@@ -134,7 +134,7 @@ if ( ! function_exists( 'gend_society_migration_staging_dir' ) ) {
 				continue;
 			}
 			$dir = $c . '/' . $name;
-			if ( @mkdir( $dir, 0750 ) && is_writable( $dir ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_mkdir
+			if ( @mkdir( $dir, 0750 ) && wp_is_writable( $dir ) ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_mkdir
 				return $dir;
 			}
 		}
@@ -148,7 +148,7 @@ if ( ! function_exists( 'gend_society_migration_staging_dir' ) ) {
 			'web.config' => "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<configuration><system.webServer><authorization><deny users=\"*\" /></authorization></system.webServer></configuration>\n",
 		);
 		foreach ( $deny as $f => $body ) {
-			file_put_contents( $dir . '/' . $f, $body ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents
+			file_put_contents( $dir . '/' . $f, $body ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- deny files in the staging dir (wp-content or outside the web root), never the plugin folder.
 		}
 		return $dir;
 	}
@@ -458,9 +458,9 @@ if ( ! function_exists( 'gend_society_migration_export_step' ) ) {
 			$where = '';
 			if ( is_array( $t['cursor'] ) ) {
 				$ph    = implode( ', ', array_fill( 0, count( $pk ), '%s' ) );
-				$where = $wpdb->prepare( ' WHERE (' . $cols . ') > (' . $ph . ')', $t['cursor'] ); // phpcs:ignore WordPress.DB.PreparedSQL
+				$where = $wpdb->prepare( ' WHERE (' . $cols . ') > (' . $ph . ')', $t['cursor'] ); // phpcs:ignore WordPress.DB.PreparedSQL, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- one %s per key column, built above.
 			}
-			$rows = $wpdb->get_results( "SELECT * FROM `{$src}`{$where} ORDER BY {$cols} LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB
+			$rows = $wpdb->get_results( "SELECT * FROM `{$src}`{$where} ORDER BY {$cols} LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- $where is prepared above; table and column names come from SHOW KEYS / information_schema.
 		} else {
 			$limit = min( $limit, 200 );
 			$rows  = $wpdb->get_results( $wpdb->prepare( "SELECT * FROM `{$src}` LIMIT %d OFFSET %d", $limit, (int) $t['offset'] ), ARRAY_A ); // phpcs:ignore WordPress.DB
@@ -582,7 +582,7 @@ if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 		try {
 			$job = gend_society_migration_export_job(); // fresh, under the lock
 			if ( function_exists( 'set_time_limit' ) && false === strpos( (string) ini_get( 'disable_functions' ), 'set_time_limit' ) ) {
-				@set_time_limit( 60 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- opportunistic only.
+				@set_time_limit( 60 ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, Squiz.PHP.DiscouragedFunctions.Discouraged -- opportunistic only (often disabled on shared hosts; the tick budget does not rely on it).
 			}
 			$met      = (int) ini_get( 'max_execution_time' );
 			$budget   = (float) apply_filters( 'gend_society_migration_tick_budget', $met > 0 ? max( 2, min( GEND_SOCIETY_MIGRATION_TICK_MAX_S, $met - 8 ) ) : GEND_SOCIETY_MIGRATION_TICK_MAX_S );
