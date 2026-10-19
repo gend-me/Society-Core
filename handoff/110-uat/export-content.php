@@ -11,7 +11,8 @@
  * Sections (10): index excludes tar-format longname bigfile part-size stream-compat manifest watermark ready
  *   helpers: fixtures (install the C13/C14 host drop-ins, a customer gend-society copy, cache/upgrade/backups dirs, a
  *   > 2 GB sparse file, symlinks in and out of wp-content, a 300-char path; kept until fixtures-clean), export (a full
- *   DB + users + content + manifest export, kept for the sections above and for the runner's tar checks), keep-info
+ *   DB + users + content + manifest export, kept for the sections above and for the runner's tar checks), export-web
+ *   (the same, driven only by admin-ajax ticks through the site's own web server under the web limits), keep-info
  *   (STAGING / CPART / INDEXF / SRCSHA / CHANGED / EXCL lines for the runner), fixtures-clean, reset.
  *
  * Sections that read an export use the kept one (helper "export") when it exists, else run their own and drop it.
@@ -515,10 +516,10 @@ $S['index'] = function () {
 		return;
 	}
 	$tiny = function () {
-		return 0.05;
+		return 0.0001; // one unit of work per tick
 	};
 	$few  = function () {
-		return 300;
+		return 50;
 	};
 	// Run 1: small budget + small index steps, a forced stop in the middle (bytes past the committed offset, like a
 	// request killed during the write), then resume.
@@ -1021,6 +1022,72 @@ $S['export'] = function () {
 	update_option( GS110EC_KEPT, $facts, false );
 	gs110ec_info( 'export: ' . round( microtime( true ) - $t0, 1 ) . ' s ' . wp_json_encode( $r ) );
 	gs110ec_assert( 'done' === $r['status'] && 'ready' === $r['phase'], 'export', 'full DB + users + content + manifest export kept for the runner', wp_json_encode( $r ) );
+};
+
+// The same kept export, driven ONLY by admin-ajax ticks through this site's own web server (the shared-host web limits
+// apply: 30 s wall clock, 128M, no exec), as the dashboard's tick loop does with WP-Cron off.
+$S['export-web'] = function () {
+	if ( ! gs110ec_ready( 'export-web' ) ) {
+		return;
+	}
+	$admins = get_users( array( 'role' => 'administrator', 'number' => 1 ) );
+	$uid    = $admins ? (int) $admins[0]->ID : 0;
+	if ( ! gs110ec_assert( $uid > 0, 'export-web-admin', 'an administrator' ) ) {
+		return;
+	}
+	$facts = gs110ec_source_facts();
+	gs110ec_start( true );
+	wp_clear_scheduled_hook( 'gend_society_migration_export_tick' );
+	$exp = time() + 7200;
+	$tok = WP_Session_Tokens::get_instance( $uid )->create( $exp );
+	gs110ec_on_cleanup(
+		function () use ( $uid, $tok ) {
+			WP_Session_Tokens::get_instance( $uid )->destroy( $tok );
+		}
+	);
+	$nonce = substr( wp_hash( wp_nonce_tick( 'gs_membership_action' ) . '|gs_membership_action|' . $uid . '|' . $tok, 'nonce' ), -12, 10 );
+	$jar   = array(
+		new WP_Http_Cookie( array( 'name' => LOGGED_IN_COOKIE, 'value' => wp_generate_auth_cookie( $uid, $exp, 'logged_in', $tok ) ) ),
+		new WP_Http_Cookie( array( 'name' => AUTH_COOKIE, 'value' => wp_generate_auth_cookie( $uid, $exp, 'auth', $tok ) ) ),
+	);
+	$base  = (string) ( getenv( 'GS110EX_SELF' ) ? getenv( 'GS110EX_SELF' ) : admin_url( 'admin-ajax.php' ) );
+	$n     = 0;
+	$last  = array();
+	$worst = 0.0;
+	$peak  = 0;
+	$tally = array();
+	$work  = 0.0;
+	$t0    = microtime( true );
+	for ( $i = 0; $i < 3000; $i++ ) {
+		wp_clear_scheduled_hook( 'gend_society_migration_export_tick' ); // no WP-Cron event can be due: the AJAX driver alone
+		$t1    = microtime( true );
+		$r     = wp_remote_post( $base, array( 'timeout' => 45, 'cookies' => $jar, 'body' => array( 'action' => 'gend_society_migration_tick', 'nonce' => $nonce ) ) );
+		$worst = max( $worst, microtime( true ) - $t1 );
+		$j     = json_decode( (string) wp_remote_retrieve_body( $r ), true );
+		$last  = is_array( $j ) ? (array) ( $j['data'] ?? array() ) : array( 'raw' => substr( is_wp_error( $r ) ? $r->get_error_message() : wp_remote_retrieve_response_code( $r ) . ' ' . wp_remote_retrieve_body( $r ), 0, 200 ) );
+		$peak  = max( $peak, (int) ( $last['peak'] ?? 0 ) );
+		$st    = (string) ( $last['status'] ?? 'error' );
+		$tally[ $st ] = ( $tally[ $st ] ?? 0 ) + 1;
+		if ( 'running' === $st || 'done' === $st ) {
+			$work += (float) ( $last['elapsed'] ?? 0 );
+		}
+		if ( 'locked' === $st ) {
+			usleep( 500000 );
+		}
+		++$n;
+		wp_clear_scheduled_hook( 'gend_society_migration_export_tick' ); // the AJAX driver alone
+		if ( empty( $j['success'] ) || ! in_array( $last['status'] ?? '', array( 'running', 'locked' ), true ) ) {
+			break;
+		}
+	}
+	update_option( GS110EC_KEPT, $facts, false );
+	$job = gend_society_migration_export_job();
+	gs110ec_info( 'export-web: answers ' . wp_json_encode( $tally ) . ', tick work ' . round( $work, 1 ) . ' s, job ticks ' . (int) ( $job['ticks'] ?? 0 ) );
+	gs110ec_info( 'export-web: ' . $n . ' admin-ajax ticks in ' . round( microtime( true ) - $t0, 1 ) . ' s, worst request ' . round( $worst, 2 ) . ' s, peak ' . round( $peak / 1048576, 1 ) . ' MB, content parts ' . count( (array) ( $job['parts']['content'] ?? array() ) ) . ', ' . round( (int) ( $job['totals']['content_bytes'] ?? 0 ) / 1048576 ) . ' MB tar' . ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? ' (DISABLE_WP_CRON)' : '' ) . ', last ' . wp_json_encode( $last ) );
+	gs110ec_assert( 'done' === ( $last['status'] ?? '' ) && 'ready' === ( $job['phase'] ?? '' ), 'export-web', 'admin-ajax ticks (web limits) take the export to ready' );
+	gs110ec_assert( (int) ( $tally['locked'] ?? 0 ) <= 2 && (int) ( $job['ticks'] ?? 0 ) >= (int) ( $tally['running'] ?? 0 ), 'export-web-alone', 'the AJAX driver alone did the work (no WP-Cron tick held the lock)', wp_json_encode( $tally ) );
+	gs110ec_assert( $worst < 28.0, 'export-web-time', 'every web tick answered inside the 30 s host cut (worst ' . round( $worst, 2 ) . ' s)' );
+	gs110ec_assert( $peak > 0 && $peak < 77 * 1048576, 'export-web-memory', 'peak < 77 MB (60 % of 128M)', (string) $peak );
 };
 
 $S['keep-info'] = function () {

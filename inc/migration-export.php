@@ -26,8 +26,16 @@
  *  Staging   outside the web root when a candidate is writable (dirname(ABSPATH), sys_get_temp_dir()), else
  *            wp-content/gend-society-migration-<16 hex>/ with .htaccess (both Apache syntaxes), index.php and web.config,
  *            0750. Part files have random names (<16 hex>.part); only the job option maps them.
- *
- * The content phase (wp-content tar parts) and the manifest are 110-14.
+ *  Content   (110-14, M1) wp-content minus gend_society_migration_excludes() (host drop-ins / mu-plugins, caches,
+ *            backups, staging, plugins/gend-society*, files over 2 GB, symlinks leaving wp-content), in the
+ *            uploads.tar.gz slot. First a JSONL index part (resumable directory walk, committed byte offset), then tar
+ *            parts of about 32 MB: GNU-format ustar entries (././@LongLink for names over 100 bytes; files 0644,
+ *            dirs 0755, uid / gid 0; symlinks inside wp-content as relative type 2 entries), paths relative to
+ *            wp-content, one gzip member (level 1) per batch of at most 4 MB, a file larger than a batch copied across
+ *            batches and ticks with an in-entry cursor. No end-of-archive blocks except one final 1024-zero member at
+ *            the end of the last part, so the parts concatenated in order are ONE .tar.gz (an entry may span parts).
+ *  Manifest  manifest.json format 2 (site facts, part sizes + sha256, totals, the content-freeze watermark read at
+ *            content-phase start, excluded[], alt_base); then the job phase is ready.
  *
  * @package gend-society
  */
@@ -58,6 +66,20 @@ if ( ! defined( 'GEND_SOCIETY_MIGRATION_LOCK_TTL' ) ) {
 }
 if ( ! defined( 'GEND_SOCIETY_MIGRATION_JOB_OPTION' ) ) {
 	define( 'GEND_SOCIETY_MIGRATION_JOB_OPTION', 'gend_society_migration_job' );
+}
+// Content (110-14): media at gzip level 1 runs at >= 19.5 MB/s on the slowest limit bed (throughput.txt), so a 4 MB
+// member takes about 0.2 s; parts of about 32 MB stay small enough for a 30 s host cut with Range resume (110-03).
+if ( ! defined( 'GEND_SOCIETY_MIGRATION_CONTENT_MEMBER_BYTES' ) ) {
+	define( 'GEND_SOCIETY_MIGRATION_CONTENT_MEMBER_BYTES', 4 * 1048576 );
+}
+if ( ! defined( 'GEND_SOCIETY_MIGRATION_CONTENT_PART_BYTES' ) ) {
+	define( 'GEND_SOCIETY_MIGRATION_CONTENT_PART_BYTES', 32 * 1048576 );
+}
+if ( ! defined( 'GEND_SOCIETY_MIGRATION_INDEX_STEP' ) ) {
+	define( 'GEND_SOCIETY_MIGRATION_INDEX_STEP', 2000 );
+}
+if ( ! defined( 'GEND_SOCIETY_MIGRATION_LIST_MAX' ) ) {
+	define( 'GEND_SOCIETY_MIGRATION_LIST_MAX', 1000 );
 }
 
 if ( ! function_exists( 'gend_society_migration_export_job' ) ) {
@@ -244,6 +266,9 @@ if ( ! function_exists( 'gend_society_migration_export_init' ) ) {
 					'users_rows'    => 0,
 					'content_bytes' => 0,
 					'files'         => 0,
+					'dirs'          => 0,
+					'links'         => 0,
+					'excluded'      => 0,
 				),
 				'staging'      => $staging,
 				'started_at'   => time(),
@@ -534,6 +559,522 @@ if ( ! function_exists( 'gend_society_migration_export_step' ) ) {
 	}
 }
 
+/* ---- content phase (110-14) ------------------------------------------------------------------------------ */
+
+if ( ! function_exists( 'gend_society_migration_watermark' ) ) {
+	/**
+	 * The content-freeze watermark (Phase 111's delta anchor), read from the live database.
+	 *
+	 * @return array{max_post_id:int,max_comment_id:int,max_order_id:int,posts_modified_gmt:string}
+	 */
+	function gend_society_migration_watermark(): array {
+		global $wpdb;
+		$hpos  = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $wpdb->prefix . 'wc_orders' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+		$order = '' !== $hpos
+			? (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM {$wpdb->prefix}wc_orders" ) // phpcs:ignore WordPress.DB
+			: (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts} WHERE post_type IN ('shop_order', 'shop_order_placehold')" ); // phpcs:ignore WordPress.DB
+		return array(
+			'max_post_id'        => (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts}" ), // phpcs:ignore WordPress.DB
+			'max_comment_id'     => (int) $wpdb->get_var( "SELECT COALESCE(MAX(comment_ID), 0) FROM {$wpdb->comments}" ), // phpcs:ignore WordPress.DB
+			'max_order_id'       => $order,
+			'posts_modified_gmt' => (string) $wpdb->get_var( "SELECT COALESCE(MAX(post_modified_gmt), '') FROM {$wpdb->posts}" ), // phpcs:ignore WordPress.DB
+		);
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_content_init' ) ) {
+	/** Start the content phase: the index part, the cursors and the watermark (read now, at content-phase start). */
+	function gend_society_migration_content_init( array &$job ): void {
+		$job['content']   = array(
+			'index'   => array(
+				'file'   => bin2hex( random_bytes( 8 ) ) . '.idx',
+				'offset' => 0,
+				'lines'  => 0,
+				'done'   => false,
+				'stack'  => array( '' ),
+				'dir'    => null,
+				'pos'    => 0,
+			),
+			'ii'      => 0,
+			'entry'   => null,
+			'final'   => false,
+			'changed' => array(),
+		);
+		$job['excluded']  = array();
+		$job['watermark'] = gend_society_migration_watermark();
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_content_note' ) ) {
+	/** Record an excluded (or changed) path; the lists are capped, the totals are not. */
+	function gend_society_migration_content_note( array &$job, string $list, string $rel, string $reason ): void {
+		if ( 'excluded' === $list ) {
+			$job['totals']['excluded'] = (int) ( $job['totals']['excluded'] ?? 0 ) + 1;
+			if ( count( $job['excluded'] ) < GEND_SOCIETY_MIGRATION_LIST_MAX ) {
+				$job['excluded'][] = array(
+					'path'   => $rel,
+					'reason' => $reason,
+				);
+			}
+			return;
+		}
+		if ( count( $job['content']['changed'] ) < GEND_SOCIETY_MIGRATION_LIST_MAX ) {
+			$job['content']['changed'][] = array(
+				'path'   => $rel,
+				'reason' => $reason,
+			);
+		}
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_relpath' ) ) {
+	/** Relative path from directory $from to $to (both absolute, '/' separated). */
+	function gend_society_migration_relpath( string $from, string $to ): string {
+		$a = explode( '/', trim( $from, '/' ) );
+		$b = explode( '/', trim( $to, '/' ) );
+		while ( $a && $b && $a[0] === $b[0] ) {
+			array_shift( $a );
+			array_shift( $b );
+		}
+		return implode( '/', array_merge( array_fill( 0, count( $a ), '..' ), $b ) );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_index_line' ) ) {
+	/** One JSONL index line (p64 = base64 path when the name is not valid UTF-8). */
+	function gend_society_migration_index_line( array $e ): string {
+		if ( ! preg_match( '//u', $e['p'] ) ) {
+			$e['p64'] = base64_encode( $e['p'] ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- binary-safe file names in the index.
+			unset( $e['p'] );
+		}
+		return (string) wp_json_encode( $e, JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE ) . "\n";
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
+	/**
+	 * One step of the wp-content index walk: a stack of directories still to list plus the position in the current
+	 * one (a resume re-reads one listing, never the tree). Symlinks are never followed. Appends JSONL lines to the
+	 * index part and commits the byte offset with the cursor.
+	 *
+	 * @return bool False when the index part cannot be written.
+	 */
+	function gend_society_migration_index_step( array &$job ): bool {
+		$ix    = $job['content']['index'];
+		$root  = rtrim( wp_normalize_path( WP_CONTENT_DIR ), '/' );
+		$real  = rtrim( wp_normalize_path( (string) realpath( $root ) ), '/' );
+		$ex    = gend_society_migration_excludes();
+		$max   = max( 1, (int) apply_filters( 'gend_society_migration_index_step_entries', GEND_SOCIETY_MIGRATION_INDEX_STEP ) );
+		$buf   = '';
+		$lines = 0;
+		$seen  = 0;
+		while ( empty( $ix['done'] ) && $seen < $max ) {
+			if ( null === $ix['dir'] ) {
+				if ( empty( $ix['stack'] ) ) {
+					$ix['done'] = true;
+					break;
+				}
+				$ix['dir'] = (string) array_pop( $ix['stack'] );
+				$ix['pos'] = 0;
+			}
+			$rel     = (string) $ix['dir'];
+			$abs     = '' === $rel ? $root : $root . '/' . $rel;
+			$entries = is_dir( $abs ) ? @scandir( $abs ) : false; // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged -- an unreadable folder is skipped.
+			$entries = is_array( $entries ) ? array_values( array_diff( $entries, array( '.', '..' ) ) ) : array();
+			$count   = count( $entries );
+			$out     = false;
+			for ( $i = (int) $ix['pos']; $i < $count; $i++ ) {
+				if ( $seen >= $max ) {
+					$ix['pos'] = $i;
+					$out       = true;
+					break;
+				}
+				++$seen;
+				$r = '' === $rel ? $entries[ $i ] : $rel . '/' . $entries[ $i ];
+				$a = $root . '/' . $r;
+				if ( is_link( $a ) ) {
+					$t = realpath( $a );
+					$t = false === $t ? '' : wp_normalize_path( $t );
+					if ( '' !== $t && 0 === strpos( $t . '/', $real . '/' ) && $t !== $real ) {
+						$from  = wp_normalize_path( (string) realpath( dirname( $a ) ) );
+						$buf  .= gend_society_migration_index_line(
+							array(
+								'p' => $r,
+								't' => 'l',
+								'l' => gend_society_migration_relpath( $from, $t ),
+							)
+						);
+						++$lines;
+					} else {
+						gend_society_migration_content_note( $job, 'excluded', $r, 'symlink' );
+					}
+					continue;
+				}
+				if ( is_dir( $a ) ) {
+					$why = gend_society_migration_excluded( $r, true );
+					if ( '' !== $why ) {
+						gend_society_migration_content_note( $job, 'excluded', $r, $why );
+						continue;
+					}
+					$ix['stack'][] = $r;
+					$buf          .= gend_society_migration_index_line(
+						array(
+							'p' => $r,
+							't' => 'd',
+							'm' => (int) @filemtime( $a ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+						)
+					);
+					++$lines;
+					continue;
+				}
+				if ( ! is_file( $a ) ) {
+					continue; // sockets, fifos
+				}
+				$why = gend_society_migration_excluded( $r, false );
+				if ( '' === $why ) {
+					$size = (int) @filesize( $a ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+					$why  = $size > (int) $ex['max_file_bytes'] ? 'too_large' : ( is_readable( $a ) ? '' : 'unreadable' );
+				}
+				if ( '' !== $why ) {
+					gend_society_migration_content_note( $job, 'excluded', $r, $why );
+					continue;
+				}
+				$buf .= gend_society_migration_index_line(
+					array(
+						'p' => $r,
+						't' => 'f',
+						's' => $size,
+						'm' => (int) @filemtime( $a ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+					)
+				);
+				++$lines;
+			}
+			if ( $out ) {
+				break;
+			}
+			$ix['dir'] = null;
+			$ix['pos'] = 0;
+		}
+		$path = $job['staging'] . '/' . $ix['file'];
+		if ( '' !== $buf ) {
+			$fh = fopen( $path, 'ab' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+			if ( ! $fh || strlen( $buf ) !== fwrite( $fh, $buf ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fwrite
+				if ( $fh ) {
+					fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+				}
+				return false;
+			}
+			fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		} elseif ( ! is_file( $path ) ) {
+			touch( $path );
+		}
+		clearstatcache( true, $path );
+		$ix['offset']              = (int) filesize( $path );
+		$ix['lines']              += $lines;
+		$job['content']['index']   = $ix;
+		return true;
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_index_repair' ) ) {
+	/** After a killed request: cut the index part back to its committed offset. @return int Bytes cut. */
+	function gend_society_migration_index_repair( array $job ): int {
+		$ix = $job['content']['index'] ?? null;
+		if ( ! is_array( $ix ) || empty( $job['staging'] ) ) {
+			return 0;
+		}
+		$path = $job['staging'] . '/' . $ix['file'];
+		clearstatcache( true, $path );
+		if ( ! is_file( $path ) || (int) filesize( $path ) <= (int) $ix['offset'] ) {
+			return 0;
+		}
+		$size = (int) filesize( $path );
+		$fh   = fopen( $path, 'r+' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+		if ( $fh ) {
+			ftruncate( $fh, (int) $ix['offset'] );
+			fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		}
+		return $size - (int) $ix['offset'];
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_tar_header' ) ) {
+	/**
+	 * GNU-format tar header(s) for one entry: a ././@LongLink ('L') entry first when the name is over 100 bytes ('K'
+	 * for a long symlink target). Owner 0:0, no user / group names.
+	 *
+	 * @param string $name     Path relative to wp-content (directories end with '/').
+	 * @param string $type     '0' file, '5' directory, '2' symlink.
+	 * @param int    $size     Data size (files).
+	 * @param int    $mtime    Modification time.
+	 * @param string $linkname Symlink target.
+	 */
+	function gend_society_migration_tar_header( string $name, string $type, int $size, int $mtime, string $linkname = '' ): string {
+		$block = static function ( string $n, string $t, int $mode, int $sz, int $mt, string $ln ): string {
+			$h   = str_pad( substr( $n, 0, 100 ), 100, "\0" )
+				. sprintf( '%07o', $mode ) . "\0" . sprintf( '%07o', 0 ) . "\0" . sprintf( '%07o', 0 ) . "\0"
+				. sprintf( '%011o', $sz ) . "\0" . sprintf( '%011o', max( 0, min( 8589934591, $mt ) ) ) . "\0"
+				. '        ' . $t . str_pad( substr( $ln, 0, 100 ), 100, "\0" )
+				. "ustar  \0" . str_repeat( "\0", 32 + 32 + 8 + 8 + 155 + 12 );
+			$sum = array_sum( unpack( 'C*', $h ) );
+			return substr( $h, 0, 148 ) . sprintf( '%06o', $sum ) . "\0 " . substr( $h, 156 );
+		};
+		$pad  = static function ( string $d ): string {
+			return $d . str_repeat( "\0", ( 512 - strlen( $d ) % 512 ) % 512 );
+		};
+		$out  = '';
+		if ( strlen( $linkname ) > 100 ) {
+			$out .= $block( '././@LongLink', 'K', 0644, strlen( $linkname ) + 1, 0, '' ) . $pad( $linkname . "\0" );
+		}
+		if ( strlen( $name ) > 100 ) {
+			$out .= $block( '././@LongLink', 'L', 0644, strlen( $name ) + 1, 0, '' ) . $pad( $name . "\0" );
+		}
+		$mode = '5' === $type ? 0755 : ( '2' === $type ? 0777 : 0644 );
+		return $out . $block( $name, $type, $mode, '0' === $type ? $size : 0, $mtime, $linkname );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_content_step' ) ) {
+	/**
+	 * One unit of content work: an index step while the index is not done, else one gzip member (level 1) of tar
+	 * data appended to the open content part.
+	 *
+	 * @return string 'more' | 'phase' | 'error'.
+	 */
+	function gend_society_migration_content_step( array &$job ): string {
+		if ( ! isset( $job['content'] ) || ! is_array( $job['content'] ) ) {
+			gend_society_migration_content_init( $job );
+		}
+		if ( empty( $job['content']['index']['done'] ) ) {
+			if ( ! gend_society_migration_index_step( $job ) ) {
+				$job['error'] = 'Writing the export failed (disk full?)';
+				return 'error';
+			}
+			return 'more';
+		}
+		if ( ! empty( $job['content']['final'] ) ) {
+			return 'phase';
+		}
+		$root = rtrim( wp_normalize_path( WP_CONTENT_DIR ), '/' );
+		$cur  = gend_society_migration_part_open( $job, 'content' );
+		$path = $job['staging'] . '/' . $cur['file'];
+		$gz   = gzopen( $path, 'ab1' );
+		if ( ! $gz ) {
+			$job['error'] = 'Writing the export failed (disk full?)';
+			return 'error';
+		}
+		$c       = &$job['content'];
+		$written = 0;
+		$failed  = false;
+		$put     = static function ( string $data ) use ( $gz, &$written, &$failed ): void {
+			if ( '' !== $data && strlen( $data ) !== gzwrite( $gz, $data ) ) {
+				$failed = true;
+			}
+			$written += strlen( $data );
+		};
+		$ixf = $job['staging'] . '/' . $c['index']['file'];
+		$ixh = null;
+		while ( $written < GEND_SOCIETY_MIGRATION_CONTENT_MEMBER_BYTES && ! $failed ) {
+			if ( is_array( $c['entry'] ) ) {
+				$e  = $c['entry'];
+				$fh = @fopen( $root . '/' . $e['p'], 'rb' ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged, WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+				if ( $fh && $e['done'] > 0 ) {
+					fseek( $fh, (int) $e['done'] );
+				}
+				while ( $e['done'] < $e['size'] && $written < GEND_SOCIETY_MIGRATION_CONTENT_MEMBER_BYTES && ! $failed ) {
+					$want = (int) min( 1048576, $e['size'] - $e['done'], GEND_SOCIETY_MIGRATION_CONTENT_MEMBER_BYTES - $written );
+					$d    = $fh ? fread( $fh, $want ) : false; // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fread
+					if ( false === $d || '' === $d ) {
+						$d = str_repeat( "\0", $want ); // the file shrank or vanished while it was copied: keep the entry size
+						if ( empty( $e['short'] ) ) {
+							$e['short'] = true;
+							gend_society_migration_content_note( $job, 'changed', $e['p'], 'shrank' );
+						}
+					}
+					$put( $d );
+					$e['done'] += strlen( $d );
+				}
+				if ( $fh ) {
+					fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+				}
+				if ( $e['done'] >= $e['size'] ) {
+					$put( str_repeat( "\0", ( 512 - $e['size'] % 512 ) % 512 ) );
+					$c['entry'] = null;
+				} else {
+					$c['entry'] = $e;
+				}
+				continue;
+			}
+			if ( null === $ixh ) {
+				$ixh = fopen( $ixf, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+				if ( ! $ixh ) {
+					$failed = true;
+					break;
+				}
+				fseek( $ixh, (int) $c['ii'] );
+			}
+			$line = (int) $c['ii'] < (int) $c['index']['offset'] ? fgets( $ixh ) : false;
+			if ( false === $line || '' === $line ) {
+				if ( $written > 0 ) {
+					break; // the end-of-archive goes into a gzip member of its own (next step)
+				}
+				$put( str_repeat( "\0", 1024 ) ); // the one end-of-archive, at the very end of the stream
+				$c['final'] = true;
+				break;
+			}
+			$c['ii'] += strlen( $line );
+			$d        = json_decode( $line, true );
+			if ( ! is_array( $d ) ) {
+				continue;
+			}
+			$p = isset( $d['p64'] ) ? (string) base64_decode( (string) $d['p64'] ) : (string) ( $d['p'] ?? '' ); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode
+			$t = (string) ( $d['t'] ?? '' );
+			if ( '' === $p ) {
+				continue;
+			}
+			if ( 'd' === $t ) {
+				$put( gend_society_migration_tar_header( $p . '/', '5', 0, (int) ( $d['m'] ?? 0 ) ) );
+				$job['totals']['dirs'] = (int) ( $job['totals']['dirs'] ?? 0 ) + 1;
+				continue;
+			}
+			if ( 'l' === $t ) {
+				$put( gend_society_migration_tar_header( $p, '2', 0, time(), (string) ( $d['l'] ?? '' ) ) );
+				$job['totals']['links'] = (int) ( $job['totals']['links'] ?? 0 ) + 1;
+				continue;
+			}
+			$a = $root . '/' . $p;
+			clearstatcache( true, $a );
+			if ( ! is_file( $a ) || is_link( $a ) ) {
+				gend_society_migration_content_note( $job, 'changed', $p, 'vanished' );
+				continue;
+			}
+			$size = (int) filesize( $a );
+			if ( $size > (int) gend_society_migration_excludes()['max_file_bytes'] ) {
+				gend_society_migration_content_note( $job, 'changed', $p, 'too_large' );
+				continue;
+			}
+			$put( gend_society_migration_tar_header( $p, '0', $size, (int) filemtime( $a ) ) );
+			$job['totals']['files'] = (int) $job['totals']['files'] + 1;
+			if ( $size > 0 ) {
+				$c['entry'] = array(
+					'p'    => $p,
+					'size' => $size,
+					'done' => 0,
+				);
+			}
+		}
+		if ( $ixh ) {
+			fclose( $ixh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+		}
+		unset( $c );
+		gzclose( $gz );
+		if ( $failed ) {
+			$job['error'] = 'Writing the export failed (disk full?)';
+			return 'error';
+		}
+		clearstatcache( true, $path );
+		$job['cur']['offset']           = (int) filesize( $path );
+		$job['cur']['raw']             += $written;
+		$job['cur']['members']         += 1;
+		$job['totals']['content_bytes'] = (int) $job['totals']['content_bytes'] + $written;
+		if ( ! empty( $job['content']['final'] ) ) {
+			gend_society_migration_part_close( $job );
+			return 'phase';
+		}
+		if ( $job['cur']['raw'] >= GEND_SOCIETY_MIGRATION_CONTENT_PART_BYTES ) {
+			gend_society_migration_part_close( $job );
+		}
+		return 'more';
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_manifest_step' ) ) {
+	/**
+	 * Write manifest.json format 2 into staging (random name, mapped in the job). Never the secret or a staging path.
+	 *
+	 * @return string 'phase' | 'error'.
+	 */
+	function gend_society_migration_manifest_step( array &$job ): string {
+		global $wpdb;
+		$names = array_column( (array) $job['tables'], 'name' );
+		$colls = array();
+		if ( $names ) {
+			$ph    = implode( ', ', array_fill( 0, count( $names ), '%s' ) );
+			$colls = (array) $wpdb->get_col( $wpdb->prepare( "SELECT DISTINCT TABLE_COLLATION FROM information_schema.TABLES WHERE TABLE_SCHEMA = DATABASE() AND TABLE_NAME IN ({$ph}) ORDER BY TABLE_COLLATION", $names ) ); // phpcs:ignore WordPress.DB, WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare -- one %s per table name, built above.
+		}
+		$parts = array();
+		foreach ( array( 'db', 'users', 'content' ) as $k ) {
+			$parts[ $k ] = array();
+			foreach ( (array) $job['parts'][ $k ] as $p ) {
+				$parts[ $k ][] = array(
+					'n'      => (int) $p['n'],
+					'size'   => (int) $p['size'],
+					'sha256' => (string) $p['sha256'],
+					'raw'    => (int) $p['raw'],
+				);
+			}
+		}
+		$home = untrailingslashit( home_url() );
+		$m    = array(
+			'format'              => 2,
+			'source_kind'         => 'external',
+			'job_id'              => (string) $job['job_id'],
+			'source_url'          => $home,
+			'home_url'            => (string) get_option( 'home' ),
+			'site_url'            => (string) get_option( 'siteurl' ),
+			'table_prefix'        => 'wp_',
+			'source_table_prefix' => (string) $job['prefix'],
+			'db_charset'          => (string) $wpdb->charset,
+			'db_collations'       => array_values( array_filter( array_map( 'strval', $colls ) ) ),
+			'mysql_version'       => (string) $wpdb->get_var( 'SELECT VERSION()' ), // phpcs:ignore WordPress.DB
+			'php_version'         => PHP_VERSION,
+			'wp_version'          => (string) get_bloginfo( 'version' ),
+			'active_plugins'      => array_values( (array) get_option( 'active_plugins', array() ) ),
+			'active_theme'        => (string) get_stylesheet(),
+			'template'            => (string) get_option( 'template' ),
+			'stylesheet'          => (string) get_option( 'stylesheet' ),
+			'content_root'        => 'wp-content',
+			'content_stream'      => 'The content parts concatenated in order are one tar.gz (entries may span parts).',
+			'parts'               => $parts,
+			'totals'              => (array) $job['totals'],
+			'exported_at'         => gmdate( 'c' ),
+			'watermark'           => (array) ( $job['watermark'] ?? array() ),
+			'excluded'            => array_values( (array) ( $job['excluded'] ?? array() ) ),
+			'changed'             => array_values( (array) ( $job['content']['changed'] ?? array() ) ),
+			'alt_base'            => $home . '/?rest_route=',
+		);
+		$json = wp_json_encode( $m, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
+		$file = bin2hex( random_bytes( 8 ) ) . '.json';
+		$path = $job['staging'] . '/' . $file;
+		if ( ! is_string( $json ) || strlen( $json ) !== (int) file_put_contents( $path, $json ) ) { // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_file_put_contents, PluginCheck.CodeAnalysis.WriteFile.PluginDirectoryWrite -- the staging dir (outside the web root or wp-content), never the plugin folder.
+			$job['error'] = 'Writing the export failed (disk full?)';
+			return 'error';
+		}
+		$job['manifest'] = array(
+			'file'   => $file,
+			'size'   => strlen( $json ),
+			'sha256' => hash( 'sha256', $json ),
+		);
+		return 'phase';
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_export_dispatch' ) ) {
+	/** One unit of work for the job's current phase. @return string 'more' | 'phase' | 'error'. */
+	function gend_society_migration_export_dispatch( array &$job ): string {
+		switch ( (string) $job['phase'] ) {
+			case 'db':
+			case 'users':
+				return gend_society_migration_export_step( $job );
+			case 'content':
+				return gend_society_migration_content_step( $job );
+			case 'manifest':
+				return gend_society_migration_manifest_step( $job );
+		}
+		return 'phase';
+	}
+}
+
 /* ---- tick ------------------------------------------------------------------------------------------------ */
 
 if ( ! function_exists( 'gend_society_migration_bytes_of' ) ) {
@@ -558,6 +1099,13 @@ if ( ! function_exists( 'gend_society_migration_bytes_of' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_migration_export_running_phases' ) ) {
+	/** Phases a tick works on (ready and failed are final). */
+	function gend_society_migration_export_running_phases(): array {
+		return array( 'db', 'users', 'content', 'manifest' );
+	}
+}
+
 if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 	/**
 	 * Run the export for one budgeted tick (cron or AJAX driver).
@@ -571,7 +1119,7 @@ if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 		if ( ! $job || empty( $job['phase'] ) ) {
 			return array( 'status' => 'none', 'phase' => '', 'ticks' => 0, 'elapsed' => 0.0, 'peak' => 0 );
 		}
-		if ( ! in_array( $job['phase'], array( 'db', 'users' ), true ) ) {
+		if ( ! in_array( $job['phase'], gend_society_migration_export_running_phases(), true ) ) {
 			return array( 'status' => 'idle', 'phase' => (string) $job['phase'], 'ticks' => (int) $job['ticks'], 'elapsed' => 0.0, 'peak' => 0 );
 		}
 		$token = gend_society_migration_lock();
@@ -597,30 +1145,52 @@ if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 					'file'  => (string) $job['cur']['file'],
 				);
 			}
+			$icut = gend_society_migration_index_repair( $job );
+			if ( $icut > 0 ) {
+				$job['repairs'][] = array(
+					'at'    => time(),
+					'bytes' => $icut,
+					'file'  => (string) $job['content']['index']['file'],
+				);
+			}
 			++$job['ticks'];
 			$job['last_tick_at'] = time();
-			while ( microtime( true ) < $deadline && memory_get_usage() < $mem_cap ) {
-				$r = gend_society_migration_export_step( $job );
+			$next                = array(
+				'db'       => 'users',
+				'users'    => 'content',
+				'content'  => 'manifest',
+				'manifest' => 'ready',
+			);
+			do { // at least one unit of work per tick, then until the budget or the memory cap
+				$r = gend_society_migration_export_dispatch( $job );
 				if ( 'error' === $r ) {
 					$job['phase'] = 'failed';
 					$status       = 'failed';
 					break;
 				}
 				if ( 'phase' === $r ) {
-					$job['phase'] = 'db' === $job['phase'] ? 'users' : 'content';
+					$job['phase'] = $next[ $job['phase'] ] ?? 'ready';
+					if ( 'content' === $job['phase'] && ! isset( $job['content'] ) ) {
+						gend_society_migration_content_init( $job ); // the watermark is read at content-phase start
+					}
+					if ( 'ready' === $job['phase'] ) {
+						$job['ready_at'] = time();
+					}
 				}
 				gend_society_migration_export_save( $job );
-				if ( ! in_array( $job['phase'], array( 'db', 'users' ), true ) ) {
+				if ( 'ready' === $job['phase'] ) {
 					$status = 'done';
 					break;
 				}
-			}
+			} while ( microtime( true ) < $deadline && memory_get_usage() < $mem_cap );
 			gend_society_migration_export_save( $job );
 		} finally {
 			gend_society_migration_unlock( $token );
 		}
 		if ( 'running' === $status && ! wp_next_scheduled( 'gend_society_migration_export_tick' ) ) {
 			wp_schedule_single_event( time() + 5, 'gend_society_migration_export_tick' );
+		} elseif ( in_array( $status, array( 'done', 'failed' ), true ) ) {
+			wp_clear_scheduled_hook( 'gend_society_migration_export_tick' ); // nothing left to drive (the AJAX loop may have finished it)
 		}
 		return array(
 			'status'  => $status,
@@ -643,9 +1213,13 @@ if ( ! function_exists( 'gend_society_migration_export_status' ) ) {
 		foreach ( (array) $job['tables'] as $t ) {
 			$done += ! empty( $t['done'] ) ? 1 : 0;
 		}
+		$c = (array) ( $job['content'] ?? array() );
 		return array(
 			'job_id'       => (string) $job['job_id'],
 			'phase'        => (string) $job['phase'],
+			'index_lines'  => (int) ( $c['index']['lines'] ?? 0 ),
+			'index_done'   => ! empty( $c['index']['done'] ),
+			'manifest'     => ! empty( $job['manifest'] ),
 			'tables_done'  => $done,
 			'tables_total' => count( (array) $job['tables'] ),
 			'parts'        => array_map( 'count', (array) $job['parts'] ),
@@ -658,10 +1232,10 @@ if ( ! function_exists( 'gend_society_migration_export_status' ) ) {
 }
 
 if ( ! function_exists( 'gend_society_migration_export_active' ) ) {
-	/** The export still has DB / users work to do (the header's tick loop runs). */
+	/** The export still has work to do (the header's tick loop runs). */
 	function gend_society_migration_export_active(): bool {
 		$job = gend_society_migration_export_job();
-		return is_array( $job ) && in_array( (string) ( $job['phase'] ?? '' ), array( 'db', 'users' ), true );
+		return is_array( $job ) && in_array( (string) ( $job['phase'] ?? '' ), gend_society_migration_export_running_phases(), true );
 	}
 }
 
