@@ -32,7 +32,13 @@
       "provision",
       "verify",
       "live"
-    ]
+    ],
+    "state": "idle",
+    "can_start": false,
+    "can_retry": false,
+    "can_cancel": false,
+    "scheduled_at": 0,
+    "error": ""
   },
   "dashboard_plan": {
     "id": 20,
