@@ -516,7 +516,7 @@ $S['users'] = function () {
 	$d   = gs110ex_rows( gs110ex_sql( $job, 'db' ) );
 	gs110ex_assert( gs110ex_count( $wpdb->users ) === ( $u['wp_users'] ?? 0 ) && gs110ex_count( $wpdb->usermeta ) === ( $u['wp_usermeta'] ?? 0 ), 'users-rows', 'users parts: users + usermeta rows equal the source', wp_json_encode( $u ) );
 	gs110ex_assert( ! isset( $d['wp_users'] ) && ! isset( $d['wp_usermeta'] ), 'users-not-in-db', 'the db parts carry no users / usermeta' );
-	gs110ex_assert( count( $job['parts']['users'] ) >= 1 && 'content' === $job['phase'], 'users-phase', 'users parts written, then phase content (110-14 continues)', $job['phase'] );
+	gs110ex_assert( count( $job['parts']['users'] ) >= 1 && in_array( $job['phase'], array( 'content', 'manifest', 'ready' ), true ), 'users-phase', 'users parts written, then the content phase (110-14: content + manifest -> ready)', $job['phase'] );
 };
 
 $S['parts'] = function () {
@@ -633,7 +633,7 @@ $S['cron-only'] = function () {
 		++$n;
 	}
 	$job = gend_society_migration_export_job();
-	gs110ex_assert( 'content' === ( $job['phase'] ?? '' ), 'cron-only-phase', "only the WP-Cron events ({$n}) drove the export to phase content (each unfinished tick queued the next)", (string) ( $job['phase'] ?? '' ) );
+	gs110ex_assert( in_array( ( $job['phase'] ?? '' ), array( 'content', 'ready' ), true ), 'cron-only-phase', "only the WP-Cron events ({$n}) drove the export past the DB / users phases (content; ready since 110-14) (each unfinished tick queued the next)", (string) ( $job['phase'] ?? '' ) );
 };
 
 $S['ajax-only'] = function () {
@@ -679,7 +679,7 @@ $S['ajax-only'] = function () {
 	$jx = gend_society_migration_export_job();
 	gs110ex_info( "ajax-only: {$n} admin-ajax ticks, worst " . round( $worst, 2 ) . ' s, error ' . wp_json_encode( $jx['error'] ?? null ) . ', last ' . wp_json_encode( $last ) . ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? ' (DISABLE_WP_CRON)' : '' ) );
 	$job = gend_society_migration_export_job();
-	gs110ex_assert( 'content' === ( $job['phase'] ?? '' ) && 'done' === ( $last['status'] ?? '' ), 'ajax-only-phase', 'admin-ajax ticks alone reach phase content', (string) ( $job['phase'] ?? '' ) );
+	gs110ex_assert( in_array( ( $job['phase'] ?? '' ), array( 'content', 'ready' ), true ) && 'done' === ( $last['status'] ?? '' ), 'ajax-only-phase', 'admin-ajax ticks alone get past the DB / users phases (content; ready since 110-14)', (string) ( $job['phase'] ?? '' ) );
 };
 
 $S['wipe'] = function () {
