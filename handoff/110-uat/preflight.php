@@ -520,7 +520,7 @@ $gs110pf_sections['ids'] = function () {
 	$base = gs110pf_ids( gend_society_readiness_collect( 'welcome' ) );
 	gs110pf_size_all();
 	$r    = gs110pf_collect_migration();
-	gs110pf_assert( array_merge( $base, GS110PF_MIGRATION_IDS ) === gs110pf_ids( $r ), 'ids-order', "collect('migration') ids = 106 ids + db_size..estimate in order", wp_json_encode( gs110pf_ids( $r ) ) );
+	gs110pf_assert( array_merge( $base, GS110PF_MIGRATION_IDS, array( 'staging_exposed' ) ) === gs110pf_ids( $r ), 'ids-order', "collect('migration') ids = 106 ids + db_size..estimate in order + staging_exposed (110-15)", wp_json_encode( gs110pf_ids( $r ) ) );
 	$shape = true;
 	foreach ( (array) $r['checks'] as $c ) {
 		$shape = $shape && is_array( $c ) && array( 'id', 'label', 'status', 'message', 'blocker' ) === array_keys( $c ) && in_array( $c['status'], array( 'pass', 'warn', 'fail', 'info' ), true ) && is_bool( $c['blocker'] );
