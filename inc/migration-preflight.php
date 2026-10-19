@@ -1160,7 +1160,8 @@ if ( ! function_exists( 'gend_society_migration_progress_html' ) ) {
 		$block = $last ? gend_society_readiness_blockers( $last ) : array();
 		$sched = $v['schedule_allowed'];
 		$state = '' !== $v['state'] ? $v['state'] : 'idle';
-		$out   = '<div class="gs-mship-progress gs-mship-progress--migration" data-gs-mig-root="1" data-state="' . esc_attr( $state ) . '"' . ( gend_society_migration_view_polls( $v ) ? ' data-poll="1"' : '' ) . '>';
+		$tick  = function_exists( 'gend_society_migration_export_active' ) && gend_society_migration_export_active(); // 110-13: the export runs here.
+		$out   = '<div class="gs-mship-progress gs-mship-progress--migration" data-gs-mig-root="1" data-state="' . esc_attr( $state ) . '"' . ( gend_society_migration_view_polls( $v ) ? ' data-poll="1"' : '' ) . ( $tick ? ' data-tick="1"' : '' ) . '>';
 		$i     = 0;
 		foreach ( $steps as $label ) {
 			++$i;
@@ -1170,6 +1171,9 @@ if ( ! function_exists( 'gend_society_migration_progress_html' ) ) {
 		if ( 'scheduled' === $state && $v['scheduled_at'] > 0 ) {
 			/* translators: %s: local date and time. */
 			$out .= '<p class="gs-mship-mig__note" data-gs-mig-scheduled="' . (int) $v['scheduled_at'] . '">' . esc_html( sprintf( __( 'Starts %s', 'gend-society' ), wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $v['scheduled_at'] ) ) ) . '</p>';
+		}
+		if ( $tick && defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ) {
+			$out .= '<p class="gs-mship-mig__note" data-gs-mig-keep-open="1">' . esc_html__( 'WP-Cron is off on this site: keep this tab open while your site is copied.', 'gend-society' ) . '</p>';
 		}
 		if ( 'preparing' === $state && $v['waiting_for_site'] ) {
 			$out .= '<p class="gs-mship-mig__note" data-gs-mig-waiting="1">' . esc_html( $t['waiting'] ) . '</p>';

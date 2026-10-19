@@ -219,6 +219,7 @@ function gs110ex_seed_postmeta( $n ) {
 	$have = (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = 'gs110ex_seed'" ); // phpcs:ignore
 	if ( $have < $n ) {
 		$need = $n - $have;
+		$wpdb->query( 'SET SESSION cte_max_recursion_depth = 10000000' ); // phpcs:ignore -- the default (1000) stops the seed CTE.
 		$wpdb->query( "INSERT INTO {$wpdb->postmeta} (post_id, meta_key, meta_value) WITH RECURSIVE s(i) AS (SELECT 1 UNION ALL SELECT i + 1 FROM s WHERE i < {$need}) SELECT 1, 'gs110ex_seed', REPEAT(CONCAT('row ', i, ' '), 20) FROM s" ); // phpcs:ignore
 	}
 	gs110ex_on_cleanup(
@@ -227,6 +228,7 @@ function gs110ex_seed_postmeta( $n ) {
 			$wpdb->query( "DELETE FROM {$wpdb->postmeta} WHERE meta_key = 'gs110ex_seed'" ); // phpcs:ignore
 		}
 	);
+	gs110ex_assert( (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->postmeta} WHERE meta_key = 'gs110ex_seed'" ) >= $n, 'seed', "{$n} seeded postmeta rows", (string) $wpdb->last_error ); // phpcs:ignore
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -243,6 +245,7 @@ $S['init'] = function () {
 	$names = array_column( (array) ( $job['tables'] ?? array() ), 'name' );
 	sort( $names );
 	$want = gs110ex_oracle_tables();
+	sort( $want ); // PHP order on both sides (SQL ORDER BY follows the collation)
 	gs110ex_assert( $names === $want, 'init-tables', 'tables = this install\'s exact-prefix tables (' . count( $want ) . ')', wp_json_encode( array_values( array_diff( $want, $names ) ) ) . ' extra ' . wp_json_encode( array_values( array_diff( $names, $want ) ) ) );
 	$kinds = array();
 	foreach ( (array) $job['tables'] as $t ) {
@@ -402,6 +405,7 @@ $S['escape'] = function () {
 	$ph  = $wpdb->placeholder_escape();
 	gs110ex_assert( false === strpos( $sql, $ph ), 'escape-no-placeholder', 'no wpdb placeholder escape string in the parts' );
 	gs110ex_assert( ! preg_match( '/\{[0-9a-f]{64}\}/', $sql ), 'escape-no-hash', 'no {64-hex} placeholder hash in any part' );
+	gs110ex_assert( false === strpos( $sql, str_repeat( 'e', 64 ) ) && false === strpos( $sql, "'gend_society_migration_job'" ), 'escape-no-secret', 'the export never carries its own job option / export secret' );
 	// Round trip: run the exported INSERT of that row into a scratch copy of postmeta.
 	$scratch = $wpdb->base_prefix . 'gs110ex_rt';
 	gs110ex_temp_tables( array( "CREATE TABLE `{$scratch}` LIKE {$wpdb->postmeta}" ), array( $scratch ) );
@@ -569,6 +573,50 @@ $S['parts'] = function () {
 	gs110ex_assert( 0 === strpos( gs110ex_sql( array( 'staging' => $job['staging'], 'parts' => array( 'x' => array( $db[1] ?? $db[0] ) ) ), 'x' ), "SET NAMES utf8mb4;\n" ), 'parts-standalone', 'every part starts with SET NAMES (importable alone)' );
 };
 
+$S['repair'] = function () {
+	if ( ! gs110ex_ready( 'repair' ) ) {
+		return;
+	}
+	global $wpdb;
+	gs110ex_seed_postmeta( 60000 );
+	gs110ex_start();
+	$short = function () {
+		return 0.3;
+	};
+	add_filter( 'gend_society_migration_tick_budget', $short );
+	gend_society_migration_export_tick( 'cron' );
+	$job = gend_society_migration_export_job();
+	$ok  = is_array( $job['cur'] ?? null );
+	if ( gs110ex_assert( $ok, 'repair-open', 'after a short tick a part is open (mid-export)' ) ) {
+		// A request killed in the middle of a write leaves bytes past the last committed member.
+		file_put_contents( $job['staging'] . '/' . $job['cur']['file'], str_repeat( "\x1f\x8b\x08 torn member", 50 ), FILE_APPEND ); // phpcs:ignore
+	}
+	remove_filter( 'gend_society_migration_tick_budget', $short );
+	gs110ex_run();
+	$job = gend_society_migration_export_job();
+	gs110ex_assert( ! empty( $job['repairs'] ) && (int) $job['repairs'][0]['bytes'] > 0, 'repair-cut', 'the next tick cut the open part back to its last committed member', wp_json_encode( $job['repairs'] ?? null ) );
+	$rows = gs110ex_rows( gs110ex_sql( $job, 'db' ) );
+	gs110ex_assert( gs110ex_count( $wpdb->postmeta ) === ( $rows['wp_postmeta'] ?? 0 ), 'repair-rows', 'all postmeta rows exported exactly once after the repair', (string) ( $rows['wp_postmeta'] ?? 0 ) );
+	$ok = true;
+	foreach ( (array) $job['parts']['db'] as $p ) {
+		$len = 0;
+		$gz  = gzopen( $job['staging'] . '/' . $p['file'], 'rb' );
+		while ( $gz && ! gzeof( $gz ) ) {
+			$c = gzread( $gz, 1048576 );
+			if ( false === $c ) {
+				$ok = false;
+				break;
+			}
+			$len += strlen( $c );
+		}
+		if ( $gz ) {
+			gzclose( $gz );
+		}
+		$ok = $ok && $len === (int) $p['raw'] && hash_file( 'sha256', $job['staging'] . '/' . $p['file'] ) === $p['sha256'];
+	}
+	gs110ex_assert( $ok, 'repair-gzip', 'every part reads as gzip to its recorded length and sha256' );
+};
+
 $S['cron-only'] = function () {
 	if ( ! gs110ex_ready( 'cron-only' ) ) {
 		return;
@@ -628,7 +676,8 @@ $S['ajax-only'] = function () {
 			break;
 		}
 	}
-	gs110ex_info( "ajax-only: {$n} admin-ajax ticks, worst " . round( $worst, 2 ) . ' s, last ' . wp_json_encode( $last ) . ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? ' (DISABLE_WP_CRON)' : '' ) );
+	$jx = gend_society_migration_export_job();
+	gs110ex_info( "ajax-only: {$n} admin-ajax ticks, worst " . round( $worst, 2 ) . ' s, error ' . wp_json_encode( $jx['error'] ?? null ) . ', last ' . wp_json_encode( $last ) . ( defined( 'DISABLE_WP_CRON' ) && DISABLE_WP_CRON ? ' (DISABLE_WP_CRON)' : '' ) );
 	$job = gend_society_migration_export_job();
 	gs110ex_assert( 'content' === ( $job['phase'] ?? '' ) && 'done' === ( $last['status'] ?? '' ), 'ajax-only-phase', 'admin-ajax ticks alone reach phase content', (string) ( $job['phase'] ?? '' ) );
 };
@@ -694,7 +743,12 @@ $S['keep-info'] = function () {
 	}
 	global $wpdb;
 	foreach ( (array) $job['tables'] as $t ) {
-		echo 'SRC ' . 'wp_' . substr( $t['name'], strlen( $wpdb->base_prefix ) ) . ' ' . gs110ex_count( $t['name'] ) . "\n";
+		$n = gs110ex_count( $t['name'] );
+		if ( $t['name'] === $wpdb->options ) {
+			// The exporter's own state (job + secret, lock) is not exported.
+			$n -= (int) $wpdb->get_var( "SELECT COUNT(*) FROM {$wpdb->options} WHERE option_name LIKE 'gend\\_society\\_migration\\_%' OR option_name LIKE '%\\_transient\\_%'" ); // phpcs:ignore -- transients come and go during a live export; the import check leaves them out too
+		}
+		echo 'SRC ' . 'wp_' . substr( $t['name'], strlen( $wpdb->base_prefix ) ) . ' ' . $n . "\n";
 	}
 };
 

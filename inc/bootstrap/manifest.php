@@ -672,6 +672,12 @@ return array(
 			'note'  => 'Migration pre-flight sizing + report; consent-gated remote (Phase 110-09). Standalone only.',
 		),
 		array(
+			'file'  => 'inc/migration-export.php',
+			'tier'  => 'customer',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Chunked migration exporter (Phase 110-13); no exec; staging outside web root when possible.',
+		),
+		array(
 			'file'  => 'inc/pages/welcome.php',
 			'tier'  => 'customer',
 			'needs' => array( 'standalone' ),

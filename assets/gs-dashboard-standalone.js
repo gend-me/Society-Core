@@ -314,11 +314,34 @@
 		}
 	});
 
+	// 110-13: while this site exports, the open tab drives the exporter too (admin-ajax gend_society_migration_tick);
+	// with WP-Cron off this loop alone completes the export.
+	var migTicking = false;
+	function migTick() {
+		var r = migRoot();
+		if (!r || r.getAttribute('data-tick') !== '1' || migTicking) {
+			return;
+		}
+		migTicking = true;
+		migPost('gend_society_migration_tick', {}, function (j) {
+			migTicking = false;
+			var st = j && j.success && j.data ? j.data.status : '';
+			if (st === 'running') {
+				window.setTimeout(migTick, 1000);
+			} else if (st === 'locked') {
+				window.setTimeout(migTick, 5000);
+			} else if (!j) {
+				window.setTimeout(migTick, 15000);
+			}
+		});
+	}
+
 	function migStart() {
 		var r = migRoot();
 		if (r && r.getAttribute('data-poll') === '1' && !migPoll) {
 			migPoll = window.setInterval(migRepaint, 15000);
 		}
+		migTick();
 	}
 
 	// Only the paired hub, only this install, only this message type.
