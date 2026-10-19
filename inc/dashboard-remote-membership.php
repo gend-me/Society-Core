@@ -1010,6 +1010,12 @@ function gend_society_render_membership_panel( $payload = null ) {
     $gs_sa_change  = ( $gs_sa_paired && ! $gs_sa_revoked && function_exists( 'gend_society_plan_change_plan_url' ) ) ? gend_society_plan_change_plan_url( $payload ) : '';
     $gs_sa_inherit = ( $gs_sa && 'group' === ( $payload['plan_source'] ?? '' ) && is_array( $payload['inherited_from'] ?? null ) ) ? (string) ( $payload['inherited_from']['group_name'] ?? '' ) : '';
     $gs_sa_connect = $gs_sa_revoked ? __( 'Reconnect', 'gend-society' ) : ( $gs_sa_paired ? __( 'Manage connection', 'gend-society' ) : __( 'Connect to gend.me', 'gend-society' ) );
+    // Phase 110-12 (M2): on a connected standalone install the header progress carries Start / Schedule / Cancel /
+    // Retry (inc/migration-preflight.php); the friendly error goes in the status badge slot. Null elsewhere.
+    $gs_sa_mig     = ( $gs_sa_paired && function_exists( 'gend_society_migration_view' ) ) ? gend_society_migration_view( $payload ) : null;
+    if ( $gs_sa_mig && gend_society_migration_view_shows( $gs_sa_mig ) ) {
+        gend_society_migration_poll_schedule();
+    }
 
     ob_start();
     ?>
@@ -1327,11 +1333,15 @@ function gend_society_render_membership_panel( $payload = null ) {
         <div class="gs-mship-header">
             <div class="gs-mship-title">
                 <h2><?php echo esc_html( $app_title ); ?></h2>
+<?php if ( $gs_sa_mig && 'failed' === $gs_sa_mig['state'] && '' !== $gs_sa_mig['error'] ) : ?>
+                    <span class="gs-mship-status-badge" data-gs-mig-error="1" style="background:rgba(255,180,0,0.15); border-color:rgba(255,180,0,0.4); color:#ffd166;"><?php echo esc_html( $gs_sa_mig['error'] ); ?></span>
+<?php else : ?>
                 <?php if ( ! empty( $migration['live'] ) ) : ?>
                     <span class="gs-mship-status-badge">● <?php esc_html_e( 'Container Live', 'gend-society' ); ?></span>
                 <?php elseif ( $status_label !== '' ) : ?>
                     <span class="gs-mship-status-badge" style="background:rgba(255,180,0,0.15); border-color:rgba(255,180,0,0.4); color:#ffd166;"><?php echo esc_html( $status_label ); ?></span>
                 <?php endif; ?>
+<?php endif; ?>
             </div>
             <?php if ( $app_url !== '' ) : ?>
                 <a class="gs-mship-open-app" href="<?php echo esc_url( $app_url ); ?>" target="_blank" rel="noopener">
@@ -1352,7 +1362,8 @@ function gend_society_render_membership_panel( $payload = null ) {
             ! empty( $migration )
             && empty( $migration['live'] )
             && $stage_ix > 0
-            && $stage_ix < count( $steps );
+            && $stage_ix < count( $steps )
+            && ! $gs_sa_mig; // 110-12: a connected standalone install renders its own header progress below.
         ?>
         <?php if ( $show_migration_progress ) : ?>
         <div class="gs-mship-progress">
@@ -1364,6 +1375,7 @@ function gend_society_render_membership_panel( $payload = null ) {
             <?php endforeach; ?>
         </div>
         <?php endif; ?>
+<?php if ( $gs_sa_mig ) : echo gend_society_migration_progress_html( $payload ); /* phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by the builder. */ endif; ?>
 
         <!-- ── 2-card grid: Membership / Integration Hub. Feature Access moved to the top of the
              Feature Suite tab (see below) so it sits with the feature cards it controls. ── -->

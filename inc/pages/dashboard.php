@@ -225,10 +225,17 @@ function gend_society_dashboard_enqueue_standalone()
         'nonce'     => $paired && function_exists('gend_society_plan_refresh_ajax') ? wp_create_nonce('gs_plan') : '',
         'hubOrigin' => $paired && function_exists('gend_society_plan_hub_origin') ? gend_society_plan_hub_origin() : '',
         'installId' => $paired ? (string) get_option('gend_society_install_id', '') : '',
+        // 110-12: the migration header controls (manage_options + the membership panel nonce) and the CTA wait page.
+        'migNonce'         => $paired && function_exists('gend_society_migration_ajax') && current_user_can('manage_options') ? wp_create_nonce('gs_membership_action') : '',
+        'migrationWaitUrl' => $paired && function_exists('gend_society_migration_wizard_wait_url') && current_user_can('manage_options') ? gend_society_migration_wizard_wait_url() : '',
         'i18n'      => array(
-            'blocked'    => __('Your browser blocked the gend.me window.', 'gend-society'),
-            'openTab'    => __('Open it in a new tab', 'gend-society'),
-            'refreshing' => __('Updating your plan from gend.me...', 'gend-society'),
+            'blocked'     => __('Your browser blocked the gend.me window.', 'gend-society'),
+            'openTab'     => __('Open it in a new tab', 'gend-society'),
+            'refreshing'  => __('Updating your plan from gend.me...', 'gend-society'),
+            'migAck'      => __('Tick "I understand" first.', 'gend-society'),
+            'migPickTime' => __('Pick a date and time.', 'gend-society'),
+            'migWorking'  => __('Working...', 'gend-society'),
+            'migFailed'   => __('Something went wrong. Please try again.', 'gend-society'),
         ),
     ));
 }

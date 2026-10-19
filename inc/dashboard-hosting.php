@@ -384,10 +384,22 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
             $gs_sa_payload = gend_society_remote_membership_get_cached();
             $gs_sa_live    = is_array( $gs_sa_payload ) && ! empty( $gs_sa_payload['migration']['live'] );
             $gs_sa_wizard  = ( is_array( $gs_sa_payload ) && ! $gs_sa_live ) ? gend_society_plan_container_wizard_url( $gs_sa_payload ) : '';
-            if ( '' !== $gs_sa_wizard ) {
+            // 110-12: 'wizard' before payment (the click opens the popup on the local wait page first, which keeps
+            // gend.me's pre-flight current; gs-dashboard-standalone.js), 'start' once armed (inline Start step),
+            // '' while scheduled / running / failed.
+            $gs_sa_cta_mode = ( '' !== $gs_sa_wizard && function_exists( 'gend_society_migration_cta_mode' ) ) ? gend_society_migration_cta_mode( $gs_sa_payload ) : ( '' !== $gs_sa_wizard ? 'wizard' : '' );
+            if ( 'wizard' === $gs_sa_cta_mode ) {
+                if ( function_exists( 'gend_society_migration_queue_report' ) ) {
+                    gend_society_migration_queue_report();
+                }
                 $gs_sa_cta_html = gend_society_migrate_cta_markup(
                     '<a class="gdc-migrate-cta__btn" data-gs-popup data-gs-migrate-cta="1" href="' . esc_url( $gs_sa_wizard ) . '" target="_blank" rel="opener">'
                     . '<span>' . esc_html__( 'Start Migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></a>'
+                );
+            } elseif ( 'start' === $gs_sa_cta_mode ) {
+                $gs_sa_cta_html = gend_society_migrate_cta_markup(
+                    '<a class="gdc-migrate-cta__btn" data-gs-migrate-cta="1" data-gs-start-inline="1" href="#gs-mig-start-step">'
+                    . '<span>' . esc_html__( 'Start migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></a>'
                 );
             }
         }

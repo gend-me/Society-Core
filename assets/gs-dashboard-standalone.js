@@ -12,6 +12,10 @@
  * - [data-gs-qr] boxes get a QR code from WooCommerce's bundled jquery-qrcode when this site has it (no QR
  *   service); without it they stay hidden and the link next to them is the way in.
  * - button[data-gs-connect-open] belongs to the connect popup (plan 109-30); nothing here handles it.
+ * - 110-12 (M2/M7): the Storage card Start Migration CTA opens the popup on the local wait page first
+ *   (cfg.migrationWaitUrl); the membership header progress ([data-gs-mig-root]) gets Start / Confirm / Cancel /
+ *   Retry (this site's own admin-ajax, cfg.migNonce) and repaints every 15 s while armed, scheduled or running;
+ *   a[data-gs-start-inline] (the CTA once armed) opens the inline Start step.
  * Config: wp_localize_script (gendSocietyDashboard). ES5, no jQuery needed.
  */
 (function () {
@@ -145,8 +149,171 @@
 			return;
 		}
 		ev.preventDefault();
-		openPopup(a.getAttribute('href'));
+		// 110-12 (M7): the Storage card Start Migration CTA opens the popup on the local wait page first; it keeps
+		// gend.me's pre-flight current, then goes on to the container wizard (still one window, opened by the click).
+		openPopup(a.getAttribute('data-gs-migrate-cta') === '1' && cfg.migrationWaitUrl ? cfg.migrationWaitUrl : a.getAttribute('href'));
 	});
+
+	/*
+	 * 110-12 (M2): the membership header progress on a connected install. Start (opens the inline Start step),
+	 * Confirm (start now / schedule), Cancel, Retry go to this site's own admin-ajax (it talks to gend.me); the
+	 * header repaints every 15 s while armed, scheduled or running and stops when Live or failed.
+	 */
+	var migPoll = null;
+
+	function migRoot() {
+		return document.querySelector('[data-gs-mig-root]');
+	}
+
+	function migSay(msg) {
+		var r = migRoot();
+		var m = r ? r.querySelector('[data-gs-mig-msg]') : null;
+		if (m) {
+			m.textContent = msg || '';
+		}
+	}
+
+	function migPost(action, fields, done) {
+		if (!cfg.ajaxUrl || !cfg.migNonce) {
+			return;
+		}
+		var body = 'action=' + encodeURIComponent(action) + '&nonce=' + encodeURIComponent(cfg.migNonce);
+		Object.keys(fields || {}).forEach(function (k) {
+			body += '&' + encodeURIComponent(k) + '=' + encodeURIComponent(fields[k]);
+		});
+		var xhr = new XMLHttpRequest();
+		xhr.open('POST', cfg.ajaxUrl, true);
+		xhr.setRequestHeader('Content-Type', 'application/x-www-form-urlencoded; charset=UTF-8');
+		xhr.onload = function () {
+			var j = null;
+			try {
+				j = JSON.parse(xhr.responseText);
+			} catch (e) {
+				j = null;
+			}
+			done(j);
+		};
+		xhr.onerror = function () {
+			done(null);
+		};
+		xhr.send(body);
+	}
+
+	function migOpenStart() {
+		var r = migRoot();
+		var step = r ? r.querySelector('[data-gs-mig-start-step]') : null;
+		if (!step) {
+			return;
+		}
+		step.hidden = false;
+		var b = r.querySelector('[data-gs-mig-action="start-open"]');
+		if (b) {
+			b.setAttribute('aria-expanded', 'true');
+		}
+		if (step.scrollIntoView) {
+			step.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		}
+	}
+
+	function migAction(btn) {
+		var a = btn.getAttribute('data-gs-mig-action');
+		var r = migRoot();
+		if (!r) {
+			return;
+		}
+		if (a === 'start-open') {
+			var step = r.querySelector('[data-gs-mig-start-step]');
+			if (step && !step.hidden) {
+				step.hidden = true;
+				btn.setAttribute('aria-expanded', 'false');
+				return;
+			}
+			migOpenStart();
+			return;
+		}
+		if (a === 'cancel' && btn.getAttribute('data-confirm') && !window.confirm(btn.getAttribute('data-confirm'))) {
+			return;
+		}
+		var fields = {};
+		if (a === 'start') {
+			var ack = r.querySelector('input[name="gs_mig_freeze_ack"]');
+			if (!ack || !ack.checked) {
+				migSay(i18n.migAck || 'Tick "I understand" first.');
+				return;
+			}
+			fields.freeze_ack = '1';
+			var when = r.querySelector('input[name="gs_mig_when"]:checked');
+			if (when && when.value === 'schedule') {
+				var v = (r.querySelector('input[name="gs_mig_start_at"]') || {}).value || '';
+				var ts = v ? Math.floor(new Date(v).getTime() / 1000) : 0; // the browser's local time -> UTC seconds
+				if (!ts) {
+					migSay(i18n.migPickTime || 'Pick a date and time.');
+					return;
+				}
+				fields.start_at = String(ts);
+			}
+		}
+		btn.disabled = true;
+		migSay(i18n.migWorking || 'Working...');
+		migPost('gend_society_migration_' + a, fields, function (j) {
+			if (j && j.success) {
+				reload();
+				return;
+			}
+			btn.disabled = false;
+			migSay((j && j.data && j.data.message) || i18n.migFailed || 'Something went wrong. Please try again.');
+		});
+	}
+
+	function migRepaint() {
+		migPost('gend_society_migration_state', {}, function (j) {
+			if (!j || !j.success || !j.data) {
+				return;
+			}
+			var r = migRoot();
+			if (!r) {
+				return;
+			}
+			var open = r.querySelector('[data-gs-mig-start-step]');
+			var keep = open && !open.hidden;
+			if (typeof j.data.html === 'string' && j.data.html !== '') {
+				var tmp = document.createElement('div');
+				tmp.innerHTML = j.data.html;
+				var fresh = tmp.firstElementChild;
+				if (fresh && !keep) {
+					r.parentNode.replaceChild(fresh, r);
+				}
+			} else if (!keep) {
+				reload();
+				return;
+			}
+			if (!j.data.poll && migPoll) {
+				window.clearInterval(migPoll);
+				migPoll = null;
+			}
+		});
+	}
+
+	document.addEventListener('click', function (ev) {
+		var btn = closest(ev.target, '[data-gs-mig-action]');
+		if (btn) {
+			ev.preventDefault();
+			migAction(btn);
+			return;
+		}
+		var inline = closest(ev.target, 'a[data-gs-start-inline]');
+		if (inline) {
+			ev.preventDefault();
+			migOpenStart();
+		}
+	});
+
+	function migStart() {
+		var r = migRoot();
+		if (r && r.getAttribute('data-poll') === '1' && !migPoll) {
+			migPoll = window.setInterval(migRepaint, 15000);
+		}
+	}
 
 	// Only the paired hub, only this install, only this message type.
 	window.addEventListener('message', function (ev) {
@@ -189,7 +356,9 @@
 
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', qr);
+		document.addEventListener('DOMContentLoaded', migStart);
 	} else {
 		qr();
+		migStart();
 	}
 })();

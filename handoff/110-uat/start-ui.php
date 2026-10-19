@@ -487,6 +487,9 @@ $gs110su_sections['render-states'] = function () {
 		gs110su_assert( $has === $want, "rs-progress-{$name}", ( $want ? 'header progress shown' : 'no header progress' ) . " for {$name}" );
 		if ( ! $want ) {
 			$md5 = md5( gs110su_norm( gs110su_strip_cta( $html ) ) );
+			if ( getenv( 'GS110SU_DUMP' ) ) {
+				file_put_contents( getenv( 'GS110SU_DUMP' ) . '-' . $name . '.html', gs110su_norm( gs110su_strip_cta( $html ) ) ); // phpcs:ignore
+			}
 			gs110su_baseline_check( 'panel-' . $name, $md5, "rs-md5-{$name}", "{$name} panel HTML equals main (CTA block set aside)" );
 		}
 	}

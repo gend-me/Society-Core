@@ -17,3 +17,15 @@
 .gs-dash-sa-blocked a { color: #8ab4f8; font-weight: 700; }
 /* The existing hero rules set display on these rows; keep [hidden] (not connected / no data) hidden. */
 .gs-bcg-actions[hidden], .gs-bcg-stats[hidden] { display: none !important; }
+/* 110-12: migration controls inside the existing header progress (.gs-mship-progress) on a connected install. */
+.gs-mship-progress--migration .gs-mship-mig { grid-column: 1 / -1; display: flex; flex-direction: column; gap: 10px; padding: 12px 8px 0; }
+.gs-mship-mig__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
+.gs-mship-mig__note { margin: 0; font-size: 0.82rem; line-height: 1.45; color: #fff; opacity: 0.85; text-align: center; }
+.gs-mship-mig__note:empty { display: none; }
+.gs-mship-mig__start { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
+.gs-mship-mig__start[hidden] { display: none; }
+.gs-mship-mig__freeze { margin: 0; font-size: 0.85rem; line-height: 1.45; color: #fde68a; }
+.gs-mship-mig__check, .gs-mship-mig__when label { display: inline-flex; align-items: center; gap: 6px; font-size: 0.85rem; color: #fff; }
+.gs-mship-mig__when { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
+.gs-mship-mig__when input[type="datetime-local"] { background: #1a1e26; color: #fff; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; }
+.gs-mship-mig__start .gend-society-readiness { margin: 0; }
