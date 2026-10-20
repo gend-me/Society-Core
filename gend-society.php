@@ -1,7 +1,7 @@
 <?php
 /**
  * Plugin Name: GenD Society
- * Plugin URI:  https://gend.me
+ * Plugin URI:  https://gend.me/grow/downloads/digital-society-plugin/
  * Description: Connect a WordPress site to a gend.me business group, see if it is ready to move, and use the GenD dashboard or the standard WordPress admin.
  * Version:     1.6.1
  * Update URI:  https://updates.gend.me/gend-society/
