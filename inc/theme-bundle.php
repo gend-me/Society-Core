@@ -112,6 +112,11 @@ add_action('admin_init', function () {
  */
 function gend_society_theme_card_return_url($status = '') {
     $url = function_exists('gend_society_welcome_page_url') ? gend_society_welcome_page_url() : admin_url('themes.php');
+    // 109-35: the dashboard's theme warning posts gs_return=dashboard (nonce checked by the caller first).
+    // phpcs:ignore WordPress.Security.NonceVerification.Missing -- read after check_admin_referer() in the handlers.
+    if (isset($_POST['gs_return']) && 'dashboard' === sanitize_key(wp_unslash($_POST['gs_return']))) {
+        $url = admin_url('index.php');
+    }
     if ('' !== $status) {
         $url = add_query_arg('gend_society_theme', $status, $url);
     }
