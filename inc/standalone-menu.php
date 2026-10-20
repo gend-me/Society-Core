@@ -203,8 +203,9 @@ if ( ! function_exists( 'gend_society_sa_menu_area_state' ) ) {
 
 if ( ! function_exists( 'gend_society_sa_menu_full_build_url' ) ) {
 	/**
-	 * Where the wordpress.org build sends the owner for the full GenD Society build (the paired gend.me, else
-	 * gend.me). A plain link: the wordpress.org build never downloads anything itself.
+	 * Where the wordpress.org build sends the owner for the full GenD Society build: the Digital Society plugin
+	 * store product (a tracked download) on the paired gend.me, else on gend.me. A plain link: the wordpress.org
+	 * build never downloads anything itself.
 	 */
 	function gend_society_sa_menu_full_build_url(): string {
 		$base = function_exists( 'gend_society_plan_identity' ) ? (string) ( gend_society_plan_identity()['base'] ?? '' ) : '';
@@ -216,7 +217,7 @@ if ( ! function_exists( 'gend_society_sa_menu_full_build_url' ) ) {
 		 *
 		 * @param string $url Page URL.
 		 */
-		return (string) apply_filters( 'gend_society_full_build_url', untrailingslashit( $base ) . '/gend-society/' );
+		return (string) apply_filters( 'gend_society_full_build_url', untrailingslashit( $base ) . '/grow/downloads/digital-society-plugin/' );
 	}
 }
 
