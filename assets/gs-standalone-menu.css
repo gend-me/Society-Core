@@ -138,3 +138,15 @@
 	gap: 8px;
 	margin: 0 0 14px;
 }
+
+/* 113-04: core list-screen titles (e.g. Content Campaigns > Pages = edit.php?post_type=page) keep core's dark
+ * heading colour, which is barely visible on the dark skin. This file only loads on a standalone install with the
+ * GenD skin, so the hub's output is unchanged. */
+.wrap h1.wp-heading-inline {
+	color: #e6edf7;
+}
+
+.wrap .subsubsub a.current,
+.wrap .subsubsub a.current .count {
+	color: #fff;
+}

@@ -66,8 +66,8 @@ function gend_society_support_access_verify_signed_request(\WP_REST_Request $req
         return new \WP_Error('not_paired', __('This site has not been paired with gend.me.', 'gend-society'), array('status' => 412));
     }
 
-    $pub = base64_decode($pub_b64, true);
-    $sig = base64_decode($signature, true);
+    $pub = base64_decode($pub_b64, true); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- stored gend.me Ed25519 public key, strict decode.
+    $sig = base64_decode($signature, true); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- Ed25519 signature of the support-access request, strict decode.
     if (!is_string($pub) || strlen($pub) !== SODIUM_CRYPTO_SIGN_PUBLICKEYBYTES) {
         return new \WP_Error('bad_pubkey', __('Stored gend.me public key is invalid.', 'gend-society'), array('status' => 500));
     }
