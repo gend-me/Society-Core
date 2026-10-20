@@ -367,7 +367,7 @@ if ( ! function_exists( 'gend_society_sa_menu_cc_tabs' ) ) {
 
 if ( ! function_exists( 'gend_society_sa_menu_social_tabs' ) ) {
 	/**
-	 * Social Profiles tabs (gend.me order: Profiles, Members, Groups, Activity Wall). Members opens the core Users
+	 * Social Profiles tabs (gend.me order: Settings, Profiles, Members, Groups, Invites, Activity Wall). Members opens the core Users
 	 * screen (Management); the others are gend.me features (plan area 'social').
 	 *
 	 * @param string $active Active tab slug.
@@ -375,9 +375,11 @@ if ( ! function_exists( 'gend_society_sa_menu_social_tabs' ) ) {
 	function gend_society_sa_menu_social_tabs( string $active ): array {
 		$page = admin_url( 'admin.php?page=gdc-social-network-settings' );
 		$tabs = array(
+			'settings' => array( 'label' => __( 'Settings', 'gend-society' ), 'icon' => 'dashicons-admin-generic', 'url' => add_query_arg( 'tab', 'settings', $page ) ),
 			'profiles' => array( 'label' => __( 'Profiles', 'gend-society' ), 'icon' => 'dashicons-admin-users', 'url' => add_query_arg( 'tab', 'profiles', $page ) ),
 			'members'  => array( 'label' => __( 'Members', 'gend-society' ), 'icon' => 'dashicons-groups', 'url' => admin_url( 'users.php' ) ),
 			'groups'   => array( 'label' => __( 'Groups', 'gend-society' ), 'icon' => 'dashicons-groups', 'url' => add_query_arg( 'tab', 'groups', $page ) ),
+			'invites'  => array( 'label' => __( 'Invites', 'gend-society' ), 'icon' => 'dashicons-email', 'url' => add_query_arg( 'tab', 'invites', $page ) ),
 			'wall'     => array( 'label' => __( 'Activity Wall', 'gend-society' ), 'icon' => 'dashicons-buddicons-activity', 'url' => add_query_arg( 'tab', 'wall', $page ) ),
 		);
 		$out = array();
@@ -413,17 +415,19 @@ if ( ! function_exists( 'gend_society_sa_menu_render_content_campaigns' ) ) {
 
 if ( ! function_exists( 'gend_society_sa_menu_render_social_profiles' ) ) {
 	/**
-	 * Social > Social Profiles (bundled page). Members opens Users (free); Profiles / Groups / Activity Wall are
+	 * Social > Social Profiles (bundled page). Members opens Users (free); Settings / Profiles / Groups / Invites / Activity Wall are
 	 * gend.me features.
 	 */
 	function gend_society_sa_menu_render_social_profiles(): void {
 		$tab = gend_society_sa_menu_request( 'tab' );
 		$map = array(
-			'groups' => __( 'Groups', 'gend-society' ),
-			'wall'   => __( 'Activity Wall', 'gend-society' ),
+			'profiles' => __( 'Profiles', 'gend-society' ),
+			'groups'   => __( 'Groups', 'gend-society' ),
+			'invites'  => __( 'Invites', 'gend-society' ),
+			'wall'     => __( 'Activity Wall', 'gend-society' ),
 		);
-		$key   = isset( $map[ $tab ] ) ? $tab : 'profiles';
-		$label = isset( $map[ $tab ] ) ? $map[ $tab ] : __( 'Social profiles', 'gend-society' );
+		$key   = isset( $map[ $tab ] ) ? $tab : 'settings';
+		$label = isset( $map[ $tab ] ) ? $map[ $tab ] : __( 'Social network settings', 'gend-society' );
 		echo '<div class="wrap gdc-admin-dashboard gs-sa-wrap gend-society-plan gend-society-upgrade">';
 		echo gend_society_sa_menu_hero( __( 'Social Profiles', 'gend-society' ), __( 'Members of this site are managed here. Profiles, groups and the activity wall come with your gend.me plan.', 'gend-society' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
 		echo gend_society_sa_menu_strip( gend_society_sa_menu_social_tabs( $key ), 'gs-sa-tabs', __( 'Social Profiles sections', 'gend-society' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
