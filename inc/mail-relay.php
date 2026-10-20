@@ -149,3 +149,65 @@ add_action('admin_notices', function () {
     echo '<div class="notice notice-warning"><p>' . esc_html__('This site reached its monthly email allowance: new mail from your agents and Talk Flows inboxes is waiting in the outbox.', 'gend-society')
         . (!empty($st['upgrade_url']) ? ' <a href="' . esc_url($st['upgrade_url']) . '" target="_blank" rel="noopener">' . esc_html__('Upgrade your Emails plan', 'gend-society') . '</a>' : '') . '</p></div>';
 });
+
+/*
+ * BuddyPress / Youzify (Social Profile) emails through wp_mail(). BuddyPress delivers with its own BP_PHPMailer, which
+ * never calls wp_mail(), so those emails skipped this relay (and its metering) and used whatever PHPMailer was set up
+ * for. Gend_Society_BP_WP_Mail_Delivery hands each BP email to wp_mail() with the same parts BP_PHPMailer uses. The gend.me hub
+ * ships the same delivery (Gend_BP_WP_Mail_Delivery) in mu-plugins/gend-mail/bp-delivery.php; this copy stands down there.
+ */
+if (!function_exists('gend_bp_mail_define_delivery')) {
+    function gend_society_bp_mail_define_delivery() {
+        if (class_exists('Gend_Society_BP_WP_Mail_Delivery', false) || !interface_exists('BP_Email_Delivery')) return;
+
+        class Gend_Society_BP_WP_Mail_Delivery implements BP_Email_Delivery {
+
+            private static function addr($r) {
+                if (!is_object($r) || !method_exists($r, 'get_address')) return '';
+                $a = (string) $r->get_address();
+                if ($a === '') return '';
+                $n = trim(str_replace(array('"', '<', '>', "\r", "\n"), '', (string) $r->get_name()));
+                return $n !== '' ? sprintf('"%s" <%s>', $n, $a) : $a;
+            }
+
+            public function bp_email(BP_Email $email) {
+                $to = array();
+                foreach ((array) $email->get_to() as $r) { $a = self::addr($r); if ($a !== '') $to[] = $a; }
+                if (!$to) return new WP_Error('gend_bp_mail_no_recipient', 'BuddyPress email has no recipient.');
+
+                $is_html = $email->get('content_type') === 'html';
+                $charset = function_exists('bp_get_option') ? bp_get_option('blog_charset') : get_bloginfo('charset');
+                $headers = array('Content-Type: ' . ($is_html ? 'text/html' : 'text/plain') . '; charset=' . $charset);
+                $from = self::addr($email->get_from());
+                if ($from !== '') $headers[] = 'From: ' . $from;
+                $reply = self::addr($email->get_reply_to());
+                if ($reply !== '') $headers[] = 'Reply-To: ' . $reply;
+                foreach ((array) $email->get_cc() as $r) { $a = self::addr($r); if ($a !== '') $headers[] = 'Cc: ' . $a; }
+                foreach ((array) $email->get_bcc() as $r) { $a = self::addr($r); if ($a !== '') $headers[] = 'Bcc: ' . $a; }
+                // As BP_PHPMailer: no token pass on headers (BP's token replacer can't take an array).
+                foreach ((array) $email->get_headers() as $k => $v) {
+                    $k = trim((string) $k);
+                    if ($k === '' || preg_match('/^(content-type|from|reply-to|to|cc|bcc|mime-version)$/i', $k)) continue;
+                    $headers[] = $k . ': ' . str_replace(array("\r", "\n"), ' ', (string) $v);
+                }
+
+                $subject = (string) $email->get_subject('replace-tokens');
+                $body    = $is_html ? (string) $email->get_template('add-content') : (string) $email->get_content_plaintext('replace-tokens');
+
+                $failed = null;
+                $catch  = function ($err) use (&$failed) { $failed = $err; };
+                add_action('wp_mail_failed', $catch);
+                $ok = wp_mail($to, $subject, $body, $headers);
+                remove_action('wp_mail_failed', $catch);
+
+                if ($ok) return true;
+                return $failed instanceof WP_Error ? $failed : new WP_Error('gend_bp_mail_failed', 'wp_mail() could not send the BuddyPress email.');
+            }
+        }
+    }
+
+    add_filter('bp_send_email_delivery_class', function ($class) {
+        gend_society_bp_mail_define_delivery();
+        return class_exists('Gend_Society_BP_WP_Mail_Delivery', false) ? 'Gend_Society_BP_WP_Mail_Delivery' : $class;
+    }, 20);
+}
