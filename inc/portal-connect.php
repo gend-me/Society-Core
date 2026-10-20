@@ -90,12 +90,12 @@ function gend_society_portal_connect_handle_submit() {
 
     // Generate or reuse our own keypair so the install identity is stable across reconnects.
     $keypair_b64 = (string) get_option('gend_society_keypair', '');
-    $keypair_raw = $keypair_b64 !== '' ? base64_decode($keypair_b64, true) : '';
+    $keypair_raw = $keypair_b64 !== '' ? base64_decode($keypair_b64, true) : ''; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- stored Ed25519 key material, strict decode.
     if (!is_string($keypair_raw) || strlen($keypair_raw) !== SODIUM_CRYPTO_SIGN_KEYPAIRBYTES) {
         $keypair_raw = sodium_crypto_sign_keypair();
-        update_option('gend_society_keypair', base64_encode($keypair_raw), false);
+        update_option('gend_society_keypair', base64_encode($keypair_raw), false); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- stores the binary Ed25519 keypair as text.
     }
-    $pubkey_b64 = base64_encode(sodium_crypto_sign_publickey($keypair_raw));
+    $pubkey_b64 = base64_encode(sodium_crypto_sign_publickey($keypair_raw)); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- public key transport.
 
     $install_id = (string) get_option('gend_society_install_id', '');
     if ($install_id === '') {
