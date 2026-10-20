@@ -40,7 +40,7 @@ function gend_society_portal_connect_handle_submit() {
         wp_die(esc_html__('Forbidden.', 'gend-society'));
     }
 
-    $op = isset($_POST['op']) ? sanitize_text_field((string) $_POST['op']) : '';
+    $op = isset($_POST['op']) ? sanitize_text_field(wp_unslash((string) $_POST['op'])) : '';
 
     // Phase 108: standalone pairing, revoke-first disconnect and ownership; hub and container keep the code below.
     if (gend_society_portal_connect_standalone_ready()) {
@@ -68,8 +68,8 @@ function gend_society_portal_connect_handle_submit() {
 
     check_admin_referer('gs_portal_connect_submit', 'gs_portal_connect_nonce');
 
-    $gend_base    = isset($_POST['gend_base_url']) ? esc_url_raw((string) $_POST['gend_base_url']) : '';
-    $pairing_code = isset($_POST['pairing_code']) ? strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $_POST['pairing_code'])) : '';
+    $gend_base    = isset($_POST['gend_base_url']) ? esc_url_raw(wp_unslash((string) $_POST['gend_base_url'])) : '';
+    $pairing_code = isset($_POST['pairing_code']) ? strtoupper(preg_replace('/[^A-Z0-9]/', '', sanitize_text_field(wp_unslash((string) $_POST['pairing_code'])))) : '';
 
     if ($gend_base === '' || strlen($pairing_code) < 6) {
         gend_society_portal_connect_redirect('error', __('Please provide both the gend.me URL and a pairing code.', 'gend-society'));
@@ -452,8 +452,8 @@ if (!function_exists('gend_society_portal_connect_standalone_pairing')) {
 		check_admin_referer('gs_portal_connect_submit', 'gs_portal_connect_nonce');
 
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified above.
-		$gend_base = isset($_POST['gend_base_url']) ? esc_url_raw(trim(wp_unslash((string) $_POST['gend_base_url']))) : '';
-		$raw_code  = isset($_POST['pairing_code']) ? (string) wp_unslash($_POST['pairing_code']) : '';
+		$gend_base = isset($_POST['gend_base_url']) ? trim(esc_url_raw(wp_unslash((string) $_POST['gend_base_url']))) : '';
+		$raw_code  = isset($_POST['pairing_code']) ? sanitize_text_field(wp_unslash((string) $_POST['pairing_code'])) : '';
 		$consented = !empty($_POST['gend_society_consent']);
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
@@ -825,7 +825,7 @@ if (!function_exists('gend_society_portal_connect_render_connect')) {
 	function gend_society_portal_connect_render_connect() {
 		$disclosure = function_exists('gend_society_consent_disclosure_items') ? gend_society_consent_disclosure_items() : array();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- pre-fill only, validated by the pattern.
-		$code_param = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? (string) wp_unslash($_GET['gend_society_code']) : '';
+		$code_param = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? sanitize_text_field(wp_unslash($_GET['gend_society_code'])) : '';
 		$prefill    = preg_match('/^[A-HJ-NP-Z2-9]{6}$/', $code_param) ? $code_param : '';
 		$hub_url    = gend_society_connect_hub();
 		?>

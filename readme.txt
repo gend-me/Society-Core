@@ -19,8 +19,12 @@ GenD Society links a WordPress site to a business group on [gend.me](https://gen
 * **GenD page** with readiness checks. It checks the PHP version, the sodium extension, REST API and loopback access, password protection and public DNS, and lists anything to fix before a move to a gend.me container. The checks run on your own server and only contact your own site.
 * **SEO title and description box** for posts and pages.
 * **Live View** in the block editor, which previews the page you are editing.
-* **GenD dashboard.** A redesigned admin look and dashboard, on by default. "Switch back to standard WordPress" in the admin bar always returns you to the standard WordPress admin, and you can turn the GenD dashboard on again from the GenD page.
+* **GenD dashboard.** A redesigned admin look and dashboard, on by default. "Switch back to standard WordPress" at the top of the GenD dashboard always returns you to the standard WordPress admin, and you can turn the GenD dashboard on again from the GenD page.
 * **GenD Society theme.** The GenD page shows a card or a download link for the theme. The plugin never installs or activates a theme for you.
+
+= What needs a gend.me plan =
+
+Core WordPress is never locked: every standard WordPress screen and feature keeps working with or without the plugin's dashboard, connected or not. Only services that gend.me itself provides, such as hosting, backups, compute and mail relay, need a gend.me plan. For those, the GenD dashboard shows an upgrade page that names the plan which includes the service.
 
 = What Connect adds =
 
@@ -28,7 +32,7 @@ When an administrator clicks **Connect** on the GenD page, the site is paired wi
 
 * see your gend.me plan and which features it includes;
 * give gend.me support time-limited access when you ask for help;
-* later, choose a paid move of the site into a gend.me container. A move never happens automatically.
+* coming soon: a paid move of the site into a gend.me container. This is still in progress and not available yet. A move will never happen automatically.
 
 **Nothing is sent to gend.me until you click Connect.** Activating the plugin makes no outside requests. See "External services" below for exactly what is sent and when.
 
@@ -55,7 +59,15 @@ The site sends its address, a random install ID, its public key, the admin email
 
 = Will it change my admin area? =
 
-Yes, it shows the GenD dashboard by default. "Switch back to standard WordPress" in the admin bar always returns you to the standard WordPress admin, and the plugin remembers your choice.
+Yes, it shows the GenD dashboard by default. "Switch back to standard WordPress" at the top of the GenD dashboard always returns you to the standard WordPress admin, and the plugin remembers your choice.
+
+= Can I move my site to gend.me hosting now? =
+
+Not yet. Moving a site into a gend.me container is coming soon and is still in progress. The readiness checks on the GenD page already show what a move would need.
+
+= Is anything in WordPress locked behind a plan? =
+
+No. Core WordPress is never locked. A gend.me plan is only needed for services that gend.me provides, such as hosting, backups, compute and mail relay.
 
 = Does it install a theme? =
 
@@ -73,6 +85,14 @@ Deleting the plugin from the Plugins screen removes its own settings, cached dat
 
 Open the Connect popup from the Integration Hub card on the GenD dashboard and click Disconnect. Disconnecting stops all communication with gend.me.
 
+== Screenshots ==
+
+1. The GenD page with the readiness checks for a move to gend.me.
+2. The GenD dashboard before connecting.
+3. The Connect popup on the Integration Hub card.
+4. The dashboard after connecting, showing the plan and its features.
+5. "Switch back to standard WordPress" at the top of the GenD dashboard.
+
 == External services ==
 
 This plugin connects to outside services only after a site administrator chooses to connect. Nothing below happens on a site that has not clicked Connect.
@@ -86,6 +106,7 @@ This plugin connects to outside services only after a site administrator chooses
    * **Plan and features** (`/wp-json/gdc-app-manager/v1/install/<install ID>/features` and `.../membership`): your gend.me plan, its price and renewal date, the plan owner's display name, and which features the plan includes, so the GenD dashboard can show them. The answers are kept for up to an hour, and fetched again when an administrator logs in or clicks Refresh.
    * **Plan catalogue** (`.../install/<install ID>/catalog`): the gend.me plans you can choose, with prices and features, so the dashboard can name the plan that unlocks a feature.
    * **Compute Gas** (`.../install/<install ID>/gas`): your gend.me account's compute gas (earned, used and owed), its billing status, your servers and your Gas Station devices, for the Compute Gas panel on the dashboard. The answer is kept for as long as gend.me says (at least a minute).
+   * **Connection health** (`.../install/<install ID>/health`): a check that the install token is still accepted, so the dashboard can show a Reconnect notice. Only the install ID and the token are sent.
    * **Backups** (`.../install/<install ID>/backups-status`): whether backups are available for this site on gend.me and the link to choose a backup plan, for the Backups panel on the dashboard. The answer is kept for as long as gend.me says (at least a minute).
    * **Popups to gend.me pages:** buttons such as Choose a plan, Change plan, Choose a server plan, Pay and Choose backups open the matching page on gend.me in a popup window or new tab (you sign in to gend.me there). The popups send no data themselves: the address is a page on gend.me and holds no token. Payment details are entered on gend.me, never on your site. When a plan checkout finishes, the gend.me window sends your admin page a short message (plan changed, with the install ID), and the page fetches the plan again.
    * membership panel actions that you start from the GenD screens;
