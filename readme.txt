@@ -91,11 +91,11 @@ Open the Connect popup from the Integration Hub card on the GenD dashboard and c
 
 == Screenshots ==
 
-1. The GenD page with the readiness checks for a move to gend.me.
-2. The GenD dashboard before connecting.
-3. The Connect popup on the Integration Hub card.
-4. The dashboard after connecting, showing the plan and its features.
-5. "Switch back to standard WordPress" at the top of the GenD dashboard.
+1. The GenD dashboard on a new install, with the sidebar open (Dashboard, App, Store, Social, Tools, Settings) and "Switch back to standard WordPress" at the top.
+2. The Connect popup: what is sent to gend.me when you connect. Nothing is sent until you click Agree and connect.
+3. The dashboard after connecting: the Integration Hub card and the gend.me plan card (Connected, Free) with Upgrade.
+4. A gend.me feature page (Store Management) on a connected site: it runs on a gend.me container after migration, with links to the container plans and your plan.
+5. Content Campaigns > Pages: the standard WordPress pages list inside the GenD tabs, free on every install.
 
 == External services ==
 
