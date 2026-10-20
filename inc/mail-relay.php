@@ -153,14 +153,14 @@ add_action('admin_notices', function () {
 /*
  * BuddyPress / Youzify (Social Profile) emails through wp_mail(). BuddyPress delivers with its own BP_PHPMailer, which
  * never calls wp_mail(), so those emails skipped this relay (and its metering) and used whatever PHPMailer was set up
- * for. Gend_BP_WP_Mail_Delivery hands each BP email to wp_mail() with the same parts BP_PHPMailer uses. The gend.me hub
- * ships the same class in mu-plugins/gend-mail/bp-delivery.php; whichever loads first is used.
+ * for. Gend_Society_BP_WP_Mail_Delivery hands each BP email to wp_mail() with the same parts BP_PHPMailer uses. The gend.me hub
+ * ships the same delivery (Gend_BP_WP_Mail_Delivery) in mu-plugins/gend-mail/bp-delivery.php; this copy stands down there.
  */
 if (!function_exists('gend_bp_mail_define_delivery')) {
     function gend_society_bp_mail_define_delivery() {
-        if (class_exists('Gend_BP_WP_Mail_Delivery', false) || !interface_exists('BP_Email_Delivery')) return;
+        if (class_exists('Gend_Society_BP_WP_Mail_Delivery', false) || !interface_exists('BP_Email_Delivery')) return;
 
-        class Gend_BP_WP_Mail_Delivery implements BP_Email_Delivery {
+        class Gend_Society_BP_WP_Mail_Delivery implements BP_Email_Delivery {
 
             private static function addr($r) {
                 if (!is_object($r) || !method_exists($r, 'get_address')) return '';
@@ -208,6 +208,6 @@ if (!function_exists('gend_bp_mail_define_delivery')) {
 
     add_filter('bp_send_email_delivery_class', function ($class) {
         gend_society_bp_mail_define_delivery();
-        return class_exists('Gend_BP_WP_Mail_Delivery', false) ? 'Gend_BP_WP_Mail_Delivery' : $class;
+        return class_exists('Gend_Society_BP_WP_Mail_Delivery', false) ? 'Gend_Society_BP_WP_Mail_Delivery' : $class;
     }, 20);
 }
