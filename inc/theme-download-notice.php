@@ -20,10 +20,10 @@ if ( ! defined( 'GEND_SOCIETY_THEME_DOWNLOAD_DISMISS_ACTION' ) ) {
 
 if ( ! function_exists( 'gend_society_theme_download_url' ) ) {
 	/**
-	 * Theme download page on gend.me.
+	 * Theme download page on gend.me: the GenD Society Theme store product (tracked download).
 	 */
 	function gend_society_theme_download_url(): string {
-		return (string) apply_filters( 'gend_society_theme_download_url', 'https://gend.me/gend-society-theme/' );
+		return (string) apply_filters( 'gend_society_theme_download_url', 'https://gend.me/grow/downloads/gend-society-theme/' );
 	}
 }
 

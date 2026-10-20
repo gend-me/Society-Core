@@ -806,6 +806,10 @@ function gend_society_render_custom_dashboard_screen()
     // this page that is a hidden sub-panel inside the dashboard, so notices (incl. "Switch back to standard
     // WordPress") were never visible. Standalone gets core's anchor above the dashboard; hub/container unchanged.
     if (function_exists('gend_society_dashboard_is_standalone') && gend_society_dashboard_is_standalone()) {
+        // 109-35 (D36): Switch back + theme warning first, above core's notice anchor.
+        if (function_exists('gend_society_admin_experience_dashboard_top')) {
+            gend_society_admin_experience_dashboard_top();
+        }
         echo '<hr class="wp-header-end">';
     }
     echo '<div class="gs-dashboard-wrap">';

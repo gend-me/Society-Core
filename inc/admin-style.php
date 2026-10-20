@@ -192,13 +192,9 @@ add_action('admin_head', function () {
     $is_block_editor = ( $pagenow === 'post.php' || $pagenow === 'post-new.php' );
     $skip_bg = in_array( $pagenow, $exclude_pages, true ) || $is_block_editor;
 
-    // Standalone (106-03): keep the core admin bar (it carries "Switch back
-    // to native WordPress admin"); hub/container output is unchanged.
-    if (function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode()) {
-        echo '<style>';
-    } else {
-        echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
-    }
+    // Phase 109-35 (D36): the core admin bar is hidden in every mode, standalone included ("Switch back to
+    // standard WordPress" sits at the top of the GenD dashboard instead, inc/admin-experience.php).
+    echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
 
     if ( ! $skip_bg ) {
         // gend.me-hosted background; neutral gradient when remote assets

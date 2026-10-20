@@ -20,14 +20,14 @@ function gend_society_plugin_active($slug)
 add_action('admin_menu', 'gend_society_register_admin_menu', 5);
 function gend_society_register_admin_menu()
 {
-    // Standalone (plain WordPress, opt-in skin, 106-03): the skin restyles and
-    // regroups but never removes a core admin area. None of the core screens
-    // below has an equivalent reachable entry in the GenD menu built here
-    // (Posts/Pages/Media/Comments/Tools have none at all), so on standalone
-    // every core top-level menu stays, including the native Dashboard.
+    // Standalone (109-35, D36): the same core menus as gend.me are hidden from the
+    // sidebar; every core screen stays reachable through the bundled GenD menu
+    // pages (inc/standalone-menu.php: Content Campaigns, Social Profiles -> Members,
+    // App -> Themes, Hosting -> Codebase) and by its direct URL. Tools and Settings
+    // have no home in the dashboard design, so they stay in the sidebar.
     $gend_society_standalone = function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode();
 
-    if (!$gend_society_standalone) {
+    {
     // Remove default WP top-level menus we are replacing
     remove_menu_page('index.php');                   // Dashboard
     remove_menu_page('users.php');                   // Users
@@ -38,8 +38,10 @@ function gend_society_register_admin_menu()
     remove_menu_page('upload.php');                  // Media
     remove_menu_page('edit-comments.php');           // Comments
     remove_menu_page('themes.php');                  // Appearance
+    if (!$gend_society_standalone) {
     remove_menu_page('tools.php');                   // Tools
     remove_menu_page('options-general.php');         // Settings
+    }
 
     // --- DASHBOARD ---
     // Use index.php so WP Ultimo's membership checks and GenD Core's native overrides work correctly
@@ -182,10 +184,8 @@ function gend_society_register_admin_menu()
     // registered above — has to happen before Content Campaigns / Talk Flows
     // are added at admin_menu priority 1200, otherwise WP's auto-duplicate
     // fires again on that later, still-unset-at-this-point-in-time check.
-    if (!$gend_society_standalone) {
     remove_submenu_page('index.php', 'index.php');
     remove_submenu_page('index.php', 'update-core.php');
-    }
 }
 
 /**
@@ -294,27 +294,18 @@ function gend_society_suppress_plugin_menus()
         return;
     }
 
-    // Standalone (106-03): core admin areas and the GenD page are never
-    // removed; other plugins' menus may still be grouped as before.
+    // Standalone (109-35, D36): core menus are hidden as on gend.me (reachable
+    // through the bundled GenD menu pages); only Tools and Settings, which have
+    // no home in the dashboard design, are kept.
     $gend_society_standalone = function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode();
     $gend_society_protected  = $gend_society_standalone ? [
-        'index.php',
-        'users.php',
-        'plugins.php',
-        'update-core.php',
-        'edit.php',
-        'edit.php?post_type=page',
-        'upload.php',
-        'edit-comments.php',
-        'themes.php',
         'tools.php',
         'options-general.php',
-        'gend-society',
     ] : [];
 
     // Explicitly unset the index.php submenu array so "Home" and "Updates" do not appear as flyouts
     global $submenu;
-    if (!$gend_society_standalone && isset($submenu['index.php'])) {
+    if (isset($submenu['index.php'])) {
         unset($submenu['index.php']);
     }
 
