@@ -2205,6 +2205,11 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         </button>
                     </div>
                     <?php
+                    // 109-35 (D36): on standalone the WordPress Plugins / Updates screens are reached from here (their
+                    // sidebar menus are hidden as on gend.me). The function exists on standalone only.
+                    if ( function_exists( 'gend_society_sa_menu_codebase_links' ) ) {
+                        gend_society_sa_menu_codebase_links();
+                    }
                     if ( function_exists( 'gend_society_hosting_render_codebase_packages' ) ) {
                         gend_society_hosting_render_codebase_packages();
                     }
