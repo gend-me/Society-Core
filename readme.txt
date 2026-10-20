@@ -24,7 +24,7 @@ GenD Society links a WordPress site to a business group on [gend.me](https://gen
 
 = What needs a gend.me plan =
 
-Core WordPress is never locked: every standard WordPress screen and feature keeps working with or without the plugin's dashboard, connected or not. Only services that gend.me itself provides, such as hosting, backups, compute and mail relay, need a gend.me plan. For those, the GenD dashboard shows an upgrade page that names the plan which includes the service.
+Core WordPress is never locked: every standard WordPress screen and feature keeps working with or without the plugin's dashboard, connected or not, and the usual WordPress admin addresses always open directly. What needs a gend.me plan is what gend.me provides: the gend.me features in the GenD sidebar (such as Store, Social and Projects) and the gend.me hosting services (such as containers, backups, compute and mail relay). Each of those menu items opens an upgrade page that names the plan which includes it. After you have a plan, the page links to the full GenD Society build on gend.me, which you download and install yourself; this version of the plugin never downloads or installs it.
 
 = What Connect adds =
 
@@ -55,7 +55,7 @@ No. The plugin makes no outside requests until an administrator clicks Connect.
 
 = What happens when I click Connect? =
 
-The site sends its address, a random install ID, its public key, the admin email address and the pairing code to gend.me so the two can be linked. The details are in "External services" below.
+A popup lists what will be sent before anything is: your site address, a random install ID, the site's public key and the admin email address. When you confirm, the site sends these (with its admin page address and plugin version, signed with the site's key) and you sign in to gend.me in a new window to choose the business group. The popup also says that your gend.me account and that group are linked to the site, and that the display name of the site's connection owner is shared. The details are in "External services" below.
 
 = Will it change my admin area? =
 
@@ -67,7 +67,7 @@ Not yet. Moving a site into a gend.me container is coming soon and is still in p
 
 = Is anything in WordPress locked behind a plan? =
 
-No. Core WordPress is never locked. A gend.me plan is only needed for services that gend.me provides, such as hosting, backups, compute and mail relay.
+No. Core WordPress is never locked, and its admin pages always open directly. A gend.me plan is only needed for what gend.me provides: the gend.me features in the GenD sidebar (such as Store, Social and Projects) and gend.me hosting services (such as containers, backups, compute and mail relay). With a plan, the upgrade page links to the full GenD Society build download on gend.me.
 
 = Does it install a theme? =
 
@@ -105,7 +105,7 @@ This plugin connects to outside services only after a site administrator chooses
 
 [gend.me](https://gend.me) is the GenD business-group and hosting platform. The plugin uses it in these cases:
 
-1. **Connect (started by an administrator).** When you click Connect, the plugin sends your site address (URL), a random install ID (UUID) created by the plugin, the site's public key, the site admin email address and the pairing code you entered to gend.me. This links the site to your business group and gives the site an install token.
+1. **Connect (started by an administrator).** Clicking Connect opens a popup that lists what will be sent; nothing is sent until you confirm it. The plugin then sends gend.me your site address (URL), a random install ID (UUID) created by the plugin, the site's public key and the site admin email address, together with the site's admin page address, the plugin version, a timestamp and a signature made with the site's key. You sign in to gend.me in a new window and choose the business group; gend.me then sends back a one-time code, and the site exchanges it (with its install ID and a signature) for an install token. Your gend.me account and the business group you choose are linked to the site on gend.me. If you use a pairing code from your group page instead, the same site details are sent with that code. When you set or change the site's connection owner, the owner's display name is sent to gend.me, which shows it to the business group.
 2. **After connecting, using the install token.** The install token is sent in a request header, never in a web address. The site sends its install ID with each request; gend.me answers with the details listed here. None of these requests happen before you connect.
    * **Plan and features** (`/wp-json/gdc-app-manager/v1/install/<install ID>/features` and `.../membership`): your gend.me plan, its price and renewal date, the plan owner's display name, and which features the plan includes, so the GenD dashboard can show them. The answers are kept for up to an hour, and fetched again when an administrator logs in or clicks Refresh.
    * **Plan catalogue** (`.../install/<install ID>/catalog`): the gend.me plans you can choose, with prices and features, so the dashboard can name the plan that unlocks a feature.
