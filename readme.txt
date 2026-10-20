@@ -71,7 +71,11 @@ No. Core WordPress is never locked. A gend.me plan is only needed for services t
 
 = Does it install a theme? =
 
-No. The GenD page can show a download link for the GenD Society theme, but installing and activating it is up to you.
+No. The GenD page can show a link to the free GenD Society theme download at [gend.me/grow/downloads/gend-society-theme](https://gend.me/grow/downloads/gend-society-theme/), but downloading, installing and activating it is up to you.
+
+= What is the full GenD Society build? =
+
+The full build bundles the GenD Society theme and updates itself from gend.me with signed releases. It is a free download at [gend.me/grow/downloads/digital-society-plugin](https://gend.me/grow/downloads/digital-society-plugin/). This version of the plugin only links to that page. It never downloads or installs the full build.
 
 = Does it add anything to my public site? =
 
@@ -95,7 +99,7 @@ Open the Connect popup from the Integration Hub card on the GenD dashboard and c
 
 == External services ==
 
-This plugin connects to outside services only after a site administrator chooses to connect. Nothing below happens on a site that has not clicked Connect.
+This plugin connects to outside services only after a site administrator chooses to connect. Nothing below happens on a site that has not clicked Connect, except opening the two download links described at the end of the gend.me section when you click them.
 
 = gend.me =
 
@@ -114,6 +118,7 @@ This plugin connects to outside services only after a site administrator chooses
    * mail relay through gend.me, only if an administrator chooses gend.me mail.
 3. **After connecting: images.** The GenD admin screens load some images that are hosted on gend.me. Your browser requests them from gend.me, which sends your IP address and browser details as with any web request.
 4. **Support access (only after connecting).** gend.me can send the site a signed, time-limited admin-access grant when you ask for support. The site checks the signature with gend.me's public key before accepting it.
+5. **Download links (opened only when you click them).** The GenD page links to the GenD Society theme download, https://gend.me/grow/downloads/gend-society-theme/, and to the full GenD Society build, https://gend.me/grow/downloads/digital-society-plugin/ (on a connected site, the same page on your paired gend.me). These are plain links: the plugin does not request these pages and adds no site data to them. Your browser opens the page in a new tab, and gend.me receives your IP address and browser details as with any web request. The downloads are free store products on gend.me, so getting a file means completing a free ($0) checkout there.
 
 gend.me [Terms of Service](https://gend.me/terms-of-service/) and [Privacy Policy](https://gend.me/privacy-policy/).
 
