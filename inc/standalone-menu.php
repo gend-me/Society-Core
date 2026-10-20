@@ -255,6 +255,8 @@ if ( ! function_exists( 'gend_society_sa_menu_render_gated' ) ) {
 		$page  = gend_society_sa_menu_request( 'page' );
 		$gated = gend_society_sa_menu_gated();
 		$item  = $gated[ $page ] ?? array( 'label' => __( 'This area', 'gend-society' ), 'area' => 'app' );
+		// The page title in the gend.me hero style (the skin hides .wrap h1).
+		echo '<div class="wrap gdc-admin-dashboard gs-sa-wrap">' . gend_society_sa_menu_hero( $item['label'], __( 'A gend.me feature. It opens here once your dashboard plan includes it.', 'gend-society' ) ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
 		if ( 'included' !== gend_society_sa_menu_area_state( $item['area'] ) && function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
 			gend_society_feature_upgrade_page_standalone( $item['area'] );
 			return;
@@ -330,13 +332,14 @@ if ( ! function_exists( 'gend_society_sa_menu_hero' ) ) {
 	 * @param string $lead  Lead text.
 	 */
 	function gend_society_sa_menu_hero( string $title, string $lead ): string {
-		return '<div class="gs-sa-hero"><h1 class="gs-sa-hero__title">' . esc_html( $title ) . '</h1><p class="gdc-lead">' . esc_html( $lead ) . '</p></div>';
+		// The skin hides .wrap h1 (assets/admin-style.css) and draws its own headers; core's notice anchor goes after it.
+		return '<div class="gs-sa-hero"><div class="gs-sa-hero__title" role="heading" aria-level="1">' . esc_html( $title ) . '</div><p class="gdc-lead">' . esc_html( $lead ) . '</p></div><hr class="wp-header-end">';
 	}
 }
 
 if ( ! function_exists( 'gend_society_sa_menu_cc_tabs' ) ) {
 	/**
-	 * Content Campaigns tabs (gend.me order: Analytics, Info Pages, Blogging, Social, Advertisements, Media).
+	 * Content Campaigns tabs (gend.me order and labels: Analytics, Pages, Blogging, Social, Media, Advertisements).
 	 * WordPress tabs open the core screens; the others are gend.me features (plan area 'app').
 	 *
 	 * @param string $active Active tab slug.
@@ -345,11 +348,11 @@ if ( ! function_exists( 'gend_society_sa_menu_cc_tabs' ) ) {
 		$page = admin_url( 'admin.php?page=content-campaigns' );
 		$tabs = array(
 			'analytics' => array( 'label' => __( 'Analytics', 'gend-society' ), 'icon' => 'dashicons-chart-area', 'url' => add_query_arg( 'tab', 'analytics', $page ), 'cap' => 'edit_posts' ),
-			'pages'     => array( 'label' => __( 'Info Pages', 'gend-society' ), 'icon' => 'dashicons-admin-page', 'url' => admin_url( 'edit.php?post_type=page' ), 'cap' => 'edit_pages' ),
+			'pages'     => array( 'label' => __( 'Pages', 'gend-society' ), 'icon' => 'dashicons-admin-page', 'url' => admin_url( 'edit.php?post_type=page' ), 'cap' => 'edit_pages' ),
 			'blogging'  => array( 'label' => __( 'Blogging', 'gend-society' ), 'icon' => 'dashicons-welcome-write-blog', 'url' => admin_url( 'edit.php' ), 'cap' => 'edit_posts' ),
 			'social'    => array( 'label' => __( 'Social', 'gend-society' ), 'icon' => 'dashicons-share', 'url' => add_query_arg( 'tab', 'social', $page ), 'cap' => 'edit_posts' ),
-			'ads'       => array( 'label' => __( 'Advertisements', 'gend-society' ), 'icon' => 'dashicons-megaphone', 'url' => add_query_arg( 'tab', 'advertisements', $page ), 'cap' => 'edit_posts' ),
 			'media'     => array( 'label' => __( 'Media', 'gend-society' ), 'icon' => 'dashicons-images-alt2', 'url' => admin_url( 'upload.php' ), 'cap' => 'upload_files' ),
+			'ads'       => array( 'label' => __( 'Advertisements', 'gend-society' ), 'icon' => 'dashicons-megaphone', 'url' => add_query_arg( 'tab', 'advertisements', $page ), 'cap' => 'edit_posts' ),
 		);
 		$out = array();
 		foreach ( $tabs as $slug => $t ) {
