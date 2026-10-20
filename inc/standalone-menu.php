@@ -119,12 +119,31 @@ if ( ! function_exists( 'gend_society_sa_menu_register' ) ) {
 
 		// The GenD page (readiness, theme card) is not in the gend.me sidebar; its URL keeps working.
 		remove_menu_page( 'gend-society' );
+		// Without its menu entry get_admin_page_title() returns null on that page and admin-header.php passes it
+		// to strip_tags() (PHP 8.1+ deprecation in debug.log). Give the page its title back.
+		add_action(
+			'load-' . ( isset( $GLOBALS['gend_society_welcome_hook'] ) ? (string) $GLOBALS['gend_society_welcome_hook'] : 'toplevel_page_gend-society' ),
+			'gend_society_sa_menu_welcome_title'
+		);
+		add_action( 'load-admin_page_gend-society', 'gend_society_sa_menu_welcome_title' );
 
 		foreach ( array_filter( $hooks ) as $hook ) {
 			add_action( 'load-' . $hook, 'gend_society_sa_menu_load_page' );
 		}
 	}
 	add_action( 'admin_menu', 'gend_society_sa_menu_register', 1300 );
+}
+
+if ( ! function_exists( 'gend_society_sa_menu_welcome_title' ) ) {
+	/**
+	 * Set the admin page title of the GenD page, which has no sidebar entry in the standalone skin.
+	 */
+	function gend_society_sa_menu_welcome_title(): void {
+		global $title;
+		if ( empty( $title ) ) {
+			$title = __( 'GenD', 'gend-society' ); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited
+		}
+	}
 }
 
 if ( ! function_exists( 'gend_society_sa_menu_load_page' ) ) {
