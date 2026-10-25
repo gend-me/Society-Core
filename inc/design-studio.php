@@ -100,8 +100,7 @@ function gend_society_studio_redirect_landing() {
  *   menus     the site's navigation menus
  *   admin     an existing admin screen shown inside the studio ('url')
  *
- * A template item may name 'fallback' (create from that template when missing)
- * and 'preview' (a front-end URL to open).
+ * A template item may name 'fallback' (create from that template when missing).
  *
  * @return array[]
  */
@@ -148,7 +147,7 @@ function gend_society_studio_sections() {
 						array( 'id' => 'header', 'label' => __( 'Header', 'gend-society' ), 'kind' => 'part', 'slug' => 'header' ),
 						array( 'id' => 'menus', 'label' => __( 'Menus', 'gend-society' ), 'kind' => 'menus' ),
 						array( 'id' => 'footer', 'label' => __( 'Footer', 'gend-society' ), 'kind' => 'part', 'slug' => 'footer' ),
-						array( 'id' => '404', 'label' => __( 'Page 404', 'gend-society' ), 'kind' => 'template', 'slug' => '404', 'preview' => home_url( '/gs-studio-404-preview/' ) ),
+						array( 'id' => '404', 'label' => __( 'Page 404', 'gend-society' ), 'kind' => 'template', 'slug' => '404' ),
 						array( 'id' => 'coming-soon', 'label' => __( 'Coming Soon', 'gend-society' ), 'kind' => 'template', 'slug' => 'coming-soon' ),
 					),
 				),

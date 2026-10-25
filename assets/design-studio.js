@@ -1587,20 +1587,21 @@
 	function canvasUrl( t ) {
 		return editorUrl( '/' + t.type + '/' + t.id, { canvas: 'edit' } );
 	}
-	function frameView( hit, url, headExtra, opts ) {
+	// An embedded editor or settings screen, filling the content area (no studio bar above it).
+	function frameView( label, url, opts ) {
 		opts = opts || {};
-		var frame = h( 'iframe', { class: 'gs-st-editor-frame', src: url, title: hit.item.label, allow: 'clipboard-read; clipboard-write' } );
+		var frame = h( 'iframe', { class: 'gs-st-editor-frame', src: url, title: label, allow: 'clipboard-read; clipboard-write' } );
 		var loader = h( 'div', { class: 'gs-st-frame-loader' }, h( 'span', { class: 'gs-st-spinner' } ), opts.loading || __( 'Opening the editor…', 'gend-society' ) );
 		frame.addEventListener( 'load', function () {
 			loader.classList.add( 'is-done' );
 		} );
-		return h( 'div', { class: 'gs-st-editor' }, h( 'div', { class: 'gs-st-editor-head' }, crumbs( hit ), h( 'div', { class: 'gs-st-editor-actions' }, headExtra || null ) ), h( 'div', { class: 'gs-st-editor-body' }, loader, frame ) );
+		return h( 'div', { class: 'gs-st-editor' }, h( 'div', { class: 'gs-st-editor-body' }, loader, frame ) );
 	}
 	function openEmbed( label, url ) {
 		S.stylesStale = true;
 		main.textContent = '';
 		previewFrame = null;
-		main.appendChild( frameView( { section: { label: __( 'Branding', 'gend-society' ) }, item: { label: label } }, url ) );
+		main.appendChild( frameView( label, url ) );
 	}
 	function emptyState( ic, title, body, actions ) {
 		return h( 'div', { class: 'gs-st-empty' }, h( 'span', { class: 'gs-st-empty-ico' }, icon( ic ) ), h( 'h2', null, title ), body ? h( 'p', null, body ) : null, actions ? h( 'div', { class: 'gs-st-row is-center' }, actions ) : null );
@@ -1624,12 +1625,7 @@
 		if ( ! t ) {
 			return viewMissing( hit );
 		}
-		var st = statusOf( t );
-		var extra = [ h( 'span', { class: 'gs-st-badge is-' + st.key }, st.label ) ];
-		if ( it.preview ) {
-			extra.push( h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: it.preview, target: '_blank', rel: 'noopener' }, icon( 'visibility' ), __( 'Preview', 'gend-society' ) ) );
-		}
-		return frameView( hit, canvasUrl( t ), extra );
+		return frameView( it.label, canvasUrl( t ) );
 	}
 	function viewMissing( hit ) {
 		var it = hit.item;
@@ -1685,7 +1681,7 @@
 			var st = statusOf( t );
 			return h( 'button', { type: 'button', class: 'gs-st-tpl', style: { '--i': i }, onclick: function () {
 				main.textContent = '';
-				main.appendChild( frameView( { section: hit.section, item: { label: titleOf( t ) } }, canvasUrl( t ), [ h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: '#/' + hit.section.id + '/' + hit.item.id }, icon( 'arrow-left-alt2' ), __( 'All page templates', 'gend-society' ) ) ] ) );
+				main.appendChild( frameView( titleOf( t ), canvasUrl( t ) ) );
 			} }, h( 'span', { class: 'gs-st-tpl-thumb' }, h( 'i' ), h( 'i' ), h( 'i' ) ), h( 'strong', null, titleOf( t ) ), h( 'small', null, t.description || t.slug ), h( 'span', { class: 'gs-st-badge is-' + st.key }, st.label ) );
 		} ) );
 		return h( 'div', { class: 'gs-st-pad' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, __( 'Layouts you can pick for any page. Open one to design it.', 'gend-society' ) ), cards, h( 'div', { class: 'gs-st-row' }, h( 'button', { type: 'button', class: 'gs-st-btn is-primary', onclick: function () {
@@ -1732,7 +1728,7 @@
 				return loadTemplates().then( function () {
 					toast( sprintf( __( '%s created.', 'gend-society' ), name ), 'ok' );
 					main.textContent = '';
-					main.appendChild( frameView( { section: hit.section, item: { label: name } }, canvasUrl( t ), [ h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: '#/' + hit.section.id + '/' + hit.item.id }, icon( 'arrow-left-alt2' ), __( 'All page templates', 'gend-society' ) ) ] ) );
+					main.appendChild( frameView( name, canvasUrl( t ) ) );
 				} );
 			} ).catch( function ( e ) {
 				toast( errMsg( e ), 'error' );
@@ -1757,7 +1753,7 @@
 			location.replace( link );
 			return loadingView();
 		}
-		return frameView( { section: { label: type === 'wp_template_part' ? __( 'Template parts', 'gend-society' ) : __( 'Templates', 'gend-society' ) }, item: { label: titleOf( t ) } }, canvasUrl( t ) );
+		return frameView( titleOf( t ), canvasUrl( t ) );
 	}
 
 	function viewMenus( hit ) {
@@ -1774,7 +1770,7 @@
 		var cards = h( 'div', { class: 'gs-st-tpl-grid' }, S.menus.map( function ( m, i ) {
 			return h( 'button', { type: 'button', class: 'gs-st-tpl', style: { '--i': i }, onclick: function () {
 				main.textContent = '';
-				main.appendChild( frameView( { section: hit.section, item: { label: titleOf( m ) || __( 'Menu', 'gend-society' ) } }, editorUrl( '/wp_navigation/' + m.id, { canvas: 'edit' } ), [ h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: '#/' + hit.section.id + '/' + hit.item.id }, icon( 'arrow-left-alt2' ), __( 'All menus', 'gend-society' ) ) ] ) );
+				main.appendChild( frameView( titleOf( m ) || __( 'Menu', 'gend-society' ), editorUrl( '/wp_navigation/' + m.id, { canvas: 'edit' } ) ) );
 			} }, h( 'span', { class: 'gs-st-tpl-thumb is-menu' }, h( 'i' ), h( 'i' ), h( 'i' ) ), h( 'strong', null, titleOf( m ) || __( '(no title)', 'gend-society' ) ), h( 'small', null, new Date( m.modified ).toLocaleDateString() ) );
 		} ) );
 		return h( 'div', { class: 'gs-st-pad' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, __( 'The navigation menus used in your header, footer and pages.', 'gend-society' ) ), S.menus.length ? cards : emptyState( 'menu', __( 'No menus yet', 'gend-society' ), __( 'Menus are created when you add a Navigation block to your header.', 'gend-society' ), [ h( 'a', { class: 'gs-st-btn is-primary', href: '#/app/header' }, __( 'Edit header', 'gend-society' ) ) ] ) );
@@ -1788,7 +1784,7 @@
 			hash = hit.item.url.slice( hashAt );
 			url = hit.item.url.slice( 0, hashAt ) + ( hit.item.url.slice( 0, hashAt ).indexOf( '?' ) === -1 ? '?' : '&' ) + 'gs_studio_embed=1' + hash;
 		}
-		return frameView( hit, url, [ h( 'span', { class: 'gs-st-badge is-plugin', title: __( 'These pages are drawn by the app. A block template version is on the way.', 'gend-society' ) }, __( 'App settings', 'gend-society' ) ) ], { loading: __( 'Loading settings…', 'gend-society' ) } );
+		return frameView( hit.item.label, url, { loading: __( 'Loading settings…', 'gend-society' ) } );
 	}
 
 	/* ── Boot ──────────────────────────────────────────────────────────── */
