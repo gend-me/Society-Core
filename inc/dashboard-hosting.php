@@ -616,8 +616,9 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
             $gs_sa_wizard  = ( is_array( $gs_sa_payload ) && ! $gs_sa_live ) ? gend_society_plan_container_wizard_url( $gs_sa_payload ) : '';
             // 110-12: 'wizard' before payment (the click opens the popup on the local wait page first, which keeps
             // gend.me's pre-flight current; gs-dashboard-standalone.js), 'start' once armed (inline Start step),
-            // '' while scheduled / running / failed.
-            $gs_sa_cta_mode = ( '' !== $gs_sa_wizard && function_exists( 'gend_society_migration_cta_mode' ) ) ? gend_society_migration_cta_mode( $gs_sa_payload ) : ( '' !== $gs_sa_wizard ? 'wizard' : '' );
+            // '' while scheduled / running / failed. 110-21: '' without the migration module (the wordpress.org build
+            // ships none), since paying would arm a migration that build cannot start.
+            $gs_sa_cta_mode = ( '' !== $gs_sa_wizard && function_exists( 'gend_society_migration_cta_mode' ) ) ? gend_society_migration_cta_mode( $gs_sa_payload ) : '';
             if ( 'wizard' === $gs_sa_cta_mode ) {
                 if ( function_exists( 'gend_society_migration_queue_report' ) ) {
                     gend_society_migration_queue_report();
