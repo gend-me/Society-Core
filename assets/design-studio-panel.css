@@ -1,0 +1,112 @@
+/* GenD Society - Design Studio: dark skin for the Group Styling builder
+   (Social Profiles' header templates, group pages and navigation panel) when it
+   is shown inside the studio. The panel forces white tables with
+   `html body .gdc-group-styling-admin ... !important`, so these rules add
+   body.gs-studio-embed to win. */
+
+html, body.gs-studio-embed, body.gs-studio-embed #wpwrap, body.gs-studio-embed #wpcontent, body.gs-studio-embed #wpbody-content {
+	background: #0b0e14 !important;
+}
+body.gs-studio-embed .gs-studio-panel {
+	margin: 0 !important;
+	padding: 28px 32px 160px;
+	color: #e8edf5;
+	font-size: 14px;
+}
+body.gs-studio-embed .gs-studio-panel h3 {
+	color: #e8edf5 !important;
+	font-size: 20px;
+	font-weight: 700;
+	margin: 28px 0 12px;
+	letter-spacing: -.01em;
+}
+body.gs-studio-embed .gs-studio-panel h3:first-of-type { margin-top: 8px; }
+body.gs-studio-embed .gs-studio-panel p,
+body.gs-studio-embed .gs-studio-panel label { color: #c6cfdf !important; }
+body.gs-studio-embed .gs-studio-panel .description { color: #8b98b0 !important; max-width: 70ch; }
+
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat {
+	max-width: none !important;
+	border: 1px solid rgba(255, 255, 255, .09) !important;
+	border-radius: 14px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, .03) !important;
+	box-shadow: none !important;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat th,
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat td {
+	color: #e8edf5 !important;
+	background-color: transparent !important;
+	border-color: rgba(255, 255, 255, .07) !important;
+	padding: 12px 14px !important;
+	vertical-align: middle;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat thead th {
+	color: #8b98b0 !important;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	border-bottom: 1px solid rgba(255, 255, 255, .09) !important;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat.striped > tbody > tr:nth-child(odd) > * {
+	background-color: rgba(255, 255, 255, .025) !important;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat tbody tr:hover > * {
+	background-color: rgba(255, 255, 255, .05) !important;
+}
+
+/* Inputs and selects */
+body.gs-studio-embed .gs-studio-panel input[type="text"],
+body.gs-studio-embed .gs-studio-panel input[type="number"],
+body.gs-studio-embed .gs-studio-panel select {
+	background: rgba(0, 0, 0, .28) !important;
+	color: #e8edf5 !important;
+	border: 1px solid rgba(255, 255, 255, .14) !important;
+	border-radius: 8px !important;
+	min-height: 34px;
+	box-shadow: none !important;
+}
+body.gs-studio-embed .gs-studio-panel input:focus,
+body.gs-studio-embed .gs-studio-panel select:focus {
+	border-color: #97e46e !important;
+	box-shadow: 0 0 0 3px rgba(151, 228, 110, .15) !important;
+}
+
+/* Buttons (outside the picker dialog, which keeps its own dark styling) */
+body.gs-studio-embed .gs-studio-panel .button:not(.gdc-gs-assign-picker-dialog .button) {
+	background: rgba(255, 255, 255, .08) !important;
+	color: #e8edf5 !important;
+	border: 1px solid rgba(255, 255, 255, .14) !important;
+	border-radius: 9px !important;
+	box-shadow: none !important;
+	min-height: 32px;
+	padding: 0 12px !important;
+}
+body.gs-studio-embed .gs-studio-panel .button:not(.gdc-gs-assign-picker-dialog .button):hover {
+	background: rgba(255, 255, 255, .14) !important;
+	border-color: rgba(255, 255, 255, .24) !important;
+}
+body.gs-studio-embed .gs-studio-panel .button-primary:not(.gdc-gs-assign-picker-dialog .button) {
+	background: #97e46e !important;
+	color: #0d1a06 !important;
+	border-color: transparent !important;
+	font-weight: 600;
+}
+body.gs-studio-embed .gs-studio-panel .button-primary:not(.gdc-gs-assign-picker-dialog .button):hover { background: #a9ef83 !important; }
+body.gs-studio-embed .gs-studio-panel .button-link-delete:not(.gdc-gs-assign-picker-dialog .button) {
+	color: #ff8a8a !important;
+	border-color: rgba(255, 107, 107, .35) !important;
+	background: transparent !important;
+}
+body.gs-studio-embed .gs-studio-panel a { color: #97e46e; }
+body.gs-studio-embed .gs-studio-panel em { color: #8b98b0; }
+body.gs-studio-embed .gs-studio-panel code { background: rgba(255, 255, 255, .08); color: #e8edf5; border-radius: 4px; }
+
+body.gs-studio-embed ::-webkit-scrollbar { width: 8px; height: 8px; }
+body.gs-studio-embed ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 4px; }
+
+/* WordPress core stripes the rows themselves (.striped > tbody > :nth-child(odd)). */
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat > tbody > tr,
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat > thead > tr {
+	background-color: transparent !important;
+}

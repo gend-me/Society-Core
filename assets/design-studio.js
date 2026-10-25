@@ -541,6 +541,14 @@
 		main = h( 'main', { class: 'gs-st-main', tabindex: '-1' } );
 		// The rail sits on the right; the save bar floats over the bottom of the canvas.
 		root.appendChild( h( 'div', { class: 'gs-st-app' }, h( 'div', { class: 'gs-st-body' }, main, nav ), saveSlot ) );
+		// Clicking the item that is already open reopens it (e.g. back to a list from an editor opened inside it).
+		nav.addEventListener( 'click', function ( e ) {
+			var a = e.target.closest( 'a[href^="#"]' );
+			if ( a && a.getAttribute( 'href' ) === location.hash ) {
+				e.preventDefault();
+				onRoute();
+			}
+		} );
 	}
 
 	function renderNav() {
