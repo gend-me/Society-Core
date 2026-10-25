@@ -1,0 +1,14 @@
+{
+	"name": "support access back in the wordpress.org build (exclude line removed)",
+	"exclude": {
+		"wporg": {
+			"remove": ["inc/support-access.php"]
+		}
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "forbidden-path inc/support-access.php"
+		}
+	]
+}

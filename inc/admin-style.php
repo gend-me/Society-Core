@@ -122,10 +122,12 @@ function gend_society_enqueue_admin_assets()
         // filtered server-side by gs_group_embed_menu_items().
         'gendGroupMenu' => function_exists('gend_society_group_embed_menu_items') ? gend_society_group_embed_menu_items() : [],
         'gendGroupName' => function_exists('gend_society_group_embed_group_name') ? gend_society_group_embed_group_name() : '',
+        // @build-strip-begin wporg
         // Inputs the header's Login-to-GenD button needs to drive the same
         // PKCE popup flow as wp-login.php (see oauth-login.php).
         'gendOauthClientId' => function_exists('gend_society_oauth_client_id') ? gend_society_oauth_client_id() : '',
         'gendOauthRestUrl'  => esc_url_raw(rest_url('gend-society/v1/oauth/login')),
+        // @build-strip-end wporg
         // Header nav-pill backgrounds from the consent-gated gend.me table
         // (inc/remote-assets.php); '' = render the neutral placeholder.
         'navPillImages'     => [

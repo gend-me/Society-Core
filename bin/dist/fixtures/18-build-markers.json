@@ -1,0 +1,12 @@
+{
+	"name": "unclosed and unknown-variant build markers",
+	"append": {
+		"inc/consent.php": "\n// @build-strip-begin nosuch\n// @build-strip-end nosuch\n// @build-only-begin wporg\n"
+	},
+	"expect": [
+		{ "variant": "wporg", "rule": "build-marker-variant" },
+		{ "variant": "full", "rule": "build-marker-variant" },
+		{ "variant": "wporg", "rule": "build-marker-unclosed" },
+		{ "variant": "full", "rule": "build-marker-unclosed" }
+	]
+}

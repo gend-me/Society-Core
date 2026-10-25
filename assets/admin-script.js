@@ -126,6 +126,7 @@
 
     function buildDefaultHeader() {
         var data = window.gsAdminData || {};
+    // @build-strip-begin wporg
         // Only render the Login-to-GenD button when the OAuth client is
         // configured — otherwise the button can't actually do anything and
         // showing a dead/disabled control just confuses people.
@@ -133,6 +134,7 @@
         var loginBtn = canLogin
             ? '<button type="button" class="gs-login-gend-btn" id="gs-header-login-gend">Login to GenD</button>'
             : '';
+    // @build-strip-end wporg
         // Pill backgrounds come from the consent-gated gend.me table
         // (inc/remote-assets.php via gsAdminData.navPillImages). An empty
         // URL renders a neutral placeholder instead of requesting gend.me.
@@ -146,7 +148,9 @@
         }
 
         return '' +
+    // @build-strip-begin wporg
             loginBtn +
+    // @build-strip-end wporg
             '<nav class="nav-central">' +
                 '<a href="/app-features" class="nav-pill">' +
                     pillBg(pills.digitalBusiness) +
@@ -165,6 +169,7 @@
                 '<a href="/" class="btn-visit-site" target="_blank" rel="noopener">Visit Site</a>' +
             '</div>';
     }
+    // @build-strip-begin wporg
 
     // ── OAuth popup launcher (mirrors wp-login.php's PKCE flow in
     // oauth-login.php so an already-logged-in admin can link their
@@ -292,6 +297,7 @@
             }
         });
     }
+    // @build-strip-end wporg
 
     function injectHeader() {
         if (document.getElementById('main-3d-header')) { return; }
