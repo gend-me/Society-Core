@@ -167,6 +167,10 @@
 	function errMsg( e ) {
 		return ( e && e.message ) || __( 'Something went wrong. Please try again.', 'gend-society' );
 	}
+	// Template ids are "theme//slug". Keep the slashes literal: servers often reject %2F in paths.
+	function idPath( id ) {
+		return String( id ).split( '/' ).map( encodeURIComponent ).join( '/' );
+	}
 	function titleOf( t ) {
 		if ( ! t ) {
 			return '';
@@ -510,13 +514,9 @@
 		var top = h(
 			'header',
 			{ class: 'gs-st-top' },
-			h( 'a', { class: 'gs-st-brand', href: cfg.dashboardUrl, title: __( 'Back to the dashboard', 'gend-society' ) }, icon( 'arrow-left-alt2' ), h( 'span', { class: 'gs-st-brand-mark' }, icon( 'art' ) ), h( 'span', { class: 'gs-st-brand-text' }, h( 'strong', null, __( 'Design Studio', 'gend-society' ) ), h( 'small', null, cfg.themeName ) ) ),
+			h( 'div', { class: 'gs-st-brand' }, h( 'span', { class: 'gs-st-brand-mark' }, icon( 'art' ) ), h( 'span', { class: 'gs-st-brand-text' }, h( 'strong', null, __( 'Design Studio', 'gend-society' ) ), h( 'small', null, cfg.themeName ) ) ),
 			h( 'div', { class: 'gs-st-search-wrap' }, icon( 'search' ), searchInput, h( 'kbd', null, navigator.platform.indexOf( 'Mac' ) === 0 ? '⌘K' : 'Ctrl K' ) ),
 			saveSlot,
-			h( 'div', { class: 'gs-st-top-actions' },
-				h( 'a', { class: 'gs-st-btn is-ghost', href: cfg.siteEditorUrl + '?gs_core=1', title: __( 'Open the standard WordPress Site Editor', 'gend-society' ) }, icon( 'wordpress' ), h( 'span', null, __( 'Site Editor', 'gend-society' ) ) ),
-				h( 'a', { class: 'gs-st-btn', href: cfg.homeUrl, target: '_blank', rel: 'noopener' }, icon( 'external' ), h( 'span', null, __( 'View site', 'gend-society' ) ) )
-			)
 		);
 		nav = h( 'nav', { class: 'gs-st-nav', 'aria-label': __( 'Design areas', 'gend-society' ) } );
 		main = h( 'main', { class: 'gs-st-main', tabindex: '-1' } );
@@ -533,7 +533,7 @@
 	function renderNav() {
 		nav.textContent = '';
 		var q = ( searchInput.value || '' ).trim().toLowerCase();
-		nav.appendChild( h( 'a', { class: 'gs-st-nav-home' + ( ! current.section ? ' is-active' : '' ), href: '#/' }, icon( 'dashboard' ), __( 'Overview', 'gend-society' ) ) );
+		nav.appendChild( h( 'a', { class: 'gs-st-nav-home' + ( ! current.section ? ' is-active' : '' ), href: '#/', title: __( 'Overview', 'gend-society' ) }, h( 'span', { class: 'gs-st-nav-ico' }, icon( 'dashboard' ) ), h( 'span', { class: 'gs-st-nav-home-label' }, __( 'Overview', 'gend-society' ) ) ) );
 		activeSections.forEach( function ( section ) {
 			var items = allItems( section );
 			var counted = items.filter( function ( it ) {
@@ -545,7 +545,7 @@
 			var open = q ? true : ! collapsed[ section.id ];
 			var head = h(
 				'button',
-				{ type: 'button', class: 'gs-st-nav-section' + ( current.section === section.id ? ' is-current' : '' ), 'aria-expanded': open ? 'true' : 'false', onclick: function () {
+				{ type: 'button', title: section.label, class: 'gs-st-nav-section' + ( current.section === section.id ? ' is-current' : '' ), 'aria-expanded': open ? 'true' : 'false', onclick: function () {
 					collapsed[ section.id ] = open;
 					try {
 						window.localStorage.setItem( 'gsStudioCollapsed', JSON.stringify( collapsed ) );
@@ -601,6 +601,16 @@
 	}
 	var lastView = '';
 	function onRoute() {
+		var raw = ( location.hash || '' ).replace( /^#\/?/, '' ).split( '/' );
+		if ( raw[ 0 ] === 'edit' && raw[ 1 ] && raw[ 2 ] ) {
+			current = { section: 'edit', item: '' };
+			lastView = 'editor';
+			S.stylesStale = true;
+			renderNav();
+			main.textContent = '';
+			main.appendChild( viewEditRoute( raw[ 1 ], decodeURIComponent( raw.slice( 2 ).join( '/' ) ) ) );
+			return;
+		}
 		var next = parseHash();
 		var hit = next.section ? findItem( next.section, next.item ) : null;
 		if ( next.section && ! next.item ) {
@@ -1228,7 +1238,7 @@
 		frame.addEventListener( 'load', function () {
 			loader.classList.add( 'is-done' );
 		} );
-		return h( 'div', { class: 'gs-st-editor' }, h( 'div', { class: 'gs-st-editor-head' }, crumbs( hit ), h( 'div', { class: 'gs-st-editor-actions' }, headExtra || null, h( 'a', { class: 'gs-st-icon-btn', href: url.replace( /&gs_studio_embed=1/, '' ), target: '_blank', rel: 'noopener', title: __( 'Open in a new tab', 'gend-society' ), 'aria-label': __( 'Open in a new tab', 'gend-society' ) }, icon( 'external' ) ) ) ), h( 'div', { class: 'gs-st-editor-body' }, loader, frame ) );
+		return h( 'div', { class: 'gs-st-editor' }, h( 'div', { class: 'gs-st-editor-head' }, crumbs( hit ), h( 'div', { class: 'gs-st-editor-actions' }, headExtra || null ) ), h( 'div', { class: 'gs-st-editor-body' }, loader, frame ) );
 	}
 	function openEmbed( label, url ) {
 		S.stylesStale = true;
@@ -1288,7 +1298,7 @@
 		var seeds = {
 			'add-to-cart': '<!-- wp:woocommerce/add-to-cart-form /-->',
 		};
-		var getContent = fb ? api( { path: '/wp/v2/templates/' + encodeURIComponent( fb.id ) + '?context=edit&_fields=content' } ).then( function ( r ) {
+		var getContent = fb ? api( { path: '/wp/v2/templates/' + idPath( fb.id ) + '?context=edit&_fields=content' } ).then( function ( r ) {
 			return ( r.content && r.content.raw ) || '';
 		} ) : Promise.resolve( seeds[ it.slug ] || '<!-- wp:template-part {"slug":"header"} /--><!-- wp:group {"tagName":"main","layout":{"type":"constrained"}} --><main class="wp-block-group"><!-- wp:post-content /--></main><!-- /wp:group --><!-- wp:template-part {"slug":"footer"} /-->' );
 		return getContent.then( function ( content ) {
@@ -1309,7 +1319,8 @@
 		var list = Object.keys( S.templates ).map( function ( k ) {
 			return S.templates[ k ];
 		} ).filter( function ( t ) {
-			return t.slug === hit.item.match || t.slug.indexOf( hit.item.match + '-' ) === 0 || t.is_custom;
+			// Page templates: page, page-*, and the custom ones people add (wp-custom-template-*).
+			return t.slug === hit.item.match || t.slug.indexOf( hit.item.match + '-' ) === 0 || t.slug.indexOf( 'wp-custom-template-' ) === 0;
 		} ).filter( function ( t ) {
 			// Plugin page templates are listed in their own section.
 			return [ 'page-cart', 'page-checkout', 'page-affiliate-dashboard', 'page-team-dashboard', 'page-wallet' ].indexOf( t.slug ) === -1;
@@ -1321,7 +1332,76 @@
 				main.appendChild( frameView( { section: hit.section, item: { label: titleOf( t ) } }, canvasUrl( t ), [ h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: '#/' + hit.section.id + '/' + hit.item.id }, icon( 'arrow-left-alt2' ), __( 'All page templates', 'gend-society' ) ) ] ) );
 			} }, h( 'span', { class: 'gs-st-tpl-thumb' }, h( 'i' ), h( 'i' ), h( 'i' ) ), h( 'strong', null, titleOf( t ) ), h( 'small', null, t.description || t.slug ), h( 'span', { class: 'gs-st-badge is-' + st.key }, st.label ) );
 		} ) );
-		return h( 'div', { class: 'gs-st-pad' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, __( 'Layouts you can pick for any page. Open one to design it.', 'gend-society' ) ), cards, h( 'div', { class: 'gs-st-row' }, h( 'a', { class: 'gs-st-btn is-ghost', href: cfg.siteEditorUrl + '?p=%2Ftemplate', target: '_blank', rel: 'noopener' }, icon( 'plus-alt2' ), __( 'Add a new template in the Site Editor', 'gend-society' ) ) ) );
+		return h( 'div', { class: 'gs-st-pad' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, __( 'Layouts you can pick for any page. Open one to design it.', 'gend-society' ) ), cards, h( 'div', { class: 'gs-st-row' }, h( 'button', { type: 'button', class: 'gs-st-btn is-primary', onclick: function () {
+			newPageTemplate( hit );
+		} }, icon( 'plus-alt2' ), __( 'New page template', 'gend-society' ) ) ) );
+	}
+
+	function promptBox( title, body, label, placeholder ) {
+		return new Promise( function ( resolve ) {
+			var input = h( 'input', { type: 'text', class: 'gs-st-input', placeholder: placeholder || '', 'aria-label': label } );
+			var overlay = h( 'div', { class: 'gs-st-modal-wrap', role: 'dialog', 'aria-modal': 'true', 'aria-label': title } );
+			var close = function ( v ) {
+				overlay.remove();
+				resolve( v );
+			};
+			var form = h( 'form', { class: 'gs-st-modal', onsubmit: function ( e ) {
+				e.preventDefault();
+				if ( input.value.trim() ) {
+					close( input.value.trim() );
+				}
+			} }, h( 'h2', null, title ), h( 'p', null, body ), h( 'label', { class: 'gs-st-field' }, h( 'span', null, label ), input ), h( 'div', { class: 'gs-st-modal-actions' }, h( 'button', { type: 'button', class: 'gs-st-btn', onclick: function () {
+				close( null );
+			} }, __( 'Cancel', 'gend-society' ) ), h( 'button', { type: 'submit', class: 'gs-st-btn is-primary' }, __( 'Create', 'gend-society' ) ) ) );
+			overlay.appendChild( form );
+			overlay.addEventListener( 'click', function ( e ) {
+				if ( e.target === overlay ) {
+					close( null );
+				}
+			} );
+			document.body.appendChild( overlay );
+			input.focus();
+		} );
+	}
+	function newPageTemplate( hit ) {
+		promptBox( __( 'New page template', 'gend-society' ), __( 'Give it a name. It starts as a copy of your Pages template and can be picked for any page.', 'gend-society' ), __( 'Template name', 'gend-society' ), __( 'e.g. Landing page', 'gend-society' ) ).then( function ( name ) {
+			if ( ! name ) {
+				return;
+			}
+			var slug = 'wp-custom-template-' + name.toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' );
+			var base = S.templates.page;
+			( base ? api( { path: '/wp/v2/templates/' + idPath( base.id ) + '?context=edit&_fields=content' } ) : Promise.resolve( {} ) ).then( function ( r ) {
+				return api( { path: '/wp/v2/templates', method: 'POST', data: { slug: slug, title: name, content: ( r.content && r.content.raw ) || '', status: 'publish' } } );
+			} ).then( function ( t ) {
+				return loadTemplates().then( function () {
+					toast( sprintf( __( '%s created.', 'gend-society' ), name ), 'ok' );
+					main.textContent = '';
+					main.appendChild( frameView( { section: hit.section, item: { label: name } }, canvasUrl( t ), [ h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: '#/' + hit.section.id + '/' + hit.item.id }, icon( 'arrow-left-alt2' ), __( 'All page templates', 'gend-society' ) ) ] ) );
+				} );
+			} ).catch( function ( e ) {
+				toast( errMsg( e ), 'error' );
+			} );
+		} );
+	}
+	function viewEditRoute( type, id ) {
+		var list = type === 'wp_template_part' ? S.parts : S.templates;
+		var t = null;
+		Object.keys( list ).some( function ( k ) {
+			if ( list[ k ].id === id ) {
+				t = list[ k ];
+				return true;
+			}
+			return false;
+		} );
+		if ( ! t ) {
+			return emptyState( 'warning', __( 'Template not found', 'gend-society' ), __( 'It may have been deleted. Pick a design area on the left.', 'gend-society' ) );
+		}
+		var link = linkForTemplate( t );
+		if ( link ) {
+			location.replace( link );
+			return loadingView();
+		}
+		return frameView( { section: { label: type === 'wp_template_part' ? __( 'Template parts', 'gend-society' ) : __( 'Templates', 'gend-society' ) }, item: { label: titleOf( t ) } }, canvasUrl( t ) );
 	}
 
 	function viewMenus( hit ) {

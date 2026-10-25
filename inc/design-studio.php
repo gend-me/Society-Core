@@ -7,9 +7,10 @@
  * section per active GenD plugin). Branding panels edit the core settings and
  * the user's global styles directly (same data the Site Editor writes); every
  * template item opens the real block editor canvas inside the studio, so the
- * Site Editor stays the single editing engine. Deep links that carry a route
- * (site-editor.php?p=...) still open core directly, and ?gs_core=1 opens core's
- * own landing screen.
+ * block editing engine stays core's. The Site Editor itself is never shown on
+ * its own: every site-editor.php visit opens the studio (a deep link to one
+ * template opens that template in the studio), and the embedded editor wears
+ * the GenD skin (assets/design-studio-editor.css).
  *
  * Sections come from gend_society_studio_sections(); other plugins can add or
  * change them through the 'gend_society_studio_sections' filter.
@@ -66,17 +67,25 @@ function gend_society_studio_register_page() {
 
 add_action( 'load-site-editor.php', 'gend_society_studio_redirect_landing' );
 /**
- * Sends the bare Site Editor URL to the studio. Any route or query keeps core.
+ * Every Site Editor visit opens the studio; only the studio's own embed loads
+ * core's editor. A deep link to one template or template part
+ * (?p=/wp_template/<id>, or the older ?postType=&postId=) opens it in the studio.
  */
 function gend_society_studio_redirect_landing() {
-	if ( ! wp_is_block_theme() || ! current_user_can( 'edit_theme_options' ) ) {
+	if ( ! wp_is_block_theme() || ! current_user_can( 'edit_theme_options' ) || gend_society_studio_is_embed() ) {
 		return;
 	}
-	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- routing only, nothing is changed.
-	if ( ! empty( $_GET ) ) {
-		return; // A deep link (p=, postType=, canvas=, gs_core=1 ...) opens core directly.
+	$target = admin_url( 'admin.php?page=' . GEND_SOCIETY_STUDIO_PAGE );
+	// phpcs:disable WordPress.Security.NonceVerification.Recommended -- routing only, nothing is changed.
+	$route = isset( $_GET['p'] ) ? sanitize_text_field( wp_unslash( $_GET['p'] ) ) : '';
+	if ( '' === $route && isset( $_GET['postType'], $_GET['postId'] ) ) {
+		$route = '/' . sanitize_key( wp_unslash( $_GET['postType'] ) ) . '/' . sanitize_text_field( wp_unslash( $_GET['postId'] ) );
 	}
-	wp_safe_redirect( admin_url( 'admin.php?page=' . GEND_SOCIETY_STUDIO_PAGE ) );
+	// phpcs:enable WordPress.Security.NonceVerification.Recommended
+	if ( preg_match( '#^/(wp_template|wp_template_part)/(.+)$#', $route, $m ) ) {
+		$target .= '#/edit/' . $m[1] . '/' . rawurlencode( $m[2] );
+	}
+	wp_safe_redirect( $target );
 	exit;
 }
 
@@ -403,6 +412,11 @@ add_action( 'admin_head', 'gend_society_studio_embed_css', 99 );
 function gend_society_studio_embed_css() {
 	if ( ! gend_society_studio_is_embed() ) {
 		return;
+	}
+	global $pagenow;
+	if ( 'site-editor.php' === $pagenow ) {
+		$css = 'assets/design-studio-editor.css';
+		echo '<link rel="stylesheet" id="gs-studio-editor-css" href="' . esc_url( GEND_SOCIETY_URL . $css . '?ver=' . GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) ) . '">'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- printed last so it overrides the editor's own late styles.
 	}
 	echo '<style id="gs-studio-embed-css">'
 		. 'body.gs-studio-embed{--gs-header-h:0px!important}'
