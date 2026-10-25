@@ -574,7 +574,7 @@ function gend_society_studio_specimen_page() {
 <body <?php body_class( 'gs-studio-specimen' ); ?>>
 <div class="gsg">
 
-	<section class="gsg-cover">
+	<section class="gsg-cover" id="gsg-cover">
 		<div class="gsg-row gsg-meta">
 			<span><?php echo esc_html( $name ); ?></span>
 			<span><?php esc_html_e( 'Brand Guidelines', 'gend-society' ); ?></span>
@@ -630,7 +630,7 @@ function gend_society_studio_specimen_page() {
 			<figure class="gsg-logo-tile is-clearspace"><div class="gsg-clear"><?php echo $wordmark( 'gsg-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?></div><figcaption><?php esc_html_e( 'Clear space · keep the dashed area free', 'gend-society' ); ?></figcaption></figure>
 		</div>
 		<?php if ( $icon ) : ?>
-			<div class="gsg-icon-row">
+			<div class="gsg-icon-row" id="gsg-icons">
 				<img class="gsg-icon is-round" src="<?php echo esc_url( $icon ); ?>" alt="">
 				<img class="gsg-icon is-squircle" src="<?php echo esc_url( $icon ); ?>" alt="">
 				<img class="gsg-icon is-square" src="<?php echo esc_url( $icon ); ?>" alt="">
@@ -666,7 +666,7 @@ function gend_society_studio_specimen_page() {
 			<div class="gsg-chapter-title"><?php esc_html_e( 'Typography', 'gend-society' ); ?></div>
 			<div class="gsg-chapter-lede"><?php esc_html_e( 'Two voices: one to announce, one to explain. The scale below is the system every page is set in.', 'gend-society' ); ?></div>
 		</header>
-		<div class="gsg-faces">
+		<div class="gsg-faces" id="gsg-faces">
 			<div class="gsg-face">
 				<div class="gsg-face-role"><?php esc_html_e( 'Headings', 'gend-society' ); ?></div>
 				<div class="gsg-canvas gsg-face-glyph"><h2 class="wp-block-heading" data-gsg-font="heading">Aa</h2></div>
@@ -682,12 +682,12 @@ function gend_society_studio_specimen_page() {
 		</div>
 		<div class="gsg-scale">
 			<?php foreach ( $scale as $tag => $role ) : ?>
-				<div class="gsg-scale-row">
+				<div class="gsg-scale-row" id="gsg-type-<?php echo esc_attr( $tag ); ?>">
 					<div class="gsg-scale-meta"><b><?php echo esc_html( strtoupper( $tag ) . ' · ' . $role ); ?></b><span data-gsg-spec="<?php echo esc_attr( $tag ); ?>">—</span></div>
 					<div class="gsg-canvas"><<?php echo esc_html( $tag ); ?> class="wp-block-heading" data-gsg-el="<?php echo esc_attr( $tag ); ?>"><?php esc_html_e( 'Crafted with intent', 'gend-society' ); ?></<?php echo esc_html( $tag ); ?>></div>
 				</div>
 			<?php endforeach; ?>
-			<div class="gsg-scale-row">
+			<div class="gsg-scale-row" id="gsg-type-p">
 				<div class="gsg-scale-meta"><b><?php esc_html_e( 'Body · Paragraph', 'gend-society' ); ?></b><span data-gsg-spec="p">—</span></div>
 				<div class="gsg-canvas"><p data-gsg-el="p"><?php esc_html_e( 'Good body type disappears: it is calm, comfortable and easy to read at length, so the ideas come through and the type does not get in the way. Inline links', 'gend-society' ); ?> <a href="#" data-gsg-el="a"><?php esc_html_e( 'look like this', 'gend-society' ); ?></a>.</p></div>
 			</div>
@@ -701,8 +701,8 @@ function gend_society_studio_specimen_page() {
 			<div class="gsg-chapter-lede"><?php esc_html_e( 'The building blocks people touch: actions, links and editorial accents.', 'gend-society' ); ?></div>
 		</header>
 		<div class="gsg-comp-grid">
-			<div class="gsg-comp"><div class="gsg-label"><?php esc_html_e( 'Buttons', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><?php echo $buttons; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?></div></div>
-			<div class="gsg-comp"><div class="gsg-label"><?php esc_html_e( 'Links', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><p><?php esc_html_e( 'Read the', 'gend-society' ); ?> <a href="#"><?php esc_html_e( 'full story', 'gend-society' ); ?></a> <?php esc_html_e( 'or', 'gend-society' ); ?> <a href="#"><?php esc_html_e( 'get in touch', 'gend-society' ); ?></a>.</p></div></div>
+			<div class="gsg-comp" id="gsg-comp-buttons"><div class="gsg-label"><?php esc_html_e( 'Buttons', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><?php echo $buttons; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?></div></div>
+			<div class="gsg-comp" id="gsg-comp-links"><div class="gsg-label"><?php esc_html_e( 'Links', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><p><?php esc_html_e( 'Read the', 'gend-society' ); ?> <a href="#"><?php esc_html_e( 'full story', 'gend-society' ); ?></a> <?php esc_html_e( 'or', 'gend-society' ); ?> <a href="#"><?php esc_html_e( 'get in touch', 'gend-society' ); ?></a>.</p></div></div>
 			<div class="gsg-comp is-wide"><div class="gsg-label"><?php esc_html_e( 'Quote', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><?php echo $quote; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?></div></div>
 		</div>
 	</section>

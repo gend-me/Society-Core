@@ -404,11 +404,50 @@
 		}, function () {} );
 	}, 300 );
 
+	// The style guide section that matches what is being edited.
+	function guideAnchor() {
+		var byItem = { logo: 'gsg-logo', favicon: 'gsg-icons', 'site-name': 'gsg-cover', palettes: 'gsg-colour' };
+		if ( current.item === 'fonts' ) {
+			var byEl = { heading: 'gsg-faces', p: 'gsg-type-p', a: 'gsg-comp-links', button: 'gsg-comp-buttons' };
+			return byEl[ S.typeEl ] || 'gsg-type-' + ( S.typeEl || 'h1' );
+		}
+		return byItem[ current.item ] || '';
+	}
+	function guideScroll( smooth ) {
+		if ( ! previewFrame || S.previewMode === 'home' ) {
+			return;
+		}
+		try {
+			var doc = previewFrame.contentDocument;
+			var id = guideAnchor();
+			// Fall back to the chapter when a section is missing (no app icon yet, for example).
+			var el = id && ( doc.getElementById( id ) || ( id === 'gsg-icons' && doc.getElementById( 'gsg-logo' ) ) );
+			if ( el ) {
+				var center = id.indexOf( 'gsg-type-' ) === 0 || id.indexOf( 'gsg-comp-' ) === 0;
+				el.scrollIntoView( { behavior: smooth ? 'smooth' : 'instant', block: center ? 'center' : 'start' } );
+			}
+		} catch ( e ) {
+			// Cross-origin preview: leave the scroll position alone.
+		}
+	}
+
 	function previewPane( opts ) {
 		opts = opts || {};
 		var url = S.previewMode === 'home' ? cfg.homeUrl : cfg.specimenUrl;
 		previewFrame = h( 'iframe', { class: 'gs-st-preview-frame', title: __( 'Live preview', 'gend-society' ), src: url, loading: 'lazy' } );
-		previewFrame.addEventListener( 'load', injectPreview );
+		previewFrame.addEventListener( 'load', function () {
+			injectPreview();
+			guideScroll( false );
+			// Fonts and the guide's own adjustments can still move things: anchor again once settled.
+			try {
+				previewFrame.contentDocument.fonts.ready.then( function () {
+					guideScroll( false );
+				} );
+			} catch ( e ) {}
+			setTimeout( function () {
+				guideScroll( false );
+			}, 700 );
+		} );
 		var seg = function ( mode, label ) {
 			return h( 'button', { type: 'button', class: 'gs-st-seg' + ( S.previewMode === mode ? ' is-on' : '' ), 'aria-pressed': S.previewMode === mode ? 'true' : 'false', onclick: function () {
 				S.previewMode = mode;
@@ -1355,6 +1394,7 @@
 			return h( 'button', { type: 'button', role: 'tab', 'aria-selected': e.id === el.id ? 'true' : 'false', class: 'gs-st-type-tab' + ( e.id === el.id ? ' is-on' : '' ), onclick: function () {
 				S.typeEl = e.id;
 				redraw();
+				guideScroll( true );
 			} }, e.label, customisedEl( e ) ? h( 'i', { class: 'gs-st-dot is-custom' } ) : null );
 		} ) );
 
