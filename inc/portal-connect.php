@@ -396,6 +396,13 @@ if (!function_exists('gend_society_portal_connect_forget_local')) {
 		if (function_exists('gend_society_consent_clear')) {
 			gend_society_consent_clear();
 		}
+		// @build-only-begin wporg
+		// Optional sharing starts off again on the next connect.
+		delete_option('gend_society_share_mail_relay');
+		delete_option('gend_society_share_plugin_list');
+		wp_clear_scheduled_hook('gend_society_mail_storage_report');
+		wp_clear_scheduled_hook('gend_society_feature_state_daily');
+		// @build-only-end wporg
 	}
 }
 
@@ -437,12 +444,49 @@ if (!function_exists('gend_society_portal_connect_handle_standalone')) {
 			case 'claim_owner':
 				gend_society_portal_connect_standalone_owner($op);
 				return;
+			// @build-only-begin wporg
+			case 'data_sharing':
+				gend_society_portal_connect_data_sharing_save();
+				return;
+			// @build-only-end wporg
 			default:
 				gend_society_portal_connect_standalone_pairing();
 		}
 	}
 }
 
+// @build-only-begin wporg
+if (!function_exists('gend_society_portal_connect_data_sharing_save')) {
+	/**
+	 * admin-post op=data_sharing (wordpress.org build): save the owner's optional sharing choices from the
+	 * Connected card. The caller checks manage_options; nonce gend_society_data_sharing.
+	 */
+	function gend_society_portal_connect_data_sharing_save() {
+		check_admin_referer('gend_society_data_sharing', 'gend_society_data_sharing_nonce');
+		if (!function_exists('gend_society_build_is_wporg') || !gend_society_build_is_wporg()) {
+			gend_society_portal_connect_standalone_redirect('error', __('This build has no optional sharing settings.', 'gend-society'));
+			return;
+		}
+		$plugin_list_was_on = gend_society_data_sharing_allowed('plugin_list');
+		foreach (array_keys(gend_society_data_sharing_items()) as $item) {
+			$field = 'gend_society_share_' . $item;
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+			$on = isset($_POST[$field]) && '1' === sanitize_text_field(wp_unslash((string) $_POST[$field]));
+			update_option($field, $on ? '1' : '0', false);
+		}
+		if (!gend_society_data_sharing_allowed('mail_relay')) {
+			wp_clear_scheduled_hook('gend_society_mail_storage_report');
+		}
+		if (!gend_society_data_sharing_allowed('plugin_list')) {
+			wp_clear_scheduled_hook('gend_society_feature_state_daily');
+		} elseif (!$plugin_list_was_on && function_exists('gend_society_feature_state_report_now')) {
+			gend_society_feature_state_report_now();
+		}
+		gend_society_portal_connect_standalone_redirect('success', __('Sharing choices saved.', 'gend-society'));
+	}
+}
+
+// @build-only-end wporg
 if (!function_exists('gend_society_portal_connect_standalone_pairing')) {
 	/**
 	 * Pairing-code connect: consent first, then the hub's /connect, which
@@ -973,6 +1017,24 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 				</tbody>
 			</table>
 
+<?php /* @build-only-begin wporg */ ?>
+			<?php if (function_exists('gend_society_build_is_wporg') && gend_society_build_is_wporg()) : ?>
+				<h3><?php esc_html_e('Optional sharing with gend.me', 'gend-society'); ?></h3>
+				<p><?php esc_html_e('Both are off unless you turn them on here. Turning one off stops it straight away.', 'gend-society'); ?></p>
+				<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="gend-society-connect-sharing">
+					<?php wp_nonce_field('gend_society_data_sharing', 'gend_society_data_sharing_nonce'); ?>
+					<input type="hidden" name="action" value="gend_society_portal_connect_submit" />
+					<input type="hidden" name="op" value="data_sharing" />
+					<?php foreach (gend_society_data_sharing_items() as $gend_society_item => $gend_society_share) : ?>
+						<p>
+							<label><input type="checkbox" name="gend_society_share_<?php echo esc_attr($gend_society_item); ?>" value="1"<?php checked(gend_society_data_sharing_allowed($gend_society_item)); ?> /> <?php echo esc_html($gend_society_share['label']); ?></label><br />
+							<span class="description"><?php echo esc_html($gend_society_share['description']); ?></span>
+						</p>
+					<?php endforeach; ?>
+					<?php submit_button(__('Save sharing choices', 'gend-society'), 'secondary', 'submit', false); ?>
+				</form>
+			<?php endif; ?>
+<?php /* @build-only-end wporg */ ?>
 			<h3><?php esc_html_e('Disconnect', 'gend-society'); ?></h3>
 			<?php $billing = function_exists('gend_society_plan_disconnect_billing') ? gend_society_plan_disconnect_billing() : null; ?>
 			<?php if ($billing) : ?>
