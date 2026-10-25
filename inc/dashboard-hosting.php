@@ -311,6 +311,236 @@ if ( ! function_exists( 'gend_society_migrate_cta_markup' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
+    /**
+     * The shared upgrade popup ([data-gs-upgrade-open] buttons: iframe checkout on gend.me, install-token picker
+     * elsewhere). Printed by the Storage cards below and by the Email hosting card on pages without them
+     * (Talk Flows). The script binds once per page (data-upg-inited), so a second copy stays inert.
+     *
+     * @param bool $gs_sa Standalone install (no checkout iframe).
+     */
+    function gend_society_hosting_render_upgrade_modal( $gs_sa = false ) {
+        ?>
+        <style>
+            /* ── Upgrade popup: backdrop + card + entrance, iframe body ── */
+            .gs-upgrade-modal { position: fixed; inset: 0; z-index: 999999; display: none; align-items: center; justify-content: center; padding: 24px; }
+            .gs-upgrade-modal.is-open { display: flex; }
+            .gs-upgrade-modal__backdrop {
+                position: absolute; inset: 0;
+                background: radial-gradient(1200px 500px at 20% 10%, rgba(34,211,238,.10), transparent 60%),
+                            radial-gradient(1000px 400px at 80% 90%, rgba(99,102,241,.10), transparent 55%),
+                            rgba(2, 6, 23, .78);
+                -webkit-backdrop-filter: blur(18px) saturate(160%);
+                        backdrop-filter: blur(18px) saturate(160%);
+                opacity: 0;
+                transition: opacity .32s cubic-bezier(.2,.9,.3,1);
+            }
+            .gs-upgrade-modal.is-open .gs-upgrade-modal__backdrop { opacity: 1; }
+            .gs-upgrade-modal__card {
+                position: relative;
+                width: 100%; max-width: 880px; height: 86vh; max-height: 860px;
+                background: linear-gradient(160deg, rgba(15,23,42,.97), rgba(15,23,42,.90));
+                border: 1px solid rgba(125, 211, 252, .28);
+                border-radius: 24px;
+                box-shadow: 0 48px 96px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
+                display: flex; flex-direction: column; overflow: hidden;
+                opacity: 0; transform: translateY(20px) scale(.98);
+                transition: opacity .35s cubic-bezier(.2,.9,.3,1), transform .35s cubic-bezier(.2,.9,.3,1);
+            }
+            .gs-upgrade-modal.is-open .gs-upgrade-modal__card { opacity: 1; transform: none; }
+            @media (max-width: 640px) { .gs-upgrade-modal__card { height: 92vh; max-height: none; border-radius: 18px; } }
+
+            .gs-upgrade-modal__close {
+                position: absolute; top: 14px; right: 14px; z-index: 1;
+                width: 36px; height: 36px; border-radius: 50%;
+                background: rgba(11,14,20,.65); border: 1px solid rgba(125,211,252,.20);
+                color: #e2e8f0; font-size: 1.2rem; line-height: 1; cursor: pointer;
+                transition: background .18s ease, transform .15s ease;
+            }
+            .gs-upgrade-modal__close:hover { background: rgba(239,68,68,.20); transform: rotate(90deg); }
+            .gs-upgrade-modal__frame { flex: 1 1 auto; width: 100%; border: 0; background: #0b0e14; }
+            /* ── Proxy-mode picker: shown instead of the iframe when this
+               install can't load gend.me's checkout in an iframe (a
+               genuinely separate domain - self-hosted/container - whose
+               cross-origin cookies the iframe can't carry). ── */
+            .gs-upgrade-modal__picker { flex: 1 1 auto; overflow-y: auto; padding: 28px; color: #e2e8f0; }
+            .gs-upgrade-modal__picker-status { color: #94a3b8; font-size: 0.9rem; padding: 8px 2px; }
+            .gs-upgrade-modal__picker-status.is-error { color: #fca5a5; }
+            .gs-upgrade-modal__picker-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
+            .gs-upgrade-modal__picker-card {
+                display: flex; align-items: center; justify-content: space-between; gap: 12px;
+                padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03);
+                border: 1px solid rgba(125,211,252,.20); cursor: pointer; text-align: left;
+                width: 100%; color: #fff; font: inherit;
+                transition: border-color .15s ease, background .15s ease;
+            }
+            .gs-upgrade-modal__picker-card:hover:not([disabled]) { border-color: rgba(34,211,238,.6); background: rgba(34,211,238,.08); }
+            .gs-upgrade-modal__picker-card[disabled] { opacity: 0.5; cursor: wait; }
+            .gs-upgrade-modal__picker-card.is-current { border-color: rgba(78,230,138,.4); background: rgba(0,180,80,.06); }
+            .gs-upgrade-modal__picker-name { font-weight: 700; font-size: 0.95rem; }
+            .gs-upgrade-modal__picker-price { color: #7dd3fc; font-size: 0.85rem; font-weight: 600; }
+        </style>
+        <div class="gs-upgrade-modal" data-gs-upgrade-modal aria-hidden="true" role="dialog" aria-modal="true">
+            <div class="gs-upgrade-modal__backdrop" data-gs-upgrade-close></div>
+            <div class="gs-upgrade-modal__card">
+                <button type="button" class="gs-upgrade-modal__close" data-gs-upgrade-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
+<?php if ( $gs_sa ) : ?>
+                <div class="gs-upgrade-modal__frame" data-gs-upg-iframe hidden></div>
+<?php else : ?>
+                <iframe class="gs-upgrade-modal__frame" data-gs-upg-iframe src="about:blank" title="<?php esc_attr_e( 'Upgrade checkout', 'gend-society' ); ?>" loading="lazy"></iframe>
+<?php endif; ?>
+                <div class="gs-upgrade-modal__picker" data-gs-upg-picker hidden></div>
+            </div>
+        </div>
+        <script>
+        (function () {
+            var modal = document.querySelector('[data-gs-upgrade-modal]');
+            if (!modal || modal.dataset.upgInited === '1') return;
+            modal.dataset.upgInited = '1';
+            // Escape any ancestor's transform/filter containing block so
+            // position:fixed centers on the real viewport, not a wrapper.
+            if (modal.parentElement !== document.body) {
+                document.body.appendChild(modal);
+            }
+            var iframe = modal.querySelector('[data-gs-upg-iframe]');
+            var picker = modal.querySelector('[data-gs-upg-picker]');
+            var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+            var ajaxNonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>;
+
+            function showIframe(url) {
+                picker.hidden = true;
+                picker.innerHTML = '';
+                iframe.hidden = false;
+                iframe.src = url;
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            function showPickerStatus(msg, isError) {
+                picker.innerHTML = '<div class="gs-upgrade-modal__picker-status' + (isError ? ' is-error' : '') + '">' + msg + '</div>';
+            }
+
+            function openPicker() {
+                iframe.hidden = true;
+                iframe.src = 'about:blank';
+                picker.hidden = false;
+                picker.innerHTML = '';
+                modal.classList.add('is-open');
+                modal.setAttribute('aria-hidden', 'false');
+                document.body.style.overflow = 'hidden';
+            }
+
+            // Resolves plan_id -> a real gend.me checkout_url via the
+            // install-token-authed proxy (gs_membership_change_plan ->
+            // gdc_self_hosted_rest_change_plan on the hub), then does a
+            // real top-level navigation to it in a new tab - not an
+            // iframe, so gend.me's own session cookie works normally.
+            function proxyChangePlan(planId) {
+                showPickerStatus('Preparing checkout…', false);
+                var fd = new FormData();
+                fd.append('action', 'gend_society_membership_change_plan');
+                fd.append('nonce', ajaxNonce);
+                fd.append('plan_id', planId);
+                fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (resp) {
+                        if (resp && resp.success && resp.data && resp.data.checkout_url) {
+                            window.open(resp.data.checkout_url, '_blank', 'noopener');
+                            close();
+                        } else {
+                            showPickerStatus((resp && resp.data && resp.data.message) || 'Could not start checkout.', true);
+                        }
+                    })
+                    .catch(function () { showPickerStatus('Network error.', true); });
+            }
+
+            function renderPlanGrid(plans) {
+                if (!plans || !plans.length) {
+                    showPickerStatus('No plans available for this resource yet.', false);
+                    return;
+                }
+                var grid = document.createElement('div');
+                grid.className = 'gs-upgrade-modal__picker-grid';
+                plans.forEach(function (p) {
+                    var card = document.createElement('button');
+                    card.type = 'button';
+                    card.className = 'gs-upgrade-modal__picker-card' + (p.is_current ? ' is-current' : '');
+                    card.disabled = !!p.is_current;
+                    var left = document.createElement('div');
+                    left.className = 'gs-upgrade-modal__picker-name';
+                    left.textContent = p.name || '';
+                    var right = document.createElement('div');
+                    right.className = p.is_current ? 'gs-upgrade-modal__picker-status' : 'gs-upgrade-modal__picker-price';
+                    right.textContent = p.is_current ? 'Current plan' : (p.price_label || '');
+                    card.appendChild(left);
+                    card.appendChild(right);
+                    if (!p.is_current) {
+                        card.addEventListener('click', function () {
+                            grid.querySelectorAll('.gs-upgrade-modal__picker-card').forEach(function (c) { c.disabled = true; });
+                            proxyChangePlan(p.id);
+                        });
+                    }
+                    grid.appendChild(card);
+                });
+                picker.innerHTML = '';
+                picker.appendChild(grid);
+            }
+
+            function proxyShowResourcePicker(resourceType) {
+                openPicker();
+                showPickerStatus('Loading plans…', false);
+                var fd = new FormData();
+                fd.append('action', 'gend_society_membership_plan_options');
+                fd.append('nonce', ajaxNonce);
+                fd.append('resource', resourceType);
+                fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
+                    .then(function (r) { return r.json(); })
+                    .then(function (resp) {
+                        if (resp && resp.success) {
+                            renderPlanGrid((resp.data && resp.data.plans) || []);
+                        } else {
+                            showPickerStatus((resp && resp.data && resp.data.message) || 'Could not load plans.', true);
+                        }
+                    })
+                    .catch(function () { showPickerStatus('Network error.', true); });
+            }
+
+            function openFor(btn) {
+                var url = btn.getAttribute('data-embed-url') || '';
+                if (url) { showIframe(url); return; }
+                var planId = btn.getAttribute('data-plan-id');
+                if (planId) { openPicker(); proxyChangePlan(planId); return; }
+                var resourceType = btn.getAttribute('data-resource-type');
+                if (resourceType) { proxyShowResourcePicker(resourceType); return; }
+            }
+            function close() {
+                modal.classList.remove('is-open');
+                modal.setAttribute('aria-hidden', 'true');
+                document.body.style.overflow = '';
+                iframe.src = 'about:blank';
+                picker.innerHTML = '';
+            }
+            document.addEventListener('click', function (e) {
+                var open = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-open]');
+                if (open) { e.preventDefault(); openFor(open); return; }
+                var closer = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-close]');
+                if (closer && modal.contains(closer)) { e.preventDefault(); close(); return; }
+            });
+            document.addEventListener('keydown', function (e) {
+                if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
+            });
+            // The embed's own Escape handler (inside the iframe) posts this
+            // same message - close the outer modal in response too.
+            window.addEventListener('message', function (e) {
+                if (e.data && e.data.gdcAttach === 'close' && modal.classList.contains('is-open')) close();
+            });
+        })();
+        </script>
+        <?php
+    }
+}
+
 if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) {
     /**
      * Storage usage cards (Media / Database / Codebase) + the account-wide
@@ -534,224 +764,8 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
             // per call to this function; the Upgrade buttons above dispatch
             // data-gs-upgrade-open with the resource slug + labels so the
             // modal can show contextual pitch copy.
-        ?>
-        <style>
-            /* ── Upgrade popup: backdrop + card + entrance, iframe body ── */
-            .gs-upgrade-modal { position: fixed; inset: 0; z-index: 999999; display: none; align-items: center; justify-content: center; padding: 24px; }
-            .gs-upgrade-modal.is-open { display: flex; }
-            .gs-upgrade-modal__backdrop {
-                position: absolute; inset: 0;
-                background: radial-gradient(1200px 500px at 20% 10%, rgba(34,211,238,.10), transparent 60%),
-                            radial-gradient(1000px 400px at 80% 90%, rgba(99,102,241,.10), transparent 55%),
-                            rgba(2, 6, 23, .78);
-                -webkit-backdrop-filter: blur(18px) saturate(160%);
-                        backdrop-filter: blur(18px) saturate(160%);
-                opacity: 0;
-                transition: opacity .32s cubic-bezier(.2,.9,.3,1);
-            }
-            .gs-upgrade-modal.is-open .gs-upgrade-modal__backdrop { opacity: 1; }
-            .gs-upgrade-modal__card {
-                position: relative;
-                width: 100%; max-width: 880px; height: 86vh; max-height: 860px;
-                background: linear-gradient(160deg, rgba(15,23,42,.97), rgba(15,23,42,.90));
-                border: 1px solid rgba(125, 211, 252, .28);
-                border-radius: 24px;
-                box-shadow: 0 48px 96px rgba(0,0,0,.65), inset 0 1px 0 rgba(255,255,255,.05);
-                display: flex; flex-direction: column; overflow: hidden;
-                opacity: 0; transform: translateY(20px) scale(.98);
-                transition: opacity .35s cubic-bezier(.2,.9,.3,1), transform .35s cubic-bezier(.2,.9,.3,1);
-            }
-            .gs-upgrade-modal.is-open .gs-upgrade-modal__card { opacity: 1; transform: none; }
-            @media (max-width: 640px) { .gs-upgrade-modal__card { height: 92vh; max-height: none; border-radius: 18px; } }
-
-            .gs-upgrade-modal__close {
-                position: absolute; top: 14px; right: 14px; z-index: 1;
-                width: 36px; height: 36px; border-radius: 50%;
-                background: rgba(11,14,20,.65); border: 1px solid rgba(125,211,252,.20);
-                color: #e2e8f0; font-size: 1.2rem; line-height: 1; cursor: pointer;
-                transition: background .18s ease, transform .15s ease;
-            }
-            .gs-upgrade-modal__close:hover { background: rgba(239,68,68,.20); transform: rotate(90deg); }
-            .gs-upgrade-modal__frame { flex: 1 1 auto; width: 100%; border: 0; background: #0b0e14; }
-            /* ── Proxy-mode picker: shown instead of the iframe when this
-               install can't load gend.me's checkout in an iframe (a
-               genuinely separate domain - self-hosted/container - whose
-               cross-origin cookies the iframe can't carry). ── */
-            .gs-upgrade-modal__picker { flex: 1 1 auto; overflow-y: auto; padding: 28px; color: #e2e8f0; }
-            .gs-upgrade-modal__picker-status { color: #94a3b8; font-size: 0.9rem; padding: 8px 2px; }
-            .gs-upgrade-modal__picker-status.is-error { color: #fca5a5; }
-            .gs-upgrade-modal__picker-grid { display: flex; flex-direction: column; gap: 10px; margin-top: 12px; }
-            .gs-upgrade-modal__picker-card {
-                display: flex; align-items: center; justify-content: space-between; gap: 12px;
-                padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03);
-                border: 1px solid rgba(125,211,252,.20); cursor: pointer; text-align: left;
-                width: 100%; color: #fff; font: inherit;
-                transition: border-color .15s ease, background .15s ease;
-            }
-            .gs-upgrade-modal__picker-card:hover:not([disabled]) { border-color: rgba(34,211,238,.6); background: rgba(34,211,238,.08); }
-            .gs-upgrade-modal__picker-card[disabled] { opacity: 0.5; cursor: wait; }
-            .gs-upgrade-modal__picker-card.is-current { border-color: rgba(78,230,138,.4); background: rgba(0,180,80,.06); }
-            .gs-upgrade-modal__picker-name { font-weight: 700; font-size: 0.95rem; }
-            .gs-upgrade-modal__picker-price { color: #7dd3fc; font-size: 0.85rem; font-weight: 600; }
-        </style>
-        <div class="gs-upgrade-modal" data-gs-upgrade-modal aria-hidden="true" role="dialog" aria-modal="true">
-            <div class="gs-upgrade-modal__backdrop" data-gs-upgrade-close></div>
-            <div class="gs-upgrade-modal__card">
-                <button type="button" class="gs-upgrade-modal__close" data-gs-upgrade-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
-<?php if ( $gs_sa ) : ?>
-                <div class="gs-upgrade-modal__frame" data-gs-upg-iframe hidden></div>
-<?php else : ?>
-                <iframe class="gs-upgrade-modal__frame" data-gs-upg-iframe src="about:blank" title="<?php esc_attr_e( 'Upgrade checkout', 'gend-society' ); ?>" loading="lazy"></iframe>
-<?php endif; ?>
-                <div class="gs-upgrade-modal__picker" data-gs-upg-picker hidden></div>
-            </div>
-        </div>
-        <script>
-        (function () {
-            var modal = document.querySelector('[data-gs-upgrade-modal]');
-            if (!modal || modal.dataset.upgInited === '1') return;
-            modal.dataset.upgInited = '1';
-            // Escape any ancestor's transform/filter containing block so
-            // position:fixed centers on the real viewport, not a wrapper.
-            if (modal.parentElement !== document.body) {
-                document.body.appendChild(modal);
-            }
-            var iframe = modal.querySelector('[data-gs-upg-iframe]');
-            var picker = modal.querySelector('[data-gs-upg-picker]');
-            var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
-            var ajaxNonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>;
-
-            function showIframe(url) {
-                picker.hidden = true;
-                picker.innerHTML = '';
-                iframe.hidden = false;
-                iframe.src = url;
-                modal.classList.add('is-open');
-                modal.setAttribute('aria-hidden', 'false');
-                document.body.style.overflow = 'hidden';
-            }
-
-            function showPickerStatus(msg, isError) {
-                picker.innerHTML = '<div class="gs-upgrade-modal__picker-status' + (isError ? ' is-error' : '') + '">' + msg + '</div>';
-            }
-
-            function openPicker() {
-                iframe.hidden = true;
-                iframe.src = 'about:blank';
-                picker.hidden = false;
-                picker.innerHTML = '';
-                modal.classList.add('is-open');
-                modal.setAttribute('aria-hidden', 'false');
-                document.body.style.overflow = 'hidden';
-            }
-
-            // Resolves plan_id -> a real gend.me checkout_url via the
-            // install-token-authed proxy (gs_membership_change_plan ->
-            // gdc_self_hosted_rest_change_plan on the hub), then does a
-            // real top-level navigation to it in a new tab - not an
-            // iframe, so gend.me's own session cookie works normally.
-            function proxyChangePlan(planId) {
-                showPickerStatus('Preparing checkout…', false);
-                var fd = new FormData();
-                fd.append('action', 'gend_society_membership_change_plan');
-                fd.append('nonce', ajaxNonce);
-                fd.append('plan_id', planId);
-                fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (resp) {
-                        if (resp && resp.success && resp.data && resp.data.checkout_url) {
-                            window.open(resp.data.checkout_url, '_blank', 'noopener');
-                            close();
-                        } else {
-                            showPickerStatus((resp && resp.data && resp.data.message) || 'Could not start checkout.', true);
-                        }
-                    })
-                    .catch(function () { showPickerStatus('Network error.', true); });
-            }
-
-            function renderPlanGrid(plans) {
-                if (!plans || !plans.length) {
-                    showPickerStatus('No plans available for this resource yet.', false);
-                    return;
-                }
-                var grid = document.createElement('div');
-                grid.className = 'gs-upgrade-modal__picker-grid';
-                plans.forEach(function (p) {
-                    var card = document.createElement('button');
-                    card.type = 'button';
-                    card.className = 'gs-upgrade-modal__picker-card' + (p.is_current ? ' is-current' : '');
-                    card.disabled = !!p.is_current;
-                    var left = document.createElement('div');
-                    left.className = 'gs-upgrade-modal__picker-name';
-                    left.textContent = p.name || '';
-                    var right = document.createElement('div');
-                    right.className = p.is_current ? 'gs-upgrade-modal__picker-status' : 'gs-upgrade-modal__picker-price';
-                    right.textContent = p.is_current ? 'Current plan' : (p.price_label || '');
-                    card.appendChild(left);
-                    card.appendChild(right);
-                    if (!p.is_current) {
-                        card.addEventListener('click', function () {
-                            grid.querySelectorAll('.gs-upgrade-modal__picker-card').forEach(function (c) { c.disabled = true; });
-                            proxyChangePlan(p.id);
-                        });
-                    }
-                    grid.appendChild(card);
-                });
-                picker.innerHTML = '';
-                picker.appendChild(grid);
-            }
-
-            function proxyShowResourcePicker(resourceType) {
-                openPicker();
-                showPickerStatus('Loading plans…', false);
-                var fd = new FormData();
-                fd.append('action', 'gend_society_membership_plan_options');
-                fd.append('nonce', ajaxNonce);
-                fd.append('resource', resourceType);
-                fetch(ajaxUrl, { method: 'POST', body: fd, credentials: 'same-origin' })
-                    .then(function (r) { return r.json(); })
-                    .then(function (resp) {
-                        if (resp && resp.success) {
-                            renderPlanGrid((resp.data && resp.data.plans) || []);
-                        } else {
-                            showPickerStatus((resp && resp.data && resp.data.message) || 'Could not load plans.', true);
-                        }
-                    })
-                    .catch(function () { showPickerStatus('Network error.', true); });
-            }
-
-            function openFor(btn) {
-                var url = btn.getAttribute('data-embed-url') || '';
-                if (url) { showIframe(url); return; }
-                var planId = btn.getAttribute('data-plan-id');
-                if (planId) { openPicker(); proxyChangePlan(planId); return; }
-                var resourceType = btn.getAttribute('data-resource-type');
-                if (resourceType) { proxyShowResourcePicker(resourceType); return; }
-            }
-            function close() {
-                modal.classList.remove('is-open');
-                modal.setAttribute('aria-hidden', 'true');
-                document.body.style.overflow = '';
-                iframe.src = 'about:blank';
-                picker.innerHTML = '';
-            }
-            document.addEventListener('click', function (e) {
-                var open = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-open]');
-                if (open) { e.preventDefault(); openFor(open); return; }
-                var closer = e.target && e.target.closest && e.target.closest('[data-gs-upgrade-close]');
-                if (closer && modal.contains(closer)) { e.preventDefault(); close(); return; }
-            });
-            document.addEventListener('keydown', function (e) {
-                if (e.key === 'Escape' && modal.classList.contains('is-open')) close();
-            });
-            // The embed's own Escape handler (inside the iframe) posts this
-            // same message - close the outer modal in response too.
-            window.addEventListener('message', function (e) {
-                if (e.data && e.data.gdcAttach === 'close' && modal.classList.contains('is-open')) close();
-            });
-        })();
-        </script>
-        <?php endif; ?>
+            gend_society_hosting_render_upgrade_modal( $gs_sa );
+        endif; ?>
         <script>
         (function () {
             if (window.gsStorageRescanInited) { return; }
@@ -1772,10 +1786,12 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                             <span class="dashicons dashicons-list-view" style="vertical-align: middle; margin-right: 4px;"></span>
                             <?php esc_html_e( 'Tables', 'gend-society' ); ?>
                         </button>
+<?php /* @build-strip-begin wporg */ ?>
                         <button type="button" class="gs-hosting-tables-modal__tab" data-gs-tables-tab="query" role="tab" aria-selected="false">
                             <span class="dashicons dashicons-search" style="vertical-align: middle; margin-right: 4px;"></span>
                             <?php esc_html_e( 'Queries', 'gend-society' ); ?>
                         </button>
+<?php /* @build-strip-end wporg */ ?>
                     </nav>
 
                     <div class="gs-hosting-tables-modal__body">
@@ -1794,7 +1810,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                             <col class="gs-col-data">
                                             <col class="gs-col-index">
                                             <col class="gs-col-total">
+<?php /* @build-strip-begin wporg */ ?>
                                             <col class="gs-col-action">
+<?php /* @build-strip-end wporg */ ?>
                                         </colgroup>
                                         <thead>
                                             <tr>
@@ -1806,7 +1824,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                                 <th style="text-align: right; cursor: pointer; user-select: none;" data-gs-sort="data" role="button" tabindex="0" title="<?php esc_attr_e( 'Sort by data size', 'gend-society' ); ?>"><?php esc_html_e( 'Data', 'gend-society' ); ?> <span data-gs-sort-ind style="opacity: .55; font-size: .75em;"></span></th>
                                                 <th style="text-align: right; cursor: pointer; user-select: none;" data-gs-sort="index" role="button" tabindex="0" title="<?php esc_attr_e( 'Sort by index size', 'gend-society' ); ?>"><?php esc_html_e( 'Index', 'gend-society' ); ?> <span data-gs-sort-ind style="opacity: .55; font-size: .75em;"></span></th>
                                                 <th style="text-align: right; cursor: pointer; user-select: none;" data-gs-sort="total" role="button" tabindex="0" title="<?php esc_attr_e( 'Sort by total size', 'gend-society' ); ?>"><?php esc_html_e( 'Total', 'gend-society' ); ?> <span data-gs-sort-ind style="opacity: .55; font-size: .75em;"></span></th>
+<?php /* @build-strip-begin wporg */ ?>
                                                 <th></th>
+<?php /* @build-strip-end wporg */ ?>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1818,7 +1838,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                                     <td class="gs-col-data" style="text-align: right;"><?php echo esc_html( size_format( (int) $t['data_bytes'], 1 ) ); ?></td>
                                                     <td class="gs-col-index" style="text-align: right;"><?php echo esc_html( size_format( (int) $t['index_bytes'], 1 ) ); ?></td>
                                                     <td class="gs-col-total" style="text-align: right; color: #fff; font-weight: 600;"><?php echo esc_html( size_format( (int) $t['total_bytes'], 1 ) ); ?></td>
+<?php /* @build-strip-begin wporg */ ?>
                                                     <td class="gs-col-action" style="text-align: right;"><button type="button" class="gs-hosting__btn" data-gs-tables-browse="<?php echo esc_attr( $t['name'] ); ?>" style="background: rgba(255,255,255,0.08); padding: 4px 10px; font-size: 0.72rem;"><?php esc_html_e( 'Browse', 'gend-society' ); ?></button></td>
+<?php /* @build-strip-end wporg */ ?>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -1826,6 +1848,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                 </div>
                             </div>
 
+<?php /* @build-strip-begin wporg */ ?>
                             <!-- Tab 2: natural-language query builder.
                                  Non-technical users describe what they want;
                                  a "Find It" button asks LEO to translate the
@@ -1924,6 +1947,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
 
                                 <div id="gs-hosting-query-results" class="gs-hosting-tables-modal__results"></div>
                             </div>
+<?php /* @build-strip-end wporg */ ?>
                         </div>
                     </div>
                 </div>
@@ -2027,6 +2051,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 }
                 .gs-hosting-tables-modal__ask:focus { outline:none; border-color:rgba(78,170,255,0.55); box-shadow:0 0 0 3px rgba(78,170,255,0.18); }
                 .gs-hosting-tables-modal__ask::placeholder { color:rgba(203,213,245,0.55); }
+<?php /* @build-strip-begin wporg */ ?>
                 /* Quick-pick chip row — one-click recipes for common
                    questions, so non-technical users have a starting point
                    even when the AI helper is unavailable. */
@@ -2042,6 +2067,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 /* Open <details> rotates the chevron, like an accordion. */
                 #gs-hosting-query-details[open] > summary .dashicons-arrow-right { transform: rotate(90deg); }
                 #gs-hosting-query-details > summary::-webkit-details-marker { display: none; }
+<?php /* @build-strip-end wporg */ ?>
                 /* Friendly natural-language answer rendering for SELECT
                    results — single-value queries get an oversized number,
                    multi-row results keep the table view. */
@@ -2303,6 +2329,11 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         </button>
                     </div>
                     <?php
+                    // 109-35 (D36): on standalone the WordPress Plugins / Updates screens are reached from here (their
+                    // sidebar menus are hidden as on gend.me). The function exists on standalone only.
+                    if ( function_exists( 'gend_society_sa_menu_codebase_links' ) ) {
+                        gend_society_sa_menu_codebase_links();
+                    }
                     if ( function_exists( 'gend_society_hosting_render_codebase_packages' ) ) {
                         gend_society_hosting_render_codebase_packages();
                     }
@@ -2859,6 +2890,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 setTablesTab(tabBtn.dataset.gsTablesTab);
                 return;
             }
+<?php /* @build-strip-begin wporg */ ?>
             // Recipe chip click — pre-fill the natural-language input AND
             // stash the fallback SQL so "Find It" can use it without an AI
             // round-trip if needed.
@@ -2905,6 +2937,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 runQuery();
                 return;
             }
+<?php /* @build-strip-end wporg */ ?>
         });
         document.addEventListener('keydown', function(e){
             if (e.key === 'Escape' && $tblModal && $tblModal.classList.contains('is-open')) {
@@ -2968,12 +3001,15 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             });
         }
         // Cmd/Ctrl+Enter inside the SQL textarea runs the query.
+<?php /* @build-strip-begin wporg */ ?>
         document.addEventListener('keydown', function(e){
             if (e.target && e.target.id === 'gs-hosting-query-input' && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault();
                 runQuery();
             }
         });
+<?php /* @build-strip-end wporg */ ?>
+<?php /* @build-strip-begin wporg */ ?>
 
         function escHtml(s) {
             if (s == null) return '';
@@ -3206,6 +3242,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 $results.innerHTML = '<div class="is-err">Network error running the query.</div>';
             });
         }
+<?php /* @build-strip-end wporg */ ?>
     })();
     </script>
     <?php
@@ -4520,6 +4557,7 @@ add_action( 'wp_ajax_gend_society_hosting_media_rescan', function () {
     wp_send_json_success( $data );
 } );
 
+// @build-strip-begin wporg
 /**
  * AJAX: run a raw SQL query against the app database from the Tables modal.
  *
@@ -4602,3 +4640,4 @@ add_action( 'wp_ajax_gend_society_hosting_query_run', function () {
         'verb'     => $verb,
     ) );
 } );
+// @build-strip-end wporg

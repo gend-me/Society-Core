@@ -179,6 +179,8 @@
                 if (el.closest(KEEP)) continue;
                 var tag = el.tagName;
                 if (tag === 'IMG' || tag === 'VIDEO' || tag === 'SVG' || tag === 'svg' || tag === 'CANVAS' || tag === 'IFRAME' || tag === 'INPUT' || tag === 'SELECT' || tag === 'TEXTAREA') continue;
+                // table rows / cells keep their own styling (a tinted row stacks on the tinted table)
+                if (tag === 'THEAD' || tag === 'TBODY' || tag === 'TFOOT' || tag === 'TR' || tag === 'TH' || tag === 'TD') continue;
                 var w = el.offsetWidth, h = el.offsetHeight;
                 if (w < 160 || h < 44) continue;
                 var cs = getComputedStyle(el);
@@ -187,6 +189,8 @@
                 if (a < 0.55 && !grad) continue;
                 el.dataset.gsGlass = '1';
                 var rgb = rgbOf(a >= 0.55 ? cs.backgroundColor : 'rgb(10,14,24)');
+                // a light panel (e.g. a white table) would turn into grey haze under light text: use the dark glass
+                if (0.2126 * rgb[0] + 0.7152 * rgb[1] + 0.0722 * rgb[2] > 150) rgb = [10, 14, 24];
                 el.style.setProperty('background-image', 'none', 'important');
                 el.style.setProperty('background-color', 'rgba(' + rgb.join(',') + ',0.46)', 'important');
                 el.classList.add('gs-vglass');

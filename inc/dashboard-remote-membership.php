@@ -313,6 +313,475 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_email_plan_env' ) ) {
+    /**
+     * Inputs of the Email hosting card, read from what this install already has (no new remote call):
+     * the Emails plans (hosting group, subgroup "emails", product meta gdc_email_kind storage | sending) and the
+     * membership's current ones where Vendor App Manager runs (gend.me and its sites); usage from the hub mail
+     * service (gend_mail_state()) on gend.me, or from the state the mail relay stored on a container
+     * (gend_society_mail_service_state, gend_society_mail_relay_state); on a standalone install only the pairing state.
+     *
+     * @return array
+     */
+    function gend_society_email_plan_env(): array {
+        $sa   = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
+        $same = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
+        $env  = array(
+            'mode'       => $sa ? 'standalone' : ( $same ? 'hub' : 'container' ),
+            'paired'     => $sa && function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired(),
+            'plans'      => array(),
+            'current'    => array(),
+            'mail_state' => null,
+            'free'       => array(
+                'storage_gb' => (float) get_site_option( 'gend_mail_free_storage_gb', defined( 'GEND_MAIL_FREE_STORAGE_GB' ) ? GEND_MAIL_FREE_STORAGE_GB : 1 ),
+                'sends'      => (int) get_site_option( 'gend_mail_free_sends', defined( 'GEND_MAIL_FREE_SENDS' ) ? GEND_MAIL_FREE_SENDS : 300 ),
+            ),
+            'upgrade'    => array(),
+            'choose_url' => '',
+            'learn_url'  => '',
+            'manage_url' => defined( 'EMAIL_MANAGER_PATH' ) ? admin_url( 'admin.php?page=talk-flows' ) : '',
+        );
+        if ( $sa ) {
+            $env['learn_url'] = function_exists( 'gend_society_dashboard_standalone_action_url' ) ? gend_society_dashboard_standalone_action_url( 'membership' ) : '';
+            return $env;
+        }
+
+        // Emails plans: the same 'hosting' plan group the Backups plans come from (gdc_plan_attach_get_plans()).
+        if ( function_exists( 'gdc_get_plan_group_for_checkout' ) && function_exists( 'wu_get_product' ) ) {
+            foreach ( (array) gdc_get_plan_group_for_checkout( 'hosting' ) as $plan ) {
+                if ( ! is_array( $plan ) || 'emails' !== strtolower( (string) ( $plan['subgroup'] ?? '' ) ) ) {
+                    continue;
+                }
+                $p    = wu_get_product( (int) ( $plan['id'] ?? 0 ) );
+                $kind = ( $p && method_exists( $p, 'get_meta' ) ) ? (string) $p->get_meta( 'gdc_email_kind', '' ) : '';
+                if ( 'storage' === $kind || 'sending' === $kind ) {
+                    $env['plans'][] = array(
+                        'id'   => (int) $p->get_id(),
+                        'kind' => $kind,
+                        'name' => (string) $p->get_name(),
+                    );
+                }
+            }
+        }
+
+        // The membership this dashboard belongs to (WP Ultimo's current one), as the Backups card reads it.
+        $m = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+        if ( ! $m && function_exists( 'WP_Ultimo' ) ) {
+            try {
+                $m = WP_Ultimo()->is_loaded() ? WP_Ultimo()->currents->get_membership() : null;
+            } catch ( Throwable $e ) {
+                $m = null;
+            }
+        }
+        if ( $m && is_object( $m ) && method_exists( $m, 'get_all_products' ) ) {
+            foreach ( (array) $m->get_all_products() as $row ) {
+                $p = is_array( $row ) && isset( $row['product'] ) ? $row['product'] : null;
+                if ( ! $p || ! is_object( $p ) || ! method_exists( $p, 'get_subgroup' ) || 'emails' !== strtolower( (string) $p->get_subgroup() ) ) {
+                    continue;
+                }
+                $kind = method_exists( $p, 'get_meta' ) ? (string) $p->get_meta( 'gdc_email_kind', '' ) : '';
+                if ( ( 'storage' === $kind || 'sending' === $kind ) && empty( $env['current'][ $kind ] ) ) {
+                    $env['current'][ $kind ] = array(
+                        'id'   => (int) $p->get_id(),
+                        'name' => (string) $p->get_name(),
+                    );
+                }
+            }
+        }
+
+        // Usage this month.
+        if ( function_exists( 'gend_mail_state' ) && function_exists( 'gend_mail_current_site_key' ) ) {
+            $st = gend_mail_state( gend_mail_current_site_key() );
+            $env['mail_state'] = is_array( $st ) ? $st : null;
+        } else {
+            $st = get_option( 'gend_society_mail_service_state', null );
+            $env['mail_state'] = is_array( $st ) && isset( $st['limit'] ) ? $st : null;
+        }
+
+        if ( 'hub' === $env['mode'] ) {
+            // Same popup + checkout as Backups: My Account > Memberships in its Emails-only mode
+            // (?gdc_open_modal=<membership>&gdc_open_emails=1, Vendor App Manager's storage + sending picker).
+            $mid = ( $m && is_object( $m ) && method_exists( $m, 'get_id' ) ) ? (int) $m->get_id() : 0;
+            if ( ! $mid && function_exists( 'gdc_plan_attach_get_memberships' ) ) {
+                $eligible = array_values( (array) gdc_plan_attach_get_memberships( 'backups' ) );
+                if ( 1 === count( $eligible ) ) {
+                    $mid = (int) ( is_array( $eligible[0] ) ? ( $eligible[0]['id'] ?? 0 ) : 0 );
+                }
+            }
+            $account = get_home_url( get_main_site_id(), '/my-account/memberships/' );
+            if ( $mid ) {
+                $env['upgrade'] = array( 'data-embed-url' => add_query_arg( array( 'gdc_open_modal' => $mid, 'gdc_open_emails' => 1 ), $account ) );
+            } else {
+                // Several memberships, or none tied to this dashboard: the memberships page lets the owner pick.
+                $env['upgrade'] = array( 'data-embed-url' => $account );
+            }
+        } elseif ( is_array( $env['mail_state'] ) ) {
+            // A container: the hub's own upgrade link when the relay stored one, else its memberships page.
+            $relay = get_option( 'gend_society_mail_relay_state', null );
+            $url   = is_array( $relay ) ? (string) ( $relay['upgrade_url'] ?? '' ) : '';
+            $hub   = function_exists( 'gend_society_oauth_hub_url' ) ? gend_society_oauth_hub_url() : '';
+            if ( '' === $url || '' === $hub || 0 !== strpos( $url, $hub . '/' ) ) {
+                $url = '' !== $hub ? $hub . '/my-account/memberships/' : '';
+            }
+            $env['choose_url'] = $url;
+        }
+        return $env;
+    }
+}
+
+if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
+    /**
+     * What the Email hosting card shows (same states as the Backups card): badge, text, the two selections
+     * (storage + sending, the two sections of the Emails picker), usage meters and the plan button.
+     *
+     * @param array|null $env gend_society_email_plan_env() shape; null = read it.
+     * @return array
+     */
+    function gend_society_email_plan_view( $env = null ): array {
+        $env  = is_array( $env ) ? $env : gend_society_email_plan_env();
+        $mode = (string) ( $env['mode'] ?? 'hub' );
+        $v    = array(
+            'mode'        => $mode,
+            'state'       => '',
+            'badge'       => '',
+            'badge_class' => '',
+            'text'        => __( 'Mailboxes for your site\'s agents and Talk Flows inboxes, sent through gend.me. Pick how much mail to keep and how many emails your site can send each month.', 'gend-society' ),
+            'tiles'       => array(),
+            'meters'      => array(),
+            'cta'         => null,
+            'cta_label'   => '',
+            'learn_url'   => '',
+            'manage_url'  => (string) ( $env['manage_url'] ?? '' ),
+        );
+
+        if ( 'standalone' === $mode ) {
+            $v['badge_class'] = 'is-neutral';
+            if ( empty( $env['paired'] ) ) {
+                $v['state'] = 'not_connected';
+                $v['badge'] = __( 'Not connected', 'gend-society' );
+                $v['text']  = __( 'Connect to gend.me to see email hosting. Your site keeps sending mail its own way until you move it to gend.me hosting.', 'gend-society' );
+            } else {
+                $v['state']     = 'after_migration';
+                $v['badge']     = __( 'After migration', 'gend-society' );
+                $v['text']      = __( 'Email hosting runs on gend.me hosting. Your site keeps sending mail its own way until you move it.', 'gend-society' );
+                $v['learn_url'] = (string) ( $env['learn_url'] ?? '' );
+            }
+            $v['manage_url'] = '';
+            return $v;
+        }
+
+        $plans   = is_array( $env['plans'] ?? null ) ? $env['plans'] : array();
+        $current = is_array( $env['current'] ?? null ) ? $env['current'] : array();
+        $st      = is_array( $env['mail_state'] ?? null ) ? $env['mail_state'] : null;
+        $free    = is_array( $env['free'] ?? null ) ? $env['free'] : array();
+        $names   = array();
+        foreach ( array( 'storage', 'sending' ) as $kind ) {
+            if ( ! empty( $current[ $kind ]['name'] ) ) {
+                $names[] = (string) $current[ $kind ]['name'];
+            }
+        }
+        $active = ! empty( $names ) || ( $st && isset( $st['free'] ) && ! $st['free'] );
+
+        if ( empty( $plans ) && ! $st ) {
+            $v['state']       = 'no_plans';
+            $v['badge']       = __( 'No Email Plans Configured', 'gend-society' );
+            $v['badge_class'] = 'is-neutral';
+        } elseif ( $active ) {
+            $v['state'] = 'active';
+            $v['badge'] = $names
+                /* translators: %s: Email plan name(s). */
+                ? sprintf( __( 'Active: %s', 'gend-society' ), implode( ' + ', $names ) )
+                : __( 'Active', 'gend-society' );
+        } else {
+            $v['state']       = 'no_active';
+            $v['badge']       = __( 'No Active Plan', 'gend-society' );
+            $v['badge_class'] = 'is-warn';
+        }
+
+        $upgrade = is_array( $env['upgrade'] ?? null ) ? array_filter( array_map( 'strval', $env['upgrade'] ) ) : array();
+        if ( $upgrade && $plans ) {
+            $v['cta'] = array( 'type' => 'upgrade', 'attrs' => $upgrade );
+        } elseif ( '' !== (string) ( $env['choose_url'] ?? '' ) ) {
+            $v['cta'] = array( 'type' => 'popup', 'url' => (string) $env['choose_url'] );
+        }
+        $v['cta_label'] = $active ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' );
+
+        $free_gb    = isset( $free['storage_gb'] ) ? (float) $free['storage_gb'] : 1.0;
+        $free_sends = isset( $free['sends'] ) ? (int) $free['sends'] : 300;
+        $paid_st    = $st && isset( $st['free'] ) && ! $st['free'];
+        $v['tiles'] = array(
+            'storage' => array(
+                'label'      => __( 'Storage', 'gend-society' ),
+                'icon'       => 'dashicons-database',
+                'is_current' => ! empty( $current['storage']['name'] ),
+                'value'      => ! empty( $current['storage']['name'] ) ? (string) $current['storage']['name']
+                    /* translators: %s: Storage in GB. */
+                    : ( $paid_st ? sprintf( __( '%s GB', 'gend-society' ), number_format_i18n( (float) ( $st['storage_gb'] ?? 0 ), 0 ) )
+                    /* translators: %s: Free storage in GB. */
+                    : sprintf( __( 'Free (%s GB)', 'gend-society' ), number_format_i18n( $free_gb ) ) ),
+            ),
+            'sending' => array(
+                'label'      => __( 'Sending', 'gend-society' ),
+                'icon'       => 'dashicons-email-alt',
+                'is_current' => ! empty( $current['sending']['name'] ),
+                'value'      => ! empty( $current['sending']['name'] ) ? (string) $current['sending']['name']
+                    /* translators: %s: Emails per month. */
+                    : ( $paid_st ? sprintf( __( '%s emails a month', 'gend-society' ), number_format_i18n( (int) ( $st['limit'] ?? 0 ) ) )
+                    /* translators: %s: Free emails per month. */
+                    : sprintf( __( 'Free (%s emails a month)', 'gend-society' ), number_format_i18n( $free_sends ) ) ),
+            ),
+        );
+
+        if ( $st ) {
+            $limit = max( 0, (int) ( $st['limit'] ?? 0 ) );
+            $used  = max( 0, (int) ( $st['used'] ?? 0 ) );
+            $gb    = max( 0.0, (float) ( $st['storage_gb'] ?? 0 ) );
+            $ugb   = max( 0.0, (float) ( $st['storage_used_gb'] ?? 0 ) );
+            $v['meters'] = array(
+                'sending' => array(
+                    'label'    => __( 'Sent this month', 'gend-society' ),
+                    'value'    => $used,
+                    'decimals' => 0,
+                    /* translators: %s: Monthly sending allowance. */
+                    'of'       => sprintf( __( '/ %s', 'gend-society' ), number_format_i18n( $limit ) ),
+                    'pct'      => $limit > 0 ? (int) min( 100, round( $used * 100 / $limit ) ) : 100,
+                    'over'     => $used >= $limit,
+                ),
+                'storage' => array(
+                    'label'    => __( 'Mailbox storage', 'gend-society' ),
+                    'value'    => $ugb,
+                    'decimals' => 2,
+                    /* translators: %s: Storage allowance in GB. */
+                    'of'       => sprintf( __( '/ %s GB', 'gend-society' ), number_format_i18n( $gb, $gb === floor( $gb ) ? 0 : 2 ) ),
+                    'pct'      => $gb > 0 ? (int) min( 100, round( $ugb * 100 / $gb ) ) : 0,
+                    'over'     => $gb > 0 && $ugb > $gb,
+                ),
+            );
+        }
+        return $v;
+    }
+}
+
+if ( ! function_exists( 'gend_society_render_email_plan_card' ) ) {
+    /**
+     * The Email hosting card: the Backups card's markup and classes (.gs-bk-hero / .gs-bk-badge / .gs-bk-btn),
+     * the same [data-gs-upgrade-open] popup and checkout, plus the two selection tiles and usage meters.
+     * context 'dashboard' sits above Backups on the GenD Society dashboard (its stylesheet + popup are there);
+     * context 'talk-flows' sits at the top of Talk Flows > Email and prints a copy of the card CSS and the
+     * shared upgrade popup once per page.
+     *
+     * @param array $args context, view (gend_society_email_plan_view() result; default = computed).
+     */
+    function gend_society_render_email_plan_card( array $args = array() ): void {
+        static $printed = array();
+        $context = ( isset( $args['context'] ) && 'talk-flows' === $args['context'] ) ? 'talk-flows' : 'dashboard';
+        $v       = isset( $args['view'] ) && is_array( $args['view'] ) ? $args['view'] : gend_society_email_plan_view();
+        $cta     = is_array( $v['cta'] ) ? $v['cta'] : null;
+        $attrs   = '';
+        if ( $cta && 'upgrade' === $cta['type'] ) {
+            foreach ( (array) $cta['attrs'] as $k => $val ) {
+                if ( preg_match( '/^data-[a-z-]+$/', (string) $k ) ) {
+                    $attrs .= ' ' . $k . '="' . esc_attr( $val ) . '"';
+                }
+            }
+        }
+
+        if ( empty( $printed['css'] ) ) {
+            $printed['css'] = true;
+            ?>
+<style id="gs-em-plan-css">
+.gs-em-hero a.gs-bk-btn { box-sizing: border-box; color: #e6edf7; }
+.gs-em-hero a.gs-bk-btn:hover, .gs-em-hero a.gs-bk-btn:focus { color: #fff; }
+.gs-bk-hero.gs-em-hero { padding: 22px 26px; gap: 16px 24px; align-items: center; }
+.gs-em-hero .gs-bk-badge { margin-bottom: 10px; }
+.gs-em-hero .gs-bk-title { margin-bottom: 4px; }
+.gs-em-hero .gs-bk-sub { max-width: 620px; }
+.gs-em-hero .gs-bk-actions { gap: 8px; }
+.gs-em-sels { position: relative; z-index: 1; flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 14px; }
+.gs-em-col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.gs-em-col > .gs-em-sel { width: 100%; }
+.gs-em-col > .gs-em-meter { padding: 0 4px; }
+.gs-em-meter, .gs-em-meter__k, .gs-em-meter__v, .gs-em-meter__bar { display: block; box-sizing: border-box; }
+.gs-em-sel > .gs-em-meter { align-self: stretch; margin: 7px 0 0 -30px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.07); }
+.gs-em-sel:has(> .gs-em-meter) > .dashicons { top: 22px; margin-top: 0; }
+.gs-em-sel { box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px 14px 12px 44px; border-radius: 12px; background: rgba(11,14,20,.45); border: 1px solid rgba(255,255,255,.10); color: #e6edf7; font: inherit; text-align: left; text-decoration: none; cursor: default; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+button.gs-em-sel, a.gs-em-sel { cursor: pointer; }
+button.gs-em-sel:hover, a.gs-em-sel:hover, button.gs-em-sel:focus-visible, a.gs-em-sel:focus-visible { transform: translateY(-2px); border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.10); box-shadow: 0 10px 24px rgba(16,185,129,.16); color: #fff; outline: none; }
+.gs-em-sel > .dashicons { position: absolute; left: 14px; top: 50%; margin-top: -9px; font-size: 18px; width: 18px; height: 18px; color: #6ee7b7; transition: transform .25s cubic-bezier(.2,.9,.3,1); }
+button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform: scale(1.15) rotate(-6deg); }
+.gs-em-sel__k { color: rgba(226,232,240,.55); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
+.gs-em-sel__v { color: #fff; font-size: 0.9rem; font-weight: 700; line-height: 1.3; }
+.gs-em-sel.is-current { border-color: rgba(16,185,129,.45); }
+.gs-em-sel.is-current::after { content: '\f147'; font-family: dashicons; position: absolute; top: 8px; right: 10px; font-size: 16px; color: #6ee7b7; }
+.gs-em-meter__k { color: rgba(226,232,240,.55); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
+.gs-em-meter__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.gs-em-meter__v { color: #fff; font-size: 0.95rem; font-weight: 800; margin: 0 0 5px; white-space: nowrap; }
+.gs-em-meter__v small { color: rgba(226,232,240,.6); font-weight: 600; font-size: 0.78rem; }
+.gs-em-meter__bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
+.gs-em-meter__bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #10b981, #22d3ee); transition: width .9s cubic-bezier(.2,.9,.3,1); }
+.gs-em-meter.is-over .gs-em-meter__bar > span { background: linear-gradient(90deg, #f59e0b, #ef4444); }
+.gs-em-meter.is-over .gs-em-meter__v { color: #fcd34d; }
+@media (max-width: 640px) { .gs-bk-hero.gs-em-hero { padding: 20px 18px; align-items: stretch; } .gs-em-hero > .gs-bk-main, .gs-em-hero > .gs-em-sels { flex: 0 0 auto; min-width: 0; } .gs-em-sels { grid-template-columns: 1fr; } }
+@media (prefers-reduced-motion: reduce) { .gs-em-sel, .gs-em-sel > .dashicons, .gs-em-meter__bar > span { transition: none; } }
+</style>
+<script>
+(function () {
+    if (window.gsEmPlanInited) { return; }
+    window.gsEmPlanInited = true;
+    var reduce = window.matchMedia && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    function fmt(n, d) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: d, maximumFractionDigits: d }); }
+    function count(el) {
+        var target = parseFloat(el.getAttribute('data-value')) || 0, d = parseInt(el.getAttribute('data-decimals'), 10) || 0, t0 = null;
+        if (reduce || !target) { return; }
+        function step(ts) {
+            if (!t0) { t0 = ts; }
+            var p = Math.min((ts - t0) / 900, 1);
+            el.textContent = fmt(target * (1 - Math.pow(1 - p, 3)), d);
+            if (p < 1) { requestAnimationFrame(step); }
+        }
+        requestAnimationFrame(step);
+    }
+    function play(card) {
+        if (card.getAttribute('data-gs-em-played')) { return; }
+        card.setAttribute('data-gs-em-played', '1');
+        card.querySelectorAll('[data-gs-em-count]').forEach(count);
+        if (reduce) { return; }
+        var bars = card.querySelectorAll('[data-gs-em-bar]');
+        bars.forEach(function (b) { b.style.transition = 'none'; b.style.width = '0%'; });
+        void card.offsetWidth;
+        requestAnimationFrame(function () { bars.forEach(function (b) { b.style.transition = ''; b.style.width = (parseFloat(b.getAttribute('data-pct')) || 0) + '%'; }); });
+    }
+    function init() {
+        var cards = document.querySelectorAll('[data-gs-em-card]');
+        if (!('IntersectionObserver' in window)) { cards.forEach(play); return; }
+        var io = new IntersectionObserver(function (entries) {
+            entries.forEach(function (e) { if (e.isIntersecting && e.target.offsetParent !== null) { play(e.target); io.unobserve(e.target); } });
+        }, { threshold: 0.2 });
+        cards.forEach(function (c) { io.observe(c); });
+    }
+    if (document.readyState === 'loading') { document.addEventListener('DOMContentLoaded', init); } else { init(); }
+})();
+</script>
+            <?php
+        }
+        if ( 'talk-flows' === $context && empty( $printed['bk_css'] ) ) {
+            $printed['bk_css'] = true;
+            // Copy of the Backups card rules in gend_society_render_membership_panel() (that stylesheet is only on
+            // the dashboard) plus its entrance animation, so the card looks and moves the same in Talk Flows.
+            ?>
+<style id="gs-em-plan-bk-css">
+.gs-bk-hero { position: relative; overflow: hidden; background: linear-gradient(135deg, rgba(16,185,129,0.16) 0%, rgba(34,211,238,0.12) 55%, rgba(11,14,20,0.5) 100%); border: 1px solid rgba(16,185,129,0.28); border-radius: 20px; padding: 28px 30px; display: flex; justify-content: space-between; align-items: flex-start; gap: 28px; flex-wrap: wrap; }
+.gs-bk-hero::before { content: ''; position: absolute; inset: 0; background-image: radial-gradient(circle at 88% 8%, rgba(16,185,129,.20), transparent 55%), radial-gradient(circle at 6% 95%, rgba(34,211,238,.16), transparent 50%); pointer-events: none; }
+.gs-bk-main { position: relative; z-index: 1; flex: 1 1 280px; min-width: 220px; }
+.gs-bk-badge { position: relative; z-index: 1; display: inline-flex; align-items: center; gap: 6px; padding: 5px 14px; border-radius: 999px; background: rgba(16,185,129,.16); border: 1px solid rgba(16,185,129,.4); color: #6ee7b7; font-size: 0.7rem; font-weight: 800; text-transform: uppercase; letter-spacing: 0.08em; margin-bottom: 16px; }
+.gs-bk-badge.is-warn { background: rgba(245,158,11,.16); border-color: rgba(245,158,11,.4); color: #fcd34d; }
+.gs-bk-badge.is-neutral { background: rgba(148,163,184,.14); border-color: rgba(148,163,184,.35); color: #cbd5e1; }
+.gs-bk-badge .dashicons { font-size: 14px; width: 14px; height: 14px; }
+.gs-bk-title { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.35; padding-bottom: 2px; font-weight: 900; letter-spacing: -0.01em; background: linear-gradient(90deg, #fff, #6ee7b7); -webkit-background-clip: text; -webkit-text-fill-color: transparent; }
+.gs-bk-sub { margin: 0; color: rgba(226,232,240,.65); font-size: 0.9rem; max-width: 460px; }
+.gs-bk-actions { position: relative; z-index: 1; display: flex; flex-direction: column; gap: 10px; flex-shrink: 0; width: 210px; }
+.gs-bk-btn { display: inline-flex; align-items: center; justify-content: center; gap: 7px; width: 100%; padding: 10px 18px; border-radius: 10px; background: rgba(255,255,255,0.06); border: 1px solid rgba(255,255,255,0.14); color: #e6edf7; font-size: 0.8rem; font-weight: 700; cursor: pointer; text-decoration: none; transition: background .18s ease, border-color .18s ease, transform .18s ease; }
+.gs-bk-btn .dashicons { font-size: 15px; width: 15px; height: 15px; }
+.gs-bk-btn:hover { background: rgba(255,255,255,0.12); border-color: rgba(255,255,255,.28); transform: translateY(-1px); color: #fff; }
+.gs-bk-btn:disabled { opacity: 0.5; cursor: not-allowed; }
+.gs-bk-btn:disabled:hover { background: rgba(255,255,255,0.06); border-color: rgba(255,255,255,0.14); transform: none; color: #e6edf7; }
+.gs-bk-btn--cta { background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14 !important; border: none; text-transform: uppercase; letter-spacing: 0.05em; box-shadow: 0 8px 22px rgba(34,211,238,.32); }
+.gs-bk-btn--cta:hover { filter: brightness(1.08); transform: translateY(-2px); box-shadow: 0 10px 26px rgba(34,211,238,.4); }
+@media (max-width: 640px) { .gs-bk-hero { padding: 22px 20px; flex-direction: column; } .gs-bk-actions { width: 100%; } }
+@keyframes gs-em-rise { from { opacity: 0; transform: translateY(12px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
+.gs-em-plan--talk-flows { margin: 0 0 22px; }
+.gs-em-plan--talk-flows .gs-bk-hero h2.gs-bk-title { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.35; letter-spacing: -0.01em; text-transform: none; }
+.gs-em-plan--talk-flows .gs-bk-hero { animation: gs-em-rise 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) 0.04s both; }
+.gs-em-plan--talk-flows .gs-bk-main > * { animation: gs-em-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
+.gs-em-plan--talk-flows .gs-bk-main > *:nth-child(2) { animation-delay: 0.10s; }
+.gs-em-plan--talk-flows .gs-bk-main > *:nth-child(3) { animation-delay: 0.16s; }
+.gs-em-plan--talk-flows .gs-bk-main > *:nth-child(4) { animation-delay: 0.22s; }
+.gs-em-plan--talk-flows .gs-bk-main > *:nth-child(n+5) { animation-delay: 0.28s; }
+.gs-em-plan--talk-flows .gs-em-sels { animation: gs-em-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.22s both; }
+@media (prefers-reduced-motion: reduce) { .gs-em-plan--talk-flows .gs-bk-hero, .gs-em-plan--talk-flows .gs-bk-main > *, .gs-em-plan--talk-flows .gs-em-sels { animation: none; } }
+</style>
+            <?php
+        }
+        if ( 'talk-flows' === $context && $cta && 'upgrade' === $cta['type'] && empty( $printed['modal'] ) && function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
+            $printed['modal'] = true;
+            gend_society_hosting_render_upgrade_modal( false );
+        }
+
+        $tile_open = function ( $kind, $cur ) use ( $cta, $attrs ) {
+            $cls = 'gs-em-sel' . ( $cur ? ' is-current' : '' );
+            if ( $cta && 'upgrade' === $cta['type'] ) {
+                return '<button type="button" class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '" data-gs-upgrade-open data-resource="emails" data-resource-label="' . esc_attr__( 'Email hosting', 'gend-society' ) . '"' . $attrs . '>';
+            }
+            if ( $cta && 'popup' === $cta['type'] ) {
+                return '<a class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '" data-gs-popup href="' . esc_url( $cta['url'] ) . '" target="_blank" rel="opener">';
+            }
+            return '<div class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '">';
+        };
+        $tile_close = ( $cta && 'upgrade' === $cta['type'] ) ? '</button>' : ( ( $cta && 'popup' === $cta['type'] ) ? '</a>' : '</div>' );
+        ?>
+<?php if ( 'talk-flows' === $context ) : ?>
+<div class="gs-em-plan gs-em-plan--talk-flows">
+<?php else : ?>
+<div class="gs-em-plan" style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+<?php endif; ?>
+    <div class="gs-bk-hero gs-em-hero" data-gs-em-card data-gs-em-state="<?php echo esc_attr( $v['state'] ); ?>">
+        <div class="gs-bk-main">
+            <span class="gs-bk-badge<?php echo '' !== $v['badge_class'] ? ' ' . esc_attr( $v['badge_class'] ) : ''; ?>"><span class="dashicons dashicons-email-alt"></span><?php echo esc_html( $v['badge'] ); ?></span>
+            <h2 class="gs-bk-title"><?php esc_html_e( 'Email hosting', 'gend-society' ); ?></h2>
+            <p class="gs-bk-sub"><?php echo esc_html( $v['text'] ); ?></p>
+        </div>
+        <div class="gs-bk-actions">
+<?php if ( $cta && 'upgrade' === $cta['type'] ) : ?>
+            <button type="button" class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta" data-gs-upgrade-open data-resource="emails" data-resource-label="<?php esc_attr_e( 'Email hosting', 'gend-society' ); ?>"<?php echo $attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()'d. ?>><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( $v['cta_label'] ); ?></button>
+<?php elseif ( $cta && 'popup' === $cta['type'] ) : ?>
+            <a class="gs-bk-btn gs-bk-btn--cta" data-gs-popup href="<?php echo esc_url( $cta['url'] ); ?>" target="_blank" rel="opener"><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( $v['cta_label'] ); ?></a>
+<?php endif; ?>
+<?php if ( '' !== $v['learn_url'] ) : ?>
+            <a class="gs-bk-btn" href="<?php echo esc_url( $v['learn_url'] ); ?>" target="_blank" rel="noopener"><span class="dashicons dashicons-external"></span><?php esc_html_e( 'Learn more', 'gend-society' ); ?></a>
+<?php endif; ?>
+<?php if ( 'dashboard' === $context && '' !== $v['manage_url'] ) : ?>
+            <a class="gs-bk-btn" href="<?php echo esc_url( $v['manage_url'] ); ?>"><span class="dashicons dashicons-email"></span><?php esc_html_e( 'Manage email', 'gend-society' ); ?></a>
+<?php endif; ?>
+        </div>
+<?php
+$em_kinds = array_keys( (array) $v['tiles'] );
+foreach ( array_keys( (array) $v['meters'] ) as $em_k ) {
+    if ( ! in_array( $em_k, $em_kinds, true ) ) {
+        $em_kinds[] = $em_k;
+    }
+}
+?>
+<?php if ( ! empty( $em_kinds ) ) : ?>
+        <div class="gs-em-sels">
+<?php foreach ( $em_kinds as $kind ) : ?>
+            <div class="gs-em-col" data-gs-em-col="<?php echo esc_attr( $kind ); ?>">
+<?php
+$em_meter = '';
+if ( isset( $v['meters'][ $kind ] ) ) {
+    $mt       = $v['meters'][ $kind ];
+    $em_meter = '<span class="gs-em-meter' . ( ! empty( $mt['over'] ) ? ' is-over' : '' ) . '" data-gs-em-meter="' . esc_attr( $kind ) . '">'
+        . '<span class="gs-em-meter__head"><span class="gs-em-meter__k">' . esc_html( $mt['label'] ) . '</span><span class="gs-em-meter__v"><span data-gs-em-count data-value="' . esc_attr( (string) $mt['value'] ) . '" data-decimals="' . (int) $mt['decimals'] . '">' . esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ) . '</span> <small>' . esc_html( $mt['of'] ) . '</small></span></span>'
+        . '<span class="gs-em-meter__bar"><span data-gs-em-bar data-pct="' . (int) $mt['pct'] . '" style="width: ' . (int) $mt['pct'] . '%;"></span></span>'
+        . '</span>';
+}
+?>
+<?php if ( isset( $v['tiles'][ $kind ] ) ) : $t = $v['tiles'][ $kind ]; ?>
+                <?php echo $tile_open( $kind, ! empty( $t['is_current'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_url()'d. ?><span class="dashicons <?php echo esc_attr( $t['icon'] ); ?>"></span><span class="gs-em-sel__k"><?php echo esc_html( $t['label'] ); ?></span><span class="gs-em-sel__v"><?php echo esc_html( $t['value'] ); ?></span><?php echo $em_meter; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_html()'d or cast. ?><?php echo $tile_close; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Literal closing tag. ?>
+
+<?php elseif ( '' !== $em_meter ) : ?>
+                <?php echo $em_meter; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_html()'d or cast. ?>
+
+<?php endif; ?>
+            </div>
+<?php endforeach; ?>
+        </div>
+<?php endif; ?>
+    </div>
+</div>
+        <?php
+    }
+}
+
 if ( ! function_exists( 'gend_society_dashboard_standalone_invalidate' ) ) {
     /**
      * Drop the gas + backups caches (kept as the offline fallback) when the plan caches are invalidated
@@ -1680,6 +2149,10 @@ function gend_society_render_membership_panel( $payload = null ) {
                         </div>
                     </div>
                 </div>
+
+                <!-- ── Email hosting — the Backups card's markup + popup for the Emails plans (storage + sending),
+                     placed above Backups (gend_society_render_email_plan_card()). ── -->
+                <?php gend_society_render_email_plan_card( array( 'context' => 'dashboard' ) ); ?>
 
                 <!-- ── Backups — full-width bespoke hero (2-column: badge/
                      title/sub on the left, action buttons in their own

@@ -1,0 +1,110 @@
+name: wporg-deploy
+
+# Deploys a GenD Society release to the wordpress.org plugin directory (SVN).
+#
+#   release published (not a pre-release), or manual dispatch with a tag:
+#     build dist/wporg -> refuse if the build carries an Update URI or the self-updater,
+#     or if the plugin Version, the readme Stable tag and the tag disagree -> commit
+#     dist/wporg/gend-society to SVN trunk + tags/<version> and .wordpress-org/ to
+#     SVN /assets (10up/action-wordpress-plugin-deploy, BUILD_DIR mode).
+#
+# Inert until enabled: the job is skipped unless the repository variable
+# WPORG_DEPLOY_ENABLED is 'true'. A maintainer sets it, together with the secrets
+# SVN_USERNAME and SVN_PASSWORD (the wordpress.org SVN password, not the login
+# password), only after the plugin has been approved on wordpress.org.
+#
+# The full build (self-hosted and gend.me-hosted installs) is unaffected: it carries an
+# Update URI header, and WordPress core never asks wordpress.org about a plugin whose
+# Update URI points elsewhere. Only the wporg build, which has no Update URI and no
+# self-updater, is offered through wordpress.org.
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to deploy to wordpress.org (vX.Y.Z, must already exist)'
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wporg-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    if: vars.WPORG_DEPLOY_ENABLED == 'true' && (github.event_name == 'workflow_dispatch' || !github.event.release.prerelease)
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require SVN credentials
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          if [ -z "$SVN_USERNAME" ] || [ -z "$SVN_PASSWORD" ]; then
+            echo "::error::SVN_USERNAME and SVN_PASSWORD secrets are required to deploy to wordpress.org."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag || github.event.release.tag_name }}
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+          tools: none
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - name: Install build dependencies
+        run: npm ci
+
+      - name: Build dist/wporg
+        run: node bin/build-dist.js --variant wporg
+
+      - name: Guard the wporg build
+        id: guard
+        env:
+          TAG: ${{ inputs.tag || github.event.release.tag_name }}
+        run: |
+          set -euo pipefail
+          dir=dist/wporg/gend-society
+          if grep -rq "Update URI" "$dir"; then
+            echo "::error::The wporg build contains an Update URI header."
+            exit 1
+          fi
+          if [ -e "$dir/inc/self-update.php" ]; then
+            echo "::error::The wporg build contains inc/self-update.php."
+            exit 1
+          fi
+          version=$(grep -m1 -E "^[[:space:]]*\*[[:space:]]*Version:" "$dir/gend-society.php" | awk '{print $NF}' | tr -d '\r')
+          stable=$(grep -m1 -E "^Stable tag:" "$dir/readme.txt" | awk '{print $NF}' | tr -d '\r')
+          tagv="${TAG#v}"
+          echo "Version=$version Stable tag=$stable tag=$tagv"
+          if [ -z "$version" ] || [ "$version" != "$stable" ] || [ "$version" != "$tagv" ]; then
+            echo "::error::Version ($version), readme Stable tag ($stable) and tag ($tagv) must match."
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Deploy to wordpress.org SVN
+        # stable (2.3.0)
+        uses: 10up/action-wordpress-plugin-deploy@54bd289b8525fd23a5c365ec369185f2966529c2
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          # The wordpress.org slug. Single place to change if the directory assigns a
+          # different slug (fallback: gend-society-connect).
+          SLUG: gend-society
+          BUILD_DIR: dist/wporg/gend-society
+          ASSETS_DIR: .wordpress-org
+          VERSION: ${{ steps.guard.outputs.version }}

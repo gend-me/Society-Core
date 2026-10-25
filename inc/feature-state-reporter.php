@@ -64,6 +64,12 @@ function gend_society_feature_state_report_now() {
     if ((string) get_option('gend_society_install_token', '') === '') {
         return false;
     }
+    // @build-only-begin wporg
+    // wordpress.org build: the plugin list is sent only after the owner opts in.
+    if (function_exists('gend_society_data_sharing_allowed') && !gend_society_data_sharing_allowed('plugin_list')) {
+        return false;
+    }
+    // @build-only-end wporg
 
     $body = array(
         'plugins'     => gend_society_feature_state_collect_active_plugins(),
@@ -103,6 +109,12 @@ add_action('deactivated_plugin', 'gend_society_feature_state_schedule_dispatch',
  */
 add_action('gend_society_feature_state_daily', 'gend_society_feature_state_report_now');
 add_action('init', function () {
+    // @build-only-begin wporg
+    if (function_exists('gend_society_data_sharing_allowed') && !gend_society_data_sharing_allowed('plugin_list')) { // wordpress.org build: no daily report without the opt-in.
+        if (wp_next_scheduled('gend_society_feature_state_daily')) wp_clear_scheduled_hook('gend_society_feature_state_daily');
+        return;
+    }
+    // @build-only-end wporg
     if (!wp_next_scheduled('gend_society_feature_state_daily')) {
         wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'gend_society_feature_state_daily');
     }

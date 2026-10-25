@@ -122,10 +122,12 @@ function gend_society_enqueue_admin_assets()
         // filtered server-side by gs_group_embed_menu_items().
         'gendGroupMenu' => function_exists('gend_society_group_embed_menu_items') ? gend_society_group_embed_menu_items() : [],
         'gendGroupName' => function_exists('gend_society_group_embed_group_name') ? gend_society_group_embed_group_name() : '',
+        // @build-strip-begin wporg
         // Inputs the header's Login-to-GenD button needs to drive the same
         // PKCE popup flow as wp-login.php (see oauth-login.php).
         'gendOauthClientId' => function_exists('gend_society_oauth_client_id') ? gend_society_oauth_client_id() : '',
         'gendOauthRestUrl'  => esc_url_raw(rest_url('gend-society/v1/oauth/login')),
+        // @build-strip-end wporg
         // Header nav-pill backgrounds from the consent-gated gend.me table
         // (inc/remote-assets.php); '' = render the neutral placeholder.
         'navPillImages'     => [
@@ -192,13 +194,9 @@ add_action('admin_head', function () {
     $is_block_editor = ( $pagenow === 'post.php' || $pagenow === 'post-new.php' );
     $skip_bg = in_array( $pagenow, $exclude_pages, true ) || $is_block_editor;
 
-    // Standalone (106-03): keep the core admin bar (it carries "Switch back
-    // to native WordPress admin"); hub/container output is unchanged.
-    if (function_exists('gend_society_runtime_mode') && 'standalone' === gend_society_runtime_mode()) {
-        echo '<style>';
-    } else {
-        echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
-    }
+    // Phase 109-35 (D36): the core admin bar is hidden in every mode, standalone included ("Switch back to
+    // standard WordPress" sits at the top of the GenD dashboard instead, inc/admin-experience.php).
+    echo '<style>#wpadminbar{display:none!important;}html{margin-top:0!important;padding-top:0!important;}';
 
     if ( ! $skip_bg ) {
         // gend.me-hosted background; neutral gradient when remote assets

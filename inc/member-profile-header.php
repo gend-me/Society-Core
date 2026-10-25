@@ -112,6 +112,15 @@ function gend_society_handle_wallet_topup_purchase() {
         // qty = number of task credits; price each at the per-credit rate.
         WC()->cart->add_to_cart( $extra_pid, $n, 0, [], [ 'gdc_topup_unit_price' => $rate, 'gdc_topup_kind' => 'tasks' ] );
 
+    } elseif ( 'ai' === $kind && ! empty( $_GET['pkg'] ) ) {
+        // AI Builder Tokens package = a variation of leo's AI Builder Tokens product
+        // (Token Pricing page); leo credits its _aipa_token_package_amount on completion.
+        $pkg = absint( wp_unslash( $_GET['pkg'] ) );
+        if ( (int) get_post_meta( $pkg, '_aipa_token_package_amount', true ) <= 0 || 'publish' !== get_post_status( $pkg ) ) {
+            wp_safe_redirect( $back ); exit;
+        }
+        WC()->cart->add_to_cart( $pkg );
+
     } elseif ( 'ai' === $kind ) {
         if ( ! class_exists( 'AIPA_Commerce' ) ) { wp_safe_redirect( $back ); exit; }
         $amt = max( 1, $amount );
@@ -258,6 +267,14 @@ function gend_society_topup_embed_checkout_css() {
             visibility: hidden !important;
         }
         .woocommerce, .wc-block-checkout, .wp-block-woocommerce-checkout { background: transparent !important; }
+        /* Order-pay page (Compute Gas Pay Now): light text on the dark embed */
+        body.woocommerce-order-pay, body.woocommerce-order-pay #order_review,
+        body.woocommerce-order-pay table.shop_table th, body.woocommerce-order-pay table.shop_table td,
+        body.woocommerce-order-pay .woocommerce-privacy-policy-text, body.woocommerce-order-pay label { color: #e2e8f0 !important; }
+        body.woocommerce-order-pay table.shop_table, body.woocommerce-order-pay table.shop_table th,
+        body.woocommerce-order-pay table.shop_table td { border-color: rgba(255,255,255,.1) !important; background: transparent !important; }
+        body.woocommerce-order-pay table.shop_table tfoot th, body.woocommerce-order-pay .order-total td { color: #fff !important; font-weight: 700; }
+        body.woocommerce-order-pay .woocommerce-privacy-policy-text, body.woocommerce-order-pay .woocommerce-privacy-policy-text a { color: #94a3b8 !important; }
 
         /* ══ "Pay with your balance" → self-assembling futuristic dashboard ══ */
         .gend-wallet-classic {
@@ -390,6 +407,9 @@ function gend_society_topup_autocomplete( $status, $order_id, $order ) {
         $product = $item->get_product();
         $sku     = $product ? $product->get_sku() : '';
         $pid     = (int) $item->get_product_id();
+        if ( (int) get_post_meta( (int) ( $item->get_variation_id() ?: $pid ), '_aipa_token_package_amount', true ) > 0 ) {
+            return 'completed';
+        }
         if ( 'aipa-credits' === $sku || 'gend-dgen-topup' === $sku || ( $extra_pid && $pid === $extra_pid ) ) {
             return 'completed';
         }
@@ -684,6 +704,248 @@ function gend_society_rest_profile_avatar_update( WP_REST_Request $request ) {
     ], 200 );
 }
 
+// ─── Connected group: Compute Gas owed + Gas Station earnings ────────────────
+// Owed  = the group's web app GAS usage not yet paid, on the same rules as the
+//         monthly usage billing (vendor-app-manager gdc-gas-usage-billing.php):
+//         unbilled 'recorded' ledger rows of the group/site minus the Leo and
+//         contract rows (prepaid elsewhere), plus the viewer's unpaid usage orders.
+//         Pay Now bills the rows on demand into a usage order (gend_society_gas_pay_now).
+// Earned = owner_amount on ledger rows served by devices of the group's device
+//         owners (psoo_group_device_owner_uids: group admins, + super admins for
+//         the hub group), paid out in DGEN.
+function gend_society_profile_group_gas_site_id( $group_id ) {
+    global $wpdb;
+    $group_id = (int) $group_id;
+    if ( $group_id <= 0 || ! is_multisite() ) return 0;
+    $blog = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT blog_id FROM {$wpdb->blogmeta} WHERE meta_key = 'gdc_bp_group_id' AND meta_value = %s ORDER BY blog_id ASC LIMIT 1",
+        (string) $group_id
+    ) );
+    if ( $blog <= 0 && function_exists( 'groups_get_groupmeta' ) ) {
+        $blog = (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true );
+    }
+    return ( $blog > 0 && get_blog_details( $blog ) ) ? $blog : 0;
+}
+
+/**
+ * The group's unbilled GAS ledger rows, on the monthly billing's rules: status
+ * 'recorded' (and not yet tagged with a billing key), on the group's site or
+ * group, minus the excluded key prefixes (Leo: prepaid in Leo Tokens; contract:
+ * settled by the contract).
+ *
+ * @return array[] id, idempotency_key, task_id, sales_amount
+ */
+function gend_society_gas_billable_rows( $group_id ) {
+    global $wpdb;
+    $ledger   = $wpdb->base_prefix . 'gdc_gas_ledger';
+    $group_id = (int) $group_id;
+    if ( $group_id <= 0 || $ledger !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $ledger ) ) ) {
+        return array();
+    }
+    $site_id = gend_society_profile_group_gas_site_id( $group_id );
+    $where   = "status = 'recorded' AND ( group_id = %d" . ( $site_id > 0 ? ' OR site_id = %d' : '' ) . ' )';
+    $args    = $site_id > 0 ? array( $group_id, $site_id ) : array( $group_id );
+    if ( function_exists( '\\WP_Ultimo\\Integrations\\gdc_gas_usage_has_billing_columns' )
+        && \WP_Ultimo\Integrations\gdc_gas_usage_has_billing_columns() ) {
+        $where .= " AND billing_key = ''";
+    }
+    $prefixes = function_exists( '\\WP_Ultimo\\Integrations\\gdc_gas_usage_excluded_prefixes' )
+        ? \WP_Ultimo\Integrations\gdc_gas_usage_excluded_prefixes()
+        : array( 'leo' => array( 'aipa-', 'gasrun-' ), 'contract' => array( 'contract-' ) );
+    foreach ( (array) $prefixes as $list ) {
+        foreach ( (array) $list as $p ) {
+            if ( '' === (string) $p ) continue;
+            $where .= ' AND idempotency_key NOT LIKE %s';
+            $args[] = $wpdb->esc_like( (string) $p ) . '%';
+        }
+    }
+    $rows = $wpdb->get_results( $wpdb->prepare(
+        "SELECT id, idempotency_key, task_id, sales_amount FROM {$ledger} WHERE {$where} ORDER BY id ASC", // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+        $args
+    ), ARRAY_A );
+    return (array) $rows;
+}
+
+/** The user's GAS usage orders that still need payment (vendor-app-manager's unpaid list). */
+function gend_society_gas_unpaid_orders( $user_id ) {
+    $user_id = (int) $user_id;
+    $list    = $user_id > 0 ? get_user_meta( $user_id, 'gdc_gas_usage_unpaid', true ) : array();
+    $out     = array();
+    if ( ! is_array( $list ) || ! function_exists( 'wc_get_order' ) ) return $out;
+    foreach ( array_keys( $list ) as $oid ) {
+        $o = wc_get_order( (int) $oid );
+        if ( $o && (int) $o->get_customer_id() === $user_id && '' !== (string) $o->get_meta( '_gdc_gas_usage_period' ) && $o->needs_payment() ) {
+            $out[] = $o;
+        }
+    }
+    return $out;
+}
+
+/**
+ * Pay Now: returns the pay link for the group's outstanding Compute Gas. An
+ * unpaid usage order is reused; otherwise the billable rows are billed right
+ * away into a new usage order through vendor-app-manager's own billing
+ * functions (same carrier line, stamps, ledger marks, audit row and unpaid
+ * tracking as the monthly run; no invoice email, the member is paying now).
+ */
+add_action( 'wp_ajax_gend_society_gas_pay_now', 'gend_society_gas_pay_now' );
+function gend_society_gas_pay_now() {
+    check_ajax_referer( 'gend_society_gas_pay' );
+    $uid      = get_current_user_id();
+    $group_id = isset( $_POST['group_id'] ) ? absint( $_POST['group_id'] ) : 0;
+    if ( ! $uid || ! $group_id || ! function_exists( 'groups_is_user_admin' ) || ! groups_is_user_admin( $uid, $group_id ) ) {
+        wp_send_json_error( array( 'message' => 'Only a group admin can pay this group\'s compute gas.' ), 403 );
+    }
+    $ns = '\\WP_Ultimo\\Integrations\\';
+    foreach ( array( 'gdc_gas_usage_create_order', 'gdc_gas_usage_mark_rows', 'gdc_gas_usage_install_schema', 'gdc_gas_usage_log_reserve', 'gdc_gas_usage_sum' ) as $fn ) {
+        if ( ! function_exists( $ns . $fn ) ) {
+            wp_send_json_error( array( 'message' => 'Compute Gas billing is not available right now.' ), 503 );
+        }
+    }
+
+    global $wpdb;
+    $lock = 'gs_gas_pay_' . $uid;
+    if ( '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) ) ) {
+        wp_send_json_error( array( 'message' => 'Another payment is being prepared. Try again in a moment.' ), 409 );
+    }
+    try {
+        // An unpaid usage order already exists: pay that one first.
+        $unpaid = gend_society_gas_unpaid_orders( $uid );
+        if ( $unpaid ) {
+            $o = $unpaid[0];
+            wp_send_json_success( array( 'pay_url' => $o->get_checkout_payment_url(), 'amount' => wc_format_decimal( $o->get_total(), 2 ), 'order_id' => $o->get_id() ) );
+        }
+
+        if ( ! \WP_Ultimo\Integrations\gdc_gas_usage_install_schema() ) {
+            wp_send_json_error( array( 'message' => 'Compute Gas billing is not ready yet.' ), 503 );
+        }
+        $rows = gend_society_gas_billable_rows( $group_id );
+        $ids  = array_map( 'intval', wp_list_pluck( $rows, 'id' ) );
+        if ( ! $ids ) {
+            wp_send_json_error( array( 'message' => 'There is no compute gas to pay.' ), 400 );
+        }
+        $total  = \WP_Ultimo\Integrations\gdc_gas_usage_sum( $ids );
+        $peg    = function_exists( $ns . 'gdc_gas_to_cad_peg' ) ? (float) \WP_Ultimo\Integrations\gdc_gas_to_cad_peg() : 1.0;
+        $amount = round( (float) $total * $peg, 2 );
+        if ( $amount < 0.01 ) {
+            wp_send_json_error( array( 'message' => 'The balance is under 0.01; it rolls into next month.' ), 400 );
+        }
+        $breakdown = array();
+        foreach ( $rows as $r ) {
+            $tk = (string) $r['task_id'];
+            $breakdown[ $tk ]['n']   = (int) ( $breakdown[ $tk ]['n'] ?? 0 ) + 1;
+            $breakdown[ $tk ]['gas'] = (float) ( $breakdown[ $tk ]['gas'] ?? 0 ) + (float) $r['sales_amount'];
+        }
+        $period = wp_date( 'Y-m' );
+        $key    = 'now:' . $uid . ':' . $group_id . ':' . time();
+        $entry  = array(
+            'rows'       => count( $ids ),
+            'ledger_ids' => $ids,
+            'total_gas'  => $total,
+            'amount'     => $amount,
+            'detail'     => 'Pay Now from the member profile (group ' . $group_id . ')',
+        );
+        if ( ! \WP_Ultimo\Integrations\gdc_gas_usage_log_reserve( $key, $period, $uid, $entry, 'creating' ) ) {
+            wp_send_json_error( array( 'message' => 'Could not prepare the payment. Try again.' ), 500 );
+        }
+        $order = \WP_Ultimo\Integrations\gdc_gas_usage_create_order( $uid, $period, $key, $entry, $breakdown );
+        if ( is_wp_error( $order ) || ! $order ) {
+            $msg = is_wp_error( $order ) ? $order->get_error_message() : 'order not created';
+            \WP_Ultimo\Integrations\gdc_gas_usage_log_update( $key, array( 'outcome' => 'error', 'detail' => $msg ) );
+            wp_send_json_error( array( 'message' => 'Could not create the payment order.' ), 500 );
+        }
+        $oid = (int) $order->get_id();
+        \WP_Ultimo\Integrations\gdc_gas_usage_log_update( $key, array( 'order_id' => $oid, 'outcome' => 'ordered', 'charge' => 'pay-now' ) );
+        $marked = \WP_Ultimo\Integrations\gdc_gas_usage_mark_rows( $ids, $key, $oid );
+        $order->update_meta_data( '_gdc_gas_usage_collected', gmdate( 'Y-m-d H:i:s' ) ); // paid by the member now: no invoice email / auto-charge
+        $order->update_meta_data( '_gdc_gas_usage_group_id', $group_id );
+        $order->add_order_note( sprintf( 'Billed on demand from the member profile Pay Now button (group %d); %d of %d ledger rows marked.', $group_id, $marked, count( $ids ) ) );
+        $order->save();
+        if ( function_exists( $ns . 'gdc_gas_usage_track_unpaid' ) ) {
+            \WP_Ultimo\Integrations\gdc_gas_usage_track_unpaid( $order );
+        }
+        wp_send_json_success( array( 'pay_url' => $order->get_checkout_payment_url(), 'amount' => wc_format_decimal( $order->get_total(), 2 ), 'order_id' => $oid ) );
+    } finally {
+        $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
+    }
+}
+
+function gend_society_profile_gas_amount( $v, $unit ) {
+    $v = (float) $v;
+    $d = ( $v > 0 && $v < 0.01 ) ? 4 : 2;
+    return number_format( $v, $d ) . ' ' . $unit;
+}
+
+function gend_society_profile_group_gas( $group_id, $group_url ) {
+    global $wpdb;
+    $ledger    = $wpdb->base_prefix . 'gdc_gas_ledger';
+    $group_url = trailingslashit( (string) $group_url );
+    $out = array(
+        'owed'          => 0.0,
+        'can_pay'       => false,
+        'owed_label'    => gend_society_profile_gas_amount( 0, 'GAS' ),
+        'owed_sub'      => 'No compute gas used yet',
+        'pay_url'       => $group_url . 'compute-gas/',
+        'pay_title'     => '',
+        'earned_label'  => gend_society_profile_gas_amount( 0, 'DGEN' ),
+        'devices_label' => 'No devices connected',
+        'stations_url'  => $group_url . 'compute-gas/gas-stations/',
+    );
+    if ( $ledger !== $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $ledger ) ) ) {
+        return $out;
+    }
+
+    // Owed.
+    $unbilled = 0.0;
+    foreach ( gend_society_gas_billable_rows( $group_id ) as $row ) {
+        $unbilled += (float) $row['sales_amount'];
+    }
+    $pending = 0.0;
+    foreach ( gend_society_gas_unpaid_orders( get_current_user_id() ) as $order ) {
+        $pending += (float) $order->get_total();
+    }
+    $out['owed']       = $unbilled + $pending;
+    $out['owed_label'] = gend_society_profile_gas_amount( $out['owed'], 'GAS' );
+    $out['can_pay']    = function_exists( '\\WP_Ultimo\\Integrations\\gdc_gas_usage_create_order' )
+        && ( $pending > 0 || round( $unbilled, 2 ) >= 0.01 );
+    if ( $pending > 0 ) {
+        $out['owed_sub'] = 'Invoice ready to pay';
+    } elseif ( $unbilled > 0 && ! $out['can_pay'] ) {
+        $out['owed_sub'] = 'Under 0.01 - rolls into next month';
+    } elseif ( $unbilled > 0 ) {
+        $out['owed_sub'] = 'Pay now, or it is billed on the 1st';
+    } elseif ( gend_society_profile_group_gas_site_id( $group_id ) > 0 ) {
+        $out['owed_sub'] = 'All compute gas paid';
+    }
+
+    // Earned.
+    $owners = function_exists( 'psoo_group_device_owner_uids' )
+        ? array_values( array_filter( array_map( 'intval', (array) psoo_group_device_owner_uids( $group_id ) ) ) )
+        : array();
+    if ( $owners ) {
+        $in     = implode( ',', array_fill( 0, count( $owners ), '%d' ) );
+        $earned = (float) $wpdb->get_var( $wpdb->prepare(
+            "SELECT COALESCE(SUM(owner_amount), 0) FROM %i WHERE station_user_id IN ($in)", // phpcs:ignore WordPress.DB.PreparedSQLPlaceholders.UnfinishedPrepare
+            array_merge( array( $ledger ), $owners )
+        ) );
+        $out['earned_label'] = gend_society_profile_gas_amount( $earned, 'DGEN' );
+        if ( function_exists( 'psoo_device_get_records' ) ) {
+            $devices = 0;
+            $online  = 0;
+            foreach ( $owners as $owner_id ) {
+                foreach ( (array) psoo_device_get_records( $owner_id ) as $record ) {
+                    $devices++;
+                    if ( function_exists( 'psoo_device_online' ) && psoo_device_online( $record ) ) $online++;
+                }
+            }
+            if ( $devices > 0 ) {
+                $out['devices_label'] = sprintf( '%d device%s connected · %d online', $devices, 1 === $devices ? '' : 's', $online );
+            }
+        }
+    }
+    return $out;
+}
+
 // ─── Render header ────────────────────────────────────────────────────────────
 // Hook into youzify_profile_before_header (fires before the <header> element)
 // so our section renders first. The original header + navbar are hidden via CSS.
@@ -734,38 +996,40 @@ function gend_society_render_profile_header() {
         ? (float) mycred_get_users_balance( $user_id, 'mycred_default' )
         : 0.0;
 
-    // Card order: DGEN Balance, Task Credits, Store Credits, AI Builder
-    // Tokens (stagger follows position so the entrance animation stays
+    // Card order: DGEN Coins, AI Builder Tokens, Task Services, Store
+    // Credits (stagger follows position so the entrance animation stays
     // left-to-right).
     $balances = apply_filters( 'gend_society_profile_header_balances', [
         [
-            'label'   => '🇨🇦 DGEN Balance',
-            'value'   => number_format( $dgen_balance ),
-            'color'   => 'var(--gph-green)',
-            'stagger' => 2,
-            'topup'   => 'dgen',
-        ],
-        [
-            'label'   => 'Task Credits',
-            'value'   => number_format( $task_credits ),
-            'color'   => 'var(--gph-magenta)',
-            'stagger' => 3,
-            'topup'   => 'tasks',
-        ],
-        [
-            'label'       => '🇨🇦 Store Credits',
-            'value'       => '$' . number_format( $store_credits, 2 ),
-            'color'       => 'var(--gph-red)',
-            'stagger'     => 4,
-            'topup'       => 'store',
-            'topup_label' => 'Spend',
+            'label'       => '🇨🇦 DGEN Coins',
+            'value'       => number_format( $dgen_balance ),
+            'color'       => 'var(--gph-green)',
+            'stagger'     => 2,
+            'topup'       => 'earn',
+            'topup_label' => 'Earn',
         ],
         [
             'label'   => 'AI Builder Tokens',
             'value'   => number_format( $ai_tokens, 1 ),
             'color'   => 'var(--gph-blue)',
-            'stagger' => 5,
+            'stagger' => 3,
             'topup'   => 'ai',
+        ],
+        [
+            'label'       => 'Task Services',
+            'value'       => number_format( $task_credits ),
+            'color'       => 'var(--gph-magenta)',
+            'stagger'     => 4,
+            'topup'       => 'tasks',
+            'topup_label' => 'Retainers',
+        ],
+        [
+            'label'       => '🇨🇦 Store Credits',
+            'value'       => '$' . number_format( $store_credits, 2 ),
+            'color'       => 'var(--gph-red)',
+            'stagger'     => 5,
+            'topup'       => 'store',
+            'topup_label' => 'Spend',
         ],
     ], $user_id );
 
@@ -781,14 +1045,32 @@ function gend_society_render_profile_header() {
         $cs_topup       = ST_Contract_Settings::get();
         $task_topup_pid = (int) ( $cs_topup['retainer_product_id'] ?? 0 );
     }
+    // AI Builder Tokens packages, priced on leo's Token Pricing page (variations
+    // of the AI Builder Tokens product). Empty where leo's packages don't exist.
+    $ai_packages = [];
+    if ( function_exists( 'aipa_token_packages' ) ) {
+        foreach ( aipa_token_packages() as $pk ) {
+            if ( $pk['tokens'] <= 0 || $pk['price'] <= 0 ) continue;
+            $pk_label = $pk['parent'] ? (string) get_post_meta( $pk['id'], 'attribute_package', true ) : '';
+            $ai_packages[] = [
+                'id'     => (int) $pk['id'],
+                'label'  => '' !== $pk_label ? $pk_label : (string) $pk['name'],
+                'tokens' => (int) $pk['tokens'],
+                'price'  => (float) $pk['price'],
+            ];
+        }
+    }
     // Which top-up surfaces are actually wired up on this install.
     $topup_enabled = [
         'tasks' => ( $task_topup_pid > 0 ),
-        'ai'    => class_exists( 'AIPA_Commerce' ),
+        'ai'    => class_exists( 'AIPA_Commerce' ) || ! empty( $ai_packages ),
         // DGEN purchase is hub-only; the product/credit hook lives in C&P.
         'dgen'  => class_exists( 'Gend_CP_DGEN_TopUp' ),
         // Store credits → "Spend" opens the shop (any WooCommerce store).
         'store' => class_exists( 'WooCommerce' ),
+        // DGEN Coins → "Earn" opens the viewer's own affiliate dashboard
+        // (reward-programs' bare [affiliate_sales_dashboard] embed page).
+        'earn'  => function_exists( 'gend_wallet_affiliate_embed_url' ) && shortcode_exists( 'affiliate_sales_dashboard' ),
     ];
 
     // ── Linked application row ────────────────────────────────────────────────
@@ -836,6 +1118,9 @@ function gend_society_render_profile_header() {
             }
         }
     }
+    $admin_group_gas = ( $admin_group && $is_own_profile )
+        ? gend_society_profile_group_gas( (int) $admin_group->id, $admin_group_url )
+        : null;
 
     // ── Action buttons ────────────────────────────────────────────────────────
     $msg_url     = '';
@@ -1464,6 +1749,35 @@ function gend_society_render_profile_header() {
                            style="margin-left:8px;"
                            target="_blank" rel="noopener">View Site</a>
                     </div>
+                    <?php if ( $admin_group_gas ) : ?>
+                    <div class="gdc-group-gas">
+                        <div class="gdc-group-gas__stat gdc-group-gas__stat--owed">
+                            <div class="gdc-group-gas__text">
+                                <span class="gdc-group-gas__label">Gas Owed</span>
+                                <span class="gdc-group-gas__value"><?php echo esc_html( $admin_group_gas['owed_label'] ); ?></span>
+                                <span class="gdc-group-gas__sub"><?php echo esc_html( $admin_group_gas['owed_sub'] ); ?></span>
+                            </div>
+                            <?php if ( $admin_group_gas['can_pay'] ) : ?>
+                            <button type="button" class="gdc-group-gas__btn"
+                                    data-gdc-gas-pay="<?php echo (int) $admin_group->id; ?>">Pay Now</button>
+                            <?php elseif ( $admin_group_gas['owed'] > 0 ) : ?>
+                            <a href="<?php echo esc_url( $admin_group_gas['pay_url'] ); ?>"
+                               class="gdc-group-gas__btn gdc-group-gas__btn--ghost">Details</a>
+                            <?php else : ?>
+                            <span class="gdc-group-gas__btn is-done">Paid Up</span>
+                            <?php endif; ?>
+                        </div>
+                        <div class="gdc-group-gas__stat gdc-group-gas__stat--earned">
+                            <div class="gdc-group-gas__text">
+                                <span class="gdc-group-gas__label">Gas Station Earnings</span>
+                                <span class="gdc-group-gas__value"><?php echo esc_html( $admin_group_gas['earned_label'] ); ?></span>
+                                <span class="gdc-group-gas__sub"><?php echo esc_html( $admin_group_gas['devices_label'] ); ?></span>
+                            </div>
+                            <a href="<?php echo esc_url( $admin_group_gas['stations_url'] ); ?>"
+                               class="gdc-group-gas__btn gdc-group-gas__btn--ghost">Devices</a>
+                        </div>
+                    </div>
+                    <?php endif; ?>
                 </div>
                 <?php endif; ?>
 
@@ -1552,11 +1866,16 @@ function gend_society_render_profile_header() {
             'ai'          => ! empty( $topup_enabled['ai'] ),
             'dgen'        => ! empty( $topup_enabled['dgen'] ),
             'store'       => ! empty( $topup_enabled['store'] ),
+            'earn'        => ! empty( $topup_enabled['earn'] ),
+            'earnUrl'     => ! empty( $topup_enabled['earn'] ) ? gend_wallet_affiliate_embed_url() : '',
+            'ajaxUrl'     => admin_url( 'admin-ajax.php' ),
+            'gasNonce'    => wp_create_nonce( 'gend_society_gas_pay' ),
             'shopUrl'     => function_exists( 'wc_get_page_permalink' ) ? wc_get_page_permalink( 'shop' ) : home_url( '/shop/' ),
             'hasWalletCard' => (bool) ( $is_own_profile && shortcode_exists( 'gend_wallet' ) ),
             'sym'         => function_exists( 'get_woocommerce_currency_symbol' ) ? get_woocommerce_currency_symbol() : '$',
             'taskBalance' => (float) $task_credits,
             'aiBalance'   => (float) $ai_tokens,
+            'aiPackages'  => $ai_packages,
             'dgenBalance' => (float) $dgen_balance,
             'storeBalance'=> (float) $store_credits,
             'creditValue' => (float) $gdc_task_credit_rate,
@@ -1734,6 +2053,115 @@ function gend_society_render_profile_header() {
             mount(d, accent);
         }
 
+        // Big iframe popup shared by Earn + Retainers (same shell as Spend).
+        function openFramePopup(o) {
+            var d = el('div', 'gdc-tp-dialog gdc-tp-dialog--shop');
+            d.style.setProperty('--gph-accent', o.accent);
+            d.appendChild(el('div', 'gdc-tp-scan'));
+            var close = el('button', 'gdc-tp-close', '&times;');
+            close.type = 'button'; close.setAttribute('aria-label', 'Close');
+            close.addEventListener('click', closeOverlay);
+            d.appendChild(close);
+            d.appendChild(el('div', 'gdc-tp-cobar', '<span class="gdc-tp-cobar__dot"></span> ' + o.bar));
+            var loading = el('div', 'gdc-tp-loading', '<div class="gdc-tp-spinner"></div><p class="gdc-tp-loadmsg">' + o.loading + '</p>');
+            d.appendChild(loading);
+            var frame = el('iframe', 'gdc-tp-frame gdc-tp-frame--shop');
+            frame.setAttribute('title', o.title);
+            var revealed = false, poll, hard;
+            function reveal() {
+                if (revealed) return; revealed = true;
+                clearInterval(poll); clearTimeout(hard);
+                loading.style.display = 'none';
+                frame.classList.add('is-loaded');
+                if (o.onReveal) o.onReveal(frame);
+            }
+            // Wait for the real page, not the iframe's initial about:blank.
+            poll = setInterval(function () {
+                var rs;
+                try {
+                    rs = frame.contentWindow.location.href !== 'about:blank' && frame.contentDocument.readyState;
+                } catch (e) { rs = null; }
+                if (rs === 'interactive' || rs === 'complete') reveal();
+            }, 150);
+            frame.addEventListener('load', function () {
+                reveal();
+                if (o.onReveal) o.onReveal(frame);   // re-run once everything has mounted
+            });
+            hard = setTimeout(reveal, 12000);
+            frame.src = o.url;
+            d.appendChild(frame);
+            var fb = el('div', 'gdc-tp-foot', o.foot);
+            d.appendChild(fb);
+            mount(d, o.accent);
+            return fb;
+        }
+
+        // ── DGEN Coins → Earn: the viewer's affiliate (commissions) dashboard ─
+        function openEarn() {
+            openFramePopup({
+                accent: 'var(--gph-green)',
+                url: CFG.earnUrl,
+                title: 'Affiliate dashboard',
+                bar: 'Earn DGEN Coins &middot; your referral links, team and commissions',
+                loading: 'Loading your affiliate dashboard&hellip;',
+                foot: 'Commissions are paid out in DGEN &middot; <a href="' + CFG.earnUrl + '" target="_blank" rel="noopener">Open in a new tab &rarr;</a>'
+            });
+        }
+
+        // ── Task Services → Retainers: the retainer plans product page, with
+        // the one-off task-credit purchase kept one click away. ─
+        function openRetainers() {
+            if (!CFG.retainerUrl) return openTasks();
+            var fb = openFramePopup({
+                accent: 'var(--gph-magenta)',
+                url: CFG.retainerUrl,
+                title: 'Retainers',
+                bar: 'Task Services Retainers &middot; <strong style="color:var(--gph-accent)">' + fmt(CFG.taskBalance) + '</strong> credits available',
+                loading: 'Loading retainer plans&hellip;',
+                foot: 'Need a one-off request? <a href="#" data-gdc-buy-credits="1">Buy individual task credits &rarr;</a>',
+                onReveal: styleShopEmbed
+            });
+            var a = fb.querySelector('[data-gdc-buy-credits]');
+            if (a) a.addEventListener('click', function (e) { e.preventDefault(); openTasks(); });
+        }
+
+        // ── Gas Owed → Pay Now: bill the balance now, pay it in a checkout popup ─
+        function openGasPay(btn) {
+            var label = btn.textContent;
+            btn.disabled = true; btn.textContent = 'Preparing…';
+            var body = new URLSearchParams({ action: 'gend_society_gas_pay_now', _ajax_nonce: CFG.gasNonce, group_id: btn.getAttribute('data-gdc-gas-pay') || '' });
+            fetch(CFG.ajaxUrl, { method: 'POST', credentials: 'same-origin', body: body })
+                .then(function (r) { return r.json(); })
+                .then(function (res) {
+                    btn.disabled = false; btn.textContent = label;
+                    if (!res || !res.success || !res.data || !res.data.pay_url) {
+                        alert((res && res.data && res.data.message) || 'Could not prepare the payment. Try again.');
+                        return;
+                    }
+                    var url = res.data.pay_url + (res.data.pay_url.indexOf('?') === -1 ? '?' : '&') + 'gend_embed=1';
+                    openFramePopup({
+                        accent: 'var(--gph-red)',
+                        url: url,
+                        title: 'Pay Compute Gas',
+                        bar: 'Pay Compute Gas &middot; <strong style="color:var(--gph-accent)">' + CFG.sym + fmt(parseFloat(res.data.amount) || 0) + '</strong> CAD',
+                        loading: 'Preparing your secure checkout&hellip;',
+                        foot: 'Secure checkout &middot; <a href="' + res.data.pay_url + '" target="_blank" rel="noopener">Open checkout in a new tab &rarr;</a>'
+                    });
+                    // Refresh the balance once the popup closes.
+                    window.__gdcTpOnClose = function () { location.reload(); };
+                })
+                .catch(function () {
+                    btn.disabled = false; btn.textContent = label;
+                    alert('Could not prepare the payment. Try again.');
+                });
+        }
+        document.addEventListener('click', function (e) {
+            var b = e.target.closest && e.target.closest('[data-gdc-gas-pay]');
+            if (!b || b.disabled) return;
+            e.preventDefault();
+            openGasPay(b);
+        });
+
         // ── Helpers ──────────────────────────────────────────────────────
         function el(tag, cls, html) {
             var n = document.createElement(tag);
@@ -1756,6 +2184,7 @@ function gend_society_render_profile_header() {
                 setTimeout(function(){ o.remove(); }, 220);
             }
             document.removeEventListener('keydown', onEsc);
+            if (window.__gdcTpOnClose) { var cb = window.__gdcTpOnClose; window.__gdcTpOnClose = null; cb(); }
             // Release the body scroll-lock taken in mount().
             document.documentElement.classList.remove('gdc-tp-lock');
         }
@@ -1853,14 +2282,47 @@ function gend_society_render_profile_header() {
                 '<span class="gdc-tp-badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2a4 4 0 0 1 4 4c1.5.5 3 1.8 3 4a4 4 0 0 1-1 2.6A4 4 0 0 1 16 22H8a4 4 0 0 1-2-7.4A4 4 0 0 1 5 12c0-2.2 1.5-3.5 3-4a4 4 0 0 1 4-4z"/><circle cx="9" cy="11" r="1" fill="currentColor"/><circle cx="15" cy="11" r="1" fill="currentColor"/></svg></span>' +
                 '<div><h2>Top Up AI Builder Tokens</h2><p class="gdc-tp-tag">Fuel every build, edit, and generation with more tokens.</p></div>');
             var bal = el('div', 'gdc-tp-balance', 'Current balance &middot; <strong>' + fmt(CFG.aiBalance) + '</strong> tokens');
-            var amtLabel = el('div', 'gdc-tp-label', 'How many tokens would you like?');
             var totalRow = el('div', 'gdc-tp-total', '');
+            var foot = el('div', 'gdc-tp-foot', 'Secure checkout &middot; billed in CAD &middot; tokens credited instantly on payment.');
+            var pkgs = CFG.aiPackages || [];
+            if (pkgs.length) {
+                // Packages + prices come from the Token Pricing page (AI Builder Tokens variations).
+                var money = function (n) { return Number(n).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 }); };
+                // CFG.sym is an HTML entity (&#36;); decode it for textContent.
+                var symTxt = (function () { var x = document.createElement('textarea'); x.innerHTML = CFG.sym; return x.value; })();
+                var pkgLabel = el('div', 'gdc-tp-label', 'Choose a package');
+                var chips = el('div', 'gdc-tp-chips gdc-tp-chips--pkg');
+                var chosen = null;
+                var pick = function (p, chip) {
+                    chosen = p;
+                    Array.prototype.forEach.call(chips.children, function (c) { c.classList.toggle('is-active', c === chip); });
+                    totalRow.innerHTML = 'Total <strong>' + CFG.sym + money(p.price) + '</strong> <small>' +
+                        CFG.sym + money(p.price / p.tokens * 1000) + ' / 1,000 tokens</small>';
+                };
+                pkgs.forEach(function (p, i) {
+                    var c = el('button', 'gdc-tp-chip');
+                    c.type = 'button';
+                    var name = el('span', 'gdc-tp-pkg-name'); name.textContent = p.label;
+                    var price = el('small'); price.textContent = 'tokens \u00b7 ' + symTxt + money(p.price);
+                    c.appendChild(name);
+                    c.appendChild(document.createTextNode(fmt(p.tokens) + ' '));
+                    c.appendChild(price);
+                    c.addEventListener('click', function () { pick(p, c); });
+                    chips.appendChild(c);
+                    if (i === Math.min(1, pkgs.length - 1)) setTimeout(function () { pick(p, c); }, 0);
+                });
+                var goPkg = cta('Continue to Secure Checkout', 'var(--gph-blue)', function () {
+                    if (chosen) goCheckout('ai', { pkg: chosen.id });
+                });
+                mount(dialog('var(--gph-blue)', [head, bal, pkgLabel, chips, totalRow, goPkg, foot]), 'var(--gph-blue)');
+                return;
+            }
+            var amtLabel = el('div', 'gdc-tp-label', 'How many tokens would you like?');
             function paint(v) { totalRow.innerHTML = 'Total <strong>' + CFG.sym + fmt(v) + '</strong> <small>' + CFG.sym + '1.00 / token</small>'; }
             var amt = amountField([500, 1000, 2500, 5000], 'tok', paint);
             var go = cta('Continue to Secure Checkout', 'var(--gph-blue)', function () {
                 goCheckout('ai', { amount: Math.max(1, Math.round(amt.get())) });
             });
-            var foot = el('div', 'gdc-tp-foot', 'Secure checkout &middot; billed in CAD &middot; tokens credited instantly on payment.');
             mount(dialog('var(--gph-blue)', [head, bal, amtLabel, amt.node, totalRow, go, foot]), 'var(--gph-blue)');
         }
 
@@ -1930,7 +2392,8 @@ function gend_society_render_profile_header() {
             if (!btn) return;
             e.preventDefault();
             var kind = btn.getAttribute('data-gdc-topup');
-            if (kind === 'tasks' && CFG.tasks) return openTasks();
+            if (kind === 'earn' && CFG.earn) return openEarn();
+            if (kind === 'tasks' && CFG.tasks) return openRetainers();
             if (kind === 'ai' && CFG.ai) return openAI();
             if (kind === 'dgen' && CFG.dgen) return openDGEN();
             if (kind === 'store' && CFG.store) return openShop();
@@ -3214,6 +3677,75 @@ body.bp-user .youzify-inline-mobile-nav {
     background: rgba(137,194,224,0.1) !important;
 }
 
+/* ── Connected group: Gas Owed / Gas Station Earnings ────────────────── */
+.gdc-group-gas {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+    padding: 0 24px 18px;
+}
+.gdc-group-gas__stat {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 16px;
+    border-radius: 16px;
+    background: rgba(255,255,255,0.03);
+    border: 1px solid rgba(255,255,255,0.08);
+    --gas-accent: var(--gph-red);
+}
+.gdc-group-gas__stat--earned { --gas-accent: var(--gph-green); }
+.gdc-group-gas__text { display: flex; flex-direction: column; gap: 2px; flex: 1; min-width: 0; }
+.gdc-group-gas__label {
+    font-family: monospace;
+    font-size: 0.6rem;
+    letter-spacing: 1.4px;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+.gdc-group-gas__value {
+    font-size: 1.15rem;
+    font-weight: 900;
+    color: var(--gas-accent);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+.gdc-group-gas__sub { font-size: 0.62rem; color: #64748b; }
+.gdc-group-gas__btn {
+    flex-shrink: 0;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid var(--gas-accent);
+    background: rgba(255,255,255,0.04);
+    color: var(--gas-accent) !important;
+    font-family: "Inter", sans-serif;
+    font-size: 0.6rem;
+    font-weight: 900;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    text-decoration: none !important;
+    line-height: 1;
+    transition: background 0.25s, color 0.2s, box-shadow 0.3s, transform 0.3s;
+}
+button.gdc-group-gas__btn { cursor: pointer; }
+button.gdc-group-gas__btn[disabled] { opacity: .6; cursor: progress; }
+a.gdc-group-gas__btn:hover,
+a.gdc-group-gas__btn:focus-visible,
+button.gdc-group-gas__btn:not([disabled]):hover,
+button.gdc-group-gas__btn:focus-visible {
+    background: var(--gas-accent);
+    color: #06080d !important;
+    transform: translateY(-2px);
+    box-shadow: 0 12px 26px -10px var(--gas-accent);
+    outline: none;
+}
+.gdc-group-gas__btn--ghost { border-color: rgba(255,255,255,0.18); color: #cbd5e1 !important; }
+.gdc-group-gas__btn.is-done { border-color: rgba(0,255,136,0.35); color: var(--gph-green) !important; cursor: default; }
+@media (max-width: 720px) {
+    .gdc-group-gas { grid-template-columns: 1fr; padding: 0 16px 16px; }
+}
+
 /* Balance grid */
 .gdc-balance-grid {
     display: grid;
@@ -4183,6 +4715,7 @@ nav.bp-navs li.selected .gdc-subnav-icon::after,
 .gdc-stagger-2 .gdc-topup-btn { animation-delay: 1.00s; }
 .gdc-stagger-3 .gdc-topup-btn { animation-delay: 1.15s; }
 .gdc-stagger-4 .gdc-topup-btn { animation-delay: 1.30s; }
+.gdc-stagger-5 .gdc-topup-btn { animation-delay: 1.45s; }
 /* Hover: grow the real type + padding (crisp, not a blurry scale) for a
    bigger, easier-to-read pill that lifts and glows on its accent colour. */
 .gdc-topup-btn:hover,
@@ -4427,6 +4960,17 @@ html.gdc-tp-lock { overflow: hidden !important; }
     box-shadow: inset 0 0 0 1px var(--gph-accent), 0 6px 18px -8px var(--gph-accent);
 }
 .gdc-tp-chip.is-active small { color: var(--gph-accent); }
+.gdc-tp-chips--pkg .gdc-tp-chip { flex: 1 1 140px; text-align: left; padding: 12px 14px; font-size: 1rem; }
+.gdc-tp-pkg-name {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 0.62rem;
+    font-weight: 700;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    color: #94a3b8;
+}
+.gdc-tp-chip.is-active .gdc-tp-pkg-name { color: #e2e8f0; }
 .gdc-tp-custom {
     margin-top: 10px;
     width: 100%;

@@ -114,7 +114,7 @@ function gend_society_davinci_usage_map( array $user_ids, $since ) {
     return $out;
 }
 
-/** Current Leo token-currency symbol/label (defaults USD). */
+/** Current AI Builder Token-currency symbol/label (defaults USD). */
 function gend_society_davinci_currency() {
     if ( class_exists( 'AIPA_Usage' ) && method_exists( 'AIPA_Usage', 'get_token_pricing_settings' ) ) {
         $s = AIPA_Usage::get_token_pricing_settings();
@@ -456,7 +456,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
 
         <?php
         /* v12.1 — Top-level 3-tab bar on the Davinci AI menu page per operator
-           directive. Tabs: Leo Tokens (default, wraps existing AI-spend command
+           directive. Tabs: AI Builder Tokens (default, wraps existing AI-spend command
            center content), Brain (deep-links to /business-plan/brain/),
            Wireframe (deep-links to /business-plan/wireframe/). The Brain +
            Wireframe nav buttons were removed from the Business Plan tab in the
@@ -514,7 +514,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
         </style>
 
         <?php /* Top tabs removed (operator directive 2026-08-25):
-                 the Brain hub below replaced them — Leo Tokens is the only
+                 the Brain hub below replaced them — AI Builder Tokens is the only
                  page view now. */ ?>
 
         <script>
@@ -952,7 +952,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
                 <h2><?php esc_html_e( 'Davinci AI', 'gend-society' ); ?></h2>
                 <p><?php esc_html_e( 'A complete overview of every dollar of AI spend on your connected web app — Leo content tokens, autonomous agents, third-party AI integrations, and on-chain compute gas, all in one place.', 'gend-society' ); ?></p>
             </div>
-            <a class="gs-dv-btn gs-dv-btn--sm" href="#gs-dv-sec-leo" style="align-self:center;"><?php esc_html_e( 'Jump to Leo Tokens', 'gend-society' ); ?></a>
+            <a class="gs-dv-btn gs-dv-btn--sm" href="#gs-dv-sec-leo" style="align-self:center;"><?php esc_html_e( 'Jump to AI Builder Tokens', 'gend-society' ); ?></a>
         </div>
 
         <div class="gs-dv-summary">
@@ -980,7 +980,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
 
         <?php
         /* ───────── Sub-tabs under the stat cards: Members / Usage & Spend ──
-           Members (default): every connected-app member's Leo Token balance,
+           Members (default): every connected-app member's AI Builder Token balance,
            one-click admin token purchases, and scheduled Purchase Contracts
            (role- or member-targeted, daily/weekly/monthly, billed to the
            purchasing admin's DGEN wallet at 1 CAD = 1 DGEN). Usage & Spend
@@ -1340,8 +1340,8 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
             <section class="gs-dv-panel">
                 <div class="gs-dv-panel-head">
                     <div>
-                        <h3><?php esc_html_e( 'Member Leo Token Balances', 'gend-society' ); ?></h3>
-                        <p class="lede"><?php esc_html_e( 'Every member of the connected web app with their live Leo Token balance. Buy any member more tokens on the spot — the package price bills your DGEN wallet (1 CAD = 1 DGEN) and the tokens land on their account instantly.', 'gend-society' ); ?></p>
+                        <h3><?php esc_html_e( 'Member AI Builder Token Balances', 'gend-society' ); ?></h3>
+                        <p class="lede"><?php esc_html_e( 'Every member of the connected web app with their live AI Builder Token balance. Buy any member more tokens on the spot — the package price bills your DGEN wallet (1 CAD = 1 DGEN) and the tokens land on their account instantly.', 'gend-society' ); ?></p>
                     </div>
                     <span class="gs-dvm-wallet" data-dvm-wallet><?php esc_html_e( 'Your DGEN: …', 'gend-society' ); ?></span>
                 </div>
@@ -1386,10 +1386,10 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
                     <div class="gs-dvm-cmodal-dialog" role="dialog" aria-modal="true">
                         <button type="button" class="gs-dvm-cmodal-x" data-cm-close aria-label="<?php esc_attr_e( 'Close', 'gend-society' ); ?>">&times;</button>
                         <h3 data-cm-title><?php esc_html_e( 'New Purchase Contract', 'gend-society' ); ?></h3>
-                        <p class="gs-dvm-cmodal-sub"><?php esc_html_e( 'Automatic Leo Token purchases for this app\'s members — billed to your DGEN wallet on the chosen cadence.', 'gend-society' ); ?></p>
+                        <p class="gs-dvm-cmodal-sub"><?php esc_html_e( 'Automatic AI Builder Token purchases for this app\'s members — billed to your DGEN wallet on the chosen cadence.', 'gend-society' ); ?></p>
 
                         <div class="gs-dvm-cmodal-field">
-                            <span class="gs-dvm-cmodal-lbl">👥 <?php esc_html_e( 'Who receives the Leo Tokens', 'gend-society' ); ?></span>
+                            <span class="gs-dvm-cmodal-lbl">👥 <?php esc_html_e( 'Who receives the AI Builder Tokens', 'gend-society' ); ?></span>
                             <div class="gs-dvm-seg" data-cm-target>
                                 <button type="button" class="gs-dvm-seg-btn is-on" data-cm-target-btn="members">🧑‍🤝‍🧑 <?php esc_html_e( 'Specific members', 'gend-society' ); ?></button>
                                 <button type="button" class="gs-dvm-seg-btn" data-cm-target-btn="role">🎭 <?php esc_html_e( 'Member roles', 'gend-society' ); ?></button>
@@ -1615,7 +1615,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
                 <div class="gs-dv-panel-head">
                     <div>
                         <h3><?php esc_html_e( 'Sequence Run Costs', 'gend-society' ); ?></h3>
-                        <p class="lede"><?php esc_html_e( 'Every sequence synced to gend.me from this group, with the estimated AI cost of one full run. Steps routed to a connected device or the Claude terminal run on member hardware / personal licenses (no gend.me metering); steps on the gend.me Compute Network are estimated from each prompt at current Leo Token pricing.', 'gend-society' ); ?></p>
+                        <p class="lede"><?php esc_html_e( 'Every sequence synced to gend.me from this group, with the estimated AI cost of one full run. Steps routed to a connected device or the Claude terminal run on member hardware / personal licenses (no gend.me metering); steps on the gend.me Compute Network are estimated from each prompt at current AI Builder Token pricing.', 'gend-society' ); ?></p>
                     </div>
                 </div>
                 <?php $gs_dv_sq = gend_society_dv_sequences_cost( $group_id ); ?>
@@ -1633,7 +1633,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
                             <div class="v"><?php echo esc_html( gend_society_davinci_money( $gs_dv_sq['totalUsd'] ) ); ?></div>
                         </div>
                         <div class="gs-dv-stat">
-                            <p class="k"><?php esc_html_e( 'Est. Leo Tokens / Run All', 'gend-society' ); ?></p>
+                            <p class="k"><?php esc_html_e( 'Est. AI Builder Tokens / Run All', 'gend-society' ); ?></p>
                             <div class="v"><?php echo esc_html( number_format_i18n( round( $gs_dv_sq['totalTokens'] ) ) ); ?></div>
                         </div>
                         <div class="gs-dv-stat">
@@ -1653,7 +1653,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
                                 <th><?php esc_html_e( 'gend.me AI Steps', 'gend-society' ); ?></th>
                                 <th><?php esc_html_e( 'Device / Terminal Steps', 'gend-society' ); ?></th>
                                 <th><?php esc_html_e( 'Est. Cost / Run', 'gend-society' ); ?></th>
-                                <th><?php esc_html_e( 'Est. Leo Tokens / Run', 'gend-society' ); ?></th>
+                                <th><?php esc_html_e( 'Est. AI Builder Tokens / Run', 'gend-society' ); ?></th>
                                 <th></th>
                             </tr></thead>
                             <tbody>
@@ -2059,7 +2059,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
                     var balEl = tr.querySelector('[data-bal]');
                     if (balEl) balEl.textContent = fmtN(d.balance);
                     renderWallet();
-                    say(statusEl, '✓ ' + fmtN(d.tokens) + ' <?php echo esc_js( __( 'Leo Tokens added for', 'gend-society' ) ); ?> ' + m.name, true);
+                    say(statusEl, '✓ ' + fmtN(d.tokens) + ' <?php echo esc_js( __( 'AI Builder Tokens added for', 'gend-society' ) ); ?> ' + m.name, true);
                 }).catch(function(){ btn.disabled = false; say(statusEl, '<?php echo esc_js( __( 'Network error.', 'gend-society' ) ); ?>', false); });
             }); }
             // ── Contract editor popup: AJAX member search-and-select,
@@ -2255,7 +2255,7 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Davinci Architect → Leo → MEMBERS sub-tab
-// Member Leo Token balances, one-click admin purchases (billed to the acting
+// Member AI Builder Token balances, one-click admin purchases (billed to the acting
 // admin's DGEN wallet at 1 CAD = 1 DGEN), and scheduled Purchase Contracts
 // (role- or member-targeted, daily/weekly/monthly) processed by an hourly
 // cron on the hub. Contracts live in ONE site option keyed by group id so
@@ -2268,7 +2268,7 @@ function gend_society_dv_leo_admin_ok( $group_id ) {
     return function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( get_current_user_id(), (int) $group_id );
 }
 
-/** Published Leo Token package products (hub main site). */
+/** Published AI Builder Token package products (hub main site). */
 function gend_society_dv_leo_packages() {
     global $wpdb;
     $rows = $wpdb->get_results(
@@ -2276,7 +2276,7 @@ function gend_society_dv_leo_packages() {
          FROM {$wpdb->posts} p
          JOIN {$wpdb->postmeta} m ON m.post_id = p.ID AND m.meta_key = '_aipa_token_package_amount'
          LEFT JOIN {$wpdb->postmeta} pr ON pr.post_id = p.ID AND pr.meta_key = '_price'
-         WHERE p.post_type = 'product' AND p.post_status = 'publish'
+         WHERE p.post_type IN ('product','product_variation') AND p.post_status = 'publish'
          ORDER BY (pr.meta_value + 0) ASC LIMIT 20", ARRAY_A
     );
     $out = array();
@@ -2332,7 +2332,7 @@ function gend_society_dv_leo_charge( $payer, $amount, $member_id, $pkg_name ) {
         'leo_token_purchase_for_member',
         (int) $payer,
         -$amount,
-        sprintf( 'Leo Tokens (%s) purchased for %s', $pkg_name, $member ? $member->display_name : ( '#' . (int) $member_id ) ),
+        sprintf( 'AI Builder Tokens (%s) purchased for %s', $pkg_name, $member ? $member->display_name : ( '#' . (int) $member_id ) ),
         (int) $member_id,
         array( 'package' => $pkg_name ),
         'transact'
@@ -2541,6 +2541,9 @@ function gend_society_dv_leo_contracts_run() {
             if ( (int) ( $c['nextRunAt'] ?? 0 ) > $now ) continue;
 
             $pkg = null;
+            // Old package product moved into an AI Builder Tokens variation → follow it.
+            $moved = (int) get_post_meta( (int) ( $c['packageId'] ?? 0 ), '_aipa_migrated_to', true );
+            if ( $moved ) { $c['packageId'] = $moved; $all[ $group_id ][ $i ]['packageId'] = $moved; $dirty = true; }
             foreach ( gend_society_dv_leo_packages() as $cand ) { if ( $cand['id'] === (int) ( $c['packageId'] ?? 0 ) ) { $pkg = $cand; break; } }
             if ( ! $pkg ) {
                 $all[ $group_id ][ $i ]['lastNote'] = 'package missing — paused';

@@ -1,0 +1,152 @@
+/* Phase 109-35 (D36): tab strips of the bundled GenD menu pages on a standalone install (inc/standalone-menu.php).
+ * The .gdc-tabs / .gdc-tab look is copied from gend.me's own admin dashboards (Content Campaigns / Social Profiles
+ * admin-dashboard-base.css) so the bundled pages and the core screens they open read as the same tabs. */
+.gdc-admin-dashboard .gdc-lead {
+	color: #dbe1ea;
+	max-width: 980px;
+}
+
+.gdc-admin-dashboard .gdc-tabs {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 18px 0;
+}
+
+.gdc-admin-dashboard .gdc-tab {
+	border: 1px solid #2a2f3a;
+	background: #1f2430;
+	color: #e6edf7;
+	padding: 8px 12px;
+	border-radius: 8px;
+	cursor: pointer;
+	text-decoration: none;
+	font-size: 13px;
+	line-height: 1.5;
+	transition: color .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease;
+}
+
+.gdc-admin-dashboard .gdc-tab .dashicons {
+	margin-right: 6px;
+	font-size: 16px;
+	width: 16px;
+	height: 16px;
+	vertical-align: text-bottom;
+}
+
+.gdc-admin-dashboard .gdc-tab:hover,
+.gdc-admin-dashboard .gdc-tab:focus {
+	color: #fff;
+	border-color: #3b82f6;
+	box-shadow: 0 0 0 1px rgba(59, 130, 246, .25);
+}
+
+.gdc-admin-dashboard .gdc-tab.active {
+	background: linear-gradient(180deg, #4f46e5, #3b82f6);
+	color: #fff;
+	border-color: transparent;
+	box-shadow: 0 12px 28px rgba(59, 130, 246, .4);
+}
+
+.gdc-admin-dashboard .gs-sa-subtabs {
+	margin: -6px 0 14px;
+}
+
+.gdc-admin-dashboard .gs-sa-subtabs .gdc-tab {
+	padding: 5px 10px;
+	font-size: 12px;
+	background: rgba(31, 36, 48, .7);
+}
+
+.gs-sa-home {
+	margin: 14px 20px 0 2px;
+}
+
+.gs-sa-home__crumb {
+	margin: 0;
+	color: #9fb0c8;
+	font-size: 12px;
+	text-transform: uppercase;
+	letter-spacing: .06em;
+}
+
+.gs-sa-home__crumb a {
+	color: #cfe0ff;
+	text-decoration: none;
+}
+
+.gs-sa-hero {
+	max-width: 760px;
+	margin: 18px auto 6px;
+	padding: 22px 28px 18px;
+	text-align: center;
+	border-radius: 18px;
+	border: 1px solid rgba(255, 255, 255, .08);
+	background: rgba(11, 14, 20, .72);
+	box-shadow: 0 16px 40px rgba(0, 0, 0, .35);
+}
+
+.gs-sa-hero__title {
+	margin: 0 0 8px;
+	color: #fff;
+	font-size: 34px;
+	font-weight: 800;
+	letter-spacing: .08em;
+	line-height: 1.2;
+	text-transform: uppercase;
+}
+
+.gs-sa-hero .gdc-lead {
+	margin: 0 auto;
+	font-size: 13px;
+}
+
+.gs-sa-wrap .gs-sa-tabs {
+	justify-content: center;
+	padding: 10px;
+	border-radius: 14px;
+	background: rgba(11, 14, 20, .45);
+	border: 1px solid rgba(255, 255, 255, .06);
+}
+
+/* The upgrade / included cards (gs-plan.css draws them for the light core admin) on the dark GenD skin. */
+.gend-society-plan .gend-society-card.gs-plan-card {
+	max-width: 1100px;
+	background: linear-gradient(180deg, rgba(20, 24, 34, .72), rgba(11, 14, 20, .8));
+	border: 1px solid rgba(255, 255, 255, .1);
+	border-radius: 14px;
+	color: #dbe1ea;
+	box-shadow: inset 0 1px 0 rgba(255, 255, 255, .06), 0 16px 40px rgba(0, 0, 0, .35);
+}
+
+.gend-society-plan .gend-society-card.gs-plan-card h2,
+.gend-society-plan .gend-society-card.gs-plan-card .gs-up-state {
+	color: #fff;
+}
+
+.gend-society-plan .gend-society-card.gs-plan-card p {
+	color: #cbd5e1;
+}
+
+.gend-society-plan .gs-plan-live {
+	color: #9fb0c8;
+}
+
+.gs-sa-codebase-links {
+	display: flex;
+	flex-wrap: wrap;
+	gap: 8px;
+	margin: 0 0 14px;
+}
+
+/* 113-04: core list-screen titles (e.g. Content Campaigns > Pages = edit.php?post_type=page) keep core's dark
+ * heading colour, which is barely visible on the dark skin. This file only loads on a standalone install with the
+ * GenD skin, so the hub's output is unchanged. */
+.wrap h1.wp-heading-inline {
+	color: #e6edf7;
+}
+
+.wrap .subsubsub a.current,
+.wrap .subsubsub a.current .count {
+	color: #fff;
+}

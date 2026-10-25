@@ -40,7 +40,7 @@ function gend_society_portal_connect_handle_submit() {
         wp_die(esc_html__('Forbidden.', 'gend-society'));
     }
 
-    $op = isset($_POST['op']) ? sanitize_text_field((string) $_POST['op']) : '';
+    $op = isset($_POST['op']) ? sanitize_text_field(wp_unslash((string) $_POST['op'])) : '';
 
     // Phase 108: standalone pairing, revoke-first disconnect and ownership; hub and container keep the code below.
     if (gend_society_portal_connect_standalone_ready()) {
@@ -68,8 +68,8 @@ function gend_society_portal_connect_handle_submit() {
 
     check_admin_referer('gs_portal_connect_submit', 'gs_portal_connect_nonce');
 
-    $gend_base    = isset($_POST['gend_base_url']) ? esc_url_raw((string) $_POST['gend_base_url']) : '';
-    $pairing_code = isset($_POST['pairing_code']) ? strtoupper(preg_replace('/[^A-Z0-9]/', '', (string) $_POST['pairing_code'])) : '';
+    $gend_base    = isset($_POST['gend_base_url']) ? esc_url_raw(wp_unslash((string) $_POST['gend_base_url'])) : '';
+    $pairing_code = isset($_POST['pairing_code']) ? strtoupper(preg_replace('/[^A-Z0-9]/', '', sanitize_text_field(wp_unslash((string) $_POST['pairing_code'])))) : '';
 
     if ($gend_base === '' || strlen($pairing_code) < 6) {
         gend_society_portal_connect_redirect('error', __('Please provide both the gend.me URL and a pairing code.', 'gend-society'));
@@ -90,12 +90,12 @@ function gend_society_portal_connect_handle_submit() {
 
     // Generate or reuse our own keypair so the install identity is stable across reconnects.
     $keypair_b64 = (string) get_option('gend_society_keypair', '');
-    $keypair_raw = $keypair_b64 !== '' ? base64_decode($keypair_b64, true) : '';
+    $keypair_raw = $keypair_b64 !== '' ? base64_decode($keypair_b64, true) : ''; // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_decode -- stored Ed25519 key material, strict decode.
     if (!is_string($keypair_raw) || strlen($keypair_raw) !== SODIUM_CRYPTO_SIGN_KEYPAIRBYTES) {
         $keypair_raw = sodium_crypto_sign_keypair();
-        update_option('gend_society_keypair', base64_encode($keypair_raw), false);
+        update_option('gend_society_keypair', base64_encode($keypair_raw), false); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- stores the binary Ed25519 keypair as text.
     }
-    $pubkey_b64 = base64_encode(sodium_crypto_sign_publickey($keypair_raw));
+    $pubkey_b64 = base64_encode(sodium_crypto_sign_publickey($keypair_raw)); // phpcs:ignore WordPress.PHP.DiscouragedPHPFunctions.obfuscation_base64_encode -- public key transport.
 
     $install_id = (string) get_option('gend_society_install_id', '');
     if ($install_id === '') {
@@ -396,6 +396,13 @@ if (!function_exists('gend_society_portal_connect_forget_local')) {
 		if (function_exists('gend_society_consent_clear')) {
 			gend_society_consent_clear();
 		}
+		// @build-only-begin wporg
+		// Optional sharing starts off again on the next connect.
+		delete_option('gend_society_share_mail_relay');
+		delete_option('gend_society_share_plugin_list');
+		wp_clear_scheduled_hook('gend_society_mail_storage_report');
+		wp_clear_scheduled_hook('gend_society_feature_state_daily');
+		// @build-only-end wporg
 	}
 }
 
@@ -437,12 +444,49 @@ if (!function_exists('gend_society_portal_connect_handle_standalone')) {
 			case 'claim_owner':
 				gend_society_portal_connect_standalone_owner($op);
 				return;
+			// @build-only-begin wporg
+			case 'data_sharing':
+				gend_society_portal_connect_data_sharing_save();
+				return;
+			// @build-only-end wporg
 			default:
 				gend_society_portal_connect_standalone_pairing();
 		}
 	}
 }
 
+// @build-only-begin wporg
+if (!function_exists('gend_society_portal_connect_data_sharing_save')) {
+	/**
+	 * admin-post op=data_sharing (wordpress.org build): save the owner's optional sharing choices from the
+	 * Connected card. The caller checks manage_options; nonce gend_society_data_sharing.
+	 */
+	function gend_society_portal_connect_data_sharing_save() {
+		check_admin_referer('gend_society_data_sharing', 'gend_society_data_sharing_nonce');
+		if (!function_exists('gend_society_build_is_wporg') || !gend_society_build_is_wporg()) {
+			gend_society_portal_connect_standalone_redirect('error', __('This build has no optional sharing settings.', 'gend-society'));
+			return;
+		}
+		$plugin_list_was_on = gend_society_data_sharing_allowed('plugin_list');
+		foreach (array_keys(gend_society_data_sharing_items()) as $item) {
+			$field = 'gend_society_share_' . $item;
+			// phpcs:ignore WordPress.Security.NonceVerification.Missing -- verified above.
+			$on = isset($_POST[$field]) && '1' === sanitize_text_field(wp_unslash((string) $_POST[$field]));
+			update_option($field, $on ? '1' : '0', false);
+		}
+		if (!gend_society_data_sharing_allowed('mail_relay')) {
+			wp_clear_scheduled_hook('gend_society_mail_storage_report');
+		}
+		if (!gend_society_data_sharing_allowed('plugin_list')) {
+			wp_clear_scheduled_hook('gend_society_feature_state_daily');
+		} elseif (!$plugin_list_was_on && function_exists('gend_society_feature_state_report_now')) {
+			gend_society_feature_state_report_now();
+		}
+		gend_society_portal_connect_standalone_redirect('success', __('Sharing choices saved.', 'gend-society'));
+	}
+}
+
+// @build-only-end wporg
 if (!function_exists('gend_society_portal_connect_standalone_pairing')) {
 	/**
 	 * Pairing-code connect: consent first, then the hub's /connect, which
@@ -452,8 +496,8 @@ if (!function_exists('gend_society_portal_connect_standalone_pairing')) {
 		check_admin_referer('gs_portal_connect_submit', 'gs_portal_connect_nonce');
 
 		// phpcs:disable WordPress.Security.NonceVerification.Missing -- verified above.
-		$gend_base = isset($_POST['gend_base_url']) ? esc_url_raw(trim(wp_unslash((string) $_POST['gend_base_url']))) : '';
-		$raw_code  = isset($_POST['pairing_code']) ? (string) wp_unslash($_POST['pairing_code']) : '';
+		$gend_base = isset($_POST['gend_base_url']) ? trim(esc_url_raw(wp_unslash((string) $_POST['gend_base_url']))) : '';
+		$raw_code  = isset($_POST['pairing_code']) ? sanitize_text_field(wp_unslash((string) $_POST['pairing_code'])) : '';
 		$consented = !empty($_POST['gend_society_consent']);
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 
@@ -825,7 +869,7 @@ if (!function_exists('gend_society_portal_connect_render_connect')) {
 	function gend_society_portal_connect_render_connect() {
 		$disclosure = function_exists('gend_society_consent_disclosure_items') ? gend_society_consent_disclosure_items() : array();
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- pre-fill only, validated by the pattern.
-		$code_param = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? (string) wp_unslash($_GET['gend_society_code']) : '';
+		$code_param = isset($_GET['gend_society_code']) && is_string($_GET['gend_society_code']) ? sanitize_text_field(wp_unslash($_GET['gend_society_code'])) : '';
 		$prefill    = preg_match('/^[A-HJ-NP-Z2-9]{6}$/', $code_param) ? $code_param : '';
 		$hub_url    = gend_society_connect_hub();
 		?>
@@ -973,6 +1017,24 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 				</tbody>
 			</table>
 
+<?php /* @build-only-begin wporg */ ?>
+			<?php if (function_exists('gend_society_build_is_wporg') && gend_society_build_is_wporg()) : ?>
+				<h3><?php esc_html_e('Optional sharing with gend.me', 'gend-society'); ?></h3>
+				<p><?php esc_html_e('Both are off unless you turn them on here. Turning one off stops it straight away.', 'gend-society'); ?></p>
+				<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="gend-society-connect-sharing">
+					<?php wp_nonce_field('gend_society_data_sharing', 'gend_society_data_sharing_nonce'); ?>
+					<input type="hidden" name="action" value="gend_society_portal_connect_submit" />
+					<input type="hidden" name="op" value="data_sharing" />
+					<?php foreach (gend_society_data_sharing_items() as $gend_society_item => $gend_society_share) : ?>
+						<p>
+							<label><input type="checkbox" name="gend_society_share_<?php echo esc_attr($gend_society_item); ?>" value="1"<?php checked(gend_society_data_sharing_allowed($gend_society_item)); ?> /> <?php echo esc_html($gend_society_share['label']); ?></label><br />
+							<span class="description"><?php echo esc_html($gend_society_share['description']); ?></span>
+						</p>
+					<?php endforeach; ?>
+					<?php submit_button(__('Save sharing choices', 'gend-society'), 'secondary', 'submit', false); ?>
+				</form>
+			<?php endif; ?>
+<?php /* @build-only-end wporg */ ?>
 			<h3><?php esc_html_e('Disconnect', 'gend-society'); ?></h3>
 			<?php $billing = function_exists('gend_society_plan_disconnect_billing') ? gend_society_plan_disconnect_billing() : null; ?>
 			<?php if ($billing) : ?>

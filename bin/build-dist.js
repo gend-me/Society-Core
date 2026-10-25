@@ -47,6 +47,8 @@ const VARIANTS = {
 	full: {
 		forbiddenTiers: ['hub'],
 		forbiddenPaths: [],
+		forbiddenStrings: [],
+		buildConstant: '',
 		stampTiers: 'core,customer,container,updater',
 		dropUpdateUri: false,
 		remoteRule: 'warn',
@@ -58,7 +60,14 @@ const VARIANTS = {
 	},
 	wporg: {
 		forbiddenTiers: ['hub', 'updater', 'container'],
-		forbiddenPaths: ['themes/', 'inc/theme-bundle.php', 'inc/compat-aliases.php', 'inc/compat-bridges.php', 'chatflows/'],
+		// inc/support-access.php: wordpress.org review 2026-10-25 (remote administration). It stays in the
+		// customer tier for the full build; the wordpress.org build must never ship it again.
+		forbiddenPaths: ['themes/', 'inc/theme-bundle.php', 'inc/compat-aliases.php', 'inc/compat-bridges.php', 'chatflows/', 'inc/support-access.php'],
+		// Text that must not appear in any shipped wordpress.org file: the support-access grant/user and the
+		// raw SQL console (both removed from this build by bin/dist/wporg.exclude and @build-strip blocks).
+		forbiddenStrings: ['grant-admin-access', 'revoke-admin-access', 'gend_support', 'GEND_SOCIETY_SUPPORT_', 'hosting_query_run', 'gs-hosting-query-'],
+		// Written into the staged gend-society.php: the code's opt-in gates key off it.
+		buildConstant: 'wporg',
 		stampTiers: 'core,customer',
 		dropUpdateUri: true,
 		remoteRule: 'fail',
@@ -342,9 +351,60 @@ function transformMain(src, cfg, variantName, fail) {
 		`\n// Distribution build (${variantName}): only these manifest tiers ship in this zip.\n` +
 		`if ( ! defined( 'GEND_SOCIETY_BUILD_TIERS' ) ) {\n` +
 		`\tdefine( 'GEND_SOCIETY_BUILD_TIERS', '${cfg.stampTiers}' );\n` +
-		`}\n`;
+		`}\n` +
+		(cfg.buildConstant
+			? `if ( ! defined( 'GEND_SOCIETY_BUILD' ) ) {\n\tdefine( 'GEND_SOCIETY_BUILD', '${cfg.buildConstant}' );\n}\n`
+			: '');
 	out = out.slice(0, at) + stamp + out.slice(at);
 	return out;
+}
+
+// ---------------------------------------------------------------------------
+// Build markers (any shipped text file)
+//
+//   @build-strip-begin <variant[,variant]> ... @build-strip-end <same list>
+//       the lines between are left out of the listed variants;
+//   @build-only-begin <variant[,variant]> ... @build-only-end <same list>
+//       the lines between ship ONLY in the listed variants.
+//
+// A marker is the whole line it sits on (write it as a comment the file's language
+// ignores: "// ...", "<?php /* ... */ ?>" at column 0, "<!-- ... -->"). Every build
+// drops the marker lines themselves, so a file whose markers only fence variant-specific
+// lines ships byte-identical to the unmarked original in the other variants.
+// Source checkouts (gend.me itself) run the file as written: code inside markers keeps
+// its own runtime guard (gend_society_build_is_wporg()).
+// ---------------------------------------------------------------------------
+
+const MARKER_RE = /@build-(strip|only)-(begin|end)(?:[ \t]+([a-z]+(?:,[a-z]+)*))?/;
+
+function applyBuildMarkers(src, variantName, rel, fail) {
+	if (!src.includes('@build-')) return src;
+	const lines = src.split(/(?<=\n)/);
+	const out = [];
+	let open = null;
+	lines.forEach((line, i) => {
+		const m = line.match(MARKER_RE);
+		if (!m) {
+			if (open) {
+				const listed = open.list.split(',').includes(variantName);
+				if (open.kind === 'strip' ? listed : !listed) return;
+			}
+			out.push(line);
+			return;
+		}
+		const [, kind, edge, list] = m;
+		const at = `${rel}:${i + 1}`;
+		if (!list || list.split(',').some((v) => !VARIANTS[v])) fail('build-marker-variant', at);
+		if (edge === 'begin') {
+			if (open) fail('build-marker-nested', at);
+			open = { kind, list: list || '' };
+		} else {
+			if (!open || open.kind !== kind || open.list !== (list || '')) fail('build-marker-unbalanced', at);
+			open = null;
+		}
+	});
+	if (open) fail('build-marker-unclosed', rel);
+	return out.join('');
 }
 
 // ---------------------------------------------------------------------------
@@ -377,6 +437,10 @@ function assertContent(stageDir, rels, cfg, oldPrefixEnforced, fail, warn) {
 		const src = fs.readFileSync(path.join(stageDir, rel), 'utf8');
 		if (rel === MAIN_FILE && /^[ \t]*\*?[ \t]*Network:/im.test(firstDocblock(src))) fail('network-header', rel);
 		if (cfg.dropUpdateUri && /Update URI/i.test(src)) fail('update-uri', rel);
+		if (/@build-(strip|only)-/.test(src)) fail('build-marker-left', rel);
+		for (const s of cfg.forbiddenStrings) {
+			if (src.includes(s)) fail(`forbidden-string ${s}`, rel);
+		}
 		const remote = cfg.remoteRule === 'fail' ? fail : warn;
 		for (const host of CDN_HOSTS) {
 			if (src.includes(host)) remote(`cdn-host ${host}`, rel);
@@ -390,6 +454,10 @@ function assertContent(stageDir, rels, cfg, oldPrefixEnforced, fail, warn) {
 			for (const re of OLD_PREFIX_RES) n += (code.match(re) || []).length;
 			if (n) oldPrefixHits.push([rel, n]);
 		}
+	}
+	if (cfg.buildConstant) {
+		const main = rels.includes(MAIN_FILE) ? fs.readFileSync(path.join(stageDir, MAIN_FILE), 'utf8') : '';
+		if (!main.includes(`define( 'GEND_SOCIETY_BUILD', '${cfg.buildConstant}' );`)) fail('build-constant-missing', MAIN_FILE);
 	}
 	if (cfg.requireUpdateUri) {
 		const main = rels.includes(MAIN_FILE) ? fs.readFileSync(path.join(stageDir, MAIN_FILE), 'utf8') : '';
@@ -427,8 +495,12 @@ async function buildVariant(name, opts, tiers, all) {
 	for (const rel of rels) {
 		const dst = path.join(stageDir, rel);
 		fs.mkdirSync(path.dirname(dst), { recursive: true });
+		const src = isText(rel) ? fs.readFileSync(path.join(opts.root, rel), 'utf8') : null;
+		const marked = src !== null && src.includes('@build-');
 		if (rel === MAIN_FILE && opts.headerTransform) {
-			fs.writeFileSync(dst, transformMain(fs.readFileSync(path.join(opts.root, rel), 'utf8'), cfg, name, fail));
+			fs.writeFileSync(dst, transformMain(applyBuildMarkers(src, name, rel, fail), cfg, name, fail));
+		} else if (marked) {
+			fs.writeFileSync(dst, applyBuildMarkers(src, name, rel, fail));
 		} else {
 			fs.copyFileSync(path.join(opts.root, rel), dst);
 		}

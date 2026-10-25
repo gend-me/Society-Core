@@ -1,0 +1,57 @@
+name: wporg-assets
+
+# Updates only the wordpress.org listing (readme.txt on SVN trunk and the banners,
+# icons and screenshots in .wordpress-org/ -> SVN /assets) when they change on main,
+# without making a release (10up/action-wordpress-plugin-asset-update with
+# IGNORE_OTHER_FILES, so no plugin code is committed).
+#
+# Inert until enabled: the job is skipped unless the repository variable
+# WPORG_DEPLOY_ENABLED is 'true'. A maintainer sets it, together with the secrets
+# SVN_USERNAME and SVN_PASSWORD, only after the plugin has been approved on
+# wordpress.org.
+#
+# The full build (self-hosted and gend.me-hosted installs) is unaffected: it carries an
+# Update URI header, so WordPress core never asks wordpress.org about it.
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - readme.txt
+      - '.wordpress-org/**'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: wporg-deploy
+  cancel-in-progress: false
+
+jobs:
+  assets:
+    if: vars.WPORG_DEPLOY_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Require SVN credentials
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+        run: |
+          if [ -z "$SVN_USERNAME" ] || [ -z "$SVN_PASSWORD" ]; then
+            echo "::error::SVN_USERNAME and SVN_PASSWORD secrets are required to update the wordpress.org listing."
+            exit 1
+          fi
+
+      - uses: actions/checkout@v4
+
+      - name: Update readme and assets on wordpress.org
+        # stable (2.2.0)
+        uses: 10up/action-wordpress-plugin-asset-update@2480306f6f693672726d08b5917ea114cb2825f7
+        env:
+          SVN_USERNAME: ${{ secrets.SVN_USERNAME }}
+          SVN_PASSWORD: ${{ secrets.SVN_PASSWORD }}
+          # Keep in step with SLUG in wporg-deploy.yml.
+          SLUG: gend-society
+          IGNORE_OTHER_FILES: true
+          README_NAME: readme.txt
+          ASSETS_DIR: .wordpress-org

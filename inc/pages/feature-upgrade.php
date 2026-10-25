@@ -449,13 +449,16 @@ if ( ! function_exists( 'gend_society_feature_upgrade_fragment' ) ) {
 
 if ( ! function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
 	/**
-	 * admin.php?page=gs-feature-upgrade on a standalone install.
+	 * admin.php?page=gs-feature-upgrade on a standalone install; also the bundled GenD menu pages of features that
+	 * are not on this install (109-35, inc/standalone-menu.php), which pass their area.
+	 *
+	 * @param string $area Area slug ('' = from the request).
 	 */
-	function gend_society_feature_upgrade_page_standalone(): void {
+	function gend_society_feature_upgrade_page_standalone( string $area = '' ): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'You are not allowed to view this page.', 'gend-society' ), '', array( 'response' => 403 ) );
 		}
-		$area     = gend_society_feature_upgrade_request_area();
+		$area     = '' !== $area ? sanitize_key( $area ) : gend_society_feature_upgrade_request_area();
 		$plan_url = function_exists( 'gend_society_plan_page_url' ) ? gend_society_plan_page_url() : admin_url( 'index.php' );
 		echo '<div class="wrap gend-society-plan gend-society-upgrade">';
 		echo '<h1>' . esc_html__( 'Feature access', 'gend-society' ) . '</h1>';

@@ -14,9 +14,10 @@
  *   manage_options, nonce gend_society_admin_experience; GET for the
  *   admin-bar / header link, POST for the toggle form).
  * - gend_society_admin_experience_render_toggle(): the card on the GenD page.
- * - With the skin ON: the core admin bar is made visible again (the skin
- *   hides it), the skin header is moved below it, and "Switch back to standard
- *   WordPress" sits in both the admin bar and the skin header.
+ * - With the skin ON (109-35, D36): the core admin bar stays hidden as on
+ *   gend.me, and "Switch back to standard WordPress" sits at the top of the
+ *   GenD dashboard page content (gend_society_admin_experience_dashboard_top()),
+ *   with the theme warning + Activate below it.
  * - Phase 109 (D28/D34): the skin is ON by default on standalone. While the
  *   default (no stored choice) is in force, a notice on every skinned screen
  *   names the switch and offers "Keep the GenD dashboard" (stores gend) or
@@ -206,85 +207,92 @@ if ( ! function_exists( 'gend_society_admin_experience_can_switch_back' ) ) {
 	}
 }
 
-if ( ! function_exists( 'gend_society_admin_experience_admin_bar' ) ) {
+if ( ! function_exists( 'gend_society_admin_experience_theme_warning' ) ) {
 	/**
-	 * Admin-bar node: "Switch back to standard WordPress".
-	 *
-	 * @param WP_Admin_Bar $wp_admin_bar Admin bar.
+	 * Phase 109-35 (D36 (3)): the GenD Society theme is not active -> warning + Activate (full build: the 106 theme
+	 * card's own nonce'd admin-post action, back to the dashboard) or the wordpress.org download panel (wporg build:
+	 * the theme is not bundled). Prints nothing when the theme is active.
 	 */
-	function gend_society_admin_experience_admin_bar( $wp_admin_bar ): void {
-		if ( ! is_object( $wp_admin_bar ) || ! gend_society_admin_experience_can_switch_back() ) {
+	function gend_society_admin_experience_theme_warning(): void {
+		if ( ! current_user_can( 'switch_themes' ) ) {
 			return;
 		}
-		$wp_admin_bar->add_node(
-			array(
-				'id'    => 'gend-society-switch-back',
-				'title' => esc_html__( 'Switch back to standard WordPress', 'gend-society' ),
-				'href'  => gend_society_admin_experience_switch_url( 'native' ),
-				'meta'  => array( 'class' => 'gend-society-switch-back' ),
-			)
-		);
+		if ( function_exists( 'gend_society_theme_is_active' ) && defined( 'GEND_SOCIETY_THEME_SLUG' ) ) {
+			// The theme_roots cache written before this plugin registered its theme folder hides the bundled theme
+			// (and the Activate action refuses it) until the cache expires: refresh it when that is the case.
+			if ( ! wp_get_theme( GEND_SOCIETY_THEME_SLUG )->exists() && defined( 'GEND_SOCIETY_THEME_ROOT' ) && wp_get_theme( GEND_SOCIETY_THEME_SLUG, GEND_SOCIETY_THEME_ROOT )->exists() ) {
+				wp_clean_themes_cache( false );
+			}
+			if ( gend_society_theme_is_active() || ! wp_get_theme( GEND_SOCIETY_THEME_SLUG )->exists() ) {
+				return;
+			}
+			echo '<div class="gs-sa-top__theme" role="status">';
+			echo '<p><span class="dashicons dashicons-warning" aria-hidden="true"></span> <strong>' . esc_html__( 'The GenD Society theme is not active.', 'gend-society' ) . '</strong> ';
+			echo esc_html__( 'GenD profile, group and store pages are built for it. Your current theme stays active until you switch.', 'gend-society' ) . '</p>';
+			echo '<form method="post" action="' . esc_url( admin_url( 'admin-post.php' ) ) . '">';
+			echo '<input type="hidden" name="action" value="gend_society_theme_activate" />';
+			echo '<input type="hidden" name="gs_return" value="dashboard" />';
+			wp_nonce_field( 'gend_society_theme_activate' );
+			echo '<button type="submit" class="button button-primary gs-sa-top__activate">' . esc_html__( 'Activate GenD Society theme', 'gend-society' ) . '</button>';
+			echo '</form></div>';
+			return;
+		}
+		if ( function_exists( 'gend_society_theme_download_render_panel' ) && 'gend-society-theme' !== get_stylesheet() && 'gend-society-theme' !== get_template() ) {
+			echo '<div class="gs-sa-top__theme" role="status">';
+			echo '<p><span class="dashicons dashicons-warning" aria-hidden="true"></span> <strong>' . esc_html__( 'The GenD Society theme is not active.', 'gend-society' ) . '</strong></p>';
+			gend_society_theme_download_render_panel();
+			echo '</div>';
+		}
 	}
-	add_action( 'admin_bar_menu', 'gend_society_admin_experience_admin_bar', 100 );
 }
 
-if ( ! function_exists( 'gend_society_admin_experience_visibility_css' ) ) {
+if ( ! function_exists( 'gend_society_admin_experience_dashboard_top' ) ) {
 	/**
-	 * With the skin ON, make the core admin bar visible again (admin-style.css
-	 * hides it) and move the skin's fixed header below it. Priority 99: after
-	 * admin-style.php's admin_head output. The bar is also stacked above the
-	 * header (z-index 100001), whose 0.8 s slide-down entrance otherwise passes
-	 * over the bar and covers the Switch-back link while it animates.
+	 * Phase 109-35 (D36 (1)-(3)): the top of the GenD dashboard page content on a standalone install. The core admin
+	 * bar is hidden (inc/admin-style.php, as on gend.me), so "Switch back to standard WordPress" lives here, not in the
+	 * admin bar or the skin header. While the standalone default is in force (no stored choice) it also offers "Keep
+	 * the GenD dashboard". Called from gend_society_render_custom_dashboard_screen() (standalone branch only).
 	 */
-	function gend_society_admin_experience_visibility_css(): void {
+	function gend_society_admin_experience_dashboard_top(): void {
 		if ( ! gend_society_admin_experience_can_switch_back() ) {
 			return;
 		}
-		echo '<style id="gend-society-switch-back-css">'
-			. '#wpadminbar{display:block!important;z-index:100002!important;}'
-			. 'html.wp-toolbar{padding-top:32px!important;}'
-			. '@media screen and (max-width:782px){html.wp-toolbar{padding-top:46px!important;}}'
-			. '.header-anchor-wrap{top:32px!important;}'
-			. '@media screen and (max-width:782px){.header-anchor-wrap{top:46px!important;}}'
-			. '.gend-society-switch-back-header{margin-left:12px;padding:6px 12px;border-radius:999px;border:1px solid rgba(255,255,255,.25);color:#fff!important;text-decoration:none;font-size:12px;white-space:nowrap;}'
-			. '.gend-society-switch-back-header:hover,.gend-society-switch-back-header:focus{background:rgba(255,255,255,.12);}'
-			. '.gend-society-switch-back-header.is-floating{position:fixed;left:12px;bottom:12px;z-index:100002;margin:0;background:#1d2327;}'
+		$is_default = '' === (string) get_option( 'gend_society_admin_experience', '' );
+		echo '<div class="gs-sa-top" id="gs-sa-top">';
+		echo '<div class="gs-sa-top__switch">';
+		if ( $is_default ) {
+			echo '<span class="gs-sa-top__note">' . esc_html__( 'GenD Society turned on the GenD dashboard for this site.', 'gend-society' ) . '</span>';
+			echo '<a class="gs-sa-top__btn is-primary" href="' . esc_url( gend_society_admin_experience_switch_url( 'gend' ) ) . '">' . esc_html__( 'Keep the GenD dashboard', 'gend-society' ) . '</a>';
+		}
+		echo '<a class="gs-sa-top__btn gend-society-switch-back" href="' . esc_url( gend_society_admin_experience_switch_url( 'native' ) ) . '">' . esc_html__( 'Switch back to standard WordPress', 'gend-society' ) . '</a>';
+		echo '</div>';
+		gend_society_admin_experience_theme_warning();
+		echo '</div>';
+	}
+}
+
+if ( ! function_exists( 'gend_society_admin_experience_top_css' ) ) {
+	/**
+	 * Styles for the dashboard top bar (index.php only).
+	 */
+	function gend_society_admin_experience_top_css(): void {
+		if ( ! gend_society_admin_experience_can_switch_back() ) {
+			return;
+		}
+		echo '<style id="gend-society-sa-top-css">'
+			. '.gs-sa-top{max-width:1200px;margin:16px auto 0;display:flex;flex-direction:column;gap:10px;}'
+			. '.gs-sa-top__switch{display:flex;flex-wrap:wrap;align-items:center;justify-content:flex-end;gap:10px;}'
+			. '.gs-sa-top__note{color:#cbd5f5;font-size:13px;margin-right:auto;}'
+			. '.gs-sa-top__btn{display:inline-block;padding:8px 16px;border-radius:999px;border:1px solid rgba(255,255,255,.25);background:rgba(11,14,20,.55);color:#fff!important;text-decoration:none;font-size:13px;font-weight:600;line-height:1.4;white-space:nowrap;}'
+			. '.gs-sa-top__btn:hover,.gs-sa-top__btn:focus{background:rgba(255,255,255,.12);color:#fff;}'
+			. '.gs-sa-top__btn.is-primary{background:linear-gradient(180deg,#4f46e5,#3b82f6);border-color:transparent;}'
+			. '.gs-sa-top__theme{display:flex;flex-wrap:wrap;align-items:center;gap:12px;padding:12px 16px;border-radius:12px;border:1px solid rgba(245,158,11,.45);background:rgba(245,158,11,.12);color:#fde68a;}'
+			. '.gs-sa-top__theme p{margin:0;color:#fde68a;}.gs-sa-top__theme form{margin:0 0 0 auto;}'
+			. '.gs-sa-top__theme .card{background:transparent!important;border:0!important;box-shadow:none!important;padding:0;margin:0;max-width:none;color:#fde68a;}'
+			. '.gs-sa-top__theme .card h2{display:none;}.gs-sa-top__theme .card a{color:#fff;}'
 			. '</style>';
 	}
-	add_action( 'admin_head', 'gend_society_admin_experience_visibility_css', 99 );
-}
-
-if ( ! function_exists( 'gend_society_admin_experience_header_link' ) ) {
-	/**
-	 * Put the same Switch-back link into the skin header (.header-anchor-wrap,
-	 * injected by assets/admin-script.js). Local inline script, no remote code.
-	 */
-	function gend_society_admin_experience_header_link(): void {
-		if ( ! gend_society_admin_experience_can_switch_back() ) {
-			return;
-		}
-		$config = array(
-			// wp_nonce_url() returns an HTML-escaped URL (&amp;); a.href is set from JS, so decode it first.
-			'href'  => esc_url_raw( wp_specialchars_decode( gend_society_admin_experience_switch_url( 'native' ) ) ),
-			'label' => __( 'Switch back to standard WordPress', 'gend-society' ),
-		);
-		$js = '(function(c){'
-			. 'var done=false;'
-			. 'function make(){var a=document.createElement("a");a.className="gend-society-switch-back-header";a.href=c.href;a.textContent=c.label;return a;}'
-			. 'function put(w){if(done||!w){return false;}done=true;w.appendChild(make());return true;}'
-			. 'function floating(){if(done){return;}done=true;var a=make();a.className+=" is-floating";document.body.appendChild(a);}'
-			. 'function start(){'
-			. 'if(put(document.querySelector(".header-anchor-wrap"))){return;}'
-			. 'if(!window.MutationObserver){setTimeout(function(){if(!put(document.querySelector(".header-anchor-wrap"))){floating();}},5000);return;}'
-			. 'var o=new MutationObserver(function(){if(put(document.querySelector(".header-anchor-wrap"))){o.disconnect();}});'
-			. 'o.observe(document.body,{childList:true,subtree:true});'
-			. 'setTimeout(function(){o.disconnect();if(!put(document.querySelector(".header-anchor-wrap"))){floating();}},5000);'
-			. '}'
-			. 'if(document.readyState==="loading"){document.addEventListener("DOMContentLoaded",start);}else{start();}'
-			. '})(' . wp_json_encode( $config ) . ');';
-		wp_add_inline_script( 'common', $js );
-	}
-	add_action( 'admin_enqueue_scripts', 'gend_society_admin_experience_header_link', 99 );
+	add_action( 'admin_head-index.php', 'gend_society_admin_experience_top_css', 99 );
 }
 
 if ( ! function_exists( 'gend_society_admin_experience_notice' ) ) {
@@ -301,7 +309,7 @@ if ( ! function_exists( 'gend_society_admin_experience_notice' ) ) {
 		}
 		$is_on   = function_exists( 'gend_society_admin_skin_enabled' ) && gend_society_admin_skin_enabled();
 		$message = $is_on
-			? __( 'The GenD dashboard is on. Use "Switch back to standard WordPress" in the toolbar at any time.', 'gend-society' )
+			? __( 'The GenD dashboard is on. Use "Switch back to standard WordPress" at the top of the dashboard at any time.', 'gend-society' )
 			: __( 'You are back on the standard WordPress admin.', 'gend-society' );
 		echo '<div class="notice notice-success is-dismissible"><p>' . esc_html( $message ) . '</p></div>';
 	}
@@ -323,12 +331,16 @@ if ( ! function_exists( 'gend_society_admin_experience_default_notice' ) ) {
 		if ( '' !== (string) get_option( 'gend_society_admin_experience', '' ) ) {
 			return;
 		}
+		// 109-35: the dashboard's own top bar carries both choices there.
+		if ( isset( $GLOBALS['pagenow'] ) && 'index.php' === $GLOBALS['pagenow'] ) {
+			return;
+		}
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display-only flag set by the nonce-checked handler.
 		if ( isset( $_GET['gend_society_experience_updated'] ) ) {
 			return;
 		}
 		echo '<div class="notice notice-info gend-society-skin-default-notice"><p>'
-			. esc_html__( 'GenD Society turned on the GenD dashboard for this site. You can switch back to the standard WordPress admin at any time from the toolbar.', 'gend-society' )
+			. esc_html__( 'GenD Society turned on the GenD dashboard for this site. You can switch back to the standard WordPress admin at any time from the top of the dashboard.', 'gend-society' )
 			. '</p><p>'
 			. '<a class="button button-primary" href="' . esc_url( gend_society_admin_experience_switch_url( 'gend' ) ) . '">' . esc_html__( 'Keep the GenD dashboard', 'gend-society' ) . '</a> '
 			. '<a class="button" href="' . esc_url( gend_society_admin_experience_switch_url( 'native' ) ) . '">' . esc_html__( 'Switch back to standard WordPress', 'gend-society' ) . '</a>'

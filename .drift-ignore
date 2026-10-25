@@ -17,6 +17,8 @@
 .gitignore
 # Repo tooling: CI workflows, never deployed
 .github/
+# Repo tooling: wordpress.org listing assets (SVN /assets), never deployed
+.wordpress-org/
 # Repo tooling: helper scripts (drift check, release), never deployed
 bin/
 

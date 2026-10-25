@@ -654,6 +654,12 @@ return array(
 			'note'  => 'Feature-access upgrade prompt page.',
 		),
 		array(
+			'file'  => 'inc/standalone-menu.php',
+			'tier'  => 'core',
+			'needs' => array( 'standalone', 'skin' ),
+			'note'  => 'Phase 109-35 (D36): gend.me/wp-admin sidebar on standalone - bundled menu pages only (upgrade page until the plan includes a feature), hub tab strips on the core screens, sidebar order.',
+		),
+		array(
 			'file'  => 'inc/admin-experience.php',
 			'tier'  => 'core',
 			'needs' => array( 'standalone' ),

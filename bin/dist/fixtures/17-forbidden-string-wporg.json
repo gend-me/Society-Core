@@ -1,0 +1,16 @@
+{
+	"name": "support-access / SQL console text in a shipped wordpress.org file",
+	"append": {
+		"inc/consent.php": "\n// grant-admin-access hosting_query_run\n"
+	},
+	"expect": [
+		{
+			"variant": "wporg",
+			"rule": "forbidden-string grant-admin-access"
+		},
+		{
+			"variant": "wporg",
+			"rule": "forbidden-string hosting_query_run"
+		}
+	]
+}
