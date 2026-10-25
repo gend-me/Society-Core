@@ -99,7 +99,8 @@
             }
         };
 
-        if (!container) return null;
+        // Templates and template parts have no permalink: nothing to preview.
+        if (!container || !permalink) return null;
 
         // Construct preview URL with performance bypass param
         const previewUrl = permalink + (permalink.indexOf('?') > -1 ? '&' : '?') + 'gs_live_view=1';
