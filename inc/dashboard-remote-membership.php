@@ -592,7 +592,15 @@ if ( ! function_exists( 'gend_society_render_email_plan_card' ) ) {
 <style id="gs-em-plan-css">
 .gs-em-hero a.gs-bk-btn { box-sizing: border-box; color: #e6edf7; }
 .gs-em-hero a.gs-bk-btn:hover, .gs-em-hero a.gs-bk-btn:focus { color: #fff; }
-.gs-em-sels { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 18px; max-width: 520px; }
+.gs-bk-hero.gs-em-hero { padding: 22px 26px; gap: 16px 24px; align-items: center; }
+.gs-em-hero .gs-bk-badge { margin-bottom: 10px; }
+.gs-em-hero .gs-bk-title { margin-bottom: 4px; }
+.gs-em-hero .gs-bk-sub { max-width: 620px; }
+.gs-em-hero .gs-bk-actions { gap: 8px; }
+.gs-em-sels { position: relative; z-index: 1; flex: 1 1 100%; display: grid; grid-template-columns: repeat(auto-fit, minmax(240px, 1fr)); gap: 12px 14px; }
+.gs-em-col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
+.gs-em-col > .gs-em-sel { width: 100%; }
+.gs-em-col > .gs-em-meter { padding: 0 4px; }
 .gs-em-sel { box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px 14px 12px 44px; border-radius: 12px; background: rgba(11,14,20,.45); border: 1px solid rgba(255,255,255,.10); color: #e6edf7; font: inherit; text-align: left; text-decoration: none; cursor: default; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 button.gs-em-sel, a.gs-em-sel { cursor: pointer; }
 button.gs-em-sel:hover, a.gs-em-sel:hover, button.gs-em-sel:focus-visible, a.gs-em-sel:focus-visible { transform: translateY(-2px); border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.10); box-shadow: 0 10px 24px rgba(16,185,129,.16); color: #fff; outline: none; }
@@ -602,14 +610,15 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
 .gs-em-sel__v { color: #fff; font-size: 0.9rem; font-weight: 700; line-height: 1.3; }
 .gs-em-sel.is-current { border-color: rgba(16,185,129,.45); }
 .gs-em-sel.is-current::after { content: '\f147'; font-family: dashicons; position: absolute; top: 8px; right: 10px; font-size: 16px; color: #6ee7b7; }
-.gs-em-meters { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 12px; max-width: 520px; }
 .gs-em-meter__k { color: rgba(226,232,240,.55); font-size: 0.66rem; text-transform: uppercase; letter-spacing: 0.08em; font-weight: 800; }
-.gs-em-meter__v { color: #fff; font-size: 0.95rem; font-weight: 800; margin: 3px 0 6px; }
+.gs-em-meter__head { display: flex; justify-content: space-between; align-items: baseline; gap: 10px; }
+.gs-em-meter__v { color: #fff; font-size: 0.95rem; font-weight: 800; margin: 0 0 5px; white-space: nowrap; }
 .gs-em-meter__v small { color: rgba(226,232,240,.6); font-weight: 600; font-size: 0.78rem; }
 .gs-em-meter__bar { height: 6px; border-radius: 999px; background: rgba(255,255,255,.08); overflow: hidden; }
 .gs-em-meter__bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #10b981, #22d3ee); transition: width .9s cubic-bezier(.2,.9,.3,1); }
 .gs-em-meter.is-over .gs-em-meter__bar > span { background: linear-gradient(90deg, #f59e0b, #ef4444); }
 .gs-em-meter.is-over .gs-em-meter__v { color: #fcd34d; }
+@media (max-width: 640px) { .gs-bk-hero.gs-em-hero { padding: 20px 18px; align-items: stretch; } .gs-em-hero > .gs-bk-main, .gs-em-hero > .gs-em-sels { flex: 0 0 auto; min-width: 0; } .gs-em-sels { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .gs-em-sel, .gs-em-sel > .dashicons, .gs-em-meter__bar > span { transition: none; } }
 </style>
 <script>
@@ -685,7 +694,8 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
 .gs-em-plan--talk-flows .gs-bk-main > *:nth-child(3) { animation-delay: 0.16s; }
 .gs-em-plan--talk-flows .gs-bk-main > *:nth-child(4) { animation-delay: 0.22s; }
 .gs-em-plan--talk-flows .gs-bk-main > *:nth-child(n+5) { animation-delay: 0.28s; }
-@media (prefers-reduced-motion: reduce) { .gs-em-plan--talk-flows .gs-bk-hero, .gs-em-plan--talk-flows .gs-bk-main > * { animation: none; } }
+.gs-em-plan--talk-flows .gs-em-sels { animation: gs-em-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) 0.22s both; }
+@media (prefers-reduced-motion: reduce) { .gs-em-plan--talk-flows .gs-bk-hero, .gs-em-plan--talk-flows .gs-bk-main > *, .gs-em-plan--talk-flows .gs-em-sels { animation: none; } }
 </style>
             <?php
         }
@@ -716,25 +726,6 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
             <span class="gs-bk-badge<?php echo '' !== $v['badge_class'] ? ' ' . esc_attr( $v['badge_class'] ) : ''; ?>"><span class="dashicons dashicons-email-alt"></span><?php echo esc_html( $v['badge'] ); ?></span>
             <h2 class="gs-bk-title"><?php esc_html_e( 'Email hosting', 'gend-society' ); ?></h2>
             <p class="gs-bk-sub"><?php echo esc_html( $v['text'] ); ?></p>
-<?php if ( ! empty( $v['tiles'] ) ) : ?>
-            <div class="gs-em-sels">
-<?php foreach ( $v['tiles'] as $kind => $t ) : ?>
-                <?php echo $tile_open( $kind, ! empty( $t['is_current'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_url()'d. ?><span class="dashicons <?php echo esc_attr( $t['icon'] ); ?>"></span><span class="gs-em-sel__k"><?php echo esc_html( $t['label'] ); ?></span><span class="gs-em-sel__v"><?php echo esc_html( $t['value'] ); ?></span><?php echo $tile_close; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Literal closing tag. ?>
-
-<?php endforeach; ?>
-            </div>
-<?php endif; ?>
-<?php if ( ! empty( $v['meters'] ) ) : ?>
-            <div class="gs-em-meters">
-<?php foreach ( $v['meters'] as $kind => $mt ) : ?>
-                <div class="gs-em-meter<?php echo ! empty( $mt['over'] ) ? ' is-over' : ''; ?>" data-gs-em-meter="<?php echo esc_attr( $kind ); ?>">
-                    <div class="gs-em-meter__k"><?php echo esc_html( $mt['label'] ); ?></div>
-                    <div class="gs-em-meter__v"><span data-gs-em-count data-value="<?php echo esc_attr( (string) $mt['value'] ); ?>" data-decimals="<?php echo (int) $mt['decimals']; ?>"><?php echo esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ); ?></span> <small><?php echo esc_html( $mt['of'] ); ?></small></div>
-                    <div class="gs-em-meter__bar"><span data-gs-em-bar data-pct="<?php echo (int) $mt['pct']; ?>" style="width: <?php echo (int) $mt['pct']; ?>%;"></span></div>
-                </div>
-<?php endforeach; ?>
-            </div>
-<?php endif; ?>
         </div>
         <div class="gs-bk-actions">
 <?php if ( $cta && 'upgrade' === $cta['type'] ) : ?>
@@ -749,6 +740,32 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
             <a class="gs-bk-btn" href="<?php echo esc_url( $v['manage_url'] ); ?>"><span class="dashicons dashicons-email"></span><?php esc_html_e( 'Manage email', 'gend-society' ); ?></a>
 <?php endif; ?>
         </div>
+<?php
+$em_kinds = array_keys( (array) $v['tiles'] );
+foreach ( array_keys( (array) $v['meters'] ) as $em_k ) {
+    if ( ! in_array( $em_k, $em_kinds, true ) ) {
+        $em_kinds[] = $em_k;
+    }
+}
+?>
+<?php if ( ! empty( $em_kinds ) ) : ?>
+        <div class="gs-em-sels">
+<?php foreach ( $em_kinds as $kind ) : ?>
+            <div class="gs-em-col" data-gs-em-col="<?php echo esc_attr( $kind ); ?>">
+<?php if ( isset( $v['tiles'][ $kind ] ) ) : $t = $v['tiles'][ $kind ]; ?>
+                <?php echo $tile_open( $kind, ! empty( $t['is_current'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_url()'d. ?><span class="dashicons <?php echo esc_attr( $t['icon'] ); ?>"></span><span class="gs-em-sel__k"><?php echo esc_html( $t['label'] ); ?></span><span class="gs-em-sel__v"><?php echo esc_html( $t['value'] ); ?></span><?php echo $tile_close; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Literal closing tag. ?>
+
+<?php endif; ?>
+<?php if ( isset( $v['meters'][ $kind ] ) ) : $mt = $v['meters'][ $kind ]; ?>
+                <div class="gs-em-meter<?php echo ! empty( $mt['over'] ) ? ' is-over' : ''; ?>" data-gs-em-meter="<?php echo esc_attr( $kind ); ?>">
+                    <div class="gs-em-meter__head"><div class="gs-em-meter__k"><?php echo esc_html( $mt['label'] ); ?></div><div class="gs-em-meter__v"><span data-gs-em-count data-value="<?php echo esc_attr( (string) $mt['value'] ); ?>" data-decimals="<?php echo (int) $mt['decimals']; ?>"><?php echo esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ); ?></span> <small><?php echo esc_html( $mt['of'] ); ?></small></div></div>
+                    <div class="gs-em-meter__bar"><span data-gs-em-bar data-pct="<?php echo (int) $mt['pct']; ?>" style="width: <?php echo (int) $mt['pct']; ?>%;"></span></div>
+                </div>
+<?php endif; ?>
+            </div>
+<?php endforeach; ?>
+        </div>
+<?php endif; ?>
     </div>
 </div>
         <?php
