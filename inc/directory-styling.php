@@ -511,8 +511,9 @@ add_action( 'enqueue_block_assets', 'gend_society_ds_editor_styles' );
  * Directory block styles on directory pages.
  */
 function gend_society_ds_styles() {
-	if ( '' === gend_society_ds_current_slug() ) {
-		return;
+	$slug = gend_society_ds_current_slug();
+	if ( '' === $slug || ! gend_society_ds_layout( $slug ) ) {
+		return; // Only pages that use a published layout need these styles.
 	}
 	wp_register_style( 'gend-society-directory-blocks', false, array(), GEND_SOCIETY_VERSION );
 	wp_enqueue_style( 'gend-society-directory-blocks' );
