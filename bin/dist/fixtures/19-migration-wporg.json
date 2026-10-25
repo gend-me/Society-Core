@@ -1,0 +1,13 @@
+{
+	"name": "migration modules back in the wordpress.org build (exclude lines removed)",
+	"exclude": {
+		"wporg": {
+			"remove": ["inc/migration-preflight.php", "inc/migration-export.php", "inc/migration-serve.php"]
+		}
+	},
+	"expect": [
+		{ "variant": "wporg", "rule": "forbidden-path inc/migration-preflight.php" },
+		{ "variant": "wporg", "rule": "forbidden-path inc/migration-export.php" },
+		{ "variant": "wporg", "rule": "forbidden-path inc/migration-serve.php" }
+	]
+}

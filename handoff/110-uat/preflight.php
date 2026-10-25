@@ -1009,6 +1009,49 @@ $gs110pf_sections['cta-hidden'] = function () {
 	gs110pf_assert( false !== strpos( $render(), 'gdc-migrate-cta' ), 'cta-shown-control', 'control: paired admin, hub URL, not Live -> CTA shown' );
 };
 
+// 110-21: the wordpress.org build ships no migration modules (inc/migration-{preflight,export,serve}.php are
+// excluded until the review team has answered), so a paired admin with a container wizard URL must see NO Storage
+// Start Migration CTA there: paying would arm a migration this build cannot start. Run on a bed with dist/wporg.
+$gs110pf_sections['cta-wporg'] = function () {
+	gs110pf_assert( defined( 'GEND_SOCIETY_BUILD' ) && 'wporg' === GEND_SOCIETY_BUILD, 'wporg-build', 'bed runs the wordpress.org build (GEND_SOCIETY_BUILD = wporg)' );
+	gs110pf_assert( ! function_exists( 'gend_society_migration_cta_mode' ) && ! function_exists( 'gend_society_migration_export_tick' ) && ! function_exists( 'gend_society_migration_file_route' ), 'wporg-no-migration', 'no migration module loaded (preflight / export / serve)' );
+	gs110pf_assert( false === has_action( 'rest_api_init', 'gend_society_migration_register_file_route' ), 'wporg-no-file-route', 'no signed migration file route registered' );
+	gs110pf_keep_options( array( 'gend_society_remote_membership_cache', 'gend_society_remote_membership_cache_expires' ) );
+	$opts = array(
+		'gend_society_install_id'    => 'gs110pf-wporg-install',
+		'gend_society_install_token' => str_repeat( 'a', 64 ),
+		'gend_society_gend_base_url' => GS110PF_BASE,
+	);
+	$fs   = array();
+	foreach ( $opts as $k => $v ) {
+		$fs[ $k ] = function () use ( $v ) {
+			return $v;
+		};
+		add_filter( 'pre_option_' . $k, $fs[ $k ] );
+	}
+	add_filter( 'gend_society_remote_allowed', '__return_true', 99 );
+	wp_set_current_user( 1 );
+	gs110pf_set_payload();
+	// plan-access.php loads only on a paired install (manifest needs: paired); the bed is paired by filters here.
+	if ( ! function_exists( 'gend_society_plan_container_wizard_url' ) && is_readable( WP_PLUGIN_DIR . '/gend-society/inc/plan-access.php' ) ) {
+		require_once WP_PLUGIN_DIR . '/gend-society/inc/plan-access.php';
+	}
+	$paired = gend_society_dashboard_standalone_paired();
+	$wiz    = function_exists( 'gend_society_plan_container_wizard_url' ) ? gend_society_plan_container_wizard_url( (array) gend_society_remote_membership_get_cached() ) : '';
+	$html   = gs110pf_render(
+		function () {
+			gend_society_hosting_render_storage_resource_cards( array(), array(), array() );
+		}
+	);
+	remove_filter( 'gend_society_remote_allowed', '__return_true', 99 );
+	foreach ( $fs as $k => $cb ) {
+		remove_filter( 'pre_option_' . $k, $cb );
+	}
+	gs110pf_assert( $paired && '' !== $wiz, 'wporg-control', 'control: paired admin and the container wizard URL builds', wp_json_encode( array( $paired, $wiz ) ) );
+	gs110pf_assert( false !== strpos( $html, 'gs-hosting__resources-grid' ), 'wporg-cards-render', 'the Storage cards still render' );
+	gs110pf_assert( false === strpos( $html, 'gdc-migrate-cta' ) && false === strpos( $html, 'data-gs-migrate-cta' ), 'wporg-no-cta', 'wordpress.org build: no Start Migration CTA on the Storage card' );
+};
+
 $gs110pf_sections['cta-hub-unchanged'] = function () {
 	$mode = gend_society_runtime_mode();
 	gs110pf_assert( in_array( $mode, array( 'hub', 'container' ), true ), 'hubcta-mode', "running on hub or container ({$mode})" );
