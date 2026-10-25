@@ -601,6 +601,9 @@ if ( ! function_exists( 'gend_society_render_email_plan_card' ) ) {
 .gs-em-col { display: flex; flex-direction: column; gap: 9px; min-width: 0; }
 .gs-em-col > .gs-em-sel { width: 100%; }
 .gs-em-col > .gs-em-meter { padding: 0 4px; }
+.gs-em-meter, .gs-em-meter__k, .gs-em-meter__v, .gs-em-meter__bar { display: block; box-sizing: border-box; }
+.gs-em-sel > .gs-em-meter { align-self: stretch; margin: 7px 0 0 -30px; padding-top: 9px; border-top: 1px solid rgba(255,255,255,.07); }
+.gs-em-sel:has(> .gs-em-meter) > .dashicons { top: 22px; margin-top: 0; }
 .gs-em-sel { box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px 14px 12px 44px; border-radius: 12px; background: rgba(11,14,20,.45); border: 1px solid rgba(255,255,255,.10); color: #e6edf7; font: inherit; text-align: left; text-decoration: none; cursor: default; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 button.gs-em-sel, a.gs-em-sel { cursor: pointer; }
 button.gs-em-sel:hover, a.gs-em-sel:hover, button.gs-em-sel:focus-visible, a.gs-em-sel:focus-visible { transform: translateY(-2px); border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.10); box-shadow: 0 10px 24px rgba(16,185,129,.16); color: #fff; outline: none; }
@@ -752,15 +755,22 @@ foreach ( array_keys( (array) $v['meters'] ) as $em_k ) {
         <div class="gs-em-sels">
 <?php foreach ( $em_kinds as $kind ) : ?>
             <div class="gs-em-col" data-gs-em-col="<?php echo esc_attr( $kind ); ?>">
+<?php
+$em_meter = '';
+if ( isset( $v['meters'][ $kind ] ) ) {
+    $mt       = $v['meters'][ $kind ];
+    $em_meter = '<span class="gs-em-meter' . ( ! empty( $mt['over'] ) ? ' is-over' : '' ) . '" data-gs-em-meter="' . esc_attr( $kind ) . '">'
+        . '<span class="gs-em-meter__head"><span class="gs-em-meter__k">' . esc_html( $mt['label'] ) . '</span><span class="gs-em-meter__v"><span data-gs-em-count data-value="' . esc_attr( (string) $mt['value'] ) . '" data-decimals="' . (int) $mt['decimals'] . '">' . esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ) . '</span> <small>' . esc_html( $mt['of'] ) . '</small></span></span>'
+        . '<span class="gs-em-meter__bar"><span data-gs-em-bar data-pct="' . (int) $mt['pct'] . '" style="width: ' . (int) $mt['pct'] . '%;"></span></span>'
+        . '</span>';
+}
+?>
 <?php if ( isset( $v['tiles'][ $kind ] ) ) : $t = $v['tiles'][ $kind ]; ?>
-                <?php echo $tile_open( $kind, ! empty( $t['is_current'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_url()'d. ?><span class="dashicons <?php echo esc_attr( $t['icon'] ); ?>"></span><span class="gs-em-sel__k"><?php echo esc_html( $t['label'] ); ?></span><span class="gs-em-sel__v"><?php echo esc_html( $t['value'] ); ?></span><?php echo $tile_close; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Literal closing tag. ?>
+                <?php echo $tile_open( $kind, ! empty( $t['is_current'] ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_url()'d. ?><span class="dashicons <?php echo esc_attr( $t['icon'] ); ?>"></span><span class="gs-em-sel__k"><?php echo esc_html( $t['label'] ); ?></span><span class="gs-em-sel__v"><?php echo esc_html( $t['value'] ); ?></span><?php echo $em_meter; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_html()'d or cast. ?><?php echo $tile_close; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Literal closing tag. ?>
 
-<?php endif; ?>
-<?php if ( isset( $v['meters'][ $kind ] ) ) : $mt = $v['meters'][ $kind ]; ?>
-                <div class="gs-em-meter<?php echo ! empty( $mt['over'] ) ? ' is-over' : ''; ?>" data-gs-em-meter="<?php echo esc_attr( $kind ); ?>">
-                    <div class="gs-em-meter__head"><div class="gs-em-meter__k"><?php echo esc_html( $mt['label'] ); ?></div><div class="gs-em-meter__v"><span data-gs-em-count data-value="<?php echo esc_attr( (string) $mt['value'] ); ?>" data-decimals="<?php echo (int) $mt['decimals']; ?>"><?php echo esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ); ?></span> <small><?php echo esc_html( $mt['of'] ); ?></small></div></div>
-                    <div class="gs-em-meter__bar"><span data-gs-em-bar data-pct="<?php echo (int) $mt['pct']; ?>" style="width: <?php echo (int) $mt['pct']; ?>%;"></span></div>
-                </div>
+<?php elseif ( '' !== $em_meter ) : ?>
+                <?php echo $em_meter; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_html()'d or cast. ?>
+
 <?php endif; ?>
             </div>
 <?php endforeach; ?>
