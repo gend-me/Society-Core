@@ -157,7 +157,7 @@
 					close( null );
 				}
 			} );
-			document.body.appendChild( overlay );
+			root.appendChild( overlay );
 			var first = row.querySelector( '.is-primary' ) || row.querySelector( 'button' );
 			if ( first ) {
 				first.focus();
@@ -372,6 +372,7 @@
 		if ( ! previewFrame || ! S.previewCss ) {
 			return;
 		}
+		var css = fontFaceCss() + S.previewCss;
 		try {
 			var doc = previewFrame.contentDocument;
 			if ( ! doc || ! doc.head ) {
@@ -383,7 +384,7 @@
 				el.id = 'gs-studio-live';
 				doc.head.appendChild( el );
 			}
-			el.textContent = S.previewCss;
+			el.textContent = css;
 		} catch ( e ) {
 			// Cross-origin preview (unusual front-end domain): live CSS is skipped, saving still updates it.
 		}
@@ -752,7 +753,7 @@
 	}
 	function viewPanel( hit ) {
 		var p = hit.item.panel;
-		var needsStyles = p === 'palettes' || p === 'fonts' || p.indexOf( 'type:' ) === 0;
+		var needsStyles = p === 'palettes' || p === 'fonts';
 		if ( needsStyles && ! cfg.globalStylesId ) {
 			return emptyState( 'warning', __( 'Styles are not available', 'gend-society' ), __( 'Your active theme does not support global styles, so colours and type are set by the theme.', 'gend-society' ) );
 		}
@@ -782,10 +783,7 @@
 		if ( p === 'palettes' ) {
 			return panelPalettes( hit );
 		}
-		if ( p === 'fonts' ) {
-			return panelFonts( hit );
-		}
-		return panelType( hit, p.slice( 5 ) );
+		return panelTypography( hit );
 	}
 
 	function pickImage( title, onPick ) {
@@ -1018,167 +1016,524 @@
 		return panelLayout( hit, __( 'Pick a scheme to restyle the whole site at once, then fine-tune any colour. Nothing goes live until you save.', 'gend-society' ), controls );
 	}
 
-	function familySelect( value, onChange, label ) {
-		var sel = h( 'select', { class: 'gs-st-input', 'aria-label': label, onchange: function () {
-			onChange( sel.value ? 'var:preset|font-family|' + sel.value : '' );
-		} }, h( 'option', { value: '' }, __( 'Theme default', 'gend-society' ) ) );
-		var slug = presetSlug( value, 'font-family' );
-		fontFamilies().forEach( function ( f ) {
-			sel.appendChild( h( 'option', { value: f.slug, selected: f.slug === slug }, f.name ) );
-		} );
-		return sel;
+	/* ── Typography: one panel for every text style, with Google Fonts ─── */
+	var TYPE_ELEMENTS = [
+		{ id: 'heading', label: __( 'All headings', 'gend-society' ), base: 'styles.elements.heading', sample: __( 'Big ideas, bold headlines', 'gend-society' ) },
+		{ id: 'h1', label: 'H1', base: 'styles.elements.h1', parent: 'heading', sample: __( 'Heading 1', 'gend-society' ) },
+		{ id: 'h2', label: 'H2', base: 'styles.elements.h2', parent: 'heading', sample: __( 'Heading 2', 'gend-society' ) },
+		{ id: 'h3', label: 'H3', base: 'styles.elements.h3', parent: 'heading', sample: __( 'Heading 3', 'gend-society' ) },
+		{ id: 'h4', label: 'H4', base: 'styles.elements.h4', parent: 'heading', sample: __( 'Heading 4', 'gend-society' ) },
+		{ id: 'h5', label: 'H5', base: 'styles.elements.h5', parent: 'heading', sample: __( 'Heading 5', 'gend-society' ) },
+		{ id: 'h6', label: 'H6', base: 'styles.elements.h6', parent: 'heading', sample: __( 'Heading 6', 'gend-society' ) },
+		{ id: 'p', label: __( 'Paragraph', 'gend-society' ), base: 'styles', sample: __( 'Comfortable reading for every paragraph on your site.', 'gend-society' ) },
+		{ id: 'a', label: __( 'Link', 'gend-society' ), base: 'styles.elements.link', sample: __( 'A link that stands out', 'gend-society' ) },
+		{ id: 'button', label: __( 'Buttons', 'gend-society' ), base: 'styles.elements.button', sample: __( 'Get started', 'gend-society' ) },
+	];
+	var WEIGHT_NAMES = { 100: __( 'Thin', 'gend-society' ), 200: __( 'Extra light', 'gend-society' ), 300: __( 'Light', 'gend-society' ), 400: __( 'Regular', 'gend-society' ), 500: __( 'Medium', 'gend-society' ), 600: __( 'Semi bold', 'gend-society' ), 700: __( 'Bold', 'gend-society' ), 800: __( 'Extra bold', 'gend-society' ), 900: __( 'Black', 'gend-society' ) };
+
+	function familyBySlug( slug ) {
+		return fontFamilies().filter( function ( f ) {
+			return f.slug === slug;
+		} )[ 0 ] || null;
 	}
-	function panelFonts( hit ) {
-		var row = function ( label, path, sample ) {
-			var cur = get( S.gs, path );
-			var shown = h( 'div', { class: 'gs-st-font-sample', style: { 'font-family': ( fontFamilies().filter( function ( f ) {
-				return f.slug === presetSlug( eff( path ), 'font-family' );
-			} )[ 0 ] || {} ).fontFamily || 'inherit' } }, sample );
-			return h( 'div', { class: 'gs-st-card is-flat gs-st-font-row' }, h( 'div', { class: 'gs-st-font-head' }, h( 'strong', null, label ), h( 'small', null, cur ? familyName( cur ) : sprintf( __( 'Theme default (%s)', 'gend-society' ), familyName( get( S.base, path ) ) || __( 'system', 'gend-society' ) ) ) ), shown, familySelect( cur, function ( v ) {
-				set( S.gs, path, v );
-				changed();
-				render();
-			}, label ) );
-		};
-		var lib = fontFamilies();
-		var controls = h(
-			'div',
-			{ class: 'gs-st-stack' },
-			row( __( 'Headings', 'gend-society' ), 'styles.elements.heading.typography.fontFamily', __( 'Big ideas, bold headlines', 'gend-society' ) ),
-			row( __( 'Body text', 'gend-society' ), 'styles.typography.fontFamily', __( 'Comfortable reading for every paragraph on your site.', 'gend-society' ) ),
-			row( __( 'Buttons', 'gend-society' ), 'styles.elements.button.typography.fontFamily', __( 'Get started', 'gend-society' ) ),
-			h( 'div', { class: 'gs-st-card is-flat' }, h( 'h3', null, sprintf( __( 'Your font library (%d)', 'gend-society' ), lib.length ) ), h( 'div', { class: 'gs-st-font-chips' }, lib.map( function ( f ) {
-				return h( 'span', { class: 'gs-st-chip', style: { 'font-family': f.fontFamily } }, f.name );
-			} ) ), h( 'a', { class: 'gs-st-btn is-ghost', href: '#/branding/fonts', onclick: function ( e ) {
-				e.preventDefault();
-				openEmbed( __( 'Font library', 'gend-society' ), editorUrl( '/styles', { section: '/typography' } ) );
-			} }, icon( 'plus-alt2' ), __( 'Add or upload fonts', 'gend-society' ) ) )
-		);
-		return panelLayout( hit, __( 'Choose the typefaces for headings, body text and buttons. Each heading level and the link style can be tuned under Typography.', 'gend-society' ), controls );
+	// Turn a theme.json src ("file:./assets/fonts/x.woff2" or a URL) into a URL.
+	function fontSrcUrl( src ) {
+		src = Array.isArray( src ) ? src[ 0 ] : src;
+		if ( typeof src !== 'string' ) {
+			return '';
+		}
+		return src.indexOf( 'file:./' ) === 0 ? cfg.themeUrl + '/' + src.slice( 7 ) : src;
+	}
+	// @font-face rules for every family in the draft, so new fonts show before they are saved.
+	function fontFaceCss() {
+		var css = '';
+		fontFamilies().forEach( function ( f ) {
+			( f.fontFace || [] ).forEach( function ( face ) {
+				var url = fontSrcUrl( face.src );
+				if ( ! url ) {
+					return;
+				}
+				css += '@font-face{font-family:"' + String( face.fontFamily || f.name ).replace( /"/g, '' ) + '";font-style:' + ( face.fontStyle || 'normal' ) + ';font-weight:' + ( face.fontWeight || '400' ) + ';font-display:swap;src:url("' + url.replace( /"/g, '%22' ) + '");}';
+			} );
+		} );
+		return css;
+	}
+	function syncStudioFonts() {
+		var el = document.getElementById( 'gs-studio-fonts' );
+		if ( ! el ) {
+			el = h( 'style', { id: 'gs-studio-fonts' } );
+			document.head.appendChild( el );
+		}
+		el.textContent = fontFaceCss();
 	}
 
-	var WEIGHTS = [ '', '100', '200', '300', '400', '500', '600', '700', '800', '900' ];
-	function panelType( hit, el ) {
-		var base;
-		var colorPath;
-		if ( el === 'p' ) {
-			base = 'styles';
-			colorPath = 'styles.color.text';
-		} else if ( el === 'a' ) {
-			base = 'styles.elements.link';
-			colorPath = 'styles.elements.link.color.text';
-		} else {
-			base = 'styles.elements.' + el;
-			colorPath = base + '.color.text';
+	// Google Fonts, from WordPress's own font collection (files are installed on this site, not hot-linked).
+	function loadGoogleFonts() {
+		if ( S.google ) {
+			return Promise.resolve( S.google );
 		}
-		var tp = base + '.typography.';
-		var inherit = function ( prop ) {
-			if ( el.charAt( 0 ) === 'h' ) {
-				var v = eff( base + '.typography.' + prop );
-				return v !== undefined ? v : eff( 'styles.elements.heading.typography.' + prop );
-			}
-			return eff( tp + prop );
-		};
-		var field = function ( label, prop, input ) {
-			return h( 'label', { class: 'gs-st-field' }, h( 'span', null, label ), input );
-		};
-		var text = function ( prop, ph ) {
-			var cur = get( S.gs, tp + prop );
-			var inp = h( 'input', { type: 'text', class: 'gs-st-input', value: cur || '', placeholder: ph || ( inherit( prop ) !== undefined ? String( inherit( prop ) ) : '' ), oninput: debounce( function () {
-				set( S.gs, tp + prop, inp.value.trim() );
-				changed();
-			}, 250 ) } );
-			return inp;
-		};
-		var select = function ( prop, opts ) {
-			var cur = get( S.gs, tp + prop ) || '';
-			var sel = h( 'select', { class: 'gs-st-input', onchange: function () {
-				set( S.gs, tp + prop, sel.value );
-				changed();
-			} } );
-			opts.forEach( function ( o ) {
-				sel.appendChild( h( 'option', { value: o[ 0 ], selected: o[ 0 ] === cur }, o[ 1 ] ) );
+		if ( ! S.googleLoading ) {
+			S.googleLoading = api( { path: '/wp/v2/font-collections/google-fonts' } ).then( function ( r ) {
+				S.google = r;
+				return r;
+			}, function ( e ) {
+				S.googleLoading = null;
+				throw e;
 			} );
-			return sel;
+		}
+		return S.googleLoading;
+	}
+	function installGoogleFont( fam, onProgress ) {
+		var s = fam.font_family_settings;
+		var faces = s.fontFace || [];
+		var familyId;
+		return api( { path: '/wp/v2/font-families?slug=' + encodeURIComponent( s.slug ) + '&_embed=true' } ).then( function ( found ) {
+			if ( found && found.length ) {
+				familyId = found[ 0 ].id;
+				var installed = ( found[ 0 ]._embedded && found[ 0 ]._embedded.font_faces ) || [];
+				return installed.length ? installed.map( function ( f ) {
+					return f.font_face_settings;
+				} ) : null;
+			}
+			var fd = new window.FormData();
+			fd.append( 'font_family_settings', JSON.stringify( { name: s.name, slug: s.slug, fontFamily: s.fontFamily, preview: s.preview } ) );
+			return api( { path: '/wp/v2/font-families', method: 'POST', body: fd } ).then( function ( r ) {
+				familyId = r.id;
+				return null;
+			} );
+		} ).then( function ( existing ) {
+			if ( existing ) {
+				return existing;
+			}
+			var out = [];
+			// One style at a time: download the file from Google, upload it to this site.
+			return faces.reduce( function ( chain, face, i ) {
+				return chain.then( function () {
+					return window.fetch( face.src ).then( function ( res ) {
+						if ( ! res.ok ) {
+							throw new Error( __( 'Could not download the font file.', 'gend-society' ) );
+						}
+						return res.blob();
+					} ).then( function ( blob ) {
+						var key = 'file-' + i;
+						var fd = new window.FormData();
+						fd.append( 'font_face_settings', JSON.stringify( { fontFamily: face.fontFamily, fontStyle: face.fontStyle, fontWeight: face.fontWeight, src: key } ) );
+						fd.append( key, new window.File( [ blob ], s.slug + '-' + face.fontWeight + '-' + face.fontStyle + '.woff2', { type: 'font/woff2' } ) );
+						return api( { path: '/wp/v2/font-families/' + familyId + '/font-faces', method: 'POST', body: fd } );
+					} ).then( function ( r ) {
+						out.push( r.font_face_settings );
+						onProgress( out.length, faces.length );
+					} );
+				} );
+			}, Promise.resolve() ).then( function () {
+				return out;
+			} );
+		} ).then( function ( installedFaces ) {
+			// Activate it in the draft's custom font families (saved with the rest of the styles).
+			var family = { name: s.name, slug: s.slug, fontFamily: s.fontFamily, fontFace: installedFaces.map( function ( f ) {
+				return { fontFamily: f.fontFamily, fontStyle: f.fontStyle, fontWeight: f.fontWeight, src: f.src };
+			} ) };
+			var custom = ( get( S.gs, 'settings.typography.fontFamilies.custom' ) || [] ).filter( function ( f ) {
+				return f.slug !== s.slug;
+			} );
+			custom.push( family );
+			set( S.gs, 'settings.typography.fontFamilies.custom', custom );
+			syncStudioFonts();
+			return family;
+		} );
+	}
+
+	function fontPickerModal( current, onPick ) {
+		var overlay = h( 'div', { class: 'gs-st-modal-wrap', role: 'dialog', 'aria-modal': 'true', 'aria-label': __( 'Choose a font', 'gend-society' ) } );
+		var onKey = function ( e ) {
+			if ( e.key === 'Escape' ) {
+				close();
+			}
 		};
-		var sizeChips = h( 'div', { class: 'gs-st-chips' }, fontSizes().map( function ( fs ) {
-			var v = 'var:preset|font-size|' + fs.slug;
-			return h( 'button', { type: 'button', class: 'gs-st-chip' + ( get( S.gs, tp + 'fontSize' ) === v ? ' is-on' : '' ), title: typeof fs.size === 'string' ? fs.size : '', onclick: function () {
-				set( S.gs, tp + 'fontSize', get( S.gs, tp + 'fontSize' ) === v ? '' : v );
-				changed();
-				render();
-			} }, fs.name || fs.slug );
+		var close = function () {
+			overlay.remove();
+			document.removeEventListener( 'keydown', onKey );
+		};
+		document.addEventListener( 'keydown', onKey );
+		var cat = '';
+		var limit = 60;
+		var busy = false;
+		var search = h( 'input', { type: 'search', class: 'gs-st-input', placeholder: __( 'Search 1,900+ fonts…', 'gend-society' ), 'aria-label': __( 'Search fonts', 'gend-society' ) } );
+		var cats = h( 'div', { class: 'gs-st-chips' } );
+		var mine = h( 'div', { class: 'gs-st-font-list' } );
+		var google = h( 'div', { class: 'gs-st-font-list is-google' }, h( 'div', { class: 'gs-st-loading' }, h( 'span', { class: 'gs-st-spinner' } ), __( 'Loading Google Fonts…', 'gend-society' ) ) );
+		var status = h( 'div', { class: 'gs-st-font-status', role: 'status' } );
+		var pick = function ( value ) {
+			onPick( value );
+			close();
+		};
+		var drawMine = function () {
+			var q = search.value.trim().toLowerCase();
+			mine.textContent = '';
+			mine.appendChild( h( 'button', { type: 'button', class: 'gs-st-font-opt' + ( ! current ? ' is-on' : '' ), onclick: function () {
+				pick( '' );
+			} }, h( 'span', { class: 'gs-st-font-name' }, __( 'Theme default', 'gend-society' ) ) ) );
+			fontFamilies().filter( function ( f ) {
+				return ! q || f.name.toLowerCase().indexOf( q ) !== -1;
+			} ).forEach( function ( f ) {
+				mine.appendChild( h( 'button', { type: 'button', class: 'gs-st-font-opt' + ( presetSlug( current, 'font-family' ) === f.slug ? ' is-on' : '' ), onclick: function () {
+					pick( 'var:preset|font-family|' + f.slug );
+				} }, h( 'span', { class: 'gs-st-font-name', style: { 'font-family': f.fontFamily } }, f.name ), h( 'small', null, __( 'Installed', 'gend-society' ) ) ) );
+			} );
+		};
+		var drawGoogle = function () {
+			if ( ! S.google ) {
+				return;
+			}
+			var q = search.value.trim().toLowerCase();
+			var have = {};
+			fontFamilies().forEach( function ( f ) {
+				have[ f.slug ] = 1;
+			} );
+			var list = S.google.font_families.filter( function ( f ) {
+				var st = f.font_family_settings;
+				return ! have[ st.slug ] && ( ! q || st.name.toLowerCase().indexOf( q ) !== -1 ) && ( ! cat || ( f.categories || [] ).indexOf( cat ) !== -1 );
+			} );
+			google.textContent = '';
+			list.slice( 0, limit ).forEach( function ( f ) {
+				var st = f.font_family_settings;
+				google.appendChild( h( 'button', { type: 'button', class: 'gs-st-font-opt', title: st.name, onclick: function () {
+					if ( busy ) {
+						return;
+					}
+					busy = true;
+					overlay.classList.add( 'is-busy' );
+					status.textContent = sprintf( __( 'Installing %s…', 'gend-society' ), st.name );
+					installGoogleFont( f, function ( n, total ) {
+						status.textContent = sprintf( __( 'Installing %1$s… %2$d of %3$d styles', 'gend-society' ), st.name, n, total );
+					} ).then( function ( family ) {
+						toast( sprintf( __( '%s installed. Save styles to publish it.', 'gend-society' ), family.name ), 'ok' );
+						pick( 'var:preset|font-family|' + family.slug );
+					}, function ( e ) {
+						busy = false;
+						overlay.classList.remove( 'is-busy' );
+						status.textContent = errMsg( e );
+					} );
+				} }, st.preview ? h( 'img', { class: 'gs-st-font-preview', src: st.preview, alt: st.name, loading: 'lazy' } ) : h( 'span', { class: 'gs-st-font-name' }, st.name ), h( 'small', null, sprintf( __( '%d styles', 'gend-society' ), ( st.fontFace || [] ).length ) ) ) );
+			} );
+			if ( list.length > limit ) {
+				google.appendChild( h( 'button', { type: 'button', class: 'gs-st-btn is-ghost', onclick: function () {
+					limit += 60;
+					drawGoogle();
+				} }, sprintf( __( 'Show more (%d)', 'gend-society' ), list.length - limit ) ) );
+			}
+			if ( ! list.length ) {
+				google.appendChild( h( 'p', { class: 'gs-st-muted' }, __( 'No Google Fonts match.', 'gend-society' ) ) );
+			}
+		};
+		search.addEventListener( 'input', debounce( function () {
+			limit = 60;
+			drawMine();
+			drawGoogle();
+		}, 150 ) );
+		var dialog = h(
+			'div',
+			{ class: 'gs-st-modal is-wide' },
+			h( 'div', { class: 'gs-st-font-head' }, h( 'h2', null, __( 'Choose a font', 'gend-society' ) ), h( 'button', { type: 'button', class: 'gs-st-icon-btn', 'aria-label': __( 'Close', 'gend-society' ), onclick: function () {
+				close();
+			} }, icon( 'no-alt' ) ) ),
+			search,
+			status,
+			h( 'div', { class: 'gs-st-font-cols' },
+				h( 'section', null, h( 'h3', { class: 'gs-st-h3' }, __( 'Your fonts', 'gend-society' ) ), mine ),
+				h( 'section', null, h( 'h3', { class: 'gs-st-h3' }, __( 'Google Fonts', 'gend-society' ) ), h( 'p', { class: 'gs-st-hint' }, __( 'Pick one and it is downloaded and installed on your site automatically.', 'gend-society' ) ), cats, google )
+			)
+		);
+		overlay.appendChild( dialog );
+		overlay.addEventListener( 'click', function ( e ) {
+			if ( e.target === overlay ) {
+				close();
+			}
+		} );
+		root.appendChild( overlay );
+		drawMine();
+		search.focus();
+		loadGoogleFonts().then( function ( g ) {
+			var setCat = function ( slug, btn ) {
+				cat = slug;
+				Array.prototype.forEach.call( cats.children, function ( c ) {
+					c.classList.toggle( 'is-on', c === btn );
+				} );
+				limit = 60;
+				drawGoogle();
+			};
+			var all = h( 'button', { type: 'button', class: 'gs-st-chip is-on', onclick: function () {
+				setCat( '', all );
+			} }, __( 'All', 'gend-society' ) );
+			cats.appendChild( all );
+			( g.categories || [] ).forEach( function ( c ) {
+				var b = h( 'button', { type: 'button', class: 'gs-st-chip', onclick: function () {
+					setCat( c.slug, b );
+				} }, c.name );
+				cats.appendChild( b );
+			} );
+			drawGoogle();
+		}, function ( e ) {
+			google.textContent = errMsg( e );
+		} );
+	}
+
+	function panelTypography( hit ) {
+		if ( ! S.typeEl ) {
+			S.typeEl = 'heading';
+		}
+		syncStudioFonts();
+		var ctl = h( 'div', { class: 'gs-st-controls' } );
+		var redraw = function () {
+			var top = ctl.scrollTop;
+			ctl.textContent = '';
+			ctl.appendChild( typographyControls( hit, redraw ) );
+			ctl.scrollTop = top;
+		};
+		redraw();
+		return h( 'div', { class: 'gs-st-split' }, ctl, previewPane() );
+	}
+
+	function parseSize( v ) {
+		var m = typeof v === 'string' && v.trim().match( /^(-?[\d.]+)\s*(px|rem|em|vw|%)$/ );
+		return m ? { n: parseFloat( m[ 1 ] ), u: m[ 2 ] } : null;
+	}
+	// A size as text: presets resolve to their size (the largest step of a fluid size).
+	function sizeText( v ) {
+		var slug = presetSlug( v, 'font-size' );
+		if ( slug ) {
+			var fs = fontSizes().filter( function ( x ) {
+				return x.slug === slug;
+			} )[ 0 ];
+			if ( ! fs ) {
+				return '';
+			}
+			var sz = fs.fluid && typeof fs.fluid === 'object' && fs.fluid.max ? fs.fluid.max : fs.size;
+			return typeof sz === 'string' ? sz : '';
+		}
+		return typeof v === 'string' ? v : '';
+	}
+	function toPx( s ) {
+		return s ? ( s.u === 'px' ? s.n : s.n * 16 ) : 16;
+	}
+
+	function typographyControls( hit, redraw ) {
+		var el = TYPE_ELEMENTS.filter( function ( e ) {
+			return e.id === S.typeEl;
+		} )[ 0 ];
+		var tp = el.base + '.typography.';
+		var cur = function ( prop ) {
+			return get( S.gs, tp + prop );
+		};
+		var inherit = function ( prop ) {
+			var v = get( S.base, tp + prop );
+			if ( v === undefined && el.parent ) {
+				v = eff( 'styles.elements.heading.typography.' + prop );
+			}
+			if ( v === undefined && el.id !== 'p' ) {
+				v = eff( 'styles.typography.' + prop );
+			}
+			return v;
+		};
+		var shown = function ( prop ) {
+			var v = cur( prop );
+			return v !== undefined ? v : inherit( prop );
+		};
+		var put = function ( prop, value, rerender ) {
+			set( S.gs, tp + prop, value );
+			changed();
+			if ( rerender ) {
+				redraw();
+			}
+		};
+		var customisedEl = function ( e ) {
+			return !! get( S.gs, e.id === 'p' ? 'styles.typography' : e.base );
+		};
+
+		// Which text style is being edited.
+		var tabs = h( 'div', { class: 'gs-st-type-tabs', role: 'tablist', 'aria-label': __( 'Text styles', 'gend-society' ) }, TYPE_ELEMENTS.map( function ( e ) {
+			return h( 'button', { type: 'button', role: 'tab', 'aria-selected': e.id === el.id ? 'true' : 'false', class: 'gs-st-type-tab' + ( e.id === el.id ? ' is-on' : '' ), onclick: function () {
+				S.typeEl = e.id;
+				redraw();
+			} }, e.label, customisedEl( e ) ? h( 'i', { class: 'gs-st-dot is-custom' } ) : null );
 		} ) );
-		var colorChips = function ( path ) {
-			var cur = get( S.gs, path );
-			return h( 'div', { class: 'gs-st-chips is-colors' }, h( 'button', { type: 'button', class: 'gs-st-chip' + ( ! cur ? ' is-on' : '' ), onclick: function () {
+
+		// A sample in the chosen settings (the preview frame shows the real site).
+		var fam = familyBySlug( presetSlug( shown( 'fontFamily' ), 'font-family' ) );
+		var sample = h( 'div', { class: 'gs-st-type-sample' }, el.sample );
+		var styleSample = function () {
+			var size = parseSize( sizeText( shown( 'fontSize' ) ) );
+			sample.style.fontFamily = fam ? fam.fontFamily : '';
+			sample.style.fontSize = size ? Math.min( toPx( size ), 56 ) + 'px' : '';
+			sample.style.fontWeight = shown( 'fontWeight' ) || '';
+			sample.style.fontStyle = shown( 'fontStyle' ) || '';
+			sample.style.textTransform = shown( 'textTransform' ) || '';
+			sample.style.textDecoration = shown( 'textDecoration' ) || '';
+			sample.style.letterSpacing = shown( 'letterSpacing' ) || '';
+			sample.style.lineHeight = shown( 'lineHeight' ) || '';
+		};
+		styleSample();
+
+		// Font family.
+		var famBtn = h( 'button', { type: 'button', class: 'gs-st-font-btn', onclick: function () {
+			fontPickerModal( cur( 'fontFamily' ), function ( v ) {
+				put( 'fontFamily', v, true );
+			} );
+		} }, h( 'span', { style: { 'font-family': fam ? fam.fontFamily : 'inherit' } }, cur( 'fontFamily' ) ? familyName( cur( 'fontFamily' ) ) : sprintf( __( 'Default (%s)', 'gend-society' ), fam ? fam.name : __( 'theme', 'gend-society' ) ) ), h( 'span', { class: 'gs-st-font-btn-hint' }, __( 'Change', 'gend-society' ), icon( 'arrow-down-alt2' ) ) );
+
+		// Size: a number and unit, with a slider.
+		var sz = parseSize( sizeText( cur( 'fontSize' ) ) );
+		var szIn = parseSize( sizeText( inherit( 'fontSize' ) ) );
+		var unit = h( 'select', { class: 'gs-st-input is-unit', 'aria-label': __( 'Unit', 'gend-society' ) }, [ 'px', 'rem', 'em', 'vw' ].map( function ( u ) {
+			return h( 'option', { value: u, selected: ( sz ? sz.u : 'px' ) === u }, u );
+		} ) );
+		var num = h( 'input', { type: 'number', class: 'gs-st-input', step: 'any', min: '0', value: sz ? String( sz.n ) : '', placeholder: szIn ? sprintf( __( 'Default (%spx)', 'gend-society' ), String( Math.round( toPx( szIn ) * 10 ) / 10 ) ) : __( 'Default', 'gend-society' ), 'aria-label': __( 'Font size', 'gend-society' ) } );
+		var range = h( 'input', { type: 'range', class: 'gs-st-range', min: '8', max: '120', step: '1', value: String( toPx( sz || szIn ) ), 'aria-label': __( 'Font size slider', 'gend-society' ) } );
+		var applySize = function () {
+			put( 'fontSize', num.value === '' ? '' : num.value + unit.value );
+			styleSample();
+		};
+		num.addEventListener( 'input', debounce( function () {
+			var n = parseFloat( num.value );
+			if ( ! isNaN( n ) ) {
+				range.value = String( unit.value === 'px' ? n : n * 16 );
+			}
+			applySize();
+		}, 250 ) );
+		unit.addEventListener( 'change', applySize );
+		range.addEventListener( 'input', function () {
+			var px = parseFloat( range.value );
+			num.value = unit.value === 'px' ? String( px ) : String( Math.round( ( px / 16 ) * 100 ) / 100 );
+			sample.style.fontSize = Math.min( px, 56 ) + 'px';
+		} );
+		range.addEventListener( 'change', applySize );
+
+		// Weight: the weights the chosen font actually has, when it lists them.
+		var weights = [ '100', '200', '300', '400', '500', '600', '700', '800', '900' ];
+		if ( fam && fam.fontFace && fam.fontFace.length ) {
+			var avail = {};
+			fam.fontFace.forEach( function ( f ) {
+				var parts = String( f.fontWeight || '400' ).split( ' ' );
+				weights.forEach( function ( w ) {
+					if ( parts.length === 2 ? +w >= +parts[ 0 ] && +w <= +parts[ 1 ] : w === parts[ 0 ] ) {
+						avail[ w ] = 1;
+					}
+				} );
+			} );
+			var only = weights.filter( function ( w ) {
+				return avail[ w ];
+			} );
+			if ( only.length ) {
+				weights = only;
+			}
+		}
+		var weightSel = h( 'select', { class: 'gs-st-input', 'aria-label': __( 'Weight', 'gend-society' ), onchange: function () {
+			put( 'fontWeight', weightSel.value );
+			styleSample();
+		} }, h( 'option', { value: '' }, sprintf( __( 'Default (%s)', 'gend-society' ), inherit( 'fontWeight' ) || '400' ) ), weights.map( function ( w ) {
+			return h( 'option', { value: w, selected: String( cur( 'fontWeight' ) ) === w }, w + ' · ' + WEIGHT_NAMES[ w ] );
+		} ) );
+
+		// Styling tools.
+		var toggle = function ( ic, prop, onValue, offValue, title ) {
+			var on = shown( prop ) === onValue;
+			return h( 'button', { type: 'button', class: 'gs-st-tool' + ( on ? ' is-on' : '' ), 'aria-pressed': on ? 'true' : 'false', title: title, 'aria-label': title, onclick: function () {
+				put( prop, on ? offValue : onValue, true );
+			} }, icon( ic ) );
+		};
+		var caseBtn = function ( value, label, title ) {
+			var on = ( shown( 'textTransform' ) || 'none' ) === value;
+			return h( 'button', { type: 'button', class: 'gs-st-tool' + ( on ? ' is-on' : '' ), 'aria-pressed': on ? 'true' : 'false', title: title, 'aria-label': title, onclick: function () {
+				put( 'textTransform', value, true );
+			} }, h( 'span', { class: 'gs-st-tool-txt' }, label ) );
+		};
+		var tools = h( 'div', { class: 'gs-st-tools' },
+			h( 'div', { class: 'gs-st-toolgroup' },
+				toggle( 'editor-italic', 'fontStyle', 'italic', 'normal', __( 'Italic', 'gend-society' ) ),
+				toggle( 'editor-underline', 'textDecoration', 'underline', 'none', __( 'Underline', 'gend-society' ) ),
+				toggle( 'editor-strikethrough', 'textDecoration', 'line-through', 'none', __( 'Strikethrough', 'gend-society' ) )
+			),
+			h( 'div', { class: 'gs-st-toolgroup' },
+				caseBtn( 'none', 'Aa', __( 'As typed', 'gend-society' ) ),
+				caseBtn( 'uppercase', 'AB', __( 'Uppercase', 'gend-society' ) ),
+				caseBtn( 'capitalize', 'Ab', __( 'Capitalize', 'gend-society' ) ),
+				caseBtn( 'lowercase', 'ab', __( 'Lowercase', 'gend-society' ) )
+			)
+		);
+
+		// Line height and letter spacing sliders.
+		var slider = function ( label, prop, min, max, step, unitTxt ) {
+			var raw = cur( prop );
+			var base = inherit( prop );
+			var val = parseFloat( raw !== undefined ? raw : base );
+			if ( isNaN( val ) ) {
+				val = min < 0 ? 0 : 1.4;
+			}
+			var out = h( 'span', { class: 'gs-st-slider-val' }, raw !== undefined ? String( raw ) : sprintf( __( 'Default (%s)', 'gend-society' ), base !== undefined ? String( base ) : '-' ) );
+			var r = h( 'input', { type: 'range', class: 'gs-st-range', min: String( min ), max: String( max ), step: String( step ), value: String( val ), 'aria-label': label } );
+			r.addEventListener( 'input', function () {
+				out.textContent = r.value + unitTxt;
+				sample.style[ prop ] = r.value + unitTxt;
+			} );
+			r.addEventListener( 'change', function () {
+				put( prop, r.value + unitTxt );
+			} );
+			return h( 'div', { class: 'gs-st-field' }, h( 'span', { class: 'gs-st-slider-head' }, h( 'span', null, label ), out, raw !== undefined ? h( 'button', { type: 'button', class: 'gs-st-link-btn', onclick: function () {
+				put( prop, '', true );
+			} }, __( 'Reset', 'gend-society' ) ) : null ), r );
+		};
+
+		// Colours.
+		var colorRow = function ( label, path ) {
+			var c = get( S.gs, path );
+			return h( 'div', { class: 'gs-st-field' }, h( 'span', null, label ), h( 'div', { class: 'gs-st-chips is-colors' }, h( 'button', { type: 'button', class: 'gs-st-chip' + ( ! c ? ' is-on' : '' ), onclick: function () {
 				set( S.gs, path, '' );
 				changed();
-				render();
-			} }, __( 'Default', 'gend-society' ) ), palette().map( function ( c ) {
-				var v = 'var:preset|color|' + c.slug;
-				return h( 'button', { type: 'button', class: 'gs-st-color-chip' + ( cur === v ? ' is-on' : '' ), title: c.name, 'aria-label': c.name, style: { background: c.color }, onclick: function () {
+				redraw();
+			} }, __( 'Default', 'gend-society' ) ), palette().map( function ( p ) {
+				var v = 'var:preset|color|' + p.slug;
+				return h( 'button', { type: 'button', class: 'gs-st-color-chip' + ( c === v ? ' is-on' : '' ), title: p.name, 'aria-label': p.name, style: { background: p.color }, onclick: function () {
 					set( S.gs, path, v );
 					changed();
-					render();
+					redraw();
 				} } );
-			} ) );
+			} ) ) );
 		};
-		var famCur = get( S.gs, tp + 'fontFamily' );
-		var controls = h( 'div', { class: 'gs-st-stack' } );
-		if ( el !== 'a' ) {
-			controls.appendChild( h( 'div', { class: 'gs-st-card is-flat' },
-				field( __( 'Font', 'gend-society' ), 'fontFamily', familySelect( famCur, function ( v ) {
-					set( S.gs, tp + 'fontFamily', v );
-					changed();
-				}, __( 'Font', 'gend-society' ) ) ),
-				h( 'div', { class: 'gs-st-field' }, h( 'span', null, __( 'Size', 'gend-society' ) ), sizeChips, text( 'fontSize', __( 'or a value like 2.5rem or clamp(2rem, 5vw, 3.5rem)', 'gend-society' ) ) ),
-				h( 'div', { class: 'gs-st-grid2' },
-					field( __( 'Weight', 'gend-society' ), 'fontWeight', select( 'fontWeight', WEIGHTS.map( function ( w ) {
-						return [ w, w || __( 'Default', 'gend-society' ) ];
-					} ) ) ),
-					field( __( 'Line height', 'gend-society' ), 'lineHeight', text( 'lineHeight' ) ),
-					field( __( 'Letter spacing', 'gend-society' ), 'letterSpacing', text( 'letterSpacing' ) ),
-					field( __( 'Case', 'gend-society' ), 'textTransform', select( 'textTransform', [ [ '', __( 'Default', 'gend-society' ) ], [ 'none', __( 'As typed', 'gend-society' ) ], [ 'uppercase', __( 'UPPERCASE', 'gend-society' ) ], [ 'lowercase', __( 'lowercase', 'gend-society' ) ], [ 'capitalize', __( 'Capitalized', 'gend-society' ) ] ] ) )
-				)
-			) );
+		var colorBase = el.id === 'p' ? 'styles.color.' : el.base + '.color.';
+		var colors = h( 'div', { class: 'gs-st-card is-flat gs-st-stack' }, colorRow( el.id === 'button' ? __( 'Text colour', 'gend-society' ) : __( 'Colour', 'gend-society' ), colorBase + 'text' ) );
+		if ( el.id === 'button' ) {
+			colors.appendChild( colorRow( __( 'Background', 'gend-society' ), colorBase + 'background' ) );
 		}
-		controls.appendChild( h( 'div', { class: 'gs-st-card is-flat' }, h( 'div', { class: 'gs-st-field' }, h( 'span', null, el === 'a' ? __( 'Link colour', 'gend-society' ) : __( 'Colour', 'gend-society' ) ), colorChips( colorPath ) ) ) );
-		if ( el === 'a' ) {
-			controls.appendChild( h( 'div', { class: 'gs-st-card is-flat' },
-				h( 'div', { class: 'gs-st-field' }, h( 'span', null, __( 'Hover colour', 'gend-society' ) ), colorChips( [ 'styles', 'elements', 'link', ':hover', 'color', 'text' ] ) ),
-				h( 'div', { class: 'gs-st-grid2' },
-					field( __( 'Underline', 'gend-society' ), 'textDecoration', select( 'textDecoration', [ [ '', __( 'Default', 'gend-society' ) ], [ 'underline', __( 'Underlined', 'gend-society' ) ], [ 'none', __( 'No underline', 'gend-society' ) ] ] ) ),
-					h( 'label', { class: 'gs-st-field' }, h( 'span', null, __( 'Underline on hover', 'gend-society' ) ), ( function () {
-						var path = [ 'styles', 'elements', 'link', ':hover', 'typography', 'textDecoration' ];
-						var cur = get( S.gs, path ) || '';
-						var sel = h( 'select', { class: 'gs-st-input', onchange: function () {
-							set( S.gs, path, sel.value );
-							changed();
-						} } );
-						[ [ '', __( 'Default', 'gend-society' ) ], [ 'underline', __( 'Underlined', 'gend-society' ) ], [ 'none', __( 'No underline', 'gend-society' ) ] ].forEach( function ( o ) {
-							sel.appendChild( h( 'option', { value: o[ 0 ], selected: o[ 0 ] === cur }, o[ 1 ] ) );
-						} );
-						return sel;
-					}() ) )
-				)
-			) );
+		if ( el.id === 'a' || el.id === 'button' ) {
+			colors.appendChild( colorRow( __( 'Hover colour', 'gend-society' ), el.base.split( '.' ).concat( [ ':hover', 'color', 'text' ] ) ) );
 		}
-		var anyCustom = !! get( S.gs, base === 'styles' ? 'styles.typography' : base );
-		if ( anyCustom ) {
-			controls.appendChild( h( 'button', { type: 'button', class: 'gs-st-btn is-ghost', onclick: function () {
-				if ( base === 'styles' ) {
+
+		return h(
+			'div',
+			{ class: 'gs-st-stack' },
+			h( 'div', null, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, __( 'Pick a text style, then its font, size and styling. Google Fonts install on your site the moment you choose one.', 'gend-society' ) ) ),
+			tabs,
+			sample,
+			h( 'div', { class: 'gs-st-card is-flat gs-st-stack' },
+				h( 'div', { class: 'gs-st-field' }, h( 'span', null, __( 'Font', 'gend-society' ) ), famBtn ),
+				h( 'div', { class: 'gs-st-field' }, h( 'span', null, __( 'Size', 'gend-society' ) ), h( 'div', { class: 'gs-st-size' }, num, unit ), range ),
+				h( 'div', { class: 'gs-st-field' }, h( 'span', null, __( 'Weight', 'gend-society' ) ), weightSel ),
+				h( 'div', { class: 'gs-st-field' }, h( 'span', null, __( 'Style', 'gend-society' ) ), tools ),
+				slider( __( 'Line height', 'gend-society' ), 'lineHeight', 0.8, 2.6, 0.05, '' ),
+				slider( __( 'Letter spacing', 'gend-society' ), 'letterSpacing', -3, 12, 0.1, 'px' )
+			),
+			colors,
+			customisedEl( el ) ? h( 'button', { type: 'button', class: 'gs-st-btn is-ghost', onclick: function () {
+				if ( el.id === 'p' ) {
 					set( S.gs, 'styles.typography', '' );
 					set( S.gs, 'styles.color.text', '' );
 				} else {
-					set( S.gs, base, '' );
+					set( S.gs, el.base, '' );
 				}
 				changed();
-				render();
-			} }, icon( 'image-rotate' ), __( 'Reset to theme default', 'gend-society' ) ) );
-		}
-		var intro = el === 'p' ? __( 'The type most of your content is set in.', 'gend-society' ) : el === 'a' ? __( 'How links look inside your text.', 'gend-society' ) : sprintf( __( 'How every %s heading looks across your site.', 'gend-society' ), hit.item.label );
-		return panelLayout( hit, intro, controls );
+				redraw();
+			} }, icon( 'image-rotate' ), sprintf( __( 'Reset %s to the theme default', 'gend-society' ), el.label ) ) : null
+		);
 	}
 
 	/* ── Templates in the block editor ─────────────────────────────────── */
@@ -1320,7 +1675,7 @@
 					close( null );
 				}
 			} );
-			document.body.appendChild( overlay );
+			root.appendChild( overlay );
 			input.focus();
 		} );
 	}

@@ -93,7 +93,7 @@ function gend_society_studio_redirect_landing() {
  * The studio sections: what the sidebar shows, gated on each plugin being active.
  *
  * Item kinds:
- *   panel     a studio panel ('logo', 'favicon', 'site-name', 'palettes', 'fonts', 'type:h1' ...)
+ *   panel     a studio panel ('logo', 'favicon', 'site-name', 'palettes', 'fonts')
  *   template  a block template (slug), opened in the block editor canvas
  *   part      a template part (slug)
  *   templates a list of templates filtered by 'match' (page templates ...)
@@ -117,25 +117,6 @@ function gend_society_studio_sections() {
 		return admin_url( 'admin.php?page=' . $page . ( $tab ? '&tab=' . $tab : '' ) );
 	};
 
-	$type_items = array();
-	foreach ( array(
-		'h1' => __( 'H1', 'gend-society' ),
-		'h2' => __( 'H2', 'gend-society' ),
-		'h3' => __( 'H3', 'gend-society' ),
-		'h4' => __( 'H4', 'gend-society' ),
-		'h5' => __( 'H5', 'gend-society' ),
-		'h6' => __( 'H6', 'gend-society' ),
-		'p'  => __( 'Paragraph', 'gend-society' ),
-		'a'  => __( 'Link', 'gend-society' ),
-	) as $el => $label ) {
-		$type_items[] = array(
-			'id'    => 'type-' . $el,
-			'label' => $label,
-			'kind'  => 'panel',
-			'panel' => 'type:' . $el,
-		);
-	}
-
 	$sections = array(
 		array(
 			'id'     => 'branding',
@@ -152,10 +133,6 @@ function gend_society_studio_sections() {
 						array( 'id' => 'palettes', 'label' => __( 'Colour Schemes', 'gend-society' ), 'kind' => 'panel', 'panel' => 'palettes' ),
 						array( 'id' => 'fonts', 'label' => __( 'Font Types', 'gend-society' ), 'kind' => 'panel', 'panel' => 'fonts' ),
 					),
-				),
-				array(
-					'label' => __( 'Typography', 'gend-society' ),
-					'items' => $type_items,
 				),
 			),
 		),
@@ -378,6 +355,7 @@ function gend_society_studio_enqueue( $hook ) {
 			'dashboardUrl'   => admin_url( 'index.php' ),
 			'pluginsUrl'     => admin_url( 'plugins.php' ),
 			'homeUrl'        => home_url( '/' ),
+			'themeUrl'       => get_stylesheet_directory_uri(),
 			'specimenUrl'    => add_query_arg( 'gs_studio_specimen', '1', home_url( '/' ) ),
 			'siteTitle'      => get_bloginfo( 'name' ),
 			'restPreview'    => 'gend-society/v1/studio/preview-css',

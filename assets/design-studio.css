@@ -205,10 +205,11 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-field > span { font-size: 12px; font-weight: 600; color: var(--st-muted); }
 .gs-studio .gs-st-input {
 	width: 100%; max-width: none; min-height: 38px; height: 38px; padding: 0 12px; margin: 0;
-	color: var(--st-text); background: rgba(0, 0, 0, 0.25); border: 1px solid var(--st-border); border-radius: 9px;
-	font-size: 14px; line-height: 36px; box-shadow: none;
+	color: var(--st-text) !important; background-color: rgba(0, 0, 0, 0.25) !important; border: 1px solid var(--st-border) !important; border-radius: 9px !important;
+	font-size: 14px; line-height: 36px; box-shadow: none !important;
 }
-.gs-studio select.gs-st-input { padding-right: 30px; background-color: rgba(0, 0, 0, 0.25); color: var(--st-text); }
+.gs-studio .gs-st-input::placeholder { color: var(--st-muted); opacity: 1; }
+.gs-studio select.gs-st-input { padding-right: 30px; }
 .gs-studio select.gs-st-input option { background: #141a26; color: var(--st-text); }
 .gs-studio .gs-st-input:focus { border-color: var(--st-accent); box-shadow: 0 0 0 3px rgba(151, 228, 110, 0.15); }
 .gs-studio .gs-st-input.is-mono { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 13px; }
@@ -379,13 +380,6 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-palette-meta { display: flex; flex-direction: column; min-width: 0; }
 .gs-st-palette-meta small { color: var(--st-muted); font-size: 11px; }
 
-/* Fonts */
-.gs-st-font-row { display: flex; flex-direction: column; gap: 10px; }
-.gs-st-font-head { display: flex; justify-content: space-between; gap: 10px; align-items: baseline; }
-.gs-st-font-head small { color: var(--st-muted); font-size: 12px; text-align: right; }
-.gs-st-font-sample { font-size: 22px; line-height: 1.25; color: var(--st-text); }
-.gs-st-font-chips { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 12px; }
-.gs-st-font-chips .gs-st-chip { font-size: 14px; }
 
 /* ── Editor frames ───────────────────────────────────────────────────── */
 .gs-st-editor { display: flex; flex-direction: column; height: 100%; animation: gs-st-fade .3s var(--st-ease); }
@@ -472,4 +466,70 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 	.gs-st-palette-row .gs-st-input { grid-column: 1 / -1; }
 	.gs-st-grid2 { grid-template-columns: 1fr; }
 	.gs-st-editor { height: 80vh; }
+}
+
+/* ── Typography panel ───────────────────────────────────────────────── */
+.gs-st-type-tabs { display: flex; flex-wrap: wrap; gap: 6px; }
+.gs-studio .gs-st-type-tab {
+	position: relative; padding: 7px 12px; border-radius: 10px; cursor: pointer; font: 600 13px/1 inherit;
+	color: var(--st-muted); background: var(--st-card); border: 1px solid var(--st-border); transition: all .15s;
+}
+.gs-studio .gs-st-type-tab:hover { color: var(--st-text); border-color: var(--st-border-hi); }
+.gs-studio .gs-st-type-tab.is-on { color: var(--st-accent-ink); background: var(--st-accent); border-color: transparent; }
+.gs-st-type-tab .gs-st-dot { position: absolute; top: -3px; right: -3px; }
+.gs-st-type-sample {
+	padding: 18px 20px; border-radius: 14px; min-height: 84px; display: flex; align-items: center;
+	background: linear-gradient(135deg, rgba(182, 8, 201, .12), rgba(110, 193, 228, .08)); border: 1px solid var(--st-border);
+	font-size: 26px; line-height: 1.2; color: #fff; overflow-wrap: anywhere;
+}
+.gs-studio .gs-st-font-btn {
+	display: flex; align-items: center; justify-content: space-between; gap: 10px; width: 100%; min-height: 48px; padding: 8px 12px 8px 14px;
+	border-radius: 10px; cursor: pointer; text-align: left; font-size: 18px; color: var(--st-text);
+	background: rgba(0, 0, 0, .25); border: 1px solid var(--st-border-hi); transition: border-color .15s;
+}
+.gs-studio .gs-st-font-btn:hover { border-color: var(--st-accent); }
+.gs-st-font-btn-hint { display: inline-flex; align-items: center; gap: 4px; font: 600 12px/1 -apple-system, BlinkMacSystemFont, "Segoe UI", Inter, sans-serif; color: var(--st-accent); flex: none; }
+.gs-st-size { display: grid; grid-template-columns: 1fr 86px; gap: 8px; }
+.gs-studio .gs-st-range { width: 100%; margin: 8px 0 0; accent-color: var(--st-accent); background: transparent; }
+.gs-st-tools { display: flex; flex-wrap: wrap; gap: 8px; }
+.gs-st-toolgroup { display: inline-flex; padding: 3px; gap: 2px; border-radius: 10px; background: rgba(0, 0, 0, .25); border: 1px solid var(--st-border); }
+.gs-studio .gs-st-tool {
+	display: inline-grid; place-items: center; min-width: 36px; height: 32px; padding: 0 6px; border-radius: 8px; cursor: pointer;
+	color: var(--st-muted); background: transparent; border: 0; transition: all .15s;
+}
+.gs-studio .gs-st-tool:hover { color: var(--st-text); background: rgba(255, 255, 255, .07); }
+.gs-studio .gs-st-tool.is-on { color: var(--st-accent-ink); background: var(--st-accent); }
+.gs-st-tool-txt { font-weight: 700; font-size: 13px; }
+.gs-st-slider-head { display: flex; align-items: center; gap: 8px; }
+.gs-st-slider-head > span:first-child { flex: 1; }
+.gs-st-slider-val { font-weight: 600; color: var(--st-text); font-size: 12px; }
+.gs-studio .gs-st-link-btn { padding: 0; border: 0; background: none; color: var(--st-accent); font-size: 12px; cursor: pointer; }
+
+/* ── Font picker ────────────────────────────────────────────────────── */
+.gs-st-modal.is-wide { width: min(980px, 100%); max-height: calc(100vh - 80px); display: flex; flex-direction: column; gap: 12px; }
+.gs-st-font-head { display: flex; align-items: center; justify-content: space-between; }
+.gs-st-font-head h2 { margin: 0 !important; }
+.gs-st-font-status:empty { display: none; }
+.gs-st-font-status { font-size: 13px; color: var(--st-accent); }
+.gs-st-font-cols { display: grid; grid-template-columns: 260px 1fr; gap: 18px; min-height: 0; flex: 1; }
+.gs-st-font-cols > section { display: flex; flex-direction: column; gap: 8px; min-height: 0; }
+.gs-st-font-list { display: flex; flex-direction: column; gap: 6px; overflow-y: auto; max-height: 56vh; padding-right: 4px; scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, .15) transparent; }
+.gs-st-font-list.is-google { display: grid; grid-template-columns: repeat(auto-fill, minmax(200px, 1fr)); align-content: start; }
+.gs-st-modal .gs-st-font-opt {
+	display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 10px 12px; border-radius: 10px; cursor: pointer; text-align: left;
+	color: var(--st-text); background: rgba(255, 255, 255, .04); border: 1px solid var(--st-border); transition: border-color .15s, background .15s;
+}
+.gs-st-modal .gs-st-font-opt:hover { border-color: var(--st-border-hi); background: rgba(255, 255, 255, .08); }
+.gs-st-modal .gs-st-font-opt.is-on { border-color: var(--st-accent); background: rgba(151, 228, 110, .1); }
+.gs-st-font-opt small { color: var(--st-muted); font-size: 11px; }
+.gs-st-font-name { font-size: 18px; line-height: 1.2; }
+.gs-st-font-preview { height: 26px; max-width: 100%; filter: invert(1) brightness(1.6); }
+.gs-st-modal-wrap.is-busy .gs-st-font-list { opacity: .5; pointer-events: none; }
+.gs-st-modal .gs-st-chip { padding: 5px 11px; border-radius: 99px; font-size: 12px; cursor: pointer; color: var(--st-text); background: rgba(255, 255, 255, .05); border: 1px solid var(--st-border); }
+.gs-st-modal .gs-st-chip.is-on { background: rgba(151, 228, 110, .15); border-color: var(--st-accent); color: var(--st-accent); }
+.gs-st-modal .gs-st-icon-btn { display: inline-grid; place-items: center; width: 34px; height: 34px; border-radius: 9px; cursor: pointer; color: var(--st-muted); background: transparent; border: 0; }
+.gs-st-modal .gs-st-icon-btn:hover { color: var(--st-text); background: rgba(255, 255, 255, .08); }
+@media (max-width: 782px) {
+	.gs-st-font-cols { grid-template-columns: 1fr; }
+	.gs-st-font-list { max-height: 30vh; }
 }
