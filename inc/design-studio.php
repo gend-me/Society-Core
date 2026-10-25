@@ -492,8 +492,13 @@ function gend_society_studio_rest_preview_css( WP_REST_Request $request ) {
 
 add_action( 'template_redirect', 'gend_society_studio_specimen_page', 0 );
 /**
- * The style-guide preview page (?gs_studio_specimen=1): the site's real header,
- * footer and global styles around a sample of every type element. Only for
+ * The brand style guide (?gs_studio_specimen=1), the studio's live preview: a
+ * client-ready guidelines document built from the site's own logo, palette,
+ * fonts and global styles. The guide's frame (labels, grid, numbering) has a
+ * fixed neutral look; every specimen inside it is plain markup styled by the
+ * site's global styles, so the studio's live preview CSS restyles it as you
+ * edit. assets/design-studio-guide.js reads the computed values (hex codes,
+ * font names, sizes) so the labels stay true to what is shown. Only for
  * people who can edit the site's design; everyone else gets the normal page.
  */
 function gend_society_studio_specimen_page() {
@@ -502,47 +507,228 @@ function gend_society_studio_specimen_page() {
 		return;
 	}
 	add_filter( 'show_admin_bar', '__return_false' );
-	$sample = sprintf(
-		'<!-- wp:group {"tagName":"main","layout":{"type":"constrained"},"style":{"spacing":{"padding":{"top":"var:preset|spacing|50","bottom":"var:preset|spacing|50"}}}} --><main class="wp-block-group">'
-		. '<!-- wp:heading {"level":1} --><h1 class="wp-block-heading">%1$s</h1><!-- /wp:heading -->'
-		. '<!-- wp:heading --><h2 class="wp-block-heading">%2$s</h2><!-- /wp:heading -->'
-		. '<!-- wp:heading {"level":3} --><h3 class="wp-block-heading">%3$s</h3><!-- /wp:heading -->'
-		. '<!-- wp:heading {"level":4} --><h4 class="wp-block-heading">%4$s</h4><!-- /wp:heading -->'
-		. '<!-- wp:heading {"level":5} --><h5 class="wp-block-heading">%5$s</h5><!-- /wp:heading -->'
-		. '<!-- wp:heading {"level":6} --><h6 class="wp-block-heading">%6$s</h6><!-- /wp:heading -->'
-		. '<!-- wp:paragraph --><p>%7$s <a href="#">%8$s</a> %9$s</p><!-- /wp:paragraph -->'
-		. '<!-- wp:buttons --><div class="wp-block-buttons"><!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button">%10$s</a></div><!-- /wp:button --><!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button">%11$s</a></div><!-- /wp:button --></div><!-- /wp:buttons -->'
-		. '<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>%12$s</p><!-- /wp:paragraph --></blockquote><!-- /wp:quote -->'
-		. '</main><!-- /wp:group -->',
-		esc_html__( 'Heading 1: build something people love', 'gend-society' ),
-		esc_html__( 'Heading 2: a section title', 'gend-society' ),
-		esc_html__( 'Heading 3: a card title', 'gend-society' ),
-		esc_html__( 'Heading 4: a smaller heading', 'gend-society' ),
-		esc_html__( 'Heading 5: a label', 'gend-society' ),
-		esc_html__( 'Heading 6: the fine print', 'gend-society' ),
-		esc_html__( 'Paragraph text is what your visitors read most. Good body type is easy on the eyes, with comfortable line spacing and', 'gend-society' ),
-		esc_html__( 'a link that stands out', 'gend-society' ),
-		esc_html__( 'from the words around it.', 'gend-society' ),
-		esc_html__( 'Primary button', 'gend-society' ),
-		esc_html__( 'Outline button', 'gend-society' ),
-		esc_html__( 'A quote, to show how your accent styles carry through.', 'gend-society' )
+	$css = 'assets/design-studio-guide.css';
+	$js  = 'assets/design-studio-guide.js';
+	wp_enqueue_style( 'gs-studio-guide', GEND_SOCIETY_URL . $css, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) );
+	wp_enqueue_script( 'gs-studio-guide', GEND_SOCIETY_URL . $js, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
+
+	$name    = get_bloginfo( 'name' );
+	$tagline = get_bloginfo( 'description' );
+	$logo_id = (int) get_option( 'site_logo' );
+	$logo    = $logo_id ? wp_get_attachment_image_url( $logo_id, 'full' ) : '';
+	$icon    = get_site_icon_url( 256 );
+	$palette = wp_get_global_settings( array( 'color', 'palette' ) );
+	$colors  = array();
+	foreach ( array( 'theme', 'custom' ) as $origin ) {
+		foreach ( isset( $palette[ $origin ] ) ? (array) $palette[ $origin ] : array() as $c ) {
+			if ( ! empty( $c['slug'] ) ) {
+				$colors[ $c['slug'] ] = $c;
+			}
+		}
+	}
+	$colors = array_values( $colors );
+	$accent = '';
+	foreach ( $colors as $c ) {
+		if ( 0 === strpos( $c['slug'], 'accent' ) ) {
+			$accent = $c['slug'];
+			break;
+		}
+	}
+	$date = wp_date( 'F Y' );
+
+	// Specimens: real block markup, so block and element styles apply exactly as on the site.
+	$block = function ( $markup ) {
+		return do_blocks( $markup );
+	};
+	$buttons = $block(
+		'<!-- wp:buttons --><div class="wp-block-buttons">'
+		. '<!-- wp:button --><div class="wp-block-button"><a class="wp-block-button__link wp-element-button" href="#">' . esc_html__( 'Primary action', 'gend-society' ) . '</a></div><!-- /wp:button -->'
+		. '<!-- wp:button {"className":"is-style-outline"} --><div class="wp-block-button is-style-outline"><a class="wp-block-button__link wp-element-button" href="#">' . esc_html__( 'Secondary', 'gend-society' ) . '</a></div><!-- /wp:button -->'
+		. '</div><!-- /wp:buttons -->'
 	);
+	$quote   = $block( '<!-- wp:quote --><blockquote class="wp-block-quote"><!-- wp:paragraph --><p>' . esc_html__( 'Design is the silent ambassador of your brand.', 'gend-society' ) . '</p><!-- /wp:paragraph --><cite>' . esc_html__( 'Paul Rand', 'gend-society' ) . '</cite></blockquote><!-- /wp:quote -->' );
+
+	$scale = array(
+		'h1' => __( 'Display', 'gend-society' ),
+		'h2' => __( 'Headline', 'gend-society' ),
+		'h3' => __( 'Title', 'gend-society' ),
+		'h4' => __( 'Subtitle', 'gend-society' ),
+		'h5' => __( 'Overline', 'gend-society' ),
+		'h6' => __( 'Caption heading', 'gend-society' ),
+	);
+	$wordmark = function ( $class ) use ( $logo, $name ) {
+		if ( $logo ) {
+			return '<img class="' . esc_attr( $class ) . '" src="' . esc_url( $logo ) . '" alt="' . esc_attr( $name ) . '">';
+		}
+		return '<div class="gsg-wordmark ' . esc_attr( $class ) . '"><h2 class="wp-block-heading">' . esc_html( $name ) . '</h2></div>';
+	};
 	?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
 <meta charset="<?php bloginfo( 'charset' ); ?>">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex">
-	<?php
-	$content = do_blocks( '<!-- wp:template-part {"slug":"header"} /-->' . $sample . '<!-- wp:template-part {"slug":"footer"} /-->' );
-	wp_head();
-	?>
+<title><?php echo esc_html( sprintf( /* translators: %s: site name */ __( '%s: Brand Guidelines', 'gend-society' ), $name ) ); ?></title>
+	<?php wp_head(); ?>
 </head>
 <body <?php body_class( 'gs-studio-specimen' ); ?>>
-<style>.gs-front-sidebar,.gs-sidebar-flyout,.gs-float-menu,.gs-float-dock,aipa-widget{display:none!important}</style>
-	<?php wp_body_open(); ?>
-<div class="wp-site-blocks">
-	<?php echo $content; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?>
+<div class="gsg">
+
+	<section class="gsg-cover">
+		<div class="gsg-row gsg-meta">
+			<span><?php echo esc_html( $name ); ?></span>
+			<span><?php esc_html_e( 'Brand Guidelines', 'gend-society' ); ?></span>
+			<span><?php echo esc_html( sprintf( /* translators: %s: month and year */ __( 'Edition 01 · %s', 'gend-society' ), $date ) ); ?></span>
+		</div>
+		<div class="gsg-cover-main">
+			<div class="gsg-cover-mark"><?php echo $wordmark( 'gsg-cover-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?></div>
+			<div class="gsg-cover-title"><?php esc_html_e( 'Identity', 'gend-society' ); ?><br><em><?php esc_html_e( 'System', 'gend-society' ); ?></em></div>
+			<?php if ( $tagline ) : ?>
+				<div class="gsg-cover-tagline"><?php echo esc_html( $tagline ); ?></div>
+			<?php endif; ?>
+		</div>
+		<div class="gsg-row gsg-meta">
+			<span><?php esc_html_e( 'Prepared for the brand team', 'gend-society' ); ?></span>
+			<span class="gsg-cover-strip">
+				<?php foreach ( array_slice( $colors, 0, 6 ) as $c ) : ?>
+					<i style="background:var(--wp--preset--color--<?php echo esc_attr( $c['slug'] ); ?>)"></i>
+				<?php endforeach; ?>
+			</span>
+			<span><?php esc_html_e( 'Confidential', 'gend-society' ); ?></span>
+		</div>
+	</section>
+
+	<nav class="gsg-index">
+		<?php
+		$chapters = array(
+			'logo'       => __( 'Logo', 'gend-society' ),
+			'colour'     => __( 'Colour', 'gend-society' ),
+			'type'       => __( 'Typography', 'gend-society' ),
+			'components' => __( 'Components', 'gend-society' ),
+			'in-use'     => __( 'In use', 'gend-society' ),
+		);
+		$n = 0;
+		foreach ( $chapters as $id => $label ) :
+			++$n;
+			?>
+			<a href="#gsg-<?php echo esc_attr( $id ); ?>"><b><?php echo esc_html( sprintf( '%02d', $n ) ); ?></b><?php echo esc_html( $label ); ?></a>
+		<?php endforeach; ?>
+	</nav>
+
+	<section class="gsg-chapter" id="gsg-logo">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num">01</span>
+			<div class="gsg-chapter-title"><?php esc_html_e( 'Logo', 'gend-society' ); ?></div>
+			<div class="gsg-chapter-lede"><?php esc_html_e( 'The mark is the most recognisable piece of the identity. Give it room, keep it legible and never redraw it.', 'gend-society' ); ?></div>
+		</header>
+		<div class="gsg-logo-grid">
+			<figure class="gsg-logo-tile is-light"><?php echo $wordmark( 'gsg-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?><figcaption><?php esc_html_e( 'Primary · on light', 'gend-society' ); ?></figcaption></figure>
+			<figure class="gsg-logo-tile is-dark"><?php echo $wordmark( 'gsg-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?><figcaption><?php esc_html_e( 'Reversed · on dark', 'gend-society' ); ?></figcaption></figure>
+			<?php if ( $accent ) : ?>
+				<figure class="gsg-logo-tile" style="background:var(--wp--preset--color--<?php echo esc_attr( $accent ); ?>)"><?php echo $wordmark( 'gsg-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?><figcaption><?php esc_html_e( 'On brand colour', 'gend-society' ); ?></figcaption></figure>
+			<?php endif; ?>
+			<figure class="gsg-logo-tile is-clearspace"><div class="gsg-clear"><?php echo $wordmark( 'gsg-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?></div><figcaption><?php esc_html_e( 'Clear space · keep the dashed area free', 'gend-society' ); ?></figcaption></figure>
+		</div>
+		<?php if ( $icon ) : ?>
+			<div class="gsg-icon-row">
+				<img class="gsg-icon is-round" src="<?php echo esc_url( $icon ); ?>" alt="">
+				<img class="gsg-icon is-squircle" src="<?php echo esc_url( $icon ); ?>" alt="">
+				<img class="gsg-icon is-square" src="<?php echo esc_url( $icon ); ?>" alt="">
+				<div class="gsg-note"><b><?php esc_html_e( 'App icon & favicon', 'gend-society' ); ?></b><?php esc_html_e( 'Used in browser tabs, bookmarks and on phone home screens.', 'gend-society' ); ?></div>
+			</div>
+		<?php endif; ?>
+	</section>
+
+	<section class="gsg-chapter" id="gsg-colour">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num">02</span>
+			<div class="gsg-chapter-title"><?php esc_html_e( 'Colour', 'gend-society' ); ?></div>
+			<div class="gsg-chapter-lede"><?php esc_html_e( 'A considered palette carries the brand before a single word is read. Use the primaries generously and the accents with intent.', 'gend-society' ); ?></div>
+		</header>
+		<div class="gsg-swatches">
+			<?php foreach ( $colors as $i => $c ) : ?>
+				<div class="gsg-swatch<?php echo $i < 2 ? ' is-major' : ''; ?>">
+					<div class="gsg-chip" style="background:var(--wp--preset--color--<?php echo esc_attr( $c['slug'] ); ?>)"></div>
+					<div class="gsg-swatch-meta">
+						<div class="gsg-swatch-name"><?php echo esc_html( isset( $c['name'] ) ? $c['name'] : $c['slug'] ); ?></div>
+						<div class="gsg-code"><span><?php esc_html_e( 'HEX', 'gend-society' ); ?></span><b data-gsg="hex">—</b></div>
+						<div class="gsg-code"><span><?php esc_html_e( 'RGB', 'gend-society' ); ?></span><b data-gsg="rgb">—</b></div>
+						<div class="gsg-code"><span><?php esc_html_e( 'Token', 'gend-society' ); ?></span><b><?php echo esc_html( $c['slug'] ); ?></b></div>
+					</div>
+				</div>
+			<?php endforeach; ?>
+		</div>
+	</section>
+
+	<section class="gsg-chapter" id="gsg-type">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num">03</span>
+			<div class="gsg-chapter-title"><?php esc_html_e( 'Typography', 'gend-society' ); ?></div>
+			<div class="gsg-chapter-lede"><?php esc_html_e( 'Two voices: one to announce, one to explain. The scale below is the system every page is set in.', 'gend-society' ); ?></div>
+		</header>
+		<div class="gsg-faces">
+			<div class="gsg-face">
+				<div class="gsg-face-role"><?php esc_html_e( 'Headings', 'gend-society' ); ?></div>
+				<div class="gsg-canvas gsg-face-glyph"><h2 class="wp-block-heading" data-gsg-font="heading">Aa</h2></div>
+				<div class="gsg-face-name" data-gsg-name="heading">—</div>
+				<div class="gsg-canvas gsg-face-set"><h2 class="wp-block-heading">ABCDEFGHIJKLM NOPQRSTUVWXYZ abcdefghijklm nopqrstuvwxyz 0123456789 &amp;!?</h2></div>
+			</div>
+			<div class="gsg-face">
+				<div class="gsg-face-role"><?php esc_html_e( 'Body', 'gend-society' ); ?></div>
+				<div class="gsg-canvas gsg-face-glyph"><p data-gsg-font="body">Aa</p></div>
+				<div class="gsg-face-name" data-gsg-name="body">—</div>
+				<div class="gsg-canvas gsg-face-set"><p>ABCDEFGHIJKLM NOPQRSTUVWXYZ abcdefghijklm nopqrstuvwxyz 0123456789 &amp;!?</p></div>
+			</div>
+		</div>
+		<div class="gsg-scale">
+			<?php foreach ( $scale as $tag => $role ) : ?>
+				<div class="gsg-scale-row">
+					<div class="gsg-scale-meta"><b><?php echo esc_html( strtoupper( $tag ) . ' · ' . $role ); ?></b><span data-gsg-spec="<?php echo esc_attr( $tag ); ?>">—</span></div>
+					<div class="gsg-canvas"><<?php echo esc_html( $tag ); ?> class="wp-block-heading" data-gsg-el="<?php echo esc_attr( $tag ); ?>"><?php esc_html_e( 'Crafted with intent', 'gend-society' ); ?></<?php echo esc_html( $tag ); ?>></div>
+				</div>
+			<?php endforeach; ?>
+			<div class="gsg-scale-row">
+				<div class="gsg-scale-meta"><b><?php esc_html_e( 'Body · Paragraph', 'gend-society' ); ?></b><span data-gsg-spec="p">—</span></div>
+				<div class="gsg-canvas"><p data-gsg-el="p"><?php esc_html_e( 'Good body type disappears: it is calm, comfortable and easy to read at length, so the ideas come through and the type does not get in the way. Inline links', 'gend-society' ); ?> <a href="#" data-gsg-el="a"><?php esc_html_e( 'look like this', 'gend-society' ); ?></a>.</p></div>
+			</div>
+		</div>
+	</section>
+
+	<section class="gsg-chapter" id="gsg-components">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num">04</span>
+			<div class="gsg-chapter-title"><?php esc_html_e( 'Components', 'gend-society' ); ?></div>
+			<div class="gsg-chapter-lede"><?php esc_html_e( 'The building blocks people touch: actions, links and editorial accents.', 'gend-society' ); ?></div>
+		</header>
+		<div class="gsg-comp-grid">
+			<div class="gsg-comp"><div class="gsg-label"><?php esc_html_e( 'Buttons', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><?php echo $buttons; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?></div></div>
+			<div class="gsg-comp"><div class="gsg-label"><?php esc_html_e( 'Links', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><p><?php esc_html_e( 'Read the', 'gend-society' ); ?> <a href="#"><?php esc_html_e( 'full story', 'gend-society' ); ?></a> <?php esc_html_e( 'or', 'gend-society' ); ?> <a href="#"><?php esc_html_e( 'get in touch', 'gend-society' ); ?></a>.</p></div></div>
+			<div class="gsg-comp is-wide"><div class="gsg-label"><?php esc_html_e( 'Quote', 'gend-society' ); ?></div><div class="gsg-canvas gsg-pad"><?php echo $quote; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?></div></div>
+		</div>
+	</section>
+
+	<section class="gsg-chapter" id="gsg-in-use">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num">05</span>
+			<div class="gsg-chapter-title"><?php esc_html_e( 'In use', 'gend-society' ); ?></div>
+			<div class="gsg-chapter-lede"><?php esc_html_e( 'Everything together, as visitors will meet it.', 'gend-society' ); ?></div>
+		</header>
+		<div class="gsg-mock">
+			<div class="gsg-mock-bar"><i></i><i></i><i></i><span><?php echo esc_html( wp_parse_url( home_url(), PHP_URL_HOST ) ); ?></span></div>
+			<div class="gsg-canvas gsg-mock-body">
+				<div class="gsg-mock-nav"><?php echo $wordmark( 'gsg-mock-logo' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in the closure. ?><p><a href="#"><?php esc_html_e( 'Work', 'gend-society' ); ?></a> &nbsp; <a href="#"><?php esc_html_e( 'About', 'gend-society' ); ?></a> &nbsp; <a href="#"><?php esc_html_e( 'Contact', 'gend-society' ); ?></a></p></div>
+				<h1 class="wp-block-heading"><?php echo esc_html( $tagline ? $tagline : __( 'Build something people love', 'gend-society' ) ); ?></h1>
+				<p><?php esc_html_e( 'A short introduction that says who this is for, what it does and why it matters, in a sentence or two.', 'gend-society' ); ?></p>
+				<?php echo $buttons; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks. ?>
+			</div>
+		</div>
+	</section>
+
+	<footer class="gsg-row gsg-meta gsg-end">
+		<span><?php echo esc_html( $name ); ?></span>
+		<span><?php esc_html_e( 'Brand Guidelines', 'gend-society' ); ?></span>
+		<span><?php echo esc_html( $date ); ?></span>
+	</footer>
 </div>
 	<?php wp_footer(); ?>
 </body>
