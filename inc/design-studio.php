@@ -95,17 +95,45 @@ function gend_society_studio_register_group_styling_page() {
 	);
 }
 
+add_action( 'admin_menu', 'gend_society_studio_register_profile_styling_page', 20 );
+/**
+ * Hidden page for the Profile Styling builder (inc/profile-styling.php):
+ * profile header templates, tab layouts and the profile menu.
+ */
+function gend_society_studio_register_profile_styling_page() {
+	if ( ! function_exists( 'gend_society_ps_rest_state' ) ) {
+		return;
+	}
+	add_submenu_page(
+		'',
+		__( 'Profile Styling', 'gend-society' ),
+		__( 'Profile Styling', 'gend-society' ),
+		'edit_theme_options',
+		'gs-studio-profile-styling',
+		function () {
+			echo '<div class="wrap gs-studio-panel"><div id="gs-ps-root"><p class="description">' . esc_html__( 'Loading…', 'gend-society' ) . '</p></div></div>';
+		}
+	);
+}
+
 add_action( 'admin_enqueue_scripts', 'gend_society_studio_panel_styles' );
 /**
- * Dark skin for the Group Styling builder when it is shown inside the studio.
+ * Dark skin for the Group / Profile Styling builders shown inside the studio,
+ * and the Profile Styling builder's script.
  */
 function gend_society_studio_panel_styles() {
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- page routing.
-	if ( ! isset( $_GET['page'] ) || 'gs-studio-group-styling' !== $_GET['page'] ) {
+	$page = isset( $_GET['page'] ) ? sanitize_key( wp_unslash( $_GET['page'] ) ) : '';
+	if ( ! in_array( $page, array( 'gs-studio-group-styling', 'gs-studio-profile-styling' ), true ) ) {
 		return;
 	}
 	$css = 'assets/design-studio-panel.css';
 	wp_enqueue_style( 'gs-studio-panel', GEND_SOCIETY_URL . $css, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) );
+	if ( 'gs-studio-profile-styling' === $page ) {
+		$js = 'assets/profile-styling-admin.js';
+		wp_enqueue_script( 'gs-profile-styling-admin', GEND_SOCIETY_URL . $js, array( 'wp-api-fetch', 'wp-i18n' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
+		wp_set_script_translations( 'gs-profile-styling-admin', 'gend-society' );
+	}
 }
 
 add_action( 'load-site-editor.php', 'gend_society_studio_redirect_landing' );
@@ -159,6 +187,8 @@ function gend_society_studio_sections() {
 		? admin_url( 'admin.php?page=gs-studio-group-styling' )
 		: '';
 	$header_id   = $builder && function_exists( 'gdc_gs_get_site_default_header_id' ) ? (int) gdc_gs_get_site_default_header_id() : 0;
+	$profiles    = function_exists( 'gend_society_ps_rest_state' ) ? admin_url( 'admin.php?page=gs-studio-profile-styling' ) : '';
+	$p_header_id = $profiles ? gend_society_ps_default_header_id() : 0;
 	$yz          = function ( $page, $tab = '' ) {
 		return admin_url( 'admin.php?page=' . $page . ( $tab ? '&tab=' . $tab : '' ) );
 	};
@@ -286,11 +316,12 @@ function gend_society_studio_sections() {
 					'label' => __( 'Profile', 'gend-society' ),
 					'items' => array(
 						array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-panel', 'members-directory' ) ),
-						array( 'id' => 'profile-template', 'label' => __( 'Profile Template', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-profile-settings' ) ),
-						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-profile-settings', 'header' ) ),
-						array( 'id' => 'profile-menu', 'label' => __( 'Profile Menu', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-profile-settings', 'navbar' ) ),
-						array( 'id' => 'profile-menu-pages', 'label' => __( 'Profile Menu Pages', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-profile-settings', 'tabs' ) ),
-						array( 'id' => 'profile-layout', 'label' => __( 'Profile Layout and Sidebars', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-profile-settings', 'structure' ) ),
+						// Profile headers, tab layouts and menu are block-built (Profile Styling); Youzify settings only without it.
+						array( 'id' => 'profile-template', 'label' => __( 'Profile Template', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-headers' : $yz( 'youzify-profile-settings' ) ),
+						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles . '#gs-ps-headers' : $yz( 'youzify-profile-settings', 'header' ) ) ),
+						array( 'id' => 'profile-menu', 'label' => __( 'Profile Menu', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-nav' : $yz( 'youzify-profile-settings', 'navbar' ) ),
+						array( 'id' => 'profile-menu-pages', 'label' => __( 'Profile Menu Pages', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-nav' : $yz( 'youzify-profile-settings', 'tabs' ) ),
+						array( 'id' => 'profile-layout', 'label' => __( 'Profile Layout and Sidebars', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-nav' : $yz( 'youzify-profile-settings', 'structure' ) ),
 					),
 				),
 				array(
@@ -444,7 +475,7 @@ function gend_society_studio_embed_css() {
 		echo '<link rel="stylesheet" id="gs-studio-editor-css" href="' . esc_url( GEND_SOCIETY_URL . $css . '?ver=' . GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) ) . '">'; // phpcs:ignore WordPress.WP.EnqueuedResources.NonEnqueuedStylesheet -- printed last so it overrides the editor's own late styles.
 	}
 	echo '<style id="gs-studio-embed-css">'
-		. 'body.gs-studio-embed{--gs-header-h:0px!important}body.gs-studio-embed::before,body.gs-studio-embed::after{display:none!important}'
+		. 'body.gs-studio-embed{--gs-header-h:0px!important}body.gs-studio-embed::before,body.gs-studio-embed::after{display:none!important}:root{background:#0b0e14!important}'
 		. '#main-3d-header,.header-anchor-wrap,#wpadminbar,#adminmenumain,#wpfooter,aipa-widget,.gs-frontend-bar,.update-nag{display:none!important}'
 		. 'html.wp-toolbar{padding-top:0!important}#wpcontent,#wpfooter{margin-left:0!important}#wpbody-content{padding-top:0!important}'
 		. 'body.gs-studio-embed .edit-site-layout__view-mode-toggle-container,body.gs-studio-embed .edit-site-site-hub__view-mode-toggle-container,body.gs-studio-embed .editor-header__back-button,body.gs-studio-embed .edit-site-layout__hub,body.gs-studio-embed .edit-post-fullscreen-mode-close{visibility:hidden!important;pointer-events:none!important}'

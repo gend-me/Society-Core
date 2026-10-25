@@ -110,3 +110,31 @@ html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-ad
 html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat > thead > tr {
 	background-color: transparent !important;
 }
+
+/* ── Profile Styling builder (assets/profile-styling-admin.js) ───────── */
+body.gs-studio-embed #gs-ps-root section { margin-bottom: 40px; }
+body.gs-studio-embed #gs-ps-root table.widefat { border: 1px solid rgba(255, 255, 255, .09); border-radius: 14px; overflow: hidden; background: rgba(255, 255, 255, .03); box-shadow: none; }
+body.gs-studio-embed #gs-ps-root table.widefat > thead > tr, body.gs-studio-embed #gs-ps-root table.widefat > tbody > tr { background: transparent !important; }
+body.gs-studio-embed #gs-ps-root table.widefat th, body.gs-studio-embed #gs-ps-root table.widefat td { color: #e8edf5; background: transparent !important; border-color: rgba(255, 255, 255, .07); padding: 12px 14px; vertical-align: middle; }
+body.gs-studio-embed #gs-ps-root table.widefat thead th { color: #8b98b0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+body.gs-studio-embed #gs-ps-root table.widefat > tbody > tr:nth-child(odd) > * { background: rgba(255, 255, 255, .025) !important; }
+body.gs-studio-embed #gs-ps-root .gs-ps-actions, body.gs-studio-embed #gs-ps-root .gs-ps-order { white-space: nowrap; text-align: right; }
+body.gs-studio-embed #gs-ps-root .gs-ps-actions .button, body.gs-studio-embed #gs-ps-root .gs-ps-order .button { margin-left: 6px; }
+body.gs-studio-embed #gs-ps-root .gs-ps-layouts { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+body.gs-studio-embed #gs-ps-root .gs-ps-layout { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+body.gs-studio-embed #gs-ps-root .gs-ps-layout > span { color: #c6cfdf; font-size: 12px; margin-right: 6px; }
+body.gs-studio-embed #gs-ps-root .gs-ps-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+body.gs-studio-embed .gs-ps-msg { color: #97e46e; font-size: 13px; }
+body.gs-studio-embed .gs-ps-msg.is-bad { color: #ff8a8a; }
+body.gs-studio-embed .gs-ps-modal-wrap { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; padding: 16px; background: rgba(2, 6, 23, .72); backdrop-filter: blur(4px); }
+body.gs-studio-embed .gs-ps-modal { width: min(520px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 24px; border-radius: 16px; color: #e8edf5; background: linear-gradient(165deg, rgba(15, 23, 42, .98), rgba(11, 17, 32, .98)); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
+body.gs-studio-embed .gs-ps-modal h3 { margin: 0 0 14px; color: #f1f5f9; }
+body.gs-studio-embed .gs-ps-modal h4 { margin: 16px 0 8px; color: #8b98b0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+body.gs-studio-embed .gs-ps-modal input[type="text"] { width: 100%; background: rgba(0, 0, 0, .28); color: #e8edf5; border: 1px solid rgba(255, 255, 255, .14); border-radius: 8px; min-height: 36px; }
+body.gs-studio-embed .gs-ps-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+body.gs-studio-embed .gs-ps-check { display: flex; align-items: center; gap: 6px; color: #e8edf5 !important; }
+body.gs-studio-embed .gs-ps-modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 20px; }
+body.gs-studio-embed .gs-ps-modal-actions .gs-ps-msg { margin-right: auto; }
+body.gs-studio-embed .gs-ps-modal .button { background: rgba(255, 255, 255, .08); color: #e8edf5; border: 1px solid rgba(255, 255, 255, .14); border-radius: 9px; }
+body.gs-studio-embed .gs-ps-modal .button-primary { background: #97e46e; color: #0d1a06; border-color: transparent; font-weight: 600; }
+body.gs-studio-embed .gs-ps-modal .button-primary.is-danger { background: #ff6b6b; color: #fff; }

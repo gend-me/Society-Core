@@ -250,6 +250,12 @@ return array(
 			'note'  => 'Member profile header (terminal-style header + nav bar).',
 		),
 		array(
+			'file'  => 'inc/profile-styling.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Profile Styling: block-built profile headers, tab layouts and menu (after member-profile-header: takes over its header hook).',
+		),
+		array(
 			'file'  => 'inc/member-calendar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
