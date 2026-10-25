@@ -116,6 +116,31 @@ function gend_society_studio_register_profile_styling_page() {
 	);
 }
 
+add_action( 'admin_menu', 'gend_society_studio_register_layout_page', 20 );
+/**
+ * Hidden page that opens a directory layout (inc/directory-styling.php) in the
+ * block editor, creating it as a draft first if needed.
+ */
+function gend_society_studio_register_layout_page() {
+	if ( ! function_exists( 'gend_society_ds_layout_id' ) ) {
+		return;
+	}
+	$hook = add_submenu_page( '', __( 'Directory Layout', 'gend-society' ), __( 'Directory Layout', 'gend-society' ), 'edit_theme_options', 'gs-studio-layout', '__return_null' );
+	add_action(
+		'load-' . $hook,
+		function () {
+			// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- opens (or creates as a draft) an admin-only layout.
+			$slug = isset( $_GET['layout'] ) ? sanitize_key( wp_unslash( $_GET['layout'] ) ) : '';
+			$id   = gend_society_ds_layout_id( $slug );
+			if ( ! $id ) {
+				wp_die( esc_html__( 'Unknown layout.', 'gend-society' ) );
+			}
+			wp_safe_redirect( admin_url( 'post.php?post=' . $id . '&action=edit' ) );
+			exit;
+		}
+	);
+}
+
 add_action( 'admin_enqueue_scripts', 'gend_society_studio_panel_styles' );
 /**
  * Dark skin for the Group / Profile Styling builders shown inside the studio,
@@ -189,6 +214,10 @@ function gend_society_studio_sections() {
 	$header_id   = $builder && function_exists( 'gdc_gs_get_site_default_header_id' ) ? (int) gdc_gs_get_site_default_header_id() : 0;
 	$profiles    = function_exists( 'gend_society_ps_rest_state' ) ? admin_url( 'admin.php?page=gs-studio-profile-styling' ) : '';
 	$p_header_id = $profiles ? gend_society_ps_default_header_id() : 0;
+	$layouts     = function_exists( 'gend_society_ds_layout_id' );
+	$layout_url  = function ( $slug ) {
+		return admin_url( 'admin.php?page=gs-studio-layout&layout=' . $slug );
+	};
 	$yz          = function ( $page, $tab = '' ) {
 		return admin_url( 'admin.php?page=' . $page . ( $tab ? '&tab=' . $tab : '' ) );
 	};
@@ -315,7 +344,7 @@ function gend_society_studio_sections() {
 				array(
 					'label' => __( 'Profile', 'gend-society' ),
 					'items' => array(
-						array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-panel', 'members-directory' ) ),
+						array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
 						// Profile headers, tab layouts and menu are block-built (Profile Styling); Youzify settings only without it.
 						array( 'id' => 'profile-template', 'label' => __( 'Profile Template', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-headers' : $yz( 'youzify-profile-settings' ) ),
 						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles . '#gs-ps-headers' : $yz( 'youzify-profile-settings', 'header' ) ) ),
@@ -327,7 +356,7 @@ function gend_society_studio_sections() {
 				array(
 					'label' => __( 'Groups', 'gend-society' ),
 					'items' => array(
-						array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-panel', 'groups-directory' ) ),
+						array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
 						// Group headers and pages are block-built (Group Styling); Youzify settings only when that builder is missing.
 						array( 'id' => 'group-templates', 'label' => __( 'Group Templates', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder . '#gdc-gs-admin-root' : $yz( 'youzify-panel', 'groups' ) ),
 						array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder . '#gdc-gs-header-templates-list' : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
@@ -339,7 +368,7 @@ function gend_society_studio_sections() {
 				array(
 					'label' => __( 'Activity Feed', 'gend-society' ),
 					'items' => array(
-						array( 'id' => 'activity-styling', 'label' => __( 'Styling', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-panel', 'wall' ) ),
+						array( 'id' => 'activity-styling', 'label' => __( 'Styling', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : $yz( 'youzify-panel', 'wall' ) ),
 						array( 'id' => 'activity-reactions', 'label' => __( 'Activity Reactions', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-extensions-settings', 'activity-reactions' ) ),
 					),
 				),
