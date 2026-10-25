@@ -10,7 +10,16 @@ body.gs-studio-specimen .gs-sidebar-flyout,
 body.gs-studio-specimen .gs-float-menu,
 body.gs-studio-specimen .gs-float-dock,
 body.gs-studio-specimen aipa-widget,
-body.gs-studio-specimen #wpadminbar { display: none !important; }
+body.gs-studio-specimen #wpadminbar,
+/* Site widgets that float over pages: chat launchers and the cookie banner/button. */
+body.gs-studio-specimen .em-chat-widget,
+body.gs-studio-specimen .em-chat-panel,
+body.gs-studio-specimen .chat-widget-launcher,
+body.gs-studio-specimen .chat-widget-panel,
+body.gs-studio-specimen #gm-cc,
+body.gs-studio-specimen .gm-cc,
+body.gs-studio-specimen .gm-cc-dock,
+body.gs-studio-specimen .gm-cc-open { display: none !important; }
 
 .gsg {
 	--gsg-paper: #f3f1ec;
