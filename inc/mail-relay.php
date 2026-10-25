@@ -28,6 +28,9 @@ function gend_society_mail_relay_creds() {
 /** Whether this container's mail goes through the gend.me relay. */
 function gend_society_mail_relay_active() {
     if (!gend_society_mail_relay_creds()) return false;
+    // @build-only-begin wporg
+    if (function_exists('gend_society_data_sharing_allowed') && !gend_society_data_sharing_allowed('mail_relay')) return false; // wordpress.org build: only after the owner opts in.
+    // @build-only-end wporg
     if (function_exists('gend_mailgun_enabled') && gend_mailgun_enabled()) return false; // its own Mailgun key
     $choice = (string) get_option('gend_mail_transport', '');
     if ($choice === 'smtp') return false;
@@ -130,6 +133,9 @@ add_filter('em_inbox_outq_pre_submit', function ($pre, $m) {
 // Daily: report how much Talk Flows data this container stores (its Emails storage allowance is checked on gend.me).
 add_action('gend_society_mail_storage_report', function () {
     if (!gend_society_mail_relay_creds()) return;
+    // @build-only-begin wporg
+    if (function_exists('gend_society_data_sharing_allowed') && !gend_society_data_sharing_allowed('mail_relay')) return; // wordpress.org build: only after the owner opts in.
+    // @build-only-end wporg
     global $wpdb;
     $t = $wpdb->prefix . 'gdc_inbox_raw';
     if ($wpdb->get_var($wpdb->prepare('SHOW TABLES LIKE %s', $t)) !== $t) return;
@@ -138,6 +144,12 @@ add_action('gend_society_mail_storage_report', function () {
     if (!is_wp_error($res) && $res[0] === 200) update_option('gend_society_mail_service_state', $res[1], false);
 });
 add_action('init', function () {
+    // @build-only-begin wporg
+    if (function_exists('gend_society_data_sharing_allowed') && !gend_society_data_sharing_allowed('mail_relay')) { // wordpress.org build: no storage report without the opt-in.
+        if (wp_next_scheduled('gend_society_mail_storage_report')) wp_clear_scheduled_hook('gend_society_mail_storage_report');
+        return;
+    }
+    // @build-only-end wporg
     if (!wp_next_scheduled('gend_society_mail_storage_report')) wp_schedule_event(time() + HOUR_IN_SECONDS, 'daily', 'gend_society_mail_storage_report');
 }, 40);
 

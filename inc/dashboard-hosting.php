@@ -1688,10 +1688,12 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                             <span class="dashicons dashicons-list-view" style="vertical-align: middle; margin-right: 4px;"></span>
                             <?php esc_html_e( 'Tables', 'gend-society' ); ?>
                         </button>
+<?php /* @build-strip-begin wporg */ ?>
                         <button type="button" class="gs-hosting-tables-modal__tab" data-gs-tables-tab="query" role="tab" aria-selected="false">
                             <span class="dashicons dashicons-search" style="vertical-align: middle; margin-right: 4px;"></span>
                             <?php esc_html_e( 'Queries', 'gend-society' ); ?>
                         </button>
+<?php /* @build-strip-end wporg */ ?>
                     </nav>
 
                     <div class="gs-hosting-tables-modal__body">
@@ -1710,7 +1712,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                             <col class="gs-col-data">
                                             <col class="gs-col-index">
                                             <col class="gs-col-total">
+<?php /* @build-strip-begin wporg */ ?>
                                             <col class="gs-col-action">
+<?php /* @build-strip-end wporg */ ?>
                                         </colgroup>
                                         <thead>
                                             <tr>
@@ -1722,7 +1726,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                                 <th style="text-align: right; cursor: pointer; user-select: none;" data-gs-sort="data" role="button" tabindex="0" title="<?php esc_attr_e( 'Sort by data size', 'gend-society' ); ?>"><?php esc_html_e( 'Data', 'gend-society' ); ?> <span data-gs-sort-ind style="opacity: .55; font-size: .75em;"></span></th>
                                                 <th style="text-align: right; cursor: pointer; user-select: none;" data-gs-sort="index" role="button" tabindex="0" title="<?php esc_attr_e( 'Sort by index size', 'gend-society' ); ?>"><?php esc_html_e( 'Index', 'gend-society' ); ?> <span data-gs-sort-ind style="opacity: .55; font-size: .75em;"></span></th>
                                                 <th style="text-align: right; cursor: pointer; user-select: none;" data-gs-sort="total" role="button" tabindex="0" title="<?php esc_attr_e( 'Sort by total size', 'gend-society' ); ?>"><?php esc_html_e( 'Total', 'gend-society' ); ?> <span data-gs-sort-ind style="opacity: .55; font-size: .75em;"></span></th>
+<?php /* @build-strip-begin wporg */ ?>
                                                 <th></th>
+<?php /* @build-strip-end wporg */ ?>
                                             </tr>
                                         </thead>
                                         <tbody>
@@ -1734,7 +1740,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                                     <td class="gs-col-data" style="text-align: right;"><?php echo esc_html( size_format( (int) $t['data_bytes'], 1 ) ); ?></td>
                                                     <td class="gs-col-index" style="text-align: right;"><?php echo esc_html( size_format( (int) $t['index_bytes'], 1 ) ); ?></td>
                                                     <td class="gs-col-total" style="text-align: right; color: #fff; font-weight: 600;"><?php echo esc_html( size_format( (int) $t['total_bytes'], 1 ) ); ?></td>
+<?php /* @build-strip-begin wporg */ ?>
                                                     <td class="gs-col-action" style="text-align: right;"><button type="button" class="gs-hosting__btn" data-gs-tables-browse="<?php echo esc_attr( $t['name'] ); ?>" style="background: rgba(255,255,255,0.08); padding: 4px 10px; font-size: 0.72rem;"><?php esc_html_e( 'Browse', 'gend-society' ); ?></button></td>
+<?php /* @build-strip-end wporg */ ?>
                                                 </tr>
                                             <?php endforeach; ?>
                                         </tbody>
@@ -1742,6 +1750,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                                 </div>
                             </div>
 
+<?php /* @build-strip-begin wporg */ ?>
                             <!-- Tab 2: natural-language query builder.
                                  Non-technical users describe what they want;
                                  a "Find It" button asks LEO to translate the
@@ -1840,6 +1849,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
 
                                 <div id="gs-hosting-query-results" class="gs-hosting-tables-modal__results"></div>
                             </div>
+<?php /* @build-strip-end wporg */ ?>
                         </div>
                     </div>
                 </div>
@@ -1943,6 +1953,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 }
                 .gs-hosting-tables-modal__ask:focus { outline:none; border-color:rgba(78,170,255,0.55); box-shadow:0 0 0 3px rgba(78,170,255,0.18); }
                 .gs-hosting-tables-modal__ask::placeholder { color:rgba(203,213,245,0.55); }
+<?php /* @build-strip-begin wporg */ ?>
                 /* Quick-pick chip row — one-click recipes for common
                    questions, so non-technical users have a starting point
                    even when the AI helper is unavailable. */
@@ -1958,6 +1969,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 /* Open <details> rotates the chevron, like an accordion. */
                 #gs-hosting-query-details[open] > summary .dashicons-arrow-right { transform: rotate(90deg); }
                 #gs-hosting-query-details > summary::-webkit-details-marker { display: none; }
+<?php /* @build-strip-end wporg */ ?>
                 /* Friendly natural-language answer rendering for SELECT
                    results — single-value queries get an oversized number,
                    multi-row results keep the table view. */
@@ -2780,6 +2792,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 setTablesTab(tabBtn.dataset.gsTablesTab);
                 return;
             }
+<?php /* @build-strip-begin wporg */ ?>
             // Recipe chip click — pre-fill the natural-language input AND
             // stash the fallback SQL so "Find It" can use it without an AI
             // round-trip if needed.
@@ -2826,6 +2839,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 runQuery();
                 return;
             }
+<?php /* @build-strip-end wporg */ ?>
         });
         document.addEventListener('keydown', function(e){
             if (e.key === 'Escape' && $tblModal && $tblModal.classList.contains('is-open')) {
@@ -2889,12 +2903,15 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             });
         }
         // Cmd/Ctrl+Enter inside the SQL textarea runs the query.
+<?php /* @build-strip-begin wporg */ ?>
         document.addEventListener('keydown', function(e){
             if (e.target && e.target.id === 'gs-hosting-query-input' && (e.metaKey || e.ctrlKey) && e.key === 'Enter') {
                 e.preventDefault();
                 runQuery();
             }
         });
+<?php /* @build-strip-end wporg */ ?>
+<?php /* @build-strip-begin wporg */ ?>
 
         function escHtml(s) {
             if (s == null) return '';
@@ -3127,6 +3144,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 $results.innerHTML = '<div class="is-err">Network error running the query.</div>';
             });
         }
+<?php /* @build-strip-end wporg */ ?>
     })();
     </script>
     <?php
@@ -4441,6 +4459,7 @@ add_action( 'wp_ajax_gend_society_hosting_media_rescan', function () {
     wp_send_json_success( $data );
 } );
 
+// @build-strip-begin wporg
 /**
  * AJAX: run a raw SQL query against the app database from the Tables modal.
  *
@@ -4523,3 +4542,4 @@ add_action( 'wp_ajax_gend_society_hosting_query_run', function () {
         'verb'     => $verb,
     ) );
 } );
+// @build-strip-end wporg
