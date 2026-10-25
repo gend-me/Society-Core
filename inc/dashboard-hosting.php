@@ -247,195 +247,15 @@ if ( ! function_exists( 'gend_society_hosting_plan_upgrade_data_attrs' ) ) {
     }
 }
 
-if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) {
+if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
     /**
-     * Storage usage cards (Media / Database / Codebase) + the account-wide
-     * Upgrade popup they open, plus the "Rescan storage" button's own
-     * standalone click handling (document-scoped, like the upgrade modal
-     * below it - this needs to work correctly whether it's rendered inside
-     * dashboard-hosting.php's own #gs-hosting-root* (section_group=all) or,
-     * for the membership dashboard, directly at the top of the page above
-     * the tab strip where there is no shared #gs-hosting-root at all - see
-     * dashboard-remote-membership.php).
+     * The shared upgrade popup ([data-gs-upgrade-open] buttons: iframe checkout on gend.me, install-token picker
+     * elsewhere). Printed by the Storage cards below and by the Email hosting card on pages without them
+     * (Talk Flows). The script binds once per page (data-upg-inited), so a second copy stays inert.
+     *
+     * @param bool $gs_sa Standalone install (no checkout iframe).
      */
-    function gend_society_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing, $hosting_jump_map = array() ) {
-        // Phase 109-29: a standalone install has no gend.me container, so no container caps / "Included in your
-        // plan" and no checkout iframe (column-0 control lines keep hub/container output byte-identical).
-        $gs_sa = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
-        $gs_hosting_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
-        $resources = gend_society_hosting_collect_container_resources( $media_data, $tables_data, $gs_hosting_membership );
-
-        // Container Plan total is the literal sum of whichever of the three
-        // resources above have a real container product attached - NOT
-        // $billing's whole-membership amount (that's the Dashboard plan's
-        // price, unrelated to storage, and used to show here misleadingly
-        // whenever no container product existed to total).
-        $gs_container_sum  = 0.0;
-        $gs_container_unit = '';
-        $gs_container_any  = false;
-        foreach ( $resources as $r ) {
-            if ( ! empty( $r['price']['amount'] ) ) {
-                $gs_container_sum += (float) $r['price']['amount'];
-                $gs_container_unit = (string) ( $r['price']['unit'] ?? '' );
-                $gs_container_any  = true;
-            }
-        }
-        $gs_container_currency = ( $gs_hosting_membership && method_exists( $gs_hosting_membership, 'get_currency' ) ) ? $gs_hosting_membership->get_currency() : '';
-        $gs_container_label    = function_exists( 'wu_format_currency' ) ? wu_format_currency( $gs_container_sum, $gs_container_currency ) : number_format( $gs_container_sum, 2 );
-
-        // v12.1 — Upgrade buttons are group-admin gated so regular
-        // members don't see them. Site admins + super admins always
-        // see them.
-        $gs_can_upgrade = current_user_can( 'manage_options' )
-            || is_super_admin() // site-admin check, not a hub signal (104 audit)
-            || ( function_exists( 'gend_society_group_tabs_user_has_access' ) && gend_society_group_tabs_user_has_access() );
-
-        // No Media/Codebase/Database container plans on this networked site
-        // yet: replace the per-card Upgrade buttons with one "Migrate" button
-        // that opens the hub's membership popup (same origin, in the shared
-        // upgrade-modal iframe) and auto-launches its Code -> Media ->
-        // Database container wizard (?gdc_auto_migrate=1, woocommerce-account-
-        // memberships.php). Paying for it starts the automatic migration.
-        $gs_migrate_url = '';
-        if ( $gs_can_upgrade && $gs_hosting_membership
-            && function_exists( 'gdc_membership_needs_container_migration' ) && function_exists( 'wu_get_site' )
-            && ( ! function_exists( 'gend_society_oauth_is_hub_site' ) || gend_society_oauth_is_hub_site() ) ) {
-            $gs_this_site = wu_get_site( get_current_blog_id() );
-            if ( $gs_this_site && gdc_membership_needs_container_migration( $gs_hosting_membership, $gs_this_site ) ) {
-                $gs_migrate_url = add_query_arg(
-                    array( 'gdc_open_modal' => (int) $gs_hosting_membership->get_id(), 'gdc_auto_migrate' => 1 ),
-                    get_home_url( get_main_site_id(), '/my-account/memberships/' )
-                );
-            }
-        }
-        ?>
-        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
-            <div>
-                <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Storage', 'gend-society' ); ?></h4>
-<?php if ( $gs_sa ) : ?>
-                <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Storage this site uses on its own server, with live usage. Separate storage containers come with gend.me hosting.', 'gend-society' ); ?></p>
-<?php else : ?>
-                <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Resources your container plan provisions on this install, with live usage.', 'gend-society' ); ?></p>
-<?php endif; ?>
-            </div>
-            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
-                <button type="button" class="gs-hosting__btn" data-gs-hosting="media-rescan" style="background: rgba(255,255,255,0.08);"><?php esc_html_e( 'Rescan storage', 'gend-society' ); ?></button>
-                <div style="text-align: right;">
-                    <div class="gs-hosting__stat-label"><?php esc_html_e( 'Container Plan', 'gend-society' ); ?></div>
-                    <div style="color:#fff; font-size:1rem; font-weight:600; margin-top:4px;">
-<?php if ( $gs_sa ) : ?>
-                            <span class="gs-dash-sa-muted"><?php esc_html_e( 'After migration', 'gend-society' ); ?></span>
-<?php else : ?>
-                        <?php if ( $gs_container_any ) : ?>
-                            <?php echo esc_html( $gs_container_label ); ?>
-                            <?php if ( $gs_container_unit !== '' ) : ?>
-                                <span style="color: var(--gs-muted, #94a3b8); font-size: 0.8rem; font-weight: 400;">/ <?php echo esc_html( $gs_container_unit ); ?></span>
-                            <?php endif; ?>
-                        <?php else : ?>
-                            <span style="color: var(--gs-muted, #94a3b8); font-weight: 400; font-style: italic; font-size: 0.85rem;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></span>
-                        <?php endif; ?>
-<?php endif; ?>
-                    </div>
-                </div>
-            </div>
-        </div>
-
-        <?php
-        // Same shared CTA card the My Account membership popup renders
-        // (gdc_render_migrate_containers_cta(), vendor-app-manager); here the
-        // trigger opens the hub popup in the shared upgrade-modal iframe.
-        if ( $gs_migrate_url !== '' && function_exists( 'gdc_render_migrate_containers_cta' ) ) {
-            echo gdc_render_migrate_containers_cta( // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts.
-                '<button type="button" class="gdc-migrate-cta__btn" data-gs-upgrade-open data-resource="containers"'
-                . ' data-resource-label="' . esc_attr__( 'Independent Storage Containers', 'gend-society' ) . '"'
-                . ' data-embed-url="' . esc_url( $gs_migrate_url ) . '">'
-                . '<span>' . esc_html__( 'Start Migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></button>'
-            );
-        }
-        ?>
-
-        <div class="gs-hosting__resources-grid">
-            <?php foreach ( $resources as $r ) :
-                $pct  = gend_society_hosting_pct( (int) $r['used'], (int) $r['cap'] );
-                $warn = $pct >= 80;
-            ?>
-                <div class="gs-hosting__resource-card">
-                    <?php if ( ! empty( $hosting_jump_map[ $r['slug'] ] ) ) : ?>
-                        <button type="button" class="gs-hosting__resource-card-goto" data-gs-hosting-goto="<?php echo esc_attr( $hosting_jump_map[ $r['slug'] ] ); ?>" title="<?php esc_attr_e( 'Open in Hosting', 'gend-society' ); ?>" aria-label="<?php esc_attr_e( 'Open in Hosting', 'gend-society' ); ?>">
-                            <span class="dashicons dashicons-admin-generic"></span>
-                        </button>
-                    <?php endif; ?>
-                    <div class="gs-hosting__resource-card-head">
-                        <span class="gs-hosting__resource-card-icon dashicons <?php echo esc_attr( $r['icon'] ); ?>"></span>
-                        <div>
-                            <div class="gs-hosting__resource-card-title"><?php echo esc_html( $r['label'] ); ?></div>
-                            <div class="gs-hosting__resource-card-hint"><?php echo esc_html( $r['hint'] ); ?></div>
-                        </div>
-                    </div>
-<?php if ( $gs_sa ) : ?>
-                    <div class="gs-hosting__resource-card-usage">
-                        <?php echo esc_html( $r['used_label'] ); ?>
-                        <span class="gs-hosting__resource-card-cap"><?php esc_html_e( 'used on this server', 'gend-society' ); ?></span>
-                    </div>
-                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php esc_html_e( 'Container: after migration', 'gend-society' ); ?></div>
-<?php else : ?>
-                    <div class="gs-hosting__resource-card-usage">
-                        <?php echo esc_html( $r['used_label'] ); ?>
-                        <span class="gs-hosting__resource-card-cap">/ <?php echo esc_html( $r['cap_label'] ); ?></span>
-                    </div>
-                    <div class="gs-hosting__progress">
-                        <div class="gs-hosting__progress-bar<?php echo $warn ? ' is-warn' : ''; ?>" style="width: <?php echo (int) $pct; ?>%;"></div>
-                    </div>
-                    <div class="gs-hosting__resource-card-pct" style="<?php echo $warn ? 'color:#fcd34d;' : ''; ?>">
-                        <?php echo (int) $pct; ?>% <?php esc_html_e( 'used', 'gend-society' ); ?>
-                    </div>
-<?php endif; ?>
-<?php if ( ! $gs_sa ) : ?>
-                    <?php if ( ! empty( $r['price']['label'] ) ) : ?>
-                        <div class="gs-hosting__resource-card-usage" style="margin-top: 6px; font-size: 0.85rem;">
-                            <?php echo esc_html( $r['price']['label'] ); ?>
-                            <?php if ( ! empty( $r['price']['unit'] ) ) : ?>
-                                <span class="gs-hosting__resource-card-cap">/ <?php echo esc_html( $r['price']['unit'] ); ?></span>
-                            <?php endif; ?>
-                        </div>
-                    <?php elseif ( ! empty( $r['starting_price']['label'] ) ) : ?>
-                        <div class="gs-hosting__resource-card-usage" style="margin-top: 6px; font-size: 0.85rem; color: var(--gs-muted, #94a3b8);">
-                            <?php echo esc_html( sprintf( /* translators: %s: Starting price. */ __( 'From %s', 'gend-society' ), $r['starting_price']['label'] ) ); ?>
-                        </div>
-                    <?php else : ?>
-                        <div class="gs-hosting__resource-card-meta" style="margin-top: 6px; font-style: italic;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></div>
-                    <?php endif; ?>
-<?php endif; ?>
-                    <?php if ( ! empty( $r['meta'] ) ) : ?>
-                        <p class="gs-hosting__resource-card-meta"><?php echo esc_html( $r['meta'] ); ?></p>
-                    <?php endif; ?>
-                    <?php
-                    $gs_res_upgrade_attrs = $gs_can_upgrade && $gs_migrate_url === '' && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' )
-                        ? gend_society_hosting_resource_upgrade_data_attrs( $r['slug'] )
-                        : '';
-                    ?>
-                    <?php if ( $gs_res_upgrade_attrs !== '' ) : ?>
-                    <button type="button"
-                            class="gs-hosting__btn gs-upgrade-cta"
-                            data-gs-upgrade-open
-                            data-resource="<?php echo esc_attr( $r['slug'] ); ?>"
-                            data-resource-label="<?php echo esc_attr( $r['label'] ); ?>"
-                            <?php echo $gs_res_upgrade_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute string built by gs_hosting_resource_upgrade_data_attrs(); every value esc_attr()'d there. ?>
-                            style="margin-top: auto; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 8px 14px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
-                        <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
-                    </button>
-                    <?php endif; ?>
-                </div>
-            <?php endforeach; ?>
-        </div>
-
-        <div class="gs-hosting__feedback" data-gs-hosting-feedback="media"></div>
-
-        <?php if ( $gs_can_upgrade ) :
-            // v12.1 — Rich staggered-entrance upgrade popup. Rendered once
-            // per call to this function; the Upgrade buttons above dispatch
-            // data-gs-upgrade-open with the resource slug + labels so the
-            // modal can show contextual pitch copy.
+    function gend_society_hosting_render_upgrade_modal( $gs_sa = false ) {
         ?>
         <style>
             /* ── Upgrade popup: backdrop + card + entrance, iframe body ── */
@@ -653,7 +473,201 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
             });
         })();
         </script>
-        <?php endif; ?>
+        <?php
+    }
+}
+
+if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) {
+    /**
+     * Storage usage cards (Media / Database / Codebase) + the account-wide
+     * Upgrade popup they open, plus the "Rescan storage" button's own
+     * standalone click handling (document-scoped, like the upgrade modal
+     * below it - this needs to work correctly whether it's rendered inside
+     * dashboard-hosting.php's own #gs-hosting-root* (section_group=all) or,
+     * for the membership dashboard, directly at the top of the page above
+     * the tab strip where there is no shared #gs-hosting-root at all - see
+     * dashboard-remote-membership.php).
+     */
+    function gend_society_hosting_render_storage_resource_cards( $media_data, $tables_data, $billing, $hosting_jump_map = array() ) {
+        // Phase 109-29: a standalone install has no gend.me container, so no container caps / "Included in your
+        // plan" and no checkout iframe (column-0 control lines keep hub/container output byte-identical).
+        $gs_sa = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone();
+        $gs_hosting_membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+        $resources = gend_society_hosting_collect_container_resources( $media_data, $tables_data, $gs_hosting_membership );
+
+        // Container Plan total is the literal sum of whichever of the three
+        // resources above have a real container product attached - NOT
+        // $billing's whole-membership amount (that's the Dashboard plan's
+        // price, unrelated to storage, and used to show here misleadingly
+        // whenever no container product existed to total).
+        $gs_container_sum  = 0.0;
+        $gs_container_unit = '';
+        $gs_container_any  = false;
+        foreach ( $resources as $r ) {
+            if ( ! empty( $r['price']['amount'] ) ) {
+                $gs_container_sum += (float) $r['price']['amount'];
+                $gs_container_unit = (string) ( $r['price']['unit'] ?? '' );
+                $gs_container_any  = true;
+            }
+        }
+        $gs_container_currency = ( $gs_hosting_membership && method_exists( $gs_hosting_membership, 'get_currency' ) ) ? $gs_hosting_membership->get_currency() : '';
+        $gs_container_label    = function_exists( 'wu_format_currency' ) ? wu_format_currency( $gs_container_sum, $gs_container_currency ) : number_format( $gs_container_sum, 2 );
+
+        // v12.1 — Upgrade buttons are group-admin gated so regular
+        // members don't see them. Site admins + super admins always
+        // see them.
+        $gs_can_upgrade = current_user_can( 'manage_options' )
+            || is_super_admin() // site-admin check, not a hub signal (104 audit)
+            || ( function_exists( 'gend_society_group_tabs_user_has_access' ) && gend_society_group_tabs_user_has_access() );
+
+        // No Media/Codebase/Database container plans on this networked site
+        // yet: replace the per-card Upgrade buttons with one "Migrate" button
+        // that opens the hub's membership popup (same origin, in the shared
+        // upgrade-modal iframe) and auto-launches its Code -> Media ->
+        // Database container wizard (?gdc_auto_migrate=1, woocommerce-account-
+        // memberships.php). Paying for it starts the automatic migration.
+        $gs_migrate_url = '';
+        if ( $gs_can_upgrade && $gs_hosting_membership
+            && function_exists( 'gdc_membership_needs_container_migration' ) && function_exists( 'wu_get_site' )
+            && ( ! function_exists( 'gend_society_oauth_is_hub_site' ) || gend_society_oauth_is_hub_site() ) ) {
+            $gs_this_site = wu_get_site( get_current_blog_id() );
+            if ( $gs_this_site && gdc_membership_needs_container_migration( $gs_hosting_membership, $gs_this_site ) ) {
+                $gs_migrate_url = add_query_arg(
+                    array( 'gdc_open_modal' => (int) $gs_hosting_membership->get_id(), 'gdc_auto_migrate' => 1 ),
+                    get_home_url( get_main_site_id(), '/my-account/memberships/' )
+                );
+            }
+        }
+        ?>
+        <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
+            <div>
+                <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Storage', 'gend-society' ); ?></h4>
+<?php if ( $gs_sa ) : ?>
+                <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Storage this site uses on its own server, with live usage. Separate storage containers come with gend.me hosting.', 'gend-society' ); ?></p>
+<?php else : ?>
+                <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Resources your container plan provisions on this install, with live usage.', 'gend-society' ); ?></p>
+<?php endif; ?>
+            </div>
+            <div style="display: flex; align-items: center; gap: 16px; flex-wrap: wrap;">
+                <button type="button" class="gs-hosting__btn" data-gs-hosting="media-rescan" style="background: rgba(255,255,255,0.08);"><?php esc_html_e( 'Rescan storage', 'gend-society' ); ?></button>
+                <div style="text-align: right;">
+                    <div class="gs-hosting__stat-label"><?php esc_html_e( 'Container Plan', 'gend-society' ); ?></div>
+                    <div style="color:#fff; font-size:1rem; font-weight:600; margin-top:4px;">
+<?php if ( $gs_sa ) : ?>
+                            <span class="gs-dash-sa-muted"><?php esc_html_e( 'After migration', 'gend-society' ); ?></span>
+<?php else : ?>
+                        <?php if ( $gs_container_any ) : ?>
+                            <?php echo esc_html( $gs_container_label ); ?>
+                            <?php if ( $gs_container_unit !== '' ) : ?>
+                                <span style="color: var(--gs-muted, #94a3b8); font-size: 0.8rem; font-weight: 400;">/ <?php echo esc_html( $gs_container_unit ); ?></span>
+                            <?php endif; ?>
+                        <?php else : ?>
+                            <span style="color: var(--gs-muted, #94a3b8); font-weight: 400; font-style: italic; font-size: 0.85rem;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></span>
+                        <?php endif; ?>
+<?php endif; ?>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <?php
+        // Same shared CTA card the My Account membership popup renders
+        // (gdc_render_migrate_containers_cta(), vendor-app-manager); here the
+        // trigger opens the hub popup in the shared upgrade-modal iframe.
+        if ( $gs_migrate_url !== '' && function_exists( 'gdc_render_migrate_containers_cta' ) ) {
+            echo gdc_render_migrate_containers_cta( // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts.
+                '<button type="button" class="gdc-migrate-cta__btn" data-gs-upgrade-open data-resource="containers"'
+                . ' data-resource-label="' . esc_attr__( 'Independent Storage Containers', 'gend-society' ) . '"'
+                . ' data-embed-url="' . esc_url( $gs_migrate_url ) . '">'
+                . '<span>' . esc_html__( 'Start Migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></button>'
+            );
+        }
+        ?>
+
+        <div class="gs-hosting__resources-grid">
+            <?php foreach ( $resources as $r ) :
+                $pct  = gend_society_hosting_pct( (int) $r['used'], (int) $r['cap'] );
+                $warn = $pct >= 80;
+            ?>
+                <div class="gs-hosting__resource-card">
+                    <?php if ( ! empty( $hosting_jump_map[ $r['slug'] ] ) ) : ?>
+                        <button type="button" class="gs-hosting__resource-card-goto" data-gs-hosting-goto="<?php echo esc_attr( $hosting_jump_map[ $r['slug'] ] ); ?>" title="<?php esc_attr_e( 'Open in Hosting', 'gend-society' ); ?>" aria-label="<?php esc_attr_e( 'Open in Hosting', 'gend-society' ); ?>">
+                            <span class="dashicons dashicons-admin-generic"></span>
+                        </button>
+                    <?php endif; ?>
+                    <div class="gs-hosting__resource-card-head">
+                        <span class="gs-hosting__resource-card-icon dashicons <?php echo esc_attr( $r['icon'] ); ?>"></span>
+                        <div>
+                            <div class="gs-hosting__resource-card-title"><?php echo esc_html( $r['label'] ); ?></div>
+                            <div class="gs-hosting__resource-card-hint"><?php echo esc_html( $r['hint'] ); ?></div>
+                        </div>
+                    </div>
+<?php if ( $gs_sa ) : ?>
+                    <div class="gs-hosting__resource-card-usage">
+                        <?php echo esc_html( $r['used_label'] ); ?>
+                        <span class="gs-hosting__resource-card-cap"><?php esc_html_e( 'used on this server', 'gend-society' ); ?></span>
+                    </div>
+                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php esc_html_e( 'Container: after migration', 'gend-society' ); ?></div>
+<?php else : ?>
+                    <div class="gs-hosting__resource-card-usage">
+                        <?php echo esc_html( $r['used_label'] ); ?>
+                        <span class="gs-hosting__resource-card-cap">/ <?php echo esc_html( $r['cap_label'] ); ?></span>
+                    </div>
+                    <div class="gs-hosting__progress">
+                        <div class="gs-hosting__progress-bar<?php echo $warn ? ' is-warn' : ''; ?>" style="width: <?php echo (int) $pct; ?>%;"></div>
+                    </div>
+                    <div class="gs-hosting__resource-card-pct" style="<?php echo $warn ? 'color:#fcd34d;' : ''; ?>">
+                        <?php echo (int) $pct; ?>% <?php esc_html_e( 'used', 'gend-society' ); ?>
+                    </div>
+<?php endif; ?>
+<?php if ( ! $gs_sa ) : ?>
+                    <?php if ( ! empty( $r['price']['label'] ) ) : ?>
+                        <div class="gs-hosting__resource-card-usage" style="margin-top: 6px; font-size: 0.85rem;">
+                            <?php echo esc_html( $r['price']['label'] ); ?>
+                            <?php if ( ! empty( $r['price']['unit'] ) ) : ?>
+                                <span class="gs-hosting__resource-card-cap">/ <?php echo esc_html( $r['price']['unit'] ); ?></span>
+                            <?php endif; ?>
+                        </div>
+                    <?php elseif ( ! empty( $r['starting_price']['label'] ) ) : ?>
+                        <div class="gs-hosting__resource-card-usage" style="margin-top: 6px; font-size: 0.85rem; color: var(--gs-muted, #94a3b8);">
+                            <?php echo esc_html( sprintf( /* translators: %s: Starting price. */ __( 'From %s', 'gend-society' ), $r['starting_price']['label'] ) ); ?>
+                        </div>
+                    <?php else : ?>
+                        <div class="gs-hosting__resource-card-meta" style="margin-top: 6px; font-style: italic;"><?php esc_html_e( 'Included in your plan', 'gend-society' ); ?></div>
+                    <?php endif; ?>
+<?php endif; ?>
+                    <?php if ( ! empty( $r['meta'] ) ) : ?>
+                        <p class="gs-hosting__resource-card-meta"><?php echo esc_html( $r['meta'] ); ?></p>
+                    <?php endif; ?>
+                    <?php
+                    $gs_res_upgrade_attrs = $gs_can_upgrade && $gs_migrate_url === '' && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' )
+                        ? gend_society_hosting_resource_upgrade_data_attrs( $r['slug'] )
+                        : '';
+                    ?>
+                    <?php if ( $gs_res_upgrade_attrs !== '' ) : ?>
+                    <button type="button"
+                            class="gs-hosting__btn gs-upgrade-cta"
+                            data-gs-upgrade-open
+                            data-resource="<?php echo esc_attr( $r['slug'] ); ?>"
+                            data-resource-label="<?php echo esc_attr( $r['label'] ); ?>"
+                            <?php echo $gs_res_upgrade_attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Attribute string built by gs_hosting_resource_upgrade_data_attrs(); every value esc_attr()'d there. ?>
+                            style="margin-top: auto; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 8px 14px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
+                        <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
+                    </button>
+                    <?php endif; ?>
+                </div>
+            <?php endforeach; ?>
+        </div>
+
+        <div class="gs-hosting__feedback" data-gs-hosting-feedback="media"></div>
+
+        <?php if ( $gs_can_upgrade ) :
+            // v12.1 — Rich staggered-entrance upgrade popup. Rendered once
+            // per call to this function; the Upgrade buttons above dispatch
+            // data-gs-upgrade-open with the resource slug + labels so the
+            // modal can show contextual pitch copy.
+            gend_society_hosting_render_upgrade_modal( $gs_sa );
+        endif; ?>
         <script>
         (function () {
             if (window.gsStorageRescanInited) { return; }
