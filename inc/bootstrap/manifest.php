@@ -80,6 +80,18 @@ return array(
 			'needs' => array( 'skin' ),
 		),
 		array(
+			'file'  => 'inc/design-studio.php',
+			'tier'  => 'core',
+			'needs' => array( 'skin' ),
+			'note'  => 'Design Studio: replaces the Site Editor landing screen; live style preview endpoint + style-guide page.',
+		),
+		array(
+			'file'  => 'inc/design-studio-templates.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Studio block templates (product types, plugin dashboard pages); join the hierarchy only once customised.',
+		),
+		array(
 			'file'  => 'inc/frontend-bar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),

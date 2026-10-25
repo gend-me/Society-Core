@@ -74,6 +74,7 @@ function gend_society_features_area_map() {
 function gend_society_features_granular_slug_map() {
     return apply_filters( 'gend_society_features_granular_slug_map', array(
         'site-editor.php'             => array( 'area' => 'app',      'child' => 'app.theme_builder' ),
+        'gs-design-studio'            => array( 'area' => 'app',      'child' => 'app.theme_builder' ),
         'blog-manager'                => array( 'area' => 'app',      'child' => 'app.content_campaigns' ),
         'content-campaigns'           => array( 'area' => 'app',      'child' => 'app.content_campaigns' ),
         'talk-flows'                  => array( 'area' => 'app',      'child' => 'app.talk_flows' ),
