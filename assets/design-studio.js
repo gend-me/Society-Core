@@ -486,7 +486,7 @@
 	} );
 
 	/* ── Shell ─────────────────────────────────────────────────────────── */
-	var nav, main, searchInput, current = { section: '', item: '' };
+	var nav, main, current = { section: '', item: '' };
 	var collapsed = {};
 	try {
 		collapsed = JSON.parse( window.localStorage.getItem( 'gsStudioCollapsed' ) || '{}' ) || {};
@@ -497,42 +497,14 @@
 	function shell() {
 		root.textContent = '';
 		root.removeAttribute( 'aria-busy' );
-		searchInput = h( 'input', { type: 'search', class: 'gs-st-search', placeholder: __( 'Search designs…', 'gend-society' ), 'aria-label': __( 'Search designs', 'gend-society' ), oninput: function () {
-			renderNav();
-		}, onkeydown: function ( e ) {
-			if ( e.key === 'Enter' ) {
-				var first = nav.querySelector( '.gs-st-nav-item' );
-				if ( first ) {
-					first.click();
-				}
-			}
-			if ( e.key === 'Escape' ) {
-				searchInput.value = '';
-				renderNav();
-			}
-		} } );
-		var top = h(
-			'header',
-			{ class: 'gs-st-top' },
-			h( 'div', { class: 'gs-st-brand' }, h( 'span', { class: 'gs-st-brand-mark' }, icon( 'art' ) ), h( 'span', { class: 'gs-st-brand-text' }, h( 'strong', null, __( 'Design Studio', 'gend-society' ) ), h( 'small', null, cfg.themeName ) ) ),
-			h( 'div', { class: 'gs-st-search-wrap' }, icon( 'search' ), searchInput, h( 'kbd', null, navigator.platform.indexOf( 'Mac' ) === 0 ? '⌘K' : 'Ctrl K' ) ),
-			saveSlot,
-		);
 		nav = h( 'nav', { class: 'gs-st-nav', 'aria-label': __( 'Design areas', 'gend-society' ) } );
 		main = h( 'main', { class: 'gs-st-main', tabindex: '-1' } );
-		root.appendChild( h( 'div', { class: 'gs-st-app' }, top, h( 'div', { class: 'gs-st-body' }, nav, main ) ) );
-		document.addEventListener( 'keydown', function ( e ) {
-			if ( ( e.ctrlKey || e.metaKey ) && e.key.toLowerCase() === 'k' ) {
-				e.preventDefault();
-				searchInput.focus();
-				searchInput.select();
-			}
-		} );
+		// The rail sits on the right; the save bar floats over the bottom of the canvas.
+		root.appendChild( h( 'div', { class: 'gs-st-app' }, h( 'div', { class: 'gs-st-body' }, main, nav ), saveSlot ) );
 	}
 
 	function renderNav() {
 		nav.textContent = '';
-		var q = ( searchInput.value || '' ).trim().toLowerCase();
 		nav.appendChild( h( 'a', { class: 'gs-st-nav-home' + ( ! current.section ? ' is-active' : '' ), href: '#/', title: __( 'Overview', 'gend-society' ) }, h( 'span', { class: 'gs-st-nav-ico' }, icon( 'dashboard' ) ), h( 'span', { class: 'gs-st-nav-home-label' }, __( 'Overview', 'gend-society' ) ) ) );
 		activeSections.forEach( function ( section ) {
 			var items = allItems( section );
@@ -542,7 +514,7 @@
 			var custom = counted.filter( function ( it ) {
 				return statusOf( templateFor( it ) ).key === 'custom';
 			} ).length;
-			var open = q ? true : ! collapsed[ section.id ];
+			var open = ! collapsed[ section.id ];
 			var head = h(
 				'button',
 				{ type: 'button', title: section.label, class: 'gs-st-nav-section' + ( current.section === section.id ? ' is-current' : '' ), 'aria-expanded': open ? 'true' : 'false', onclick: function () {
@@ -558,19 +530,11 @@
 				icon( open ? 'arrow-up-alt2' : 'arrow-down-alt2' )
 			);
 			var list = h( 'div', { class: 'gs-st-nav-items' } );
-			var any = false;
 			section.groups.forEach( function ( g ) {
-				var gi = g.items.filter( function ( it ) {
-					return ! q || it.label.toLowerCase().indexOf( q ) !== -1 || section.label.toLowerCase().indexOf( q ) !== -1 || ( g.label || '' ).toLowerCase().indexOf( q ) !== -1;
-				} );
-				if ( ! gi.length ) {
-					return;
-				}
-				any = true;
 				if ( g.label ) {
 					list.appendChild( h( 'div', { class: 'gs-st-nav-group' }, g.label ) );
 				}
-				gi.forEach( function ( it ) {
+				g.items.forEach( function ( it ) {
 					var st = ( it.kind === 'template' || it.kind === 'part' ) && S.templatesLoaded ? statusOf( templateFor( it ) ) : null;
 					list.appendChild( h(
 						'a',
@@ -580,12 +544,9 @@
 					) );
 				} );
 			} );
-			if ( q && ! any ) {
-				return;
-			}
 			nav.appendChild( h( 'div', { class: 'gs-st-nav-block' }, head, open ? list : null ) );
 		} );
-		if ( lockedSections.length && ! q ) {
+		if ( lockedSections.length ) {
 			var locked = h( 'div', { class: 'gs-st-nav-locked' }, h( 'div', { class: 'gs-st-nav-group' }, __( 'Unlock with apps', 'gend-society' ) ) );
 			lockedSections.forEach( function ( s ) {
 				locked.appendChild( h( 'a', { class: 'gs-st-nav-lock', href: '#/', title: sprintf( __( 'Turns on with %s', 'gend-society' ), s.requires || '' ) }, icon( s.icon ), h( 'span', null, s.label ), icon( 'lock' ) ) );

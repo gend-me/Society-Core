@@ -17,7 +17,6 @@ body.gs-studio-page {
 	--st-danger: #ff6b6b;
 	--st-radius: 14px;
 	--st-ease: cubic-bezier(.16, 1, .3, 1);
-	--st-top: 52px;
 	--st-rail: 64px;
 	--st-nav: 272px;
 	background: var(--st-bg);
@@ -70,42 +69,19 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 
 /* ── Shell ───────────────────────────────────────────────────────────── */
 .gs-st-app { display: flex; flex-direction: column; height: 100%; }
-.gs-st-top {
-	height: var(--st-top); flex: none;
-	display: flex; align-items: center; gap: 16px; padding: 0 16px;
-	border-bottom: 1px solid var(--st-border);
-	background: rgba(11, 14, 20, 0.7);
-	backdrop-filter: blur(14px);
-}
-.gs-st-brand { display: flex; align-items: center; gap: 10px; min-width: 0; padding: 4px 8px 4px 0; }
-.gs-st-brand-mark {
-	width: 32px; height: 32px; border-radius: 10px; display: grid; place-items: center;
-	background: linear-gradient(135deg, var(--st-magenta), var(--st-blue) 60%, var(--st-accent));
-	color: #fff; box-shadow: 0 6px 20px rgba(182, 8, 201, 0.35);
-}
-.gs-st-brand-text { display: flex; flex-direction: column; line-height: 1.15; min-width: 0; }
-.gs-st-brand-text strong { font-size: 15px; letter-spacing: .01em; }
-.gs-st-brand-text small { color: var(--st-muted); font-size: 12px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.gs-st-app { position: relative; }
 
-.gs-st-search-wrap {
-	position: relative; display: flex; align-items: center; flex: 0 1 360px; margin-left: 12px;
+/* Unsaved style changes: a floating bar over the bottom of the canvas (clear of the rail and the chat bubble). */
+.gs-st-save-slot {
+	position: absolute; z-index: 70; bottom: 22px; left: calc(50% - var(--st-rail) / 2); transform: translateX(-50%);
+	display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: 14px;
+	background: rgba(20, 26, 38, .94); border: 1px solid rgba(245, 184, 75, .35);
+	box-shadow: 0 18px 50px rgba(0, 0, 0, .5); backdrop-filter: blur(12px);
+	animation: gs-st-rise .35s var(--st-ease);
 }
-.gs-st-search-wrap > .dashicons { position: absolute; left: 12px; color: var(--st-muted); pointer-events: none; }
-.gs-studio input.gs-st-search {
-	width: 100%; height: 38px; padding: 0 64px 0 38px; margin: 0;
-	color: var(--st-text); background: var(--st-card); border: 1px solid var(--st-border); border-radius: 11px;
-	transition: border-color .2s, background .2s;
-}
-.gs-studio input.gs-st-search:focus { border-color: var(--st-accent); background: var(--st-card-hi); }
-.gs-st-search-wrap kbd {
-	position: absolute; right: 8px; padding: 2px 7px; border-radius: 6px; font-size: 11px;
-	color: var(--st-muted); background: rgba(255, 255, 255, 0.06); border: 1px solid var(--st-border);
-}
-.gs-st-save-slot { display: flex; align-items: center; gap: 8px; margin-left: auto; }
+.gs-st-save-slot:empty { display: none; }
 .gs-st-save-slot.is-busy { opacity: .6; pointer-events: none; }
-.gs-st-unsaved { display: inline-flex; align-items: center; gap: 6px; color: var(--st-warn); font-size: 13px; animation: gs-st-pop .35s var(--st-ease); }
-.gs-st-top-actions { display: flex; align-items: center; gap: 8px; }
-.gs-st-save-slot:empty + .gs-st-top-actions { margin-left: auto; }
+.gs-st-unsaved { display: inline-flex; align-items: center; gap: 6px; color: var(--st-warn); font-size: 13px; white-space: nowrap; }
 
 .gs-st-body { position: relative; flex: 1; display: flex; min-height: 0; }
 
@@ -134,19 +110,20 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 /* ── Sidebar ─────────────────────────────────────────────────────────── */
 /* Studio rail: icons only until hover/focus, then an overlay (like the admin rail) - the canvas never reflows. */
 .gs-st-nav {
-	position: absolute; top: 0; bottom: 0; left: 0; z-index: 60;
-	width: var(--st-rail); overflow-x: hidden; overflow-y: auto; padding: 12px 10px 40px;
+	position: absolute; top: 0; bottom: 0; right: 0; z-index: 60;
+	/* Bottom space so the last item scrolls clear of the floating chat bubble. */
+	width: var(--st-rail); overflow-x: hidden; overflow-y: auto; padding: 12px 10px 160px;
 	background: linear-gradient(180deg, rgba(20, 24, 34, .9), rgba(9, 12, 18, .96));
 	backdrop-filter: blur(28px) saturate(160%);
-	border-right: 1px solid rgba(255, 255, 255, .08);
-	box-shadow: 4px 0 24px rgba(0, 0, 0, .25);
+	border-left: 1px solid rgba(255, 255, 255, .08);
+	box-shadow: -4px 0 24px rgba(0, 0, 0, .25);
 	transition: width .42s var(--st-ease), box-shadow .42s ease, border-color .42s ease;
 	scrollbar-width: none;
 }
 .gs-st-nav:hover, .gs-st-nav:focus-within {
 	width: var(--st-nav);
-	border-right-color: rgba(182, 8, 201, .3);
-	box-shadow: 16px 0 60px rgba(0, 0, 0, .55), 0 0 50px rgba(182, 8, 201, .1);
+	border-left-color: rgba(182, 8, 201, .3);
+	box-shadow: -16px 0 60px rgba(0, 0, 0, .55), 0 0 50px rgba(182, 8, 201, .1);
 	scrollbar-width: thin; scrollbar-color: rgba(255, 255, 255, 0.15) transparent;
 }
 .gs-st-nav:not(:hover):not(:focus-within) .gs-st-nav-items,
@@ -159,7 +136,7 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-nav:not(:hover):not(:focus-within) .gs-st-nav-home-label,
 .gs-st-nav:not(:hover):not(:focus-within) .gs-st-nav-lock span:not(.dashicons) { opacity: 0; }
 .gs-st-nav:not(:hover):not(:focus-within) .gs-st-nav-locked { border-top-color: transparent; }
-.gs-st-main { margin-left: var(--st-rail); }
+.gs-st-main { margin-right: var(--st-rail); }
 .gs-st-nav-home, .gs-studio .gs-st-nav-section {
 	display: flex; align-items: center; gap: 10px; width: 100%; padding: 9px 10px; border-radius: 10px;
 	color: var(--st-text); font: 600 14px/1.2 inherit; background: transparent; border: 0; cursor: pointer; text-align: left;
@@ -484,10 +461,7 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 }
 @media (max-width: 782px) {
 	body.gs-studio-page { --st-nav: 100%; }
-	.gs-st-top { gap: 8px; padding: 0 10px; }
-	.gs-st-brand-text, .gs-st-search-wrap kbd, .gs-st-top-actions .gs-st-btn span:not(.dashicons), .gs-st-unsaved { display: none; }
-	.gs-st-top-actions .gs-st-btn { padding: 0 10px; }
-	.gs-st-search-wrap { margin-left: 0; flex: 1 1 auto; }
+	.gs-st-unsaved { display: none; }
 	.gs-studio { height: calc(100vh - var(--gs-header-h, 56px)); }
 	.gs-st-nav:hover, .gs-st-nav:focus-within { width: min(var(--st-nav), calc(100vw - 32px)); }
 	.gs-st-overview, .gs-st-pad { padding: 20px 16px 40px; }
