@@ -401,20 +401,18 @@ if ( ! function_exists( 'gend_society_email_plan_env' ) ) {
         if ( 'hub' === $env['mode'] ) {
             // Same popup + checkout as Backups: My Account > Memberships in its Emails-only mode
             // (?gdc_open_modal=<membership>&gdc_open_emails=1, Vendor App Manager's storage + sending picker).
-            $mid    = ( $m && is_object( $m ) && method_exists( $m, 'get_id' ) ) ? (int) $m->get_id() : 0;
-            $choose = false;
+            $mid = ( $m && is_object( $m ) && method_exists( $m, 'get_id' ) ) ? (int) $m->get_id() : 0;
             if ( ! $mid && function_exists( 'gdc_plan_attach_get_memberships' ) ) {
                 $eligible = array_values( (array) gdc_plan_attach_get_memberships( 'backups' ) );
                 if ( 1 === count( $eligible ) ) {
                     $mid = (int) ( is_array( $eligible[0] ) ? ( $eligible[0]['id'] ?? 0 ) : 0 );
-                } elseif ( count( $eligible ) > 1 ) {
-                    $choose = true;
                 }
             }
             $account = get_home_url( get_main_site_id(), '/my-account/memberships/' );
             if ( $mid ) {
                 $env['upgrade'] = array( 'data-embed-url' => add_query_arg( array( 'gdc_open_modal' => $mid, 'gdc_open_emails' => 1 ), $account ) );
-            } elseif ( $choose ) {
+            } else {
+                // Several memberships, or none tied to this dashboard: the memberships page lets the owner pick.
                 $env['upgrade'] = array( 'data-embed-url' => $account );
             }
         } elseif ( is_array( $env['mail_state'] ) ) {
@@ -592,8 +590,10 @@ if ( ! function_exists( 'gend_society_render_email_plan_card' ) ) {
             $printed['css'] = true;
             ?>
 <style id="gs-em-plan-css">
+.gs-em-hero a.gs-bk-btn { box-sizing: border-box; color: #e6edf7; }
+.gs-em-hero a.gs-bk-btn:hover, .gs-em-hero a.gs-bk-btn:focus { color: #fff; }
 .gs-em-sels { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(auto-fit, minmax(170px, 1fr)); gap: 12px; margin-top: 18px; max-width: 520px; }
-.gs-em-sel { position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px 14px 12px 44px; border-radius: 12px; background: rgba(11,14,20,.45); border: 1px solid rgba(255,255,255,.10); color: #e6edf7; font: inherit; text-align: left; text-decoration: none; cursor: default; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
+.gs-em-sel { box-sizing: border-box; position: relative; display: flex; flex-direction: column; align-items: flex-start; gap: 3px; padding: 12px 14px 12px 44px; border-radius: 12px; background: rgba(11,14,20,.45); border: 1px solid rgba(255,255,255,.10); color: #e6edf7; font: inherit; text-align: left; text-decoration: none; cursor: default; transition: transform .18s ease, border-color .18s ease, background .18s ease, box-shadow .18s ease; }
 button.gs-em-sel, a.gs-em-sel { cursor: pointer; }
 button.gs-em-sel:hover, a.gs-em-sel:hover, button.gs-em-sel:focus-visible, a.gs-em-sel:focus-visible { transform: translateY(-2px); border-color: rgba(16,185,129,.55); background: rgba(16,185,129,.10); box-shadow: 0 10px 24px rgba(16,185,129,.16); color: #fff; outline: none; }
 .gs-em-sel > .dashicons { position: absolute; left: 14px; top: 50%; margin-top: -9px; font-size: 18px; width: 18px; height: 18px; color: #6ee7b7; transition: transform .25s cubic-bezier(.2,.9,.3,1); }
@@ -678,6 +678,7 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
 @media (max-width: 640px) { .gs-bk-hero { padding: 22px 20px; flex-direction: column; } .gs-bk-actions { width: 100%; } }
 @keyframes gs-em-rise { from { opacity: 0; transform: translateY(12px); filter: blur(2px); } to { opacity: 1; transform: none; filter: none; } }
 .gs-em-plan--talk-flows { margin: 0 0 22px; }
+.gs-em-plan--talk-flows .gs-bk-hero h2.gs-bk-title { margin: 0 0 6px; font-size: 1.55rem; line-height: 1.35; letter-spacing: -0.01em; text-transform: none; }
 .gs-em-plan--talk-flows .gs-bk-hero { animation: gs-em-rise 0.55s cubic-bezier(0.2, 0.9, 0.3, 1) 0.04s both; }
 .gs-em-plan--talk-flows .gs-bk-main > * { animation: gs-em-rise 0.5s cubic-bezier(0.2, 0.9, 0.3, 1) both; }
 .gs-em-plan--talk-flows .gs-bk-main > *:nth-child(2) { animation-delay: 0.10s; }
