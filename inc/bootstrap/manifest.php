@@ -89,7 +89,7 @@ return array(
 			'file'  => 'inc/site-sidebars.php',
 			'tier'  => 'core',
 			'needs' => array(),
-			'note'  => 'Site sidebars: optional left/right sidebar per area (pages, blog, shop, social), block template parts, added around the template <main>.',
+			'note'  => 'Site sidebars: optional left/right sidebar per area (pages, blog, shop, social), block template parts; the rendering block template gets a main column between its header and footer parts.',
 		),
 		array(
 			'file'  => 'inc/design-studio-templates.php',
