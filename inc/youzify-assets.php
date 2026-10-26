@@ -195,3 +195,68 @@ function gend_society_yz_rest_set( WP_REST_Request $req ) {
 	update_option( GEND_SOCIETY_YZ_OPTION, $settings, false );
 	return gend_society_yz_rest_get();
 }
+
+/* ── Script loading: no synchronous downloads ───────────────────────────── */
+
+add_action( 'wp_enqueue_scripts', 'gend_society_yz_preload_libraries', 100 );
+/**
+ * Youzify adds some of its libraries with jQuery( '<script src>' ).appendTo(),
+ * which jQuery downloads synchronously: the page freezes until the file
+ * arrives (seconds on a busy server). Loaded here as normal page scripts
+ * instead, before Youzify's own script; the inline filter below then skips
+ * the synchronous copy jQuery would fetch.
+ */
+function gend_society_yz_preload_libraries() {
+	if ( is_admin() || ! wp_script_is( 'youzify', 'enqueued' ) || ! defined( 'YOUZIFY_ASSETS' ) ) {
+		return;
+	}
+	$ver  = defined( 'YOUZIFY_VERSION' ) ? YOUZIFY_VERSION : GEND_SOCIETY_VERSION;
+	$libs = array(
+		'nice-select' => array( 'jquery' ),
+		'autosize'    => array( 'jquery' ),
+	);
+	// Live notifications: only for signed-in members, when Youzify turns them on and
+	// the page already runs heartbeat (Youzify skips them without it; never add polling).
+	if ( is_user_logged_in() && has_filter( 'youzify_scripts_vars', 'youzify_notification_localization' ) && wp_script_is( 'heartbeat', 'enqueued' ) ) {
+		$libs['live-notifications'] = array( 'jquery', 'heartbeat', 'youzify' );
+	}
+	$names = array();
+	foreach ( $libs as $name => $deps ) {
+		$handle = 'gend-society-yz-' . $name;
+		wp_enqueue_script( $handle, YOUZIFY_ASSETS . 'js/youzify-' . $name . '.min.js', $deps, $ver, true );
+		$names[] = $name;
+		// Youzify's script runs after the libraries it calls straight away.
+		if ( 'live-notifications' !== $name ) {
+			$reg = wp_scripts()->registered['youzify'];
+			if ( ! in_array( $handle, $reg->deps, true ) ) {
+				$reg->deps[] = $handle;
+			}
+		}
+	}
+	wp_add_inline_script(
+		'jquery',
+		'(function($,re){if(!$||!$.ajaxPrefilter)return;$.ajaxPrefilter("script",function(o,c,x){var m=o.url&&o.url.match(re);if(o.async===false&&m){x.abort();}});})(window.jQuery,/youzify-(' . implode( '|', array_map( 'preg_quote', $names ) ) . ')\.min\.js/);'
+	);
+}
+
+add_filter( 'script_loader_tag', 'gend_society_yz_mediaelement_order', 1000, 2 );
+/**
+ * When something defers MediaElement's core (mediaelement-and-player), its
+ * migrate add-on must be deferred too, or it runs first ("mejs is not defined").
+ *
+ * @param string $tag    Script tag.
+ * @param string $handle Script handle.
+ * @return string
+ */
+function gend_society_yz_mediaelement_order( $tag, $handle ) {
+	static $core_deferred = false;
+	if ( is_admin() ) {
+		return $tag;
+	}
+	if ( 'mediaelement-core' === $handle ) {
+		$core_deferred = (bool) preg_match( '/<script\b[^>]*\bsrc=[^>]*\bdefer\b|<script\b[^>]*\bdefer\b[^>]*\bsrc=/i', $tag );
+	} elseif ( 'mediaelement-migrate' === $handle && $core_deferred && ! preg_match( '/\b(defer|async)\b/i', $tag ) ) {
+		$tag = preg_replace( '/<script\b(?=[^>]*\bsrc=)/i', '<script defer', $tag, 1 );
+	}
+	return $tag;
+}
