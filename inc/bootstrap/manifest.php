@@ -256,6 +256,12 @@ return array(
 			'note'  => 'Profile Styling: block-built profile headers, tab layouts and menu (after member-profile-header: takes over its header hook).',
 		),
 		array(
+			'file'  => 'inc/profile-widgets.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Profile Widget block: any profile Overview widget as a block; new Overview tab layouts start with today\'s widgets.',
+		),
+		array(
 			'file'  => 'inc/directory-styling.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),

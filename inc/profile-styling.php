@@ -264,7 +264,9 @@ function gend_society_ps_tab_close() {
 	$tpl = $GLOBALS['gend_society_ps_tab_tpl'];
 	unset( $GLOBALS['gend_society_ps_tab_tpl'] );
 	gend_society_ps_tab_content( (string) ob_get_clean() );
-	echo '<div class="gdc-profile-tab-layout">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored template.
+	$tab = sanitize_html_class( (string) get_post_meta( $tpl->ID, '_gdc_tab_slug', true ) );
+	// Keep the tab's own wrapper classes, so its styles still apply to the blocks.
+	echo '<div class="gdc-profile-tab-layout youzify-tab youzify-' . esc_attr( $tab ) . '">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored template.
 }
 
 /* ── Menu (label / order / hidden) ──────────────────────────────────────── */
@@ -861,7 +863,13 @@ function gend_society_ps_rest_action( WP_REST_Request $req ) {
 					? sprintf( __( '%s tab — member type layout', 'gend-society' ), $label )
 					/* translators: %s: profile tab name. */
 					: sprintf( __( 'Default — %s tab', 'gend-society' ), $label ),
-				'post_content' => '<!-- wp:gend-society/profile-tab-content /-->',
+				/**
+				 * Filters what a new tab layout starts with (default: the tab's own content).
+				 *
+				 * @param string $content Block markup.
+				 * @param string $slug    Tab slug.
+				 */
+				'post_content' => (string) apply_filters( 'gend_society_ps_default_tab_content', '<!-- wp:gend-society/profile-tab-content /-->', $slug ),
 			),
 			true
 		);
