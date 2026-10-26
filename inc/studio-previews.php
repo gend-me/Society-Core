@@ -114,6 +114,25 @@ function gend_society_pv_render() {
 			echo '</div></div></div></div></div>';
 		};
 	}
+	if ( 'block' === $view && function_exists( 'gend_society_ab_wrap' ) && function_exists( 'bp_is_activity_directory' ) && bp_is_activity_directory() ) {
+		// One activity wall block, on the real activity page (gend-society/activity-* only).
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview.
+		$name  = isset( $_GET['block'] ) ? sanitize_text_field( wp_unslash( $_GET['block'] ) ) : '';
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview.
+		$attrs = isset( $_GET['attrs'] ) ? json_decode( wp_unslash( $_GET['attrs'] ), true ) : array(); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- decoded, then only passed as block attributes.
+		if ( preg_match( '#^gend-society/activity-[a-z-]+$#', $name ) && WP_Block_Type_Registry::get_instance()->is_registered( $name ) ) {
+			$part = function () use ( $name, $attrs ) {
+				$block = array(
+					'blockName'    => $name,
+					'attrs'        => is_array( $attrs ) ? $attrs : array(),
+					'innerBlocks'  => array(),
+					'innerHTML'    => '',
+					'innerContent' => array(),
+				);
+				echo gend_society_ab_wrap( '<div class="gs-pv-pad">' . render_block( $block ) . '</div>' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered block.
+			};
+		}
+	}
 	if ( 'original' === $view ) {
 		// The page as it is (no block layout), without the site's header and footer.
 		add_action(

@@ -73,7 +73,8 @@ function gend_society_yz_replaced( $area ) {
 		return false;
 	}
 	$layout = gend_society_ds_layout( $area );
-	return $layout && ! has_block( 'gend-society/original-content', $layout->post_content );
+	// Original Page Content and the activity wall parts still use Youzify's markup and styles.
+	return $layout && ! preg_match( '#wp:gend-society/(original-content|activity-)#', $layout->post_content );
 }
 
 /**

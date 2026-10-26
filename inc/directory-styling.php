@@ -37,7 +37,8 @@ function gend_society_ds_layouts() {
 		),
 		'activity'          => array(
 			'label'   => __( 'Activity feed', 'gend-society' ),
-			'content' => '<!-- wp:gend-society/original-content /-->',
+			// The wall built from its parts (inc/activity-blocks.php), else the page as it is.
+			'content' => function_exists( 'gend_society_ab_default_layout' ) ? gend_society_ab_default_layout() : '<!-- wp:gend-society/original-content /-->',
 		),
 		// The group sidebar, rebuilt from today's widgets (Group Administrators + Group Moderators).
 		'group-sidebar'     => array(
@@ -340,7 +341,11 @@ function gend_society_ds_take_over( $content ) {
 	}
 	$running = true;
 	gend_society_ds_original( $content );
-	$out     = '<div class="gdc-bp-layout gdc-bp-layout--' . esc_attr( $slug ) . '">' . do_blocks( $tpl->post_content ) . '</div>';
+	$out     = do_blocks( $tpl->post_content );
+	if ( 'activity' === $slug && function_exists( 'gend_society_ab_wrap' ) && false === strpos( $tpl->post_content, 'wp:gend-society/original-content' ) ) {
+		$out = gend_society_ab_wrap( $out ); // The wall's scripts and styles look for its page wrapper.
+	}
+	$out     = '<div class="gdc-bp-layout gdc-bp-layout--' . esc_attr( $slug ) . '">' . $out . '</div>';
 	$running = false;
 	return $out;
 }

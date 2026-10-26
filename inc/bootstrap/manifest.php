@@ -262,6 +262,12 @@ return array(
 			'note'  => 'Directory Styling: block layouts for the members / groups directories and the activity feed (published layouts only).',
 		),
 		array(
+			'file'  => 'inc/activity-blocks.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Activity wall blocks: filter bar, post form, feed and sidebar for the Activity feed layout (same markup and scripts as the wall).',
+		),
+		array(
 			'file'  => 'inc/youzify-assets.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
