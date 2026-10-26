@@ -189,7 +189,7 @@ function gend_society_sb_apply( $template ) {
 	}
 	$wrapped = gend_society_sb_wrap_template( $_wp_current_template_content, $area, $s );
 	if ( '' !== $wrapped ) {
-		$_wp_current_template_content = $wrapped; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- the block template about to render, with the sidebar added.
+		$_wp_current_template_content = $wrapped; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- core global: the block template about to render, with the sidebar added.
 	}
 	return $template;
 }
