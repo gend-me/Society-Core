@@ -3933,6 +3933,11 @@ if ( ! function_exists( 'gend_society_hosting_ajax_authorize' ) ) {
         if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
         }
+        // Security 2026-10-18: on the hub (and any multisite) these tools reach the shared network database
+        // and server logs, so only a network admin may use them. A container owner is its own super admin.
+        if ( is_multisite() && ! current_user_can( 'manage_network' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
+        }
         check_ajax_referer( 'gs_membership_action', 'nonce' );
     }
 }
