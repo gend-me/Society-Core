@@ -90,9 +90,46 @@ function gend_society_studio_register_group_styling_page() {
 		function () {
 			echo '<div class="wrap gs-studio-panel">';
 			gdc_gs_render_group_styling_admin_panel();
+			gend_society_studio_group_layout_section();
 			echo '</div>';
 		}
 	);
+}
+
+/**
+ * Layout & Sidebars section under the Group Styling builder: the group sidebar
+ * as a block layout (inc/directory-styling.php), with today's widgets as the start.
+ */
+function gend_society_studio_group_layout_section() {
+	if ( ! function_exists( 'gend_society_ds_layout' ) ) {
+		return;
+	}
+	$published = gend_society_ds_layout( 'group-sidebar' );
+	$draft     = $published ? null : get_posts(
+		array(
+			'post_type'      => 'gdc_bp_layout',
+			'post_status'    => 'draft',
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one admin lookup.
+			'meta_key'       => '_gdc_layout_slug',
+			'meta_value'     => 'group-sidebar', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+		)
+	);
+	if ( $published ) {
+		$status = __( 'Block layout (published): it replaces the Youzify sidebar widgets on every group.', 'gend-society' );
+	} elseif ( $draft ) {
+		$status = __( 'Block layout (draft): groups still show the Youzify sidebar widgets until you publish it.', 'gend-society' );
+	} else {
+		$status = __( 'Youzify sidebar widgets (Group Administrators, Group Moderators).', 'gend-society' );
+	}
+	echo '<section id="gs-group-layout"><h3>' . esc_html__( 'Layout & Sidebars', 'gend-society' ) . '</h3>'
+		. '<p class="description">' . esc_html__( 'The sidebar beside every group page. Design it with blocks (Group Members, Group About, any other block); it starts as a copy of today’s sidebar and goes live when you publish it.', 'gend-society' ) . '</p>'
+		. '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Area', 'gend-society' ) . '</th><th>' . esc_html__( 'Now showing', 'gend-society' ) . '</th><th></th></tr></thead><tbody>'
+		. '<tr><td><strong>' . esc_html__( 'Group sidebar', 'gend-society' ) . '</strong></td><td>' . esc_html( $status ) . '</td>'
+		. '<td style="text-align:right"><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=gs-studio-layout&layout=group-sidebar' ) ) . '">' . esc_html( $published || $draft ? __( 'Edit the sidebar', 'gend-society' ) : __( 'Design the sidebar', 'gend-society' ) ) . '</a></td></tr>'
+		. '</tbody></table></section>';
 }
 
 add_action( 'admin_menu', 'gend_society_studio_register_profile_styling_page', 20 );
@@ -346,11 +383,8 @@ function gend_society_studio_sections() {
 					'items' => array(
 						array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
 						// Profile headers, tab layouts and menu are block-built (Profile Styling); Youzify settings only without it.
-						array( 'id' => 'profile-template', 'label' => __( 'Profile Template', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-headers' : $yz( 'youzify-profile-settings' ) ),
-						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles . '#gs-ps-headers' : $yz( 'youzify-profile-settings', 'header' ) ) ),
-						array( 'id' => 'profile-menu', 'label' => __( 'Profile Menu', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-nav' : $yz( 'youzify-profile-settings', 'navbar' ) ),
-						array( 'id' => 'profile-menu-pages', 'label' => __( 'Profile Menu Pages', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-nav' : $yz( 'youzify-profile-settings', 'tabs' ) ),
-						array( 'id' => 'profile-layout', 'label' => __( 'Profile Layout and Sidebars', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles . '#gs-ps-nav' : $yz( 'youzify-profile-settings', 'structure' ) ),
+						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
+						array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
 					),
 				),
 				array(
@@ -358,11 +392,8 @@ function gend_society_studio_sections() {
 					'items' => array(
 						array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
 						// Group headers and pages are block-built (Group Styling); Youzify settings only when that builder is missing.
-						array( 'id' => 'group-templates', 'label' => __( 'Group Templates', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder . '#gdc-gs-admin-root' : $yz( 'youzify-panel', 'groups' ) ),
-						array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder . '#gdc-gs-header-templates-list' : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
-						array( 'id' => 'group-menu', 'label' => __( 'Group Menu', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder . '#gdc-gs-nav-editor' : $yz( 'youzify-panel', 'groups' ) . '#navbar' ),
-						array( 'id' => 'group-menu-pages', 'label' => __( 'Group Menu Pages', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder . '#gdc-gs-nav-editor' : $yz( 'youzify-panel', 'groups' ) . '#tabs' ),
-						array( 'id' => 'group-layout', 'label' => __( 'Group Layout and Sidebars', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder . '#gdc-gs-admin-root' : $yz( 'youzify-panel', 'groups' ) . '#structure' ),
+						array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
+						array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
 					),
 				),
 				array(

@@ -268,6 +268,12 @@ return array(
 			'note'  => 'Youzify styling control: stops Youzify front-end CSS where block layouts replaced it, or per area (scripts keep loading).',
 		),
 		array(
+			'file'  => 'inc/studio-previews.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Live previews of Social templates in the block editor (?gs_studio_view= parts, live CSS in the canvas).',
+		),
+		array(
 			'file'  => 'inc/member-calendar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),

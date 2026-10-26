@@ -39,6 +39,11 @@ function gend_society_ds_layouts() {
 			'label'   => __( 'Activity feed', 'gend-society' ),
 			'content' => '<!-- wp:gend-society/original-content /-->',
 		),
+		// The group sidebar, rebuilt from today's widgets (Group Administrators + Group Moderators).
+		'group-sidebar'     => array(
+			'label'   => __( 'Group sidebar', 'gend-society' ),
+			'content' => '<!-- wp:gend-society/group-members {"role":"admins","title":"' . esc_attr__( 'Group Administrators', 'gend-society' ) . '"} /--><!-- wp:gend-society/group-members {"role":"mods","title":"' . esc_attr__( 'Group Moderators', 'gend-society' ) . '"} /-->',
+		),
 	);
 }
 
@@ -148,6 +153,53 @@ function gend_society_ds_register() {
 				)
 			),
 			'supports'        => $supports,
+		)
+	);
+	register_block_type(
+		'gend-society/group-members',
+		array(
+			'api_version'     => 3,
+			'title'           => __( 'Group Members', 'gend-society' ),
+			'category'        => 'widgets',
+			'editor_script'   => 'gend-society-directory-blocks',
+			'render_callback' => 'gend_society_ds_block_group_members',
+			'attributes'      => array(
+				'role'  => array(
+					'type'    => 'string',
+					'default' => 'admins',
+				),
+				'title' => array(
+					'type'    => 'string',
+					'default' => '',
+				),
+				'limit' => array(
+					'type'    => 'number',
+					'default' => 10,
+				),
+			),
+			'supports'        => $supports,
+		)
+	);
+	register_block_type(
+		'gend-society/group-about',
+		array(
+			'api_version'     => 3,
+			'title'           => __( 'Group About', 'gend-society' ),
+			'category'        => 'widgets',
+			'editor_script'   => 'gend-society-directory-blocks',
+			'render_callback' => 'gend_society_ds_block_group_about',
+			'supports'        => $supports,
+		)
+	);
+	register_block_type(
+		'gend-society/original-sidebar',
+		array(
+			'api_version'     => 3,
+			'title'           => __( 'Original Group Sidebar', 'gend-society' ),
+			'category'        => 'widgets',
+			'editor_script'   => 'gend-society-directory-blocks',
+			'render_callback' => 'gend_society_ds_block_original_sidebar',
+			'supports'        => array( 'html' => false ),
 		)
 	);
 	register_block_type(
@@ -278,6 +330,9 @@ function gend_society_ds_take_over( $content ) {
 	if ( $running || is_admin() || ! in_the_loop() || ! is_main_query() ) {
 		return $content;
 	}
+	if ( function_exists( 'gend_society_pv_view' ) && 'original' === gend_society_pv_view() ) {
+		return $content; // Studio preview of the page as it is, without its layout.
+	}
 	$slug = gend_society_ds_current_slug();
 	$tpl  = $slug ? gend_society_ds_layout( $slug ) : null;
 	if ( ! $tpl ) {
@@ -301,6 +356,122 @@ function gend_society_ds_block_original() {
 		return '<div class="gdc-ps-placeholder"><strong>' . esc_html__( 'Original page content', 'gend-society' ) . '</strong><span>' . esc_html__( 'What this page shows today (for the activity feed: posting, comments and reactions).', 'gend-society' ) . '</span></div>';
 	}
 	return $content;
+}
+
+/* ── Group sidebar ──────────────────────────────────────────────────────── */
+
+add_action( 'youzify_group_sidebar', 'gend_society_ds_group_sidebar', 0 );
+/**
+ * A published Group sidebar layout replaces Youzify's group sidebar widgets.
+ */
+function gend_society_ds_group_sidebar() {
+	$tpl = gend_society_ds_layout( 'group-sidebar' );
+	if ( ! $tpl ) {
+		return;
+	}
+	remove_action( 'youzify_group_sidebar', 'youzify_get_groups_sidebar' );
+	echo '<div class="gdc-bp-sidebar">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored layout.
+}
+
+/**
+ * The group a sidebar block shows: the current group, or (in the editor) a sample group.
+ *
+ * @return int
+ */
+function gend_society_ds_block_group() {
+	$gid = function_exists( 'bp_get_current_group_id' ) ? (int) bp_get_current_group_id() : 0;
+	if ( ! $gid && function_exists( 'gend_society_pv_group_id' ) ) {
+		$gid = gend_society_pv_group_id();
+	}
+	return $gid;
+}
+
+/**
+ * Group Members block: administrators, moderators or members.
+ *
+ * @param array $attrs Block attributes.
+ * @return string
+ */
+function gend_society_ds_block_group_members( $attrs ) {
+	$gid = gend_society_ds_block_group();
+	if ( ! $gid || ! function_exists( 'groups_get_group_admins' ) ) {
+		return '';
+	}
+	$limit = max( 1, min( 48, (int) $attrs['limit'] ) );
+	$ids   = array();
+	if ( 'admins' === $attrs['role'] ) {
+		$ids = wp_list_pluck( (array) groups_get_group_admins( $gid ), 'user_id' );
+	} elseif ( 'mods' === $attrs['role'] ) {
+		$ids = wp_list_pluck( (array) groups_get_group_mods( $gid ), 'user_id' );
+	} elseif ( function_exists( 'groups_get_group_members' ) ) {
+		$res = groups_get_group_members(
+			array(
+				'group_id' => $gid,
+				'per_page' => $limit,
+			)
+		);
+		$ids = isset( $res['members'] ) ? wp_list_pluck( $res['members'], 'ID' ) : array();
+	}
+	$ids = array_slice( array_map( 'intval', $ids ), 0, $limit );
+	if ( ! $ids ) {
+		return '';
+	}
+	$items = '';
+	foreach ( $ids as $uid ) {
+		$url    = function_exists( 'bp_members_get_user_url' ) ? bp_members_get_user_url( $uid ) : '';
+		$av     = function_exists( 'bp_core_fetch_avatar' ) ? bp_core_fetch_avatar(
+			array(
+				'item_id' => $uid,
+				'type'    => 'thumb',
+				'html'    => false,
+			)
+		) : get_avatar_url( $uid );
+		$name   = function_exists( 'bp_core_get_user_displayname' ) ? bp_core_get_user_displayname( $uid ) : '';
+		$items .= '<li><a href="' . esc_url( $url ) . '"><img src="' . esc_url( $av ) . '" alt="" loading="lazy"><span>' . esc_html( $name ) . '</span></a></li>';
+	}
+	$title = '' !== trim( (string) $attrs['title'] ) ? '<h3 class="gdc-gsb-title">' . esc_html( $attrs['title'] ) . '</h3>' : '';
+	return '<section ' . get_block_wrapper_attributes( array( 'class' => 'gdc-gsb gdc-gsb--members' ) ) . '>' . $title . '<ul>' . $items . '</ul></section>';
+}
+
+/**
+ * Group About block.
+ *
+ * @return string
+ */
+function gend_society_ds_block_group_about() {
+	$gid   = gend_society_ds_block_group();
+	$group = $gid && function_exists( 'groups_get_group' ) ? groups_get_group( $gid ) : null;
+	if ( ! $group || empty( $group->id ) ) {
+		return '';
+	}
+	$count  = (int) groups_get_groupmeta( $gid, 'total_member_count' );
+	$status = array(
+		'public'  => __( 'Public group', 'gend-society' ),
+		'private' => __( 'Private group', 'gend-society' ),
+		'hidden'  => __( 'Hidden group', 'gend-society' ),
+	);
+	$meta   = '<li>' . esc_html( isset( $status[ $group->status ] ) ? $status[ $group->status ] : $group->status ) . '</li>'
+		/* translators: %s: number of members. */
+		. '<li>' . esc_html( sprintf( _n( '%s member', '%s members', $count, 'gend-society' ), number_format_i18n( $count ) ) ) . '</li>'
+		/* translators: %s: date the group was created. */
+		. '<li>' . esc_html( sprintf( __( 'Since %s', 'gend-society' ), mysql2date( get_option( 'date_format' ), $group->date_created ) ) ) . '</li>';
+	return '<section ' . get_block_wrapper_attributes( array( 'class' => 'gdc-gsb gdc-gsb--about' ) ) . '><h3 class="gdc-gsb-title">' . esc_html__( 'About', 'gend-society' ) . '</h3>'
+		. ( '' !== trim( (string) $group->description ) ? '<div class="gdc-gsb-desc">' . wp_kses_post( wpautop( $group->description ) ) . '</div>' : '' )
+		. '<ul class="gdc-gsb-meta">' . $meta . '</ul></section>';
+}
+
+/**
+ * Original Group Sidebar block: Youzify's group sidebar widgets as they are.
+ *
+ * @return string
+ */
+function gend_society_ds_block_original_sidebar() {
+	if ( ! function_exists( 'youzify_get_groups_sidebar' ) || ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) {
+		return '<div class="gdc-ps-placeholder"><strong>' . esc_html__( 'Current group sidebar', 'gend-society' ) . '</strong><span>' . esc_html__( 'Youzify’s group sidebar widgets, as they are today.', 'gend-society' ) . '</span></div>';
+	}
+	ob_start();
+	youzify_get_groups_sidebar();
+	return (string) ob_get_clean();
 }
 
 /* ── Directory blocks ───────────────────────────────────────────────────── */
@@ -516,8 +687,9 @@ add_action( 'enqueue_block_assets', 'gend_society_ds_editor_styles' );
  * Directory block styles on directory pages.
  */
 function gend_society_ds_styles() {
-	$slug = gend_society_ds_current_slug();
-	if ( '' === $slug || ! gend_society_ds_layout( $slug ) ) {
+	$slug    = gend_society_ds_current_slug();
+	$sidebar = function_exists( 'bp_is_group' ) && bp_is_group() && gend_society_ds_layout( 'group-sidebar' );
+	if ( ! $sidebar && ( '' === $slug || ! gend_society_ds_layout( $slug ) ) ) {
 		return; // Only pages that use a published layout need these styles.
 	}
 	wp_register_style( 'gend-society-directory-blocks', false, array(), GEND_SOCIETY_VERSION );
@@ -566,5 +738,13 @@ function gend_society_ds_css() {
 		. '.gdc-dir-action a,.gdc-dir-action button{display:inline-block;padding:8px 16px;border-radius:99px;border:1px solid currentColor;background:transparent;color:inherit;text-decoration:none;font:inherit;font-size:.85em;cursor:pointer}'
 		. '.gdc-dir-pager{display:flex;justify-content:center;align-items:center;gap:16px}'
 		. '.gdc-dir-pager a{text-decoration:none}'
-		. '.gdc-dir-empty{opacity:.7}';
+		. '.gdc-dir-empty{opacity:.7}'
+		. '.gdc-bp-sidebar{display:flex;flex-direction:column;gap:16px;color:#e8edf5}'
+		. '.gdc-gsb{padding:18px;border-radius:14px;border:1px solid rgba(127,127,127,.22);background:rgba(127,127,127,.06)}'
+		. '.gdc-gsb-title{margin:0 0 12px!important;font-size:1em!important;letter-spacing:.04em}'
+		. '.gdc-gsb ul{list-style:none;margin:0;padding:0;display:flex;flex-direction:column;gap:10px}'
+		. '.gdc-gsb--members a{display:flex;align-items:center;gap:10px;text-decoration:none;color:inherit}'
+		. '.gdc-gsb--members img{width:36px;height:36px;border-radius:50%;object-fit:cover}'
+		. '.gdc-gsb-desc{opacity:.85;font-size:.92em;margin-bottom:10px}'
+		. '.gdc-gsb-meta li{opacity:.7;font-size:.85em}';
 }
