@@ -86,6 +86,12 @@ return array(
 			'note'  => 'Design Studio: replaces the Site Editor landing screen; live style preview endpoint + style-guide page.',
 		),
 		array(
+			'file'  => 'inc/site-sidebars.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Site sidebars: optional left/right sidebar per area (pages, blog, shop, social), block template parts, added around the template <main>.',
+		),
+		array(
 			'file'  => 'inc/design-studio-templates.php',
 			'tier'  => 'core',
 			'needs' => array(),

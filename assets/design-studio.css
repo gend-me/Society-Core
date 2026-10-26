@@ -552,3 +552,12 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-sc-pages li > span { flex: 1; display: flex; flex-direction: column; min-width: 0; }
 .gs-st-sc-pages small { color: var(--st-muted); font-size: 11px; }
 .gs-st-sc-source { font-size: 12px; }
+
+/* Sidebars panel */
+.gs-st-sb-list { display: grid; gap: 12px; }
+.gs-st-sb.is-current { border-color: rgba(151, 228, 110, .55); }
+.gs-st-sb .gs-st-row { flex-wrap: wrap; }
+.gs-st-sb-opts { gap: 16px; }
+.gs-st-sb-width, .gs-st-sb-sticky { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #c6cfdf; }
+.gs-st-sb-width input[type=range] { width: 140px; accent-color: var(--st-accent); }
+.gs-st-sb-sticky input { accent-color: var(--st-accent); }

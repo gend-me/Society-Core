@@ -836,6 +836,9 @@
 		if ( p === 'shortcode' ) {
 			return panelShortcode( hit );
 		}
+		if ( p === 'sidebars' ) {
+			return panelSidebars( hit );
+		}
 		return panelTypography( hit );
 	}
 
@@ -1133,6 +1136,102 @@
 			ctl.textContent = errMsg( e );
 		} );
 		return split;
+	}
+
+	/* ── Sidebars: optional sidebar per area of the site ────────────────── */
+	function panelSidebars( hit ) {
+		var ctl = h( 'div', { class: 'gs-st-controls' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ),
+			h( 'p', { class: 'gs-st-intro' }, __( 'Every page is full width until you give its area a sidebar. Pick a side, then design the sidebar with blocks, just like the header and footer.', 'gend-society' ) ) );
+		var list = h( 'div', { class: 'gs-st-sb-list' }, loadingView() );
+		ctl.appendChild( list );
+		var current = null;
+		var pane = previewPane( { url: cfg.homeUrl, title: __( 'Preview', 'gend-society' ) } );
+		var titleEl = pane.querySelector( '.gs-st-preview-title' );
+		var show = function ( a ) {
+			current = a.slug;
+			if ( titleEl ) {
+				titleEl.textContent = a.label;
+			}
+			if ( previewFrame && a.url ) {
+				previewFrame.src = a.url + ( a.url.indexOf( '?' ) === -1 ? '?' : '&' ) + 'gs_sb=' + a.position + '&gs_sb_t=' + Date.now();
+			}
+		};
+		var save = function ( a, data ) {
+			return api( { path: '/gend-society/v1/sidebars', method: 'POST', data: Object.assign( { area: a.slug }, data ) } ).then( function ( r ) {
+				draw( r, a.slug );
+				toast( __( 'Saved.', 'gend-society' ), 'ok' );
+			}, function ( e ) {
+				toast( errMsg( e ), 'error' );
+			} );
+		};
+		var edit = function ( a, btn ) {
+			btn.disabled = true;
+			api( { path: '/gend-society/v1/sidebars/part', method: 'POST', data: { area: a.slug } } ).then( function () {
+				return loadTemplates();
+			} ).then( function () {
+				var t = S.parts[ 'gs-sidebar-' + a.slug ];
+				if ( ! t ) {
+					throw new Error( __( 'The sidebar could not be created.', 'gend-society' ) );
+				}
+				openEmbed( sprintf( __( 'Sidebar: %s', 'gend-society' ), a.label ), canvasUrl( t ) );
+			} ).catch( function ( e ) {
+				btn.disabled = false;
+				toast( errMsg( e ), 'error' );
+			} );
+		};
+		var draw = function ( areas, focus ) {
+			list.textContent = '';
+			areas.forEach( function ( a ) {
+				var seg = function ( pos, label ) {
+					return h( 'button', { type: 'button', class: 'gs-st-seg' + ( a.position === pos ? ' is-on' : '' ), 'aria-pressed': a.position === pos ? 'true' : 'false', onclick: function () {
+						save( a, { position: pos } );
+					} }, label );
+				};
+				var on = a.position !== 'none';
+				var width = h( 'input', { type: 'range', min: '200', max: '480', step: '10', value: String( a.width ), 'aria-label': __( 'Sidebar width', 'gend-society' ), onchange: function ( ev ) {
+					save( a, { width: parseInt( ev.target.value, 10 ) } );
+				}, oninput: function ( ev ) {
+					widthVal.textContent = ev.target.value + 'px';
+				} } );
+				var widthVal = h( 'span', { class: 'gs-st-muted' }, a.width + 'px' );
+				var editBtn = h( 'button', { type: 'button', class: 'gs-st-btn is-sm' + ( on ? ' is-primary' : ' is-ghost' ), onclick: function () {
+					edit( a, editBtn );
+				} }, icon( 'edit' ), a.hasPart ? __( 'Edit sidebar', 'gend-society' ) : __( 'Design sidebar', 'gend-society' ) );
+				var card = h( 'div', { class: 'gs-st-card gs-st-sb' + ( current === a.slug ? ' is-current' : '' ) },
+					h( 'div', { class: 'gs-st-yz-head' },
+						h( 'strong', null, a.label ),
+						h( 'span', { class: 'gs-st-badge ' + ( on ? 'is-custom' : 'is-missing' ) }, on ? ( a.position === 'left' ? __( 'Sidebar on the left', 'gend-society' ) : __( 'Sidebar on the right', 'gend-society' ) ) : __( 'Full width', 'gend-society' ) )
+					),
+					h( 'div', { class: 'gs-st-row' }, h( 'div', { class: 'gs-st-segs' }, seg( 'none', __( 'None', 'gend-society' ) ), seg( 'left', __( 'Left', 'gend-society' ) ), seg( 'right', __( 'Right', 'gend-society' ) ) ) ),
+					on ? h( 'div', { class: 'gs-st-row gs-st-sb-opts' },
+						h( 'label', { class: 'gs-st-sb-width' }, __( 'Width', 'gend-society' ), width, widthVal ),
+						h( 'label', { class: 'gs-st-sb-sticky' }, h( 'input', { type: 'checkbox', checked: a.sticky ? 'checked' : null, onchange: function ( ev ) {
+							save( a, { sticky: ev.target.checked } );
+						} } ), __( 'Stays in view when scrolling', 'gend-society' ) )
+					) : null,
+					h( 'div', { class: 'gs-st-row' }, editBtn,
+						a.url ? h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+							show( a );
+							draw( areas, a.slug );
+						} }, icon( 'visibility' ), __( 'Preview', 'gend-society' ) ) : null )
+				);
+				list.appendChild( card );
+				if ( focus === a.slug ) {
+					show( a );
+				}
+			} );
+			if ( ! current && areas[ 0 ] ) {
+				current = areas[ 0 ].slug;
+				show( areas[ 0 ] );
+				draw( areas );
+			}
+		};
+		api( { path: '/gend-society/v1/sidebars' } ).then( function ( r ) {
+			draw( r );
+		}, function ( e ) {
+			list.textContent = errMsg( e );
+		} );
+		return h( 'div', { class: 'gs-st-split' }, ctl, pane );
 	}
 
 	/* ── Youzify styling: per-area switch for Youzify's front-end CSS ───── */
