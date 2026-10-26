@@ -129,7 +129,7 @@ function gend_society_studio_group_layout_section() {
 		. '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Area', 'gend-society' ) . '</th><th>' . esc_html__( 'Now showing', 'gend-society' ) . '</th><th></th></tr></thead><tbody>'
 		. '<tr><td><strong>' . esc_html__( 'Group sidebar', 'gend-society' ) . '</strong></td><td>' . esc_html( $status ) . '</td>'
 		. '<td style="text-align:right"><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=gs-studio-layout&layout=group-sidebar' ) ) . '">' . esc_html( $published || $draft ? __( 'Edit the sidebar', 'gend-society' ) : __( 'Design the sidebar', 'gend-society' ) ) . '</a></td></tr>'
-		. gend_society_studio_group_feed_row()
+		. gend_society_studio_group_feed_row() // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- built from escaped parts.
 		. '</tbody></table></section>';
 }
 
