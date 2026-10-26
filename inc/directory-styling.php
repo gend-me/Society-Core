@@ -40,6 +40,11 @@ function gend_society_ds_layouts() {
 			// The wall built from its parts (inc/activity-blocks.php), else the page as it is.
 			'content' => function_exists( 'gend_society_ab_default_layout' ) ? gend_society_ab_default_layout() : '<!-- wp:gend-society/original-content /-->',
 		),
+		// The group's activity tab (Feed), built from the activity wall blocks.
+		'group-feed'        => array(
+			'label'   => __( 'Group feed', 'gend-society' ),
+			'content' => '<!-- wp:gend-society/activity-tabs /--><!-- wp:gend-society/activity-post-form /--><!-- wp:gend-society/activity-feed /-->',
+		),
 		// The group sidebar, rebuilt from today's widgets (Group Administrators + Group Moderators).
 		'group-sidebar'     => array(
 			'label'   => __( 'Group sidebar', 'gend-society' ),

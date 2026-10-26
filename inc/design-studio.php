@@ -125,11 +125,45 @@ function gend_society_studio_group_layout_section() {
 		$status = __( 'Youzify sidebar widgets (Group Administrators, Group Moderators).', 'gend-society' );
 	}
 	echo '<section id="gs-group-layout"><h3>' . esc_html__( 'Layout & Sidebars', 'gend-society' ) . '</h3>'
-		. '<p class="description">' . esc_html__( 'The sidebar beside every group page. Design it with blocks (Group Members, Group About, any other block); it starts as a copy of today’s sidebar and goes live when you publish it.', 'gend-society' ) . '</p>'
+		. '<p class="description">' . esc_html__( 'The sidebar beside every group page, and the group Feed tab. Design them with blocks (Group Members, Group About, the activity blocks, any other block); each starts as a copy of today’s and goes live when you publish it.', 'gend-society' ) . '</p>'
 		. '<table class="widefat striped"><thead><tr><th>' . esc_html__( 'Area', 'gend-society' ) . '</th><th>' . esc_html__( 'Now showing', 'gend-society' ) . '</th><th></th></tr></thead><tbody>'
 		. '<tr><td><strong>' . esc_html__( 'Group sidebar', 'gend-society' ) . '</strong></td><td>' . esc_html( $status ) . '</td>'
 		. '<td style="text-align:right"><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=gs-studio-layout&layout=group-sidebar' ) ) . '">' . esc_html( $published || $draft ? __( 'Edit the sidebar', 'gend-society' ) : __( 'Design the sidebar', 'gend-society' ) ) . '</a></td></tr>'
+		. gend_society_studio_group_feed_row()
 		. '</tbody></table></section>';
+}
+
+/**
+ * The Group feed row of the Layout & Sidebars table (the group's activity tab).
+ *
+ * @return string
+ */
+function gend_society_studio_group_feed_row() {
+	if ( ! function_exists( 'gend_society_ab_wrap' ) ) {
+		return '';
+	}
+	$published = gend_society_ds_layout( 'group-feed' );
+	$draft     = $published ? null : get_posts(
+		array(
+			'post_type'      => 'gdc_bp_layout',
+			'post_status'    => 'draft',
+			'posts_per_page' => 1,
+			'fields'         => 'ids',
+			'no_found_rows'  => true,
+			// phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_key -- one admin lookup.
+			'meta_key'       => '_gdc_layout_slug',
+			'meta_value'     => 'group-feed', // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
+		)
+	);
+	if ( $published ) {
+		$status = __( 'Block layout (published): every group’s Feed tab uses it.', 'gend-society' );
+	} elseif ( $draft ) {
+		$status = __( 'Block layout (draft): groups still show the Youzify feed until you publish it.', 'gend-society' );
+	} else {
+		$status = __( 'Youzify group feed (filter, posting, posts).', 'gend-society' );
+	}
+	return '<tr><td><strong>' . esc_html__( 'Group feed', 'gend-society' ) . '</strong></td><td>' . esc_html( $status ) . '</td>'
+		. '<td style="text-align:right"><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=gs-studio-layout&layout=group-feed' ) ) . '">' . esc_html( $published || $draft ? __( 'Edit the feed', 'gend-society' ) : __( 'Design the feed', 'gend-society' ) ) . '</a></td></tr>';
 }
 
 add_action( 'admin_menu', 'gend_society_studio_register_profile_styling_page', 20 );

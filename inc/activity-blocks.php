@@ -13,6 +13,10 @@
  * existing scripts. The layout gets the wall's page wrapper (see
  * gend_society_ab_wrap()).
  *
+ * In a group (the "Group feed" layout, which replaces the group's activity
+ * tab) the parts follow the group feed: its filter bar, posting for group
+ * members only, and the group's posts.
+ *
  * @package gend-society
  */
 
@@ -147,6 +151,9 @@ function gend_society_ab_block_tabs( $attrs ) {
 	if ( ! gend_society_ab_ready() ) {
 		return gend_society_ab_placeholder( __( 'Activity Filter Bar', 'gend-society' ) );
 	}
+	if ( function_exists( 'bp_is_group' ) && bp_is_group() ) {
+		return gend_society_ab_group_tabs( $attrs );
+	}
 	$me   = (int) bp_loggedin_user_id();
 	$base = $me ? trailingslashit( bp_loggedin_user_domain() ) . bp_get_activity_slug() . '/' : '';
 	$tab  = static function ( $id, $url, $label, $count, $selected = false ) {
@@ -224,9 +231,19 @@ function gend_society_ab_block_post_form( $attrs ) {
 		}
 		return '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-activity-login' ) ) . '><p>' . esc_html__( 'Sign in to post to the feed.', 'gend-society' ) . '</p><a class="wp-element-button" href="' . esc_url( wp_login_url( bp_get_activity_directory_permalink() ) ) . '">' . esc_html__( 'Sign in', 'gend-society' ) . '</a></div>';
 	}
+	$group = function_exists( 'bp_is_group' ) && bp_is_group();
 	ob_start();
-	bp_get_template_part( 'activity/post-form' );
-	return '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-activity-post-form youzify-column-content' ) ) . '>' . ob_get_clean() . '</div>';
+	if ( $group ) {
+		do_action( 'bp_before_group_activity_post_form' );
+	}
+	if ( ! $group || bp_group_is_member() ) {
+		bp_get_template_part( 'activity/post-form' );
+	}
+	if ( $group ) {
+		do_action( 'bp_after_group_activity_post_form' );
+	}
+	$html = (string) ob_get_clean();
+	return '' === trim( $html ) ? '' : '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-activity-post-form youzify-column-content' ) ) . '>' . $html . '</div>';
 }
 
 /**
@@ -239,6 +256,14 @@ function gend_society_ab_block_feed() {
 		return gend_society_ab_placeholder( __( 'Activity Feed', 'gend-society' ) );
 	}
 	ob_start();
+	if ( function_exists( 'bp_is_group' ) && bp_is_group() ) {
+		do_action( 'bp_before_group_activity_content' );
+		echo '<div class="activity single-group" aria-live="polite" aria-atomic="true" aria-relevant="all">';
+		bp_get_template_part( 'activity/activity-loop' );
+		echo '</div>';
+		do_action( 'bp_after_group_activity_content' );
+		return '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-activity-feed youzify-column-content' ) ) . '>' . ob_get_clean() . '</div>';
+	}
 	echo '<div id="template-notices" role="alert" aria-atomic="true">';
 	do_action( 'template_notices' );
 	echo '</div>';
@@ -271,7 +296,51 @@ function gend_society_ab_block_sidebar( $attrs ) {
 	return '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-activity-sidebar youzify-sidebar ' . ( $left ? 'youzify-left-sidebar' : 'youzify-right-sidebar' ) ) ) . '><div class="youzify-column-content">' . ob_get_clean() . '</div></div>';
 }
 
+/**
+ * The group feed's filter bar: RSS and the "Show:" filter.
+ *
+ * @param array $attrs Block attributes.
+ * @return string
+ */
+function gend_society_ab_group_tabs( $attrs ) {
+	ob_start();
+	echo '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-activity-tabs' ) ) . '><div class="item-list-tabs no-ajax" id="subnav" aria-label="' . esc_attr__( 'Group secondary navigation', 'gend-society' ) . '" role="navigation"><ul>';
+	echo '<li class="feed"><a href="' . esc_url( bp_get_group_activity_feed_link() ) . '" class="bp-tooltip" data-bp-tooltip="' . esc_attr__( 'RSS Feed', 'gend-society' ) . '" aria-label="' . esc_attr__( 'RSS Feed', 'gend-society' ) . '">' . esc_html__( 'RSS', 'gend-society' ) . '</a></li>';
+	do_action( 'bp_group_activity_syndication_options' );
+	if ( ! empty( $attrs['showFilter'] ) ) {
+		echo '<li id="activity-filter-select" class="last"><label for="activity-filter-by">' . esc_html__( 'Show:', 'gend-society' ) . '</label><select id="activity-filter-by"><option value="-1">' . esc_html__( '— Everything —', 'gend-society' ) . '</option>';
+		bp_activity_show_filters( 'group' );
+		do_action( 'bp_group_activity_filter_options' );
+		echo '</select></li>';
+	}
+	echo '</ul></div></div>';
+	return (string) ob_get_clean();
+}
+
 // phpcs:enable WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound, WordPress.NamingConventions.PrefixAllGlobals.DynamicHooknameFound
+
+add_filter( 'bp_get_template_part', 'gend_society_ab_group_feed_swap', 10, 2 );
+/**
+ * A published "Group feed" layout replaces the group activity tab's template.
+ *
+ * @param array  $templates Template files to load.
+ * @param string $slug      Template part.
+ * @return array
+ */
+function gend_society_ab_group_feed_swap( $templates, $slug ) {
+	if ( 'groups/single/activity' !== $slug || ! function_exists( 'gend_society_ds_layout' ) ) {
+		return $templates;
+	}
+	if ( function_exists( 'gend_society_pv_view' ) && 'original' === gend_society_pv_view() ) {
+		return $templates; // Studio preview of the tab as it is.
+	}
+	$tpl = gend_society_ds_layout( 'group-feed' );
+	if ( ! $tpl ) {
+		return $templates;
+	}
+	echo '<div class="gdc-bp-layout gdc-bp-layout--group-feed">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored layout.
+	return array(); // Nothing left to load: the layout took its place.
+}
 
 /**
  * The activity layout a new "Activity feed" layout starts with: the wall in

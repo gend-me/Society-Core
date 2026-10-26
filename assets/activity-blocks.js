@@ -12,7 +12,8 @@
 
 	function previewUrl( name, attrs ) {
 		var cfg = window.gsStudioPreview;
-		var base = cfg && cfg.directories && cfg.directories.activity;
+		// The Group feed layout previews in a group; the Activity feed layout on the activity page.
+		var base = cfg && ( cfg.layoutSlug === 'group-feed' ? cfg.groupUrl : cfg.directories && cfg.directories.activity );
 		if ( ! base ) {
 			return '';
 		}

@@ -114,7 +114,8 @@ function gend_society_pv_render() {
 			echo '</div></div></div></div></div>';
 		};
 	}
-	if ( 'block' === $view && function_exists( 'gend_society_ab_wrap' ) && function_exists( 'bp_is_activity_directory' ) && bp_is_activity_directory() ) {
+	$in_group = function_exists( 'bp_is_group' ) && bp_is_group();
+	if ( 'block' === $view && function_exists( 'gend_society_ab_wrap' ) && ( $in_group || ( function_exists( 'bp_is_activity_directory' ) && bp_is_activity_directory() ) ) ) {
 		// One activity wall block, on the real activity page (gend-society/activity-* only).
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview.
 		$name  = isset( $_GET['block'] ) ? sanitize_text_field( wp_unslash( $_GET['block'] ) ) : '';
@@ -129,7 +130,13 @@ function gend_society_pv_render() {
 					'innerHTML'    => '',
 					'innerContent' => array(),
 				);
-				echo gend_society_ab_wrap( '<div class="gs-pv-pad">' . render_block( $block ) . '</div>' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered block.
+				$html = '<div class="gs-pv-pad">' . render_block( $block ) . '</div>';
+				if ( function_exists( 'bp_is_group' ) && bp_is_group() ) {
+					// The group feed: inside the group page's own column (the activity loop scopes to the group).
+					echo '<div id="youzify"><div id="youzify-group" class="youzify youzify-page youzify-group"><div class="youzify-content"><div class="youzify-main-column"><div class="youzify-column-content">' . $html . '</div></div></div></div></div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered block.
+				} else {
+					echo gend_society_ab_wrap( $html ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered block.
+				}
 			};
 		}
 	}
