@@ -730,6 +730,20 @@ function gend_society_studio_body_class( $classes ) {
 	return $classes;
 }
 
+add_action( 'enqueue_block_assets', 'gend_society_studio_embed_canvas_css' );
+/**
+ * In a studio editor, the canvas around the page or part is dark like the
+ * studio (core's default is light grey, which showed around headers and footers).
+ */
+function gend_society_studio_embed_canvas_css() {
+	if ( ! is_admin() || ! gend_society_studio_is_embed() ) {
+		return;
+	}
+	wp_register_style( 'gend-society-studio-canvas', false, array(), GEND_SOCIETY_VERSION );
+	wp_enqueue_style( 'gend-society-studio-canvas' );
+	wp_add_inline_style( 'gend-society-studio-canvas', 'html.block-editor-iframe__html{background:#0b0e14}' );
+}
+
 add_action( 'admin_head', 'gend_society_studio_embed_css', 99 );
 /**
  * Chromeless mode for screens shown inside the studio: hides the admin chrome
@@ -772,7 +786,9 @@ function gend_society_studio_embed_editor_script() {
 		}
 		wp_add_inline_script(
 			$handle,
-			'wp.domReady(function(){try{var p=wp.data.dispatch("core/preferences");["welcomeGuide","welcomeGuideTemplate","welcomeGuidePage"].forEach(function(k){if(wp.data.select("core/preferences").get("' . $scope . '",k)!==false){p.set("' . $scope . '",k,false);}});}catch(e){}});'
+			// Also turn off Spotlight mode (dims every block but the selected one, so a one-block
+			// header looked faded) and distraction-free mode: the studio gives the editor its own frame.
+			'wp.domReady(function(){try{var p=wp.data.dispatch("core/preferences"),g=wp.data.select("core/preferences");["welcomeGuide","welcomeGuideTemplate","welcomeGuidePage"].forEach(function(k){if(g.get("' . $scope . '",k)!==false){p.set("' . $scope . '",k,false);}});["focusMode","distractionFree"].forEach(function(k){if(g.get("core",k)){p.set("core",k,false);}});}catch(e){}});'
 		);
 	}
 }
