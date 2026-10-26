@@ -96,20 +96,7 @@
 
 	// ── 2. Live stylesheets in the canvas ─────────────────────────────────
 	function styleSource() {
-		var type = cfg.postType;
-		if ( type === 'gdc_profile_header' || type === 'gdc_profile_tab' ) {
-			return withQuery( cfg.profileUrl, 'gs_studio_view=profile-header' );
-		}
-		if ( type === 'gdc_group_header' || type === 'gdc_group_page' ) {
-			return withQuery( cfg.groupUrl, 'gs_studio_view=group-header' );
-		}
-		if ( type === 'gdc_bp_layout' ) {
-			if ( cfg.layoutSlug === 'group-sidebar' ) {
-				return withQuery( cfg.groupUrl, 'gs_studio_view=group-sidebar' );
-			}
-			return withQuery( cfg.directories && cfg.directories[ cfg.layoutSlug ], 'gs_studio_view=original' );
-		}
-		return '';
+		return isGroupType() ? withQuery( cfg.groupUrl, 'gs_studio_view=group-header' ) : '';
 	}
 	var styles = null;
 	var GLOBAL_RULE = /(^|[}\s,])(html|body|:root|\*)\s*[,{.:#\[]/;
@@ -117,45 +104,66 @@
 		var type = cfg.postType;
 		return type === 'gdc_group_header' || type === 'gdc_group_page';
 	}
+	// Only the group header and group page templates need the live header's
+	// styles (their blocks are the header cards). Copy only its own scoped
+	// rules, never page-wide ones (background, layout), in a framed or an
+	// unframed canvas alike, and add the live wrapper around the blocks.
 	function inject() {
-		if ( ! styles ) {
+		if ( ! styles || ! isGroupType() ) {
 			return;
 		}
 		var canvas = document.querySelector( 'iframe[name="editor-canvas"]' );
-		var doc = canvas && canvas.contentDocument;
-		if ( doc && doc.head ) {
-			// Framed canvas: the live page's stylesheets, all of them.
-			if ( doc.head.querySelector( '[data-gs-live]' ) ) {
-				return;
-			}
-			styles.forEach( function ( node ) {
-				var copy = doc.importNode( node, true );
-				copy.setAttribute( 'data-gs-live', '1' );
-				doc.head.appendChild( copy );
-			} );
-			return;
-		}
-		// Unframed canvas (the editor shares the admin page): only the group
-		// header's own scoped styles, inside the same wrapper as the live header.
-		if ( ! isGroupType() ) {
-			return;
-		}
-		var root = document.querySelector( '.editor-styles-wrapper .is-root-container' );
+		var doc = canvas && canvas.contentDocument && canvas.contentDocument.head ? canvas.contentDocument : document;
+		var root = doc.querySelector( '.is-root-container' );
 		if ( root && ! root.classList.contains( 'bp-bridge-header-container' ) ) {
 			root.classList.add( 'bp-bridge-header-container', 'is-ready', 'gs-pv-group-root' );
 		}
-		if ( document.head.querySelector( '[data-gs-live]' ) ) {
+		if ( doc.head.querySelector( '[data-gs-live]' ) ) {
 			return;
 		}
 		styles.forEach( function ( node ) {
 			var keep = node.tagName === 'LINK' ? /psoo-bp|projects\/assets/.test( node.getAttribute( 'href' ) || '' ) : ! GLOBAL_RULE.test( node.textContent );
 			if ( keep ) {
-				var copy = node.cloneNode( true );
+				var copy = doc === document ? node.cloneNode( true ) : doc.importNode( node, true );
 				copy.setAttribute( 'data-gs-live', '1' );
-				document.head.appendChild( copy );
+				doc.head.appendChild( copy );
 			}
 		} );
 	}
+	// ── 3. "Add a section" under the template, whatever its blocks are ────
+	function ensureAddButton() {
+		var canvas = document.querySelector( 'iframe[name="editor-canvas"]' );
+		var doc = canvas && canvas.contentDocument && canvas.contentDocument.body ? canvas.contentDocument : document;
+		var root = doc.querySelector( '.is-root-container' );
+		if ( ! root || ! root.parentNode || root.parentNode.querySelector( ':scope > .gs-pv-add' ) ) {
+			return;
+		}
+		var btn = doc.createElement( 'button' );
+		btn.type = 'button';
+		btn.className = 'gs-pv-add';
+		btn.textContent = '+ ' + __( 'Add a section', 'gend-society' );
+		btn.addEventListener( 'click', function () {
+			var count = wp.data.select( 'core/block-editor' ).getBlockCount();
+			wp.data.dispatch( 'core/block-editor' ).clearSelectedBlock();
+			wp.data.dispatch( 'core/editor' ).setIsInserterOpened( { rootClientId: undefined, insertionIndex: count } );
+		} );
+		root.parentNode.insertBefore( btn, root.nextSibling );
+	}
+
+	wp.domReady( function () {
+		var addQueued = false;
+		new window.MutationObserver( function () {
+			if ( ! addQueued ) {
+				addQueued = true;
+				window.requestAnimationFrame( function () {
+					addQueued = false;
+					ensureAddButton();
+				} );
+			}
+		} ).observe( document.body, { childList: true, subtree: true } );
+		ensureAddButton();
+	} );
+
 	wp.domReady( function () {
 		var src = styleSource();
 		if ( ! src ) {

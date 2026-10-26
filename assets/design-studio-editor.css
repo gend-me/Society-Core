@@ -335,3 +335,33 @@ body.gs-studio-embed ::-webkit-scrollbar-track { background: transparent; }
 
 /* The header keeps a 64px column for the (hidden) WordPress button: pull the toolbar into it. */
 body.gs-studio-embed .editor-header__toolbar { margin-left: -52px; }
+
+/* Code editor (Options > Code editor / Edit as HTML): readable in the dark skin. */
+body.gs-studio-embed .editor-text-editor,
+body.gs-studio-embed .edit-post-text-editor,
+body.gs-studio-embed .editor-text-editor__body,
+body.gs-studio-embed .edit-post-text-editor__body {
+	background: var(--st-bg) !important;
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .editor-post-text-editor,
+body.gs-studio-embed .block-editor-block-list__block-html-textarea,
+body.gs-studio-embed .editor-text-editor textarea:not(.editor-post-title__input) {
+	background: #0e131e !important;
+	color: #e8edf5 !important;
+	border: 1px solid rgba(255, 255, 255, .14) !important;
+	border-radius: 10px !important;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+	font-size: 13px !important;
+	line-height: 1.6 !important;
+}
+body.gs-studio-embed .editor-post-text-editor { min-height: 60vh; }
+body.gs-studio-embed .editor-text-editor__toolbar,
+body.gs-studio-embed .edit-post-text-editor__toolbar {
+	background: var(--st-panel) !important;
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .editor-text-editor__toolbar h2,
+body.gs-studio-embed .edit-post-text-editor__toolbar h2 { color: var(--st-muted) !important; }
+body.gs-studio-embed .editor-post-title__input,
+body.gs-studio-embed .editor-post-title { color: var(--st-text) !important; background: transparent !important; }

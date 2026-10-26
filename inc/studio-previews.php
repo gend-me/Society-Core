@@ -198,7 +198,14 @@ function gend_society_pv_canvas_styles() {
 		. '.gs-pv-frame{display:block;width:100%;border:0;border-radius:12px;background:#0b0e14;min-height:160px}'
 		. '.gs-pv-label{display:flex;justify-content:space-between;gap:8px;padding:6px 10px;font:600 11px/1.4 system-ui,sans-serif;letter-spacing:.06em;text-transform:uppercase;color:#97e46e;background:rgba(151,228,110,.08);border:1px dashed rgba(151,228,110,.4);border-bottom:0;border-radius:12px 12px 0 0}'
 		. '.gs-pv-label span{color:#8b98b0;text-transform:none;letter-spacing:0;font-weight:400}'
-		. '.gs-pv-wrap{border:1px dashed rgba(151,228,110,.4);border-top:0;border-radius:0 0 12px 12px;overflow:hidden}';
+		. '.gs-pv-wrap{border:1px dashed rgba(151,228,110,.4);border-top:0;border-radius:0 0 12px 12px;overflow:hidden}'
+		// Always show where to add a new section, whatever the live styles do.
+		. '.is-root-container>.block-list-appender{display:block!important;visibility:visible!important;opacity:1!important;position:relative!important;margin:24px auto!important;max-width:none!important}'
+		. '.block-editor-button-block-appender{display:flex!important;width:100%!important;min-height:56px!important;color:#97e46e!important;background:rgba(151,228,110,.06)!important;box-shadow:inset 0 0 0 1px rgba(151,228,110,.45)!important;border-radius:12px!important}'
+		. '.block-editor-button-block-appender:hover{background:rgba(151,228,110,.14)!important}'
+		. '.block-editor-default-block-appender__content{color:#8b98b0!important;opacity:1!important}'
+		. '.gs-pv-add{display:block;width:calc(100% - 48px);max-width:900px;margin:28px auto 80px;padding:18px;border-radius:14px;border:1px dashed rgba(151,228,110,.55);background:rgba(151,228,110,.06);color:#97e46e;font:600 15px/1 system-ui,sans-serif;cursor:pointer}'
+		. '.gs-pv-add:hover{background:rgba(151,228,110,.14)}';
 	// The live page's own stylesheets are copied into the canvas by assets/studio-previews.js.
 	wp_register_style( 'gend-society-studio-canvas', false, array(), GEND_SOCIETY_VERSION );
 	wp_enqueue_style( 'gend-society-studio-canvas' );
