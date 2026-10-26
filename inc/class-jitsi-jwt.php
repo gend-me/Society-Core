@@ -133,7 +133,12 @@ class Gend_GS_Jitsi_JWT {
         if ( is_array( $meta ) && ! empty( $meta['jitsi_room'] ) && is_string( $meta['jitsi_room'] ) ) {
             return $meta['jitsi_room'];   // DEPLOYED Phase 29 contract — guests hold this exact value.
         }
-        return self::ROOM_PREFIX . (int) $meeting_id;   // Legacy-row fallback only.
+        // Security 2026-10-18: meeting ids are per-blog (and per-install), so the bare gsmeet-{id} fallback
+        // let blog A's meeting N share a room (and moderator JWT scope) with blog B's meeting N. The
+        // fallback now carries the blog id plus a short install tag. It is only ever handed out by the
+        // join endpoint (no fallback room is emailed), so host and guests still resolve the same room.
+        $install = substr( md5( (string) network_site_url() ), 0, 6 );
+        return self::ROOM_PREFIX . (int) get_current_blog_id() . '-' . $install . '-' . (int) $meeting_id;   // Legacy-row fallback only.
     }
 
     /**

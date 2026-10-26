@@ -154,3 +154,53 @@ if ( ! function_exists( 'gend_society_remote_allowed' ) ) {
 		);
 	}
 }
+// @build-only-begin wporg
+
+if ( ! function_exists( 'gend_society_build_is_wporg' ) ) {
+	/**
+	 * True in the wordpress.org build: bin/build-dist.js writes GEND_SOCIETY_BUILD
+	 * into that zip's gend-society.php. False in the full build and on gend.me.
+	 */
+	function gend_society_build_is_wporg(): bool {
+		return defined( 'GEND_SOCIETY_BUILD' ) && 'wporg' === GEND_SOCIETY_BUILD;
+	}
+}
+
+if ( ! function_exists( 'gend_society_data_sharing_items' ) ) {
+	/**
+	 * Optional after-connect data flows the owner turns on one by one
+	 * (wordpress.org build), in display order.
+	 *
+	 * @return array<string,array{label:string,description:string}>
+	 */
+	function gend_society_data_sharing_items(): array {
+		return array(
+			'mail_relay'  => array(
+				'label'       => __( 'Send this site\'s email through the gend.me mail service', 'gend-society' ),
+				'description' => __( 'WordPress email from this site is handed to gend.me for delivery (recipients, subject, message and attachments) and counted against your gend.me Emails plan. Once a day the site also reports how much inbox data it stores. When this is off, WordPress sends mail as it normally does.', 'gend-society' ),
+			),
+			'plugin_list' => array(
+				'label'       => __( 'Share this site\'s active plugin list with gend.me', 'gend-society' ),
+				'description' => __( 'The list of active plugins is sent when a plugin is activated or deactivated and once a day, so gend.me can show which features already run on this site.', 'gend-society' ),
+			),
+		);
+	}
+}
+
+if ( ! function_exists( 'gend_society_data_sharing_allowed' ) ) {
+	/**
+	 * Owner opt-in for one optional data flow. wordpress.org build: off until an
+	 * administrator turns it on (option gend_society_share_<item> = '1'); it is
+	 * still sent only while connected and consented. Any other build: true, so
+	 * gend.me-hosted sites keep their behaviour.
+	 *
+	 * @param string $item Key of gend_society_data_sharing_items().
+	 */
+	function gend_society_data_sharing_allowed( string $item ): bool {
+		if ( ! gend_society_build_is_wporg() ) {
+			return true;
+		}
+		return '1' === (string) get_option( 'gend_society_share_' . $item, '0' );
+	}
+}
+// @build-only-end wporg

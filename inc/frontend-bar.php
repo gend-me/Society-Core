@@ -682,7 +682,7 @@ function gend_society_build_frontend_nav()
   // Conditionally add Social
   if (gend_society_plugin_active('social-network/social-network.php') && current_user_can('manage_options')) {
     $social_children = [
-      ['label' => __('Social Profiles', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-network-settings')],
+      ['label' => __('Member Management', 'gend-society'), 'url' => admin_url('admin.php?page=gdc-social-network-settings')],
     ];
     if (gend_society_plugin_active('reward-programs/reward-programs.php')) {
       $social_children[] = ['label' => __('Point Bank', 'gend-society'), 'url' => admin_url('admin.php?page=gs-rewards')];

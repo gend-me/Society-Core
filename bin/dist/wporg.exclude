@@ -18,6 +18,9 @@ themes/
 # Old-name compat layer (created by the prefix rename): full build only
 inc/compat-aliases.php
 inc/compat-bridges.php
+# Support access (gend.me-issued time-limited admin login): wordpress.org review 2026-10-25,
+# remote administration. Customer tier, full build only. Also a VARIANTS.wporg forbidden path.
+inc/support-access.php
 # Chat-flow wireframe seed data (read only by the container-tier wireframe store)
 chatflows/
 

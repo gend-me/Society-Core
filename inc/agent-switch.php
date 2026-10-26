@@ -74,6 +74,14 @@ function gend_society_agent_switch_activate($original_user_id, $agent_user_id, $
     if (!get_userdata($original_user_id) || !get_userdata($agent_user_id)) {
         return new \WP_Error('gs_agent_switch_missing_user', __('User not found.', 'gend-society'), array('status' => 404));
     }
+    // Security 2026-10-18: only ever switch into a real AI agent user (never a
+    // human account or a network admin), whatever the caller resolved.
+    $gs_agent_target = get_userdata($agent_user_id);
+    $gs_is_agent     = (bool) get_user_meta($agent_user_id, '_aipa_is_agent', true)
+        || in_array('ai_agent', (array) $gs_agent_target->roles, true);
+    if (!$gs_is_agent || is_super_admin($agent_user_id)) {
+        return new \WP_Error('gs_agent_switch_not_agent', __('That user is not an agent.', 'gend-society'), array('status' => 403));
+    }
 
     $token = bin2hex(random_bytes(32));
     set_transient(
