@@ -761,7 +761,7 @@ function gend_society_studio_embed_css() {
 	}
 	echo '<style id="gs-studio-embed-css">'
 		. 'body.gs-studio-embed{--gs-header-h:0px!important}body.gs-studio-embed::before,body.gs-studio-embed::after{display:none!important}:root{background:#0b0e14!important}'
-		. '#main-3d-header,.header-anchor-wrap,#wpadminbar,#adminmenumain,#wpfooter,aipa-widget,.gs-frontend-bar,.update-nag{display:none!important}'
+		. '#main-3d-header,.header-anchor-wrap,#wpadminbar,#adminmenumain,#wpfooter,aipa-widget,.gs-frontend-bar,.update-nag,.em-chat-widget,.em-chat-panel,#gm-cc,.gm-cc-open{display:none!important}'
 		. 'html.wp-toolbar{padding-top:0!important}#wpcontent,#wpfooter{margin-left:0!important}#wpbody-content{padding-top:0!important}'
 		. 'body.gs-studio-embed .edit-site-layout__view-mode-toggle-container,body.gs-studio-embed .edit-site-site-hub__view-mode-toggle-container,body.gs-studio-embed .editor-header__back-button,body.gs-studio-embed .edit-site-layout__hub,body.gs-studio-embed .edit-post-fullscreen-mode-close{visibility:hidden!important;pointer-events:none!important}'
 		. '</style>';
