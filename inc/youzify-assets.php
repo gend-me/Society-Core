@@ -5,8 +5,8 @@
  * them) on pages that no longer need them. Youzify's scripts keep loading, so
  * its features (posting, reactions, media, ...) keep working.
  *
- * Per area (members directory, groups directory, activity, profiles, groups)
- * the setting is:
+ * Per area (members directory, groups directory, activity, profiles, groups,
+ * and all other pages, where Youzify loads its CSS too) the setting is:
  *   auto  (default) off where a published block layout fully replaces
  *         Youzify's output (a directory layout without Original Page Content);
  *   off   never load Youzify styles in that area;
@@ -33,6 +33,7 @@ function gend_society_yz_areas() {
 		'activity'          => __( 'Activity feed', 'gend-society' ),
 		'profiles'          => __( 'Member profiles', 'gend-society' ),
 		'groups'            => __( 'Group pages', 'gend-society' ),
+		'site'              => __( 'All other pages', 'gend-society' ),
 	);
 }
 
@@ -57,7 +58,8 @@ function gend_society_yz_current_area() {
 	if ( function_exists( 'bp_is_group' ) && bp_is_group() ) {
 		return 'groups';
 	}
-	return '';
+	// Youzify loads its stylesheets on every page, not just Social ones.
+	return function_exists( 'is_buddypress' ) && is_buddypress() ? '' : 'site';
 }
 
 /**
@@ -154,6 +156,7 @@ function gend_society_yz_rest_get() {
 		'activity'          => function_exists( 'bp_get_activity_directory_permalink' ) ? bp_get_activity_directory_permalink() : '',
 		'profiles'          => function_exists( 'bp_members_get_user_url' ) ? bp_members_get_user_url( get_current_user_id() ) : '',
 		'groups'            => '',
+		'site'              => home_url( '/' ),
 	);
 	$out      = array();
 	foreach ( gend_society_yz_areas() as $slug => $label ) {
