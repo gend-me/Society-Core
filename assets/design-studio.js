@@ -433,7 +433,7 @@
 
 	function previewPane( opts ) {
 		opts = opts || {};
-		var url = S.previewMode === 'home' ? cfg.homeUrl : cfg.specimenUrl;
+		var url = opts.url || ( S.previewMode === 'home' ? cfg.homeUrl : cfg.specimenUrl );
 		previewFrame = h( 'iframe', { class: 'gs-st-preview-frame', title: __( 'Live preview', 'gend-society' ), src: url, loading: 'lazy' } );
 		previewFrame.addEventListener( 'load', function () {
 			injectPreview();
@@ -467,7 +467,7 @@
 		var bar = h(
 			'div',
 			{ class: 'gs-st-preview-bar' },
-			h( 'div', { class: 'gs-st-segs' }, seg( 'specimen', __( 'Style guide', 'gend-society' ) ), seg( 'home', __( 'Home page', 'gend-society' ) ) ),
+			opts.url ? h( 'strong', { class: 'gs-st-preview-title' }, opts.title || '' ) : h( 'div', { class: 'gs-st-segs' }, seg( 'specimen', __( 'Style guide', 'gend-society' ) ), seg( 'home', __( 'Home page', 'gend-society' ) ) ),
 			h( 'span', { class: 'gs-st-live-dot' }, isDirty() ? __( 'Unsaved preview', 'gend-society' ) : __( 'Live', 'gend-society' ) ),
 			h( 'div', { class: 'gs-st-dev' }, dev( 'desktop', 'desktop', __( 'Desktop', 'gend-society' ) ), dev( 'tablet', 'tablet', __( 'Tablet', 'gend-society' ) ), dev( 'mobile', 'smartphone', __( 'Mobile', 'gend-society' ) ) )
 		);
@@ -833,6 +833,9 @@
 		if ( p === 'youzify' ) {
 			return panelYouzify( hit );
 		}
+		if ( p === 'shortcode' ) {
+			return panelShortcode( hit );
+		}
 		return panelTypography( hit );
 	}
 
@@ -1064,6 +1067,72 @@
 		} ) );
 		var controls = h( 'div', { class: 'gs-st-stack' }, h( 'h3', { class: 'gs-st-h3' }, __( 'Schemes', 'gend-society' ) ), grid, h( 'h3', { class: 'gs-st-h3' }, __( 'Fine-tune your palette', 'gend-society' ) ), editor );
 		return panelLayout( hit, __( 'Pick a scheme to restyle the whole site at once, then fine-tune any colour. Nothing goes live until you save.', 'gend-society' ), controls );
+	}
+
+	/* ── Shortcodes (Sales): live preview + details ─────────────────────── */
+	function panelShortcode( hit ) {
+		var tag = hit.item.tag;
+		var ctl = h( 'div', { class: 'gs-st-controls' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), loadingView() );
+		var split = h( 'div', { class: 'gs-st-split' }, ctl, previewPane( { url: cfg.homeUrl + ( cfg.homeUrl.indexOf( '?' ) === -1 ? '?' : '&' ) + 'gs_studio_shortcode=' + encodeURIComponent( tag ), title: __( 'Live preview (as you)', 'gend-society' ) } ) );
+		api( { path: '/gend-society/v1/studio/shortcode?tag=' + encodeURIComponent( tag ) } ).then( function ( d ) {
+			ctl.textContent = '';
+			var code = '[' + d.tag + ']';
+			var copyBtn = h( 'button', { type: 'button', class: 'gs-st-btn is-sm', onclick: function () {
+				var done = function () {
+					toast( sprintf( __( '%s copied.', 'gend-society' ), code ), 'ok' );
+				};
+				if ( navigator.clipboard ) {
+					navigator.clipboard.writeText( code ).then( done, done );
+				} else {
+					done();
+				}
+			} }, icon( 'admin-page' ), __( 'Copy', 'gend-society' ) );
+			var section = function ( title, body ) {
+				return h( 'div', { class: 'gs-st-card is-flat gs-st-sc-block' }, h( 'h3', null, title ), body );
+			};
+			var attrs = d.attributes.length
+				? h( 'table', { class: 'gs-st-sc-table' }, h( 'thead', null, h( 'tr', null, h( 'th', null, __( 'Attribute', 'gend-society' ) ), h( 'th', null, __( 'Default', 'gend-society' ) ) ) ), h( 'tbody', null, d.attributes.map( function ( a ) {
+					return h( 'tr', null, h( 'td', null, h( 'code', null, a.name ) ), h( 'td', null, h( 'code', null, a.default ) ) );
+				} ) ) )
+				: h( 'p', { class: 'gs-st-muted' }, __( 'No attributes: place it exactly as shown.', 'gend-society' ) );
+			var pages = d.pages.length
+				? h( 'ul', { class: 'gs-st-sc-pages' }, d.pages.map( function ( pg ) {
+					return h( 'li', null,
+						h( 'span', null, h( 'strong', null, pg.title || __( '(no title)', 'gend-society' ) ), h( 'small', null, pg.type ) ),
+						h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: pg.url, target: '_blank', rel: 'noopener' }, icon( 'external' ), __( 'View', 'gend-society' ) ),
+						h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+							main.textContent = '';
+							previewFrame = null;
+							main.appendChild( frameView( pg.title, pg.editUrl ) );
+						} }, icon( 'edit' ), __( 'Edit', 'gend-society' ) )
+					);
+				} ) )
+				: h( 'p', { class: 'gs-st-muted' }, __( 'Not used on any page yet. Paste the shortcode into a page or a Shortcode block.', 'gend-society' ) );
+			var layoutBtn = null;
+			var tpl = d.template && S.templates[ d.template ];
+			if ( tpl ) {
+				layoutBtn = h( 'button', { type: 'button', class: 'gs-st-btn is-primary', onclick: function () {
+					main.textContent = '';
+					previewFrame = null;
+					main.appendChild( frameView( titleOf( tpl ), canvasUrl( tpl ) ) );
+				} }, icon( 'layout' ), __( 'Design the page layout', 'gend-society' ) );
+			}
+			ctl.appendChild( h( 'div', { class: 'gs-st-stack' },
+				h( 'div', null, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, d.label ), h( 'p', { class: 'gs-st-intro' }, d.description ) ),
+				h( 'div', { class: 'gs-st-sc-code' }, h( 'code', null, code ), copyBtn ),
+				d.shows.length ? section( __( 'What it shows', 'gend-society' ), h( 'ul', { class: 'gs-st-sc-list' }, d.shows.map( function ( x ) {
+					return h( 'li', null, x );
+				} ) ) ) : null,
+				d.audience ? section( __( 'Who sees it', 'gend-society' ), h( 'p', null, d.audience ) ) : null,
+				section( __( 'Attributes', 'gend-society' ), attrs ),
+				section( sprintf( __( 'Used on (%d)', 'gend-society' ), d.pages.length ), pages ),
+				layoutBtn ? h( 'div', { class: 'gs-st-row' }, layoutBtn, h( 'span', { class: 'gs-st-muted' }, __( 'The block layout every page with this shortcode uses.', 'gend-society' ) ) ) : null,
+				d.source ? h( 'p', { class: 'gs-st-muted gs-st-sc-source' }, __( 'Source:', 'gend-society' ) + ' ' + d.source ) : null
+			) );
+		}, function ( e ) {
+			ctl.textContent = errMsg( e );
+		} );
+		return split;
 	}
 
 	/* ── Youzify styling: per-area switch for Youzify's front-end CSS ───── */

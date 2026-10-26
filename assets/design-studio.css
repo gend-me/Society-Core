@@ -536,3 +536,19 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-yz { display: flex; flex-direction: column; gap: 12px; }
 .gs-st-yz-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
 .gs-st-yz-head strong { font-size: 16px; }
+
+/* Shortcode panel (Sales) */
+.gs-st-preview-title { font-size: 13px; color: var(--st-muted); }
+.gs-st-sc-code { display: flex; align-items: center; justify-content: space-between; gap: 10px; padding: 12px 14px; border-radius: 12px; background: rgba(151, 228, 110, .08); border: 1px dashed rgba(151, 228, 110, .45); }
+.gs-st-sc-code code { font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace; font-size: 15px; color: var(--st-accent); background: transparent; }
+.gs-st-sc-block h3 { margin: 0 0 8px; }
+.gs-st-sc-block p { margin: 0; color: #c6cfdf; }
+.gs-st-sc-list { margin: 0; padding-left: 18px; color: #c6cfdf; display: grid; gap: 4px; }
+.gs-st-sc-table { width: 100%; border-collapse: collapse; }
+.gs-st-sc-table th, .gs-st-sc-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid var(--st-border); font-size: 13px; }
+.gs-st-sc-table th { color: var(--st-muted); font-weight: 600; }
+.gs-st-sc-pages { list-style: none; margin: 0; padding: 0; display: grid; gap: 6px; }
+.gs-st-sc-pages li { display: flex; align-items: center; gap: 6px; }
+.gs-st-sc-pages li > span { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+.gs-st-sc-pages small { color: var(--st-muted); font-size: 11px; }
+.gs-st-sc-source { font-size: 12px; }

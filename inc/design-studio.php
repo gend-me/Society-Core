@@ -345,12 +345,18 @@ function gend_society_studio_sections() {
 						array( 'id' => 'product-grouped', 'label' => __( 'Grouped Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-grouped' ),
 					),
 				),
+			),
+		),
+		array(
+			'id'       => 'sales',
+			'label'    => __( 'Sales', 'gend-society' ),
+			'icon'     => 'chart-line',
+			'blurb'    => __( 'Affiliate dashboard, referral links and commissions.', 'gend-society' ),
+			'active'   => $has_sales,
+			'requires' => __( 'Sales Team', 'gend-society' ),
+			'groups'   => array(
 				array(
-					'label'  => __( 'Sales', 'gend-society' ),
-					'active' => $has_sales,
-					'items'  => array(
-						array( 'id' => 'affiliate-dashboard', 'label' => __( 'Affiliate Dashboard', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-affiliate-dashboard' ),
-					),
+					'items' => gend_society_studio_shortcode_items( array( 'affiliate_sales_dashboard', 'affiliate_link', 'affiliate_earnings', 'referral_team', 'referred_sales_commissions', 'team_sales_commissions', 'withdraw_overview', 'member_order_commissions', 'member_product_commissions' ) ),
 				),
 			),
 		),
@@ -436,20 +442,24 @@ function gend_society_studio_sections() {
 	 */
 	$sections = apply_filters( 'gend_society_studio_sections', $sections );
 
-	// Drop inactive groups so a section only lists what its plugins provide.
-	foreach ( $sections as &$section ) {
+	// Drop inactive or empty groups so a section only lists what its plugins provide,
+	// and active sections left with nothing to show.
+	foreach ( $sections as $i => &$section ) {
 		$section['groups'] = array_values(
 			array_filter(
 				$section['groups'],
 				function ( $group ) {
-					return ! isset( $group['active'] ) || $group['active'];
+					return ( ! isset( $group['active'] ) || $group['active'] ) && ! empty( $group['items'] );
 				}
 			)
 		);
+		if ( $section['active'] && ! $section['groups'] ) {
+			unset( $sections[ $i ] );
+		}
 	}
 	unset( $section );
 
-	return $sections;
+	return array_values( $sections );
 }
 
 /**
@@ -461,6 +471,163 @@ function gend_society_studio_render_page() {
 	}
 	echo '<div id="gs-studio-root" class="gs-studio" aria-busy="true"><div class="gs-studio-boot"><span class="gs-studio-spinner" aria-hidden="true"></span>' . esc_html__( 'Opening the Design Studio…', 'gend-society' ) . '</div></div>';
 	echo '<noscript>' . esc_html__( 'The Design Studio needs JavaScript.', 'gend-society' ) . '</noscript>';
+}
+
+/**
+ * What the studio says about a shortcode (curated; plugins can add their own).
+ *
+ * Keys: label, description, shows (string[]), audience, template (block
+ * template slug of pages that use it).
+ *
+ * @return array[]
+ */
+function gend_society_studio_shortcodes() {
+	$login = __( 'Logged-in members (visitors see a log-in message).', 'gend-society' );
+	return apply_filters(
+		'gend_society_studio_shortcodes',
+		array(
+			'affiliate_sales_dashboard'  => array(
+				'label'       => __( 'Affiliate Dashboard', 'gend-society' ),
+				'description' => __( 'The member’s full sales dashboard: their sales, commissions, referred members, tracking links and payment history in one place.', 'gend-society' ),
+				'shows'       => array(
+					__( 'Monthly and lifetime orders, sales and commission', 'gend-society' ),
+					__( 'Commission rates and a direct-earnings projection', 'gend-society' ),
+					__( 'Referral performance pulse: sign-ups, tracking-URL visitors, conversion rate', 'gend-society' ),
+					__( 'Sales Team members with search and filters', 'gend-society' ),
+					__( 'Referred sales and referral payment history', 'gend-society' ),
+					__( 'Tracking URLs and linked apps, with product search', 'gend-society' ),
+				),
+				'audience'    => $login,
+				'template'    => 'page-affiliate-dashboard',
+			),
+			'affiliate_link'             => array(
+				'label'       => __( 'Affiliate Link', 'gend-society' ),
+				'description' => __( 'The member’s own referral link, ready to copy and share.', 'gend-society' ),
+				'shows'       => array( __( 'Personal referral URL with a copy button', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'affiliate_earnings'         => array(
+				'label'       => __( 'Affiliate Earnings', 'gend-society' ),
+				'description' => __( 'An overview of what the member has earned from referrals.', 'gend-society' ),
+				'shows'       => array( __( 'Earnings totals', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'referral_team'              => array(
+				'label'       => __( 'Sales Team', 'gend-society' ),
+				'description' => __( 'The members this member has referred (their Sales Team).', 'gend-society' ),
+				'shows'       => array( __( 'Referred members list', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'referred_sales_commissions' => array(
+				'label'       => __( 'Referred Sales', 'gend-society' ),
+				'description' => __( 'Commissions from sales the member referred directly.', 'gend-society' ),
+				'shows'       => array( __( 'Referred orders and their commission', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'team_sales_commissions'     => array(
+				'label'       => __( 'Team Sales', 'gend-society' ),
+				'description' => __( 'Commissions from sales made by the member’s Sales Team.', 'gend-society' ),
+				'shows'       => array( __( 'Team orders and override commission', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'withdraw_overview'          => array(
+				'label'       => __( 'Withdraw', 'gend-society' ),
+				'description' => __( 'The point types the member can withdraw, each with a withdraw button.', 'gend-society' ),
+				'shows'       => array( __( 'Withdrawable balances and withdraw buttons', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'member_order_commissions'   => array(
+				'label'       => __( 'Order Commissions', 'gend-society' ),
+				'description' => __( 'Commission earned on each order, for the member.', 'gend-society' ),
+				'shows'       => array( __( 'Orders with their commission', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+			'member_product_commissions' => array(
+				'label'       => __( 'Product Commissions', 'gend-society' ),
+				'description' => __( 'What the member earns per product they promote.', 'gend-society' ),
+				'shows'       => array( __( 'Products with their commission rate', 'gend-society' ) ),
+				'audience'    => $login,
+			),
+		)
+	);
+}
+
+/**
+ * Studio items for the shortcodes that exist on this site.
+ *
+ * @param string[] $tags Shortcode tags, in order.
+ * @return array[]
+ */
+function gend_society_studio_shortcode_items( array $tags ) {
+	$info  = gend_society_studio_shortcodes();
+	$items = array();
+	foreach ( $tags as $tag ) {
+		if ( ! shortcode_exists( $tag ) ) {
+			continue;
+		}
+		$items[] = array(
+			'id'    => 'sc-' . str_replace( '_', '-', $tag ),
+			'label' => isset( $info[ $tag ]['label'] ) ? $info[ $tag ]['label'] : $tag,
+			'kind'  => 'panel',
+			'panel' => 'shortcode',
+			'tag'   => $tag,
+		);
+	}
+	return $items;
+}
+
+/**
+ * Details read from a shortcode's code: doc comment, attributes, source.
+ *
+ * @param string $tag Shortcode tag.
+ * @return array
+ */
+function gend_society_studio_shortcode_code_info( $tag ) {
+	global $shortcode_tags;
+	$out = array(
+		'doc'        => '',
+		'attributes' => array(),
+		'source'     => '',
+	);
+	if ( empty( $shortcode_tags[ $tag ] ) ) {
+		return $out;
+	}
+	$handler = $shortcode_tags[ $tag ];
+	try {
+		if ( is_array( $handler ) ) {
+			$ref = new ReflectionMethod( $handler[0], $handler[1] );
+		} elseif ( is_string( $handler ) && function_exists( $handler ) ) {
+			$ref = new ReflectionFunction( $handler );
+		} elseif ( $handler instanceof Closure ) {
+			$ref = new ReflectionFunction( $handler );
+		} else {
+			return $out;
+		}
+	} catch ( ReflectionException $e ) {
+		return $out;
+	}
+	$file = (string) $ref->getFileName();
+	if ( '' === $file || ! is_readable( $file ) ) {
+		return $out;
+	}
+	$out['source'] = ltrim( str_replace( wp_normalize_path( WP_PLUGIN_DIR ), '', wp_normalize_path( $file ) ), '/' ) . ':' . $ref->getStartLine();
+	$doc           = (string) $ref->getDocComment();
+	if ( '' !== $doc ) {
+		$doc        = trim( preg_replace( '#^\s*(/\*\*|\*/|\*)\s?#m', '', $doc ) );
+		$out['doc'] = trim( (string) preg_replace( '#\[[a-z0-9_]+\]\s*-?\s*#', '', strtok( $doc, "\n" ) ) );
+	}
+	// phpcs:ignore WordPress.WP.AlternativeFunctions.file_get_contents_file_get_contents -- reading a local plugin file for its shortcode attributes.
+	$lines = explode( "\n", (string) file_get_contents( $file ) );
+	$body  = implode( "\n", array_slice( $lines, $ref->getStartLine() - 1, $ref->getEndLine() - $ref->getStartLine() + 1 ) );
+	if ( preg_match( '#shortcode_atts\s*\(\s*(?:array\s*\(|\[)(.*?)(?:\)|\])\s*,#s', $body, $m ) && preg_match_all( '#[\'"]([a-z0-9_-]+)[\'"]\s*=>\s*([^,\n]+)#i', $m[1], $pairs, PREG_SET_ORDER ) ) {
+		foreach ( $pairs as $pair ) {
+			$out['attributes'][] = array(
+				'name'    => $pair[1],
+				'default' => trim( trim( $pair[2] ), '\'"' ),
+			);
+		}
+	}
+	return $out;
 }
 
 add_action( 'admin_enqueue_scripts', 'gend_society_studio_enqueue' );
@@ -593,6 +760,17 @@ add_action( 'rest_api_init', 'gend_society_studio_register_rest' );
 function gend_society_studio_register_rest() {
 	register_rest_route(
 		'gend-society/v1',
+		'/studio/shortcode',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'gend_society_studio_rest_shortcode',
+			'permission_callback' => function () {
+				return current_user_can( 'edit_theme_options' );
+			},
+		)
+	);
+	register_rest_route(
+		'gend-society/v1',
 		'/studio/preview-css',
 		array(
 			'methods'             => 'POST',
@@ -602,6 +780,81 @@ function gend_society_studio_register_rest() {
 			},
 		)
 	);
+}
+
+/**
+ * A shortcode's details for the studio: description, what it shows, who sees
+ * it, attributes, source, the pages that use it and a live preview URL.
+ *
+ * @param WP_REST_Request $request Request with ?tag=.
+ * @return WP_REST_Response|WP_Error
+ */
+function gend_society_studio_rest_shortcode( WP_REST_Request $request ) {
+	global $wpdb;
+	$tag = sanitize_key( (string) $request->get_param( 'tag' ) );
+	if ( '' === $tag || ! shortcode_exists( $tag ) ) {
+		return new WP_Error( 'gs_studio_sc', __( 'That shortcode is not available on this site.', 'gend-society' ), array( 'status' => 404 ) );
+	}
+	$info = gend_society_studio_shortcodes();
+	$info = isset( $info[ $tag ] ) ? $info[ $tag ] : array();
+	$code = gend_society_studio_shortcode_code_info( $tag );
+	// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- admin-only lookup of where a shortcode is used.
+	$ids   = $wpdb->get_col( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_status = 'publish' AND post_type NOT IN ('revision','nav_menu_item') AND post_content LIKE %s ORDER BY post_modified DESC LIMIT 25", '%' . $wpdb->esc_like( '[' . $tag ) . '%' ) );
+	$pages = array();
+	foreach ( $ids as $id ) {
+		$pages[] = array(
+			'id'      => (int) $id,
+			'title'   => get_the_title( $id ),
+			'type'    => get_post_type( $id ),
+			'url'     => get_permalink( $id ),
+			'editUrl' => admin_url( 'post.php?post=' . (int) $id . '&action=edit' ),
+		);
+	}
+	return rest_ensure_response(
+		array(
+			'tag'         => $tag,
+			'label'       => isset( $info['label'] ) ? $info['label'] : $tag,
+			'description' => isset( $info['description'] ) ? $info['description'] : $code['doc'],
+			'shows'       => isset( $info['shows'] ) ? $info['shows'] : array(),
+			'audience'    => isset( $info['audience'] ) ? $info['audience'] : '',
+			'attributes'  => $code['attributes'],
+			'source'      => $code['source'],
+			'template'    => isset( $info['template'] ) ? $info['template'] : '',
+			'pages'       => $pages,
+			'previewUrl'  => add_query_arg( 'gs_studio_shortcode', $tag, home_url( '/' ) ),
+		)
+	);
+}
+
+add_action( 'template_redirect', 'gend_society_studio_shortcode_preview', 0 );
+/**
+ * Live preview of one shortcode (?gs_studio_shortcode=tag), rendered for you
+ * with the site's styles. Site editors only.
+ */
+function gend_society_studio_shortcode_preview() {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+	$tag = isset( $_GET['gs_studio_shortcode'] ) ? sanitize_key( wp_unslash( $_GET['gs_studio_shortcode'] ) ) : '';
+	if ( '' === $tag || ! current_user_can( 'edit_theme_options' ) || ! shortcode_exists( $tag ) ) {
+		return;
+	}
+	add_filter( 'show_admin_bar', '__return_false' );
+	$html = do_shortcode( '[' . $tag . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+	?><!DOCTYPE html>
+<html <?php language_attributes(); ?>>
+<head>
+<meta charset="<?php bloginfo( 'charset' ); ?>">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex">
+	<?php wp_head(); ?>
+<style>html,body{margin:0;background:#0b0e14;color:#e8edf5}.gs-sc-preview{padding:24px}.gs-front-sidebar,.gs-sidebar-flyout,.gs-float-menu,.gs-float-dock,aipa-widget,.em-chat-widget,.em-chat-panel,#gm-cc,.gm-cc-open{display:none!important}</style>
+</head>
+<body <?php body_class( 'gs-studio-preview' ); ?>>
+<div class="gs-sc-preview"><?php echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- shortcode output. ?></div>
+	<?php wp_footer(); ?>
+</body>
+</html>
+	<?php
+	exit;
 }
 
 /**
