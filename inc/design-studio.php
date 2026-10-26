@@ -425,6 +425,8 @@ function gend_society_studio_sections() {
 						// Profile headers, tab layouts and menu are block-built (Profile Styling); Youzify settings only without it.
 						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
 						array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
+						// The right sidebar, as Profile Widget blocks (inc/profile-widgets.php).
+						array( 'id' => 'profile-sidebar', 'label' => __( 'Profile Sidebar', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts && function_exists( 'gend_society_pw_default_sidebar' ) ? $layout_url( 'profile-sidebar' ) : $yz( 'youzify-profile-settings', 'widgets' ) ),
 					),
 				),
 				array(

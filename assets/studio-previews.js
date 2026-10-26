@@ -156,6 +156,39 @@
 			convertPage( 'text' );
 		} );
 		btn.parentNode.insertBefore( html, btn.nextSibling );
+		var site = layoutPageUrl();
+		if ( site ) {
+			var view = doc.createElement( 'button' );
+			view.type = 'button';
+			view.className = 'gs-pv-add is-site';
+			view.textContent = '↗ ' + __( 'Preview this layout on the site (saved version, only you see it)', 'gend-society' );
+			view.addEventListener( 'click', function () {
+				var id = wp.data.select( 'core/editor' ).getCurrentPostId();
+				window.open( withQuery( site, 'gs_layout_preview=' + id ), '_blank', 'noopener' );
+			} );
+			html.parentNode.insertBefore( view, html.nextSibling );
+		}
+	}
+
+	// The real page a Directory Layout applies to (for "Preview on the site").
+	function layoutPageUrl() {
+		if ( cfg.postType !== 'gdc_bp_layout' ) {
+			return '';
+		}
+		var slug = cfg.layoutSlug;
+		if ( cfg.directories && cfg.directories[ slug ] ) {
+			return cfg.directories[ slug ];
+		}
+		if ( slug === 'profile-sidebar' ) {
+			return cfg.profileUrl;
+		}
+		if ( slug === 'group-sidebar' ) {
+			return cfg.groupUrl;
+		}
+		if ( slug === 'group-feed' && cfg.groupUrl ) {
+			return cfg.groupUrl + 'home/';
+		}
+		return '';
 	}
 
 	// ── 4. Edit as HTML ───────────────────────────────────────────────────

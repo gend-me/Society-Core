@@ -160,6 +160,86 @@ function gend_society_pw_render( $attrs ) {
 	return '<div ' . get_block_wrapper_attributes( array( 'class' => 'gdc-profile-widget' ) ) . '>' . $html . '</div>';
 }
 
+/**
+ * A new Profile sidebar layout starts with today's sidebar widgets, in order.
+ *
+ * @return string
+ */
+function gend_society_pw_default_sidebar() {
+	$fallback = array_fill_keys( array( 'login', 'user_balance', 'user_badges', 'gamipress_user_balance', 'gamipress_user_badges', 'about_me', 'wall_media', 'social_networks', 'friends', 'flickr', 'groups', 'recent_posts', 'user_tags', 'email', 'address', 'website', 'phone' ), 'visible' );
+	$widgets  = function_exists( 'youzify_option' ) ? youzify_option( 'youzify_profile_sidebar_widgets', $fallback ) : $fallback;
+	$out      = '';
+	foreach ( is_array( $widgets ) ? $widgets : array() as $name => $visibility ) {
+		if ( 'visible' === $visibility ) {
+			$out .= '<!-- wp:gend-society/profile-widget ' . wp_json_encode( array( 'widget' => (string) $name ) ) . ' /-->';
+		}
+	}
+	return $out;
+}
+
+/**
+ * Whether the profile's right sidebar is being built, and whether a layout replaces its widgets.
+ *
+ * @param string|null $set 'open', 'close' or 'replace'.
+ * @return array { open: bool, replace: bool }
+ */
+function gend_society_pw_sidebar_state( $set = null ) {
+	static $state = array(
+		'open'    => false,
+		'replace' => false,
+	);
+	if ( 'open' === $set ) {
+		$state = array(
+			'open'    => true,
+			'replace' => false,
+		);
+	} elseif ( 'close' === $set ) {
+		$state['open'] = false;
+	} elseif ( 'replace' === $set ) {
+		$state['replace'] = true;
+	}
+	return $state;
+}
+
+add_action(
+	'youzify_before_right_sidebar_widgets',
+	static function () {
+		gend_society_pw_sidebar_state( 'open' );
+	}
+);
+
+add_filter( 'youzify_profile_sidebar_widgets', 'gend_society_pw_sidebar_widgets', 99 );
+/**
+ * A published Profile sidebar layout takes the place of the right sidebar's
+ * widgets. Youzify only asks for them when the visitor may see the profile.
+ *
+ * @param array $widgets Sidebar widgets (name => visibility).
+ * @return array
+ */
+function gend_society_pw_sidebar_widgets( $widgets ) {
+	$state = gend_society_pw_sidebar_state();
+	if ( ! $state['open'] || ! function_exists( 'gend_society_ds_layout' ) || ( function_exists( 'gend_society_pv_view' ) && 'original' === gend_society_pv_view() ) ) {
+		return $widgets;
+	}
+	if ( ! gend_society_ds_layout( 'profile-sidebar' ) ) {
+		return $widgets;
+	}
+	gend_society_pw_sidebar_state( 'replace' );
+	return array();
+}
+
+add_action( 'youzify_after_right_sidebar_widgets', 'gend_society_pw_sidebar_layout', 0 );
+/**
+ * Prints the Profile sidebar layout where the widgets were.
+ */
+function gend_society_pw_sidebar_layout() {
+	$state = gend_society_pw_sidebar_state( 'close' );
+	$tpl   = $state['replace'] ? gend_society_ds_layout( 'profile-sidebar' ) : null;
+	if ( $tpl ) {
+		echo '<div class="gdc-bp-layout gdc-bp-layout--profile-sidebar">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored layout.
+	}
+}
+
 add_filter( 'gend_society_ps_default_tab_content', 'gend_society_pw_default_overview', 10, 2 );
 /**
  * A new Overview tab layout starts with today's Overview widgets, in order.

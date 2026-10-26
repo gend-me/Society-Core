@@ -253,6 +253,8 @@ function gend_society_pv_canvas_styles() {
 		. '.gs-pv-add:hover{background:rgba(151,228,110,.14)}'
 		. '.gs-pv-add+.gs-pv-add.is-html{margin-top:-64px;border-color:rgba(110,193,228,.5);background:rgba(110,193,228,.06);color:#6ec1e4}'
 		. '.gs-pv-add.is-html:hover{background:rgba(110,193,228,.14)}'
+		. '.gs-pv-add.is-site{margin-top:-64px;border-color:rgba(182,8,201,.45);background:rgba(182,8,201,.06);color:#e08af0}'
+		. '.gs-pv-add.is-site:hover{background:rgba(182,8,201,.14)}'
 		. '.gs-lh-hint{margin:0 0 6px;padding:8px 12px;border-radius:10px;background:rgba(110,193,228,.1);color:#9fd6ee;font:500 12px/1.4 system-ui,sans-serif}'
 		. '.gs-lh-loading{padding:18px;color:#8a94a6;font:500 13px system-ui,sans-serif}'
 		. '.gs-lh-frame{width:100%;min-height:520px;border:0;border-radius:14px;background:#0b0e14}';

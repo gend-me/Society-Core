@@ -40,6 +40,11 @@ function gend_society_ds_layouts() {
 			// The wall built from its parts (inc/activity-blocks.php), else the page as it is.
 			'content' => function_exists( 'gend_society_ab_default_layout' ) ? gend_society_ab_default_layout() : '<!-- wp:gend-society/original-content /-->',
 		),
+		// The profile's right sidebar, built from Profile Widget blocks (today's widgets, in order).
+		'profile-sidebar'   => array(
+			'label'   => __( 'Profile sidebar', 'gend-society' ),
+			'content' => function_exists( 'gend_society_pw_default_sidebar' ) ? gend_society_pw_default_sidebar() : '',
+		),
 		// The group's activity tab (Feed), built from the activity wall blocks.
 		'group-feed'        => array(
 			'label'   => __( 'Group feed', 'gend-society' ),
@@ -230,6 +235,13 @@ function gend_society_ds_register() {
 function gend_society_ds_layout( $slug ) {
 	static $cache = array();
 	if ( array_key_exists( $slug, $cache ) ) {
+		return $cache[ $slug ];
+	}
+	// Editors can see a draft layout on the real page: ?gs_layout_preview=<layout id>.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+	$preview = isset( $_GET['gs_layout_preview'] ) ? absint( $_GET['gs_layout_preview'] ) : 0;
+	if ( $preview && current_user_can( 'edit_theme_options' ) && 'gdc_bp_layout' === get_post_type( $preview ) && (string) get_post_meta( $preview, '_gdc_layout_slug', true ) === $slug ) {
+		$cache[ $slug ] = get_post( $preview );
 		return $cache[ $slug ];
 	}
 	$posts = get_posts(
