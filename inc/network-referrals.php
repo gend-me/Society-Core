@@ -351,7 +351,7 @@ function gend_society_nr_resolve_store_order($resolved, $order)
     if (!gend_society_nr_is_hub_main() || !function_exists('aas_payout_resolve_program') || !$order) return $resolved;
     $uid = (int) $order->get_user_id();
     $ref = $uid ? (int) get_user_meta($uid, 'referrer_id', true) : 0;
-    if ($ref) {
+    if ($ref && $ref !== $uid && get_userdata($ref)) { // Security 2026-10-18: never the buyer themself.
         return array('ref' => $ref, 'program' => aas_payout_resolve_program(get_user_meta($uid, 'referrer_program_id', true)));
     }
     foreach (array('_gdc_nr_ref', '_aas_checkout_referrer_id') as $k) {
@@ -360,6 +360,8 @@ function gend_society_nr_resolve_store_order($resolved, $order)
     }
     $owner = gend_society_nr_site_owner((int) $order->get_meta('_gdc_nr_from_site', true));
     if ($owner && $owner !== $uid) return array('ref' => $owner, 'program' => aas_payout_resolve_program(''));
+    // Security 2026-10-18: drop a self-referral coming from the sales-team resolver.
+    if ($uid && isset($resolved['ref']) && (int) $resolved['ref'] === $uid) $resolved['ref'] = 0;
     return $resolved;
 }
 
@@ -447,6 +449,8 @@ function gend_society_nr_wu_release_commissions()
         $payment = gend_society_nr_wu_payment((int) $pid);
         if (!$payment || $payment->get_meta('_aas_paid') === 'yes') continue;
         if (time() < (int) $payment->get_meta('_aas_payout_time')) { $remaining[] = (int) $pid; continue; }
+        // Security 2026-10-18: pay only if the plan payment is still completed (not refunded/cancelled).
+        if ($payment->get_status() !== 'completed') { $payment->update_meta('_aas_paid', 'void'); continue; }
         $program = aas_payout_resolve_program($payment->get_meta('_aas_referrer_program_id'));
         $pt   = $program ? $program['payout_point_type'] : 'mycred_default';
         $data = array('ref_type' => 'wu_payment', 'payment_id' => (int) $pid);

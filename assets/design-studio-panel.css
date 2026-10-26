@@ -1,0 +1,140 @@
+/* GenD Society - Design Studio: dark skin for the Group Styling builder
+   (Social Profiles' header templates, group pages and navigation panel) when it
+   is shown inside the studio. The panel forces white tables with
+   `html body .gdc-group-styling-admin ... !important`, so these rules add
+   body.gs-studio-embed to win. */
+
+html, body.gs-studio-embed, body.gs-studio-embed #wpwrap, body.gs-studio-embed #wpcontent, body.gs-studio-embed #wpbody-content {
+	background: #0b0e14 !important;
+}
+body.gs-studio-embed .gs-studio-panel {
+	margin: 0 !important;
+	padding: 28px 32px 160px;
+	color: #e8edf5;
+	font-size: 14px;
+}
+body.gs-studio-embed .gs-studio-panel h3 {
+	color: #e8edf5 !important;
+	font-size: 20px;
+	font-weight: 700;
+	margin: 28px 0 12px;
+	letter-spacing: -.01em;
+}
+body.gs-studio-embed .gs-studio-panel h3:first-of-type { margin-top: 8px; }
+body.gs-studio-embed .gs-studio-panel p,
+body.gs-studio-embed .gs-studio-panel label { color: #c6cfdf !important; }
+body.gs-studio-embed .gs-studio-panel .description { color: #8b98b0 !important; max-width: 70ch; }
+
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat {
+	max-width: none !important;
+	border: 1px solid rgba(255, 255, 255, .09) !important;
+	border-radius: 14px;
+	overflow: hidden;
+	background: rgba(255, 255, 255, .03) !important;
+	box-shadow: none !important;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat th,
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat td {
+	color: #e8edf5 !important;
+	background-color: transparent !important;
+	border-color: rgba(255, 255, 255, .07) !important;
+	padding: 12px 14px !important;
+	vertical-align: middle;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat thead th {
+	color: #8b98b0 !important;
+	font-size: 11px;
+	text-transform: uppercase;
+	letter-spacing: .08em;
+	border-bottom: 1px solid rgba(255, 255, 255, .09) !important;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat.striped > tbody > tr:nth-child(odd) > * {
+	background-color: rgba(255, 255, 255, .025) !important;
+}
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat tbody tr:hover > * {
+	background-color: rgba(255, 255, 255, .05) !important;
+}
+
+/* Inputs and selects */
+body.gs-studio-embed .gs-studio-panel input[type="text"],
+body.gs-studio-embed .gs-studio-panel input[type="number"],
+body.gs-studio-embed .gs-studio-panel select {
+	background: rgba(0, 0, 0, .28) !important;
+	color: #e8edf5 !important;
+	border: 1px solid rgba(255, 255, 255, .14) !important;
+	border-radius: 8px !important;
+	min-height: 34px;
+	box-shadow: none !important;
+}
+body.gs-studio-embed .gs-studio-panel input:focus,
+body.gs-studio-embed .gs-studio-panel select:focus {
+	border-color: #97e46e !important;
+	box-shadow: 0 0 0 3px rgba(151, 228, 110, .15) !important;
+}
+
+/* Buttons (outside the picker dialog, which keeps its own dark styling) */
+body.gs-studio-embed .gs-studio-panel .button:not(.gdc-gs-assign-picker-dialog .button) {
+	background: rgba(255, 255, 255, .08) !important;
+	color: #e8edf5 !important;
+	border: 1px solid rgba(255, 255, 255, .14) !important;
+	border-radius: 9px !important;
+	box-shadow: none !important;
+	min-height: 32px;
+	padding: 0 12px !important;
+}
+body.gs-studio-embed .gs-studio-panel .button:not(.gdc-gs-assign-picker-dialog .button):hover {
+	background: rgba(255, 255, 255, .14) !important;
+	border-color: rgba(255, 255, 255, .24) !important;
+}
+body.gs-studio-embed .gs-studio-panel .button-primary:not(.gdc-gs-assign-picker-dialog .button) {
+	background: #97e46e !important;
+	color: #0d1a06 !important;
+	border-color: transparent !important;
+	font-weight: 600;
+}
+body.gs-studio-embed .gs-studio-panel .button-primary:not(.gdc-gs-assign-picker-dialog .button):hover { background: #a9ef83 !important; }
+body.gs-studio-embed .gs-studio-panel .button-link-delete:not(.gdc-gs-assign-picker-dialog .button) {
+	color: #ff8a8a !important;
+	border-color: rgba(255, 107, 107, .35) !important;
+	background: transparent !important;
+}
+body.gs-studio-embed .gs-studio-panel a { color: #97e46e; }
+body.gs-studio-embed .gs-studio-panel em { color: #8b98b0; }
+body.gs-studio-embed .gs-studio-panel code { background: rgba(255, 255, 255, .08); color: #e8edf5; border-radius: 4px; }
+
+body.gs-studio-embed ::-webkit-scrollbar { width: 8px; height: 8px; }
+body.gs-studio-embed ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 4px; }
+
+/* WordPress core stripes the rows themselves (.striped > tbody > :nth-child(odd)). */
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat > tbody > tr,
+html body.gs-studio-embed #wpbody-content .gs-studio-panel .gdc-group-styling-admin table.widefat > thead > tr {
+	background-color: transparent !important;
+}
+
+/* ── Profile Styling builder (assets/profile-styling-admin.js) ───────── */
+body.gs-studio-embed #gs-ps-root section { margin-bottom: 40px; }
+body.gs-studio-embed #gs-ps-root table.widefat { border: 1px solid rgba(255, 255, 255, .09); border-radius: 14px; overflow: hidden; background: rgba(255, 255, 255, .03); box-shadow: none; }
+body.gs-studio-embed #gs-ps-root table.widefat > thead > tr, body.gs-studio-embed #gs-ps-root table.widefat > tbody > tr { background: transparent !important; }
+body.gs-studio-embed #gs-ps-root table.widefat th, body.gs-studio-embed #gs-ps-root table.widefat td { color: #e8edf5; background: transparent !important; border-color: rgba(255, 255, 255, .07); padding: 12px 14px; vertical-align: middle; }
+body.gs-studio-embed #gs-ps-root table.widefat thead th { color: #8b98b0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+body.gs-studio-embed #gs-ps-root table.widefat > tbody > tr:nth-child(odd) > * { background: rgba(255, 255, 255, .025) !important; }
+body.gs-studio-embed #gs-ps-root .gs-ps-actions, body.gs-studio-embed #gs-ps-root .gs-ps-order { white-space: nowrap; text-align: right; }
+body.gs-studio-embed #gs-ps-root .gs-ps-actions .button, body.gs-studio-embed #gs-ps-root .gs-ps-order .button { margin-left: 6px; }
+body.gs-studio-embed #gs-ps-root .gs-ps-layouts { display: flex; flex-direction: column; gap: 8px; align-items: flex-start; }
+body.gs-studio-embed #gs-ps-root .gs-ps-layout { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; }
+body.gs-studio-embed #gs-ps-root .gs-ps-layout > span { color: #c6cfdf; font-size: 12px; margin-right: 6px; }
+body.gs-studio-embed #gs-ps-root .gs-ps-row { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 14px; }
+body.gs-studio-embed .gs-ps-msg { color: #97e46e; font-size: 13px; }
+body.gs-studio-embed .gs-ps-msg.is-bad { color: #ff8a8a; }
+body.gs-studio-embed .gs-ps-modal-wrap { position: fixed; inset: 0; z-index: 100000; display: grid; place-items: center; padding: 16px; background: rgba(2, 6, 23, .72); backdrop-filter: blur(4px); }
+body.gs-studio-embed .gs-ps-modal { width: min(520px, 100%); max-height: calc(100vh - 40px); overflow: auto; padding: 24px; border-radius: 16px; color: #e8edf5; background: linear-gradient(165deg, rgba(15, 23, 42, .98), rgba(11, 17, 32, .98)); border: 1px solid rgba(255, 255, 255, .14); box-shadow: 0 30px 80px rgba(0, 0, 0, .5); }
+body.gs-studio-embed .gs-ps-modal h3 { margin: 0 0 14px; color: #f1f5f9; }
+body.gs-studio-embed .gs-ps-modal h4 { margin: 16px 0 8px; color: #8b98b0; font-size: 11px; text-transform: uppercase; letter-spacing: .08em; }
+body.gs-studio-embed .gs-ps-modal input[type="text"] { width: 100%; background: rgba(0, 0, 0, .28); color: #e8edf5; border: 1px solid rgba(255, 255, 255, .14); border-radius: 8px; min-height: 36px; }
+body.gs-studio-embed .gs-ps-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(180px, 1fr)); gap: 6px; }
+body.gs-studio-embed .gs-ps-check { display: flex; align-items: center; gap: 6px; color: #e8edf5 !important; }
+body.gs-studio-embed .gs-ps-modal-actions { display: flex; justify-content: flex-end; align-items: center; gap: 8px; margin-top: 20px; }
+body.gs-studio-embed .gs-ps-modal-actions .gs-ps-msg { margin-right: auto; }
+body.gs-studio-embed .gs-ps-modal .button { background: rgba(255, 255, 255, .08); color: #e8edf5; border: 1px solid rgba(255, 255, 255, .14); border-radius: 9px; }
+body.gs-studio-embed .gs-ps-modal .button-primary { background: #97e46e; color: #0d1a06; border-color: transparent; font-weight: 600; }
+body.gs-studio-embed .gs-ps-modal .button-primary.is-danger { background: #ff6b6b; color: #fff; }

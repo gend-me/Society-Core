@@ -401,8 +401,11 @@ add_action( 'wp_ajax_gend_society_portfolio_remove', function () {
 // edit_others_posts) — and only on the post editor screens, the core editor REST routes and the editor's AJAX actions.
 const GEND_SOCIETY_MEMBER_POST_COOKIE = 'gs_member_post';
 
-function gend_society_member_post_token( $uid, $exp ) {
-    return $uid . '|' . $exp . '|' . hash_hmac( 'sha256', 'gs_member_post|' . $uid . '|' . $exp, wp_salt( 'auth' ) );
+function gend_society_member_post_token( $uid, $exp, $blog_id = 0 ) {
+    // Security 2026-10-18: the signature covers the blog the session was issued on (the salt is
+    // network-wide and the cookie is sent to every sub-site), so it only works on that blog.
+    $blog_id = $blog_id ? (int) $blog_id : (int) get_current_blog_id();
+    return $uid . '|' . $exp . '|' . hash_hmac( 'sha256', 'gs_member_post|' . $uid . '|' . $exp . '|' . $blog_id, wp_salt( 'auth' ) );
 }
 
 function gend_society_member_post_session( $uid ) {
@@ -422,10 +425,34 @@ function gend_society_member_post_context() {
             'set-post-thumbnail', 'meta-box-order', 'closed-postboxes', 'parse-embed', 'oembed-cache', 'wp-link-ajax' ), true );
     }
     if ( is_admin() ) return in_array( $pagenow, array( 'post.php', 'post-new.php', 'async-upload.php', 'media-upload.php' ), true );
-    $uri = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
-    foreach ( array( '/wp/v2/', '/wp-block-editor/v1/', '/oembed/1.0/' ) as $route ) {
-        if ( strpos( $uri, '/wp-json' . $route ) !== false || strpos( $uri, 'rest_route=' . rawurlencode( $route ) ) !== false || strpos( $uri, 'rest_route=' . $route ) !== false ) return true;
+    // Security 2026-10-18: only the REST routes the post editor needs: posts + media (read/write) and
+    // a few read-only lookups. Previously every /wp/v2/ and /wp-block-editor/v1/ route matched.
+    $uri   = isset( $_SERVER['REQUEST_URI'] ) ? (string) wp_unslash( $_SERVER['REQUEST_URI'] ) : '';
+    $route = '';
+    if ( isset( $_GET['rest_route'] ) ) {
+        $route = (string) wp_unslash( $_GET['rest_route'] );
+    } elseif ( ( $p = strpos( $uri, '/wp-json/' ) ) !== false ) {
+        $route = substr( $uri, $p + 8 );
+        $q     = strpos( $route, '?' );
+        if ( $q !== false ) $route = substr( $route, 0, $q );
+        $route = rawurldecode( $route );
     }
+    if ( $route === '' ) return false;
+    $route  = '/' . ltrim( $route, '/' );
+    $method = isset( $_GET['_method'] ) ? (string) $_GET['_method']
+        : ( isset( $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] ) ? (string) $_SERVER['HTTP_X_HTTP_METHOD_OVERRIDE'] : ( isset( $_SERVER['REQUEST_METHOD'] ) ? (string) $_SERVER['REQUEST_METHOD'] : 'GET' ) );
+    $method = strtoupper( $method );
+    $match  = function ( $prefixes ) use ( $route ) {
+        foreach ( $prefixes as $pre ) {
+            if ( $route === $pre || strpos( $route, $pre . '/' ) === 0 ) return true;
+        }
+        return false;
+    };
+    if ( $match( array( '/wp/v2/posts', '/wp/v2/media' ) ) ) return true;
+    if ( in_array( $method, array( 'GET', 'HEAD', 'OPTIONS' ), true ) && $match( array(
+        '/wp/v2/types', '/wp/v2/taxonomies', '/wp/v2/categories', '/wp/v2/tags', '/wp/v2/users/me', '/wp/v2/statuses',
+        '/wp/v2/themes', '/wp/v2/block-types', '/wp/v2/block-patterns', '/wp/v2/global-styles', '/wp/v2/search', '/oembed/1.0',
+    ) ) ) return true;
     return false;
 }
 

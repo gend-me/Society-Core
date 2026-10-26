@@ -344,7 +344,10 @@ class Gend_Society_AI_Proxy {
         if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $clean, $m ) ) {
             $body = json_decode( $m[1], true );
         }
-        error_log( '[GS OAuth DIAG] LOCAL token endpoint HTTP ' . $status . ' body=' . substr( $clean, 0, 400 ) );
+        // Security 2026-10-18: never log the token response body (it holds access and refresh tokens).
+        if ( $status !== 200 ) {
+            error_log( '[GS OAuth DIAG] LOCAL token endpoint HTTP ' . $status . ' error=' . ( is_array( $body ) ? (string) ( $body['error'] ?? '' ) : '' ) );
+        }
 
         if ( $status !== 200 || empty( $body['access_token'] ) ) {
             return new WP_REST_Response( array(
