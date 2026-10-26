@@ -274,6 +274,12 @@ return array(
 			'note'  => 'Live previews of Social templates in the block editor (?gs_studio_view= parts, live CSS in the canvas).',
 		),
 		array(
+			'file'  => 'inc/live-html.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Live HTML: Social template blocks convert to Custom HTML with {{tokens}} filled per group / member (live parts stay live).',
+		),
+		array(
 			'file'  => 'inc/member-calendar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),

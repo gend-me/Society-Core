@@ -148,6 +148,194 @@
 			wp.data.dispatch( 'core/editor' ).setIsInserterOpened( { rootClientId: undefined, insertionIndex: count } );
 		} );
 		root.parentNode.insertBefore( btn, root.nextSibling );
+		var html = doc.createElement( 'button' );
+		html.type = 'button';
+		html.className = 'gs-pv-add is-html';
+		html.textContent = '</> ' + __( 'Edit page as HTML', 'gend-society' );
+		html.addEventListener( 'click', function () {
+			convertPage( 'text' );
+		} );
+		btn.parentNode.insertBefore( html, btn.nextSibling );
+	}
+
+	// ── 4. Edit as HTML ───────────────────────────────────────────────────
+	// Server-rendered blocks store no HTML (the code editor only shows their
+	// block comments). Converting one gives a Custom HTML block with its real
+	// markup and {{tokens}} for each group's / member's own values; parts
+	// that run code stay live (data-gs-live-part / data-gs-live-block).
+	var LIVE_PREFIX = /^(gdc-blocks|gend-society)\//;
+	function convertible( block ) {
+		return LIVE_PREFIX.test( block.name ) && ! ( block.innerBlocks && block.innerBlocks.length );
+	}
+	function collect( blocks, out ) {
+		( blocks || [] ).forEach( function ( b ) {
+			if ( convertible( b ) ) {
+				out.push( b );
+			} else {
+				collect( b.innerBlocks, out );
+			}
+		} );
+		return out;
+	}
+	function editorMode() {
+		var ed = wp.data.select( 'core/editor' );
+		if ( ed && ed.getEditorMode ) {
+			return ed.getEditorMode();
+		}
+		var ep = wp.data.select( 'core/edit-post' );
+		return ep && ep.getEditorMode ? ep.getEditorMode() : 'visual';
+	}
+	function switchMode( mode ) {
+		var ed = wp.data.dispatch( 'core/editor' );
+		if ( ed && ed.switchEditorMode ) {
+			ed.switchEditorMode( mode );
+		} else if ( wp.data.dispatch( 'core/edit-post' ) ) {
+			wp.data.dispatch( 'core/edit-post' ).switchEditorMode( mode );
+		}
+	}
+	function notify( msg, type ) {
+		var n = wp.data.dispatch( 'core/notices' );
+		if ( n ) {
+			n.createNotice( type || 'success', msg, { type: 'snackbar', isDismissible: true } );
+		}
+	}
+	function convertBlocks( blocks, thenMode ) {
+		var back = editorMode();
+		if ( ! blocks.length ) {
+			if ( thenMode ) {
+				switchMode( thenMode );
+			}
+			return Promise.resolve( 0 );
+		}
+		if ( back !== 'visual' ) {
+			switchMode( 'visual' );
+		}
+		return wp.apiFetch( { path: '/gend-society/v1/live-html/convert', method: 'POST', data: { blocks: blocks.map( function ( b ) {
+			return { name: b.name, attributes: b.attributes };
+		} ) } } ).then( function ( res ) {
+			var be = wp.data.dispatch( 'core/block-editor' );
+			var live = 0;
+			blocks.forEach( function ( b, i ) {
+				var r = res[ i ];
+				if ( r && r.html ) {
+					live += r.live ? 1 : 0;
+					be.replaceBlock( b.clientId, wp.blocks.createBlock( 'core/html', { content: r.html } ) );
+				}
+			} );
+			switchMode( thenMode || back );
+			notify( live
+				? __( 'Converted to HTML. App and feed sections stay live (data-gs-live-block): their content comes from the app itself.', 'gend-society' )
+				: __( 'Converted to HTML. {{tokens}} fill in each group’s or member’s own details.', 'gend-society' ) );
+			return blocks.length;
+		} ).catch( function ( e ) {
+			switchMode( back );
+			notify( ( e && e.message ) || __( 'Could not convert.', 'gend-society' ), 'error' );
+		} );
+	}
+	function convertPage( thenMode ) {
+		return convertBlocks( collect( wp.data.select( 'core/block-editor' ).getBlocks(), [] ), thenMode );
+	}
+
+	function HtmlPreview( props ) {
+		var state = wp.element.useState( null );
+		var html = state[ 0 ];
+		var setHtml = state[ 1 ];
+		wp.element.useEffect( function () {
+			var stop = false;
+			var t = setTimeout( function () {
+				wp.apiFetch( { path: '/gend-society/v1/live-html/render', method: 'POST', data: { html: props.content, postId: wp.data.select( 'core/editor' ).getCurrentPostId() } } ).then( function ( r ) {
+					if ( ! stop ) {
+						setHtml( r.html );
+					}
+				} ).catch( function () {
+					if ( ! stop ) {
+						setHtml( '' );
+					}
+				} );
+			}, 250 );
+			return function () {
+				stop = true;
+				clearTimeout( t );
+			};
+		}, [ props.content ] );
+		var blockProps = wp.blockEditor.useBlockProps( { className: 'gs-lh-preview' } );
+		return el( 'div', blockProps, html === null
+			? el( 'div', { className: 'gs-lh-loading' }, __( 'Rendering…', 'gend-society' ) )
+			: el( 'div', { dangerouslySetInnerHTML: { __html: html } } ) );
+	}
+
+	wp.hooks.addFilter( 'editor.BlockEdit', 'gend-society/studio-live-html', wp.compose.createHigherOrderComponent( function ( BlockEdit ) {
+		return function ( props ) {
+			if ( props.name === 'core/html' && /\{\{|data-gs-live-/.test( props.attributes.content || '' ) ) {
+				return props.isSelected
+					? el( wp.element.Fragment, null,
+						el( 'div', { className: 'gs-lh-hint' }, __( 'Live HTML: {{tokens}} fill in each group’s or member’s details; data-gs-live parts stay live. Click outside the block to preview it.', 'gend-society' ) ),
+						el( BlockEdit, props ) )
+					: el( HtmlPreview, { content: props.attributes.content } );
+			}
+			if ( ! props.isSelected || ! LIVE_PREFIX.test( props.name ) ) {
+				return el( BlockEdit, props );
+			}
+			var block = wp.data.select( 'core/block-editor' ).getBlock( props.clientId );
+			if ( ! block || ! convertible( block ) ) {
+				return el( BlockEdit, props );
+			}
+			return el( wp.element.Fragment, null,
+				el( BlockEdit, props ),
+				el( wp.blockEditor.BlockControls, { group: 'other' },
+					el( wp.components.ToolbarButton, { icon: 'html', label: __( 'Edit as HTML', 'gend-society' ), onClick: function () {
+						convertBlocks( [ wp.data.select( 'core/block-editor' ).getBlock( props.clientId ) ] );
+					} }, __( 'Edit as HTML', 'gend-society' ) ) )
+			);
+		};
+	}, 'withGsLiveHtml' ) );
+
+	// The code editor: say why server-rendered sections show no HTML, and convert them.
+	var TOKENS_HELP = '{{group.name}} {{group.excerpt}} {{group.description}} {{group.url}} {{group.admin_url}} {{group.avatar}} {{group.initial}} {{group.status_label}} {{group.status_color}} {{group.members}} {{group.last_active}} {{app.name}} {{app.url}} {{app.connect_url}} {{pm.name}} {{pm.url}} {{pm.avatar}} {{proposal.title}} {{proposal.url}} {{member.name}} {{member.username}} {{member.url}} {{member.avatar}} {{member.cover}} {{member.type}} {{member.bio_html}} {{site.name}} {{site.url}} {{user.name}}';
+	var FLAGS_HELP = '{{#if pm.id}} … {{else}} … {{/if}}   {{#unless app.connected}} … {{/unless}}   — can.manage, app.connected, pm.can_chat, invest.active, group.is_current, member.is_me, user.logged_in';
+	function ensureCodeBanner() {
+		var box = document.querySelector( '.editor-text-editor' );
+		var banner = document.querySelector( '.gs-lh-banner' );
+		if ( ! box ) {
+			if ( banner ) {
+				banner.remove();
+			}
+			return;
+		}
+		var count = collect( wp.data.select( 'core/block-editor' ).getBlocks(), [] ).length;
+		if ( banner ) {
+			banner.querySelector( '.gs-lh-count' ).textContent = count ? String( count ) : '';
+			banner.classList.toggle( 'is-done', ! count );
+			return;
+		}
+		banner = document.createElement( 'div' );
+		banner.className = 'gs-lh-banner' + ( count ? '' : ' is-done' );
+		var p = document.createElement( 'p' );
+		var strong = document.createElement( 'strong' );
+		strong.className = 'gs-lh-count';
+		strong.textContent = count ? String( count ) : '';
+		p.appendChild( strong );
+		p.appendChild( document.createTextNode( ' ' + __( 'section(s) here are built on the server, so they store no HTML, only a block comment. Convert them to see and edit their real HTML.', 'gend-society' ) ) );
+		var btn = document.createElement( 'button' );
+		btn.type = 'button';
+		btn.className = 'gs-lh-btn';
+		btn.textContent = __( 'Convert to editable HTML', 'gend-society' );
+		btn.addEventListener( 'click', function () {
+			btn.disabled = true;
+			convertPage( 'text' ).then( function () {
+				btn.disabled = false;
+			} );
+		} );
+		var help = document.createElement( 'details' );
+		var sum = document.createElement( 'summary' );
+		sum.textContent = __( 'Tokens you can use in HTML', 'gend-society' );
+		help.appendChild( sum );
+		help.appendChild( document.createElement( 'code' ) ).textContent = TOKENS_HELP;
+		help.appendChild( document.createElement( 'code' ) ).textContent = FLAGS_HELP;
+		banner.appendChild( p );
+		banner.appendChild( btn );
+		banner.appendChild( help );
+		box.parentNode.insertBefore( banner, box );
 	}
 
 	wp.domReady( function () {
@@ -158,6 +346,7 @@
 				window.requestAnimationFrame( function () {
 					addQueued = false;
 					ensureAddButton();
+					ensureCodeBanner();
 				} );
 			}
 		} ).observe( document.body, { childList: true, subtree: true } );
