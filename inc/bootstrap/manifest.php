@@ -86,6 +86,12 @@ return array(
 			'note'  => 'Design Studio: replaces the Site Editor landing screen; live style preview endpoint + style-guide page.',
 		),
 		array(
+			'file'  => 'inc/page-heading.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Page basics: a visually hidden H1 with the page title when a page renders without one; the bare permalink base (e.g. /society/) goes to the blog page.',
+		),
+		array(
 			'file'  => 'inc/site-sidebars.php',
 			'tier'  => 'core',
 			'needs' => array(),
