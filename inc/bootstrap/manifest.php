@@ -262,6 +262,12 @@ return array(
 			'note'  => 'Directory Styling: block layouts for the members / groups directories and the activity feed (published layouts only).',
 		),
 		array(
+			'file'  => 'inc/youzify-assets.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Youzify styling control: stops Youzify front-end CSS where block layouts replaced it, or per area (scripts keep loading).',
+		),
+		array(
 			'file'  => 'inc/member-calendar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),

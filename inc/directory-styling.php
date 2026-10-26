@@ -170,6 +170,10 @@ function gend_society_ds_register() {
  * @return WP_Post|null
  */
 function gend_society_ds_layout( $slug ) {
+	static $cache = array();
+	if ( array_key_exists( $slug, $cache ) ) {
+		return $cache[ $slug ];
+	}
 	$posts = get_posts(
 		array(
 			'post_type'      => 'gdc_bp_layout',
@@ -183,7 +187,8 @@ function gend_society_ds_layout( $slug ) {
 			'meta_value'     => $slug, // phpcs:ignore WordPress.DB.SlowDBQuery.slow_db_query_meta_value
 		)
 	);
-	return $posts ? $posts[0] : null;
+	$cache[ $slug ] = $posts ? $posts[0] : null;
+	return $cache[ $slug ];
 }
 
 /**

@@ -372,6 +372,13 @@ function gend_society_studio_sections() {
 						array( 'id' => 'activity-reactions', 'label' => __( 'Activity Reactions', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-extensions-settings', 'activity-reactions' ) ),
 					),
 				),
+				array(
+					'label'  => __( 'Styling', 'gend-society' ),
+					'active' => function_exists( 'gend_society_yz_rest_get' ),
+					'items'  => array(
+						array( 'id' => 'youzify-styles', 'label' => __( 'Youzify Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'youzify' ),
+					),
+				),
 			),
 		),
 		array(

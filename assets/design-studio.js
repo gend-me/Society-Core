@@ -830,6 +830,9 @@
 		if ( p === 'palettes' ) {
 			return panelPalettes( hit );
 		}
+		if ( p === 'youzify' ) {
+			return panelYouzify( hit );
+		}
 		return panelTypography( hit );
 	}
 
@@ -1061,6 +1064,45 @@
 		} ) );
 		var controls = h( 'div', { class: 'gs-st-stack' }, h( 'h3', { class: 'gs-st-h3' }, __( 'Schemes', 'gend-society' ) ), grid, h( 'h3', { class: 'gs-st-h3' }, __( 'Fine-tune your palette', 'gend-society' ) ), editor );
 		return panelLayout( hit, __( 'Pick a scheme to restyle the whole site at once, then fine-tune any colour. Nothing goes live until you save.', 'gend-society' ), controls );
+	}
+
+	/* ── Youzify styling: per-area switch for Youzify's front-end CSS ───── */
+	function panelYouzify( hit ) {
+		var wrap = h( 'div', { class: 'gs-st-pad' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ),
+			h( 'p', { class: 'gs-st-intro' }, __( 'Youzify’s stylesheets fight the theme. Switch them off area by area as block layouts replace each page; its features (posting, reactions, media) keep working because its scripts still load. Auto turns them off wherever a published block layout fully replaces the page.', 'gend-society' ) ) );
+		var list = h( 'div', { class: 'gs-st-yz-list' }, loadingView() );
+		wrap.appendChild( list );
+		var draw = function ( areas ) {
+			list.textContent = '';
+			areas.forEach( function ( a ) {
+				var seg = function ( mode, label ) {
+					return h( 'button', { type: 'button', class: 'gs-st-seg' + ( a.mode === mode ? ' is-on' : '' ), 'aria-pressed': a.mode === mode ? 'true' : 'false', onclick: function () {
+						api( { path: '/gend-society/v1/youzify-styles', method: 'POST', data: { area: a.slug, mode: mode } } ).then( function ( r ) {
+							draw( r );
+							toast( __( 'Saved. Reload the page to see it.', 'gend-society' ), 'ok' );
+						}, function ( e ) {
+							toast( errMsg( e ), 'error' );
+						} );
+					} }, label );
+				};
+				var state = a.loads ? __( 'Youzify styles load here', 'gend-society' ) : __( 'Youzify styles are off here', 'gend-society' );
+				list.appendChild( h( 'div', { class: 'gs-st-card gs-st-yz' },
+					h( 'div', { class: 'gs-st-yz-head' },
+						h( 'strong', null, a.label ),
+						h( 'span', { class: 'gs-st-badge ' + ( a.loads ? 'is-missing' : 'is-custom' ) }, state )
+					),
+					h( 'p', { class: 'gs-st-hint' }, a.replaced ? __( 'A published block layout replaces this page, so Auto keeps Youzify off.', 'gend-society' ) : __( 'This page still shows Youzify’s own markup. Switching its styles off will make that part look plain until a block layout replaces it.', 'gend-society' ) ),
+					h( 'div', { class: 'gs-st-row' },
+						h( 'div', { class: 'gs-st-segs' }, seg( 'auto', __( 'Auto', 'gend-society' ) ), seg( 'off', __( 'Off', 'gend-society' ) ), seg( 'on', __( 'On', 'gend-society' ) ) ),
+						a.url ? h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: a.url, target: '_blank', rel: 'noopener' }, icon( 'external' ), __( 'Check the page', 'gend-society' ) ) : null
+					)
+				) );
+			} );
+		};
+		api( { path: '/gend-society/v1/youzify-styles' } ).then( draw, function ( e ) {
+			list.textContent = errMsg( e );
+		} );
+		return wrap;
 	}
 
 	/* ── Typography: one panel for every text style, with Google Fonts ─── */

@@ -530,3 +530,9 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 	.gs-st-font-cols { grid-template-columns: 1fr; }
 	.gs-st-font-list { max-height: 30vh; }
 }
+
+/* Youzify styling panel */
+.gs-st-yz-list { display: grid; grid-template-columns: repeat(auto-fill, minmax(320px, 1fr)); gap: 14px; max-width: 1100px; }
+.gs-st-yz { display: flex; flex-direction: column; gap: 12px; }
+.gs-st-yz-head { display: flex; justify-content: space-between; align-items: center; gap: 10px; }
+.gs-st-yz-head strong { font-size: 16px; }
