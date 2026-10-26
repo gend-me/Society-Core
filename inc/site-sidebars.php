@@ -342,13 +342,16 @@ function gend_society_sb_sample_url( $area ) {
 		case 'community':
 			return function_exists( 'bp_get_members_directory_permalink' ) ? (string) bp_get_members_directory_permalink() : '';
 	}
+	// The static front page when there is one, else the latest page.
+	$front = (int) get_option( 'page_on_front' );
+	if ( $front && 'publish' === get_post_status( $front ) ) {
+		return (string) get_permalink( $front );
+	}
 	$page = get_posts(
 		array(
 			'post_type'   => 'page',
 			'numberposts' => 1,
 			'fields'      => 'ids',
-			'orderby'     => 'menu_order',
-			'order'       => 'ASC',
 		)
 	);
 	return $page ? (string) get_permalink( $page[0] ) : home_url( '/' );
