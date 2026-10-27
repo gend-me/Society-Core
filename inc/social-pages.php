@@ -594,6 +594,134 @@ function gend_society_sp_menu( $scope ) {
 	return $rows;
 }
 
+/* ── Profile not found page ─────────────────────────────────────────────── */
+
+/**
+ * Whether this request is a members address with no member behind it
+ * (e.g. /members/<unknown>/), which the theme answers with its 404 page.
+ *
+ * @return bool
+ */
+function gend_society_sp_is_missing_profile() {
+	if ( ! is_404() || ! function_exists( 'bp_get_members_slug' ) || empty( $GLOBALS['wp'] ) ) {
+		return false;
+	}
+	$slug = bp_get_members_slug();
+	$path = trim( (string) $GLOBALS['wp']->request, '/' );
+	return $path !== $slug && 0 === strpos( $path . '/', $slug . '/' );
+}
+
+/**
+ * The "profile not found" card, from the Profile Pages › Profile not found
+ * page settings (Youzify's options), falling back to the default photos.
+ *
+ * @return string
+ */
+function gend_society_sp_missing_profile_html() {
+	$nf     = gend_society_sp_not_found();
+	$nf     = is_array( $nf ) ? $nf : array();
+	$photos = gend_society_sp_photos( 'profiles' );
+	$photos = is_array( $photos ) ? $photos : array();
+	$cover  = ! empty( $nf['cover'] ) ? $nf['cover'] : ( isset( $photos['cover'] ) ? $photos['cover'] : '' );
+	$photo  = ! empty( $nf['photo'] ) ? $nf['photo'] : ( isset( $photos['avatar'] ) ? $photos['avatar'] : '' );
+	$desc   = ! empty( $nf['desc'] ) ? $nf['desc'] : __( 'We’re sorry, the profile you’re looking for cannot be found.', 'gend-society' );
+	$button = ! empty( $nf['button'] ) ? $nf['button'] : __( 'Go Back Home', 'gend-society' );
+	$dir    = function_exists( 'bp_get_members_directory_permalink' ) ? bp_get_members_directory_permalink() : '';
+
+	$html  = '<main class="gs-nf-profile" id="main">';
+	$html .= '<div class="gs-nf-card">';
+	$html .= '<div class="gs-nf-cover"' . ( $cover ? ' style="background-image:url(&quot;' . esc_url( $cover ) . '&quot;)"' : '' ) . '></div>';
+	$html .= '<div class="gs-nf-body">';
+	$html .= '<div class="gs-nf-photo">' . ( $photo ? '<img src="' . esc_url( $photo ) . '" alt="" width="128" height="128" loading="eager" decoding="async">' : '' ) . '</div>';
+	$html .= '<p class="gs-nf-code">404</p>';
+	$html .= '<h1 class="gs-nf-title">' . esc_html__( 'Profile not found', 'gend-society' ) . '</h1>';
+	$html .= '<p class="gs-nf-desc">' . nl2br( esc_html( $desc ) ) . '</p>';
+	$html .= '<div class="gs-nf-actions"><a class="gs-nf-btn" href="' . esc_url( home_url( '/' ) ) . '">' . esc_html( $button ) . '</a>';
+	if ( $dir ) {
+		$html .= '<a class="gs-nf-btn is-ghost" href="' . esc_url( $dir ) . '">' . esc_html__( 'Browse members', 'gend-society' ) . '</a>';
+	}
+	$html .= '</div></div></div></main>';
+	return $html;
+}
+
+add_filter( 'template_include', 'gend_society_sp_missing_profile_template', 999 );
+/**
+ * A missing member gets the "profile not found" card inside the theme's own
+ * 404 page (header and footer kept, 404 status kept). Runs before the site
+ * sidebars (1000) so they still wrap it.
+ *
+ * @param string $template Template file.
+ * @return string
+ */
+function gend_society_sp_missing_profile_template( $template ) {
+	global $_wp_current_template_content;
+	if ( empty( $_wp_current_template_content ) || ! gend_society_sp_is_missing_profile() ) {
+		return $template;
+	}
+	$blocks = parse_blocks( $_wp_current_template_content );
+	$is_part = function ( $b, $area ) {
+		return function_exists( 'gend_society_sb_is_frame_part' ) ? gend_society_sb_is_frame_part( $b, $area ) : ( 'core/template-part' === $b['blockName'] && isset( $b['attrs']['slug'] ) && false !== strpos( $b['attrs']['slug'], $area ) );
+	};
+	$n     = count( $blocks );
+	$start = 0;
+	$end   = $n;
+	while ( $start < $n && ( empty( $blocks[ $start ]['blockName'] ) ? '' === trim( $blocks[ $start ]['innerHTML'] ) : $is_part( $blocks[ $start ], 'header' ) ) ) {
+		++$start;
+	}
+	while ( $end > $start && ( empty( $blocks[ $end - 1 ]['blockName'] ) ? '' === trim( $blocks[ $end - 1 ]['innerHTML'] ) : $is_part( $blocks[ $end - 1 ], 'footer' ) ) ) {
+		--$end;
+	}
+	$_wp_current_template_content = serialize_blocks( array_slice( $blocks, 0, $start ) ) // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- core global: the block template about to render.
+		. gend_society_sp_missing_profile_html()
+		. serialize_blocks( array_slice( $blocks, $end ) );
+	$GLOBALS['gend_society_sp_missing_profile'] = true;
+	add_filter( 'document_title_parts', 'gend_society_sp_missing_profile_title' );
+	return $template;
+}
+
+/**
+ * Page title for a missing member.
+ *
+ * @param array $parts Title parts.
+ * @return array
+ */
+function gend_society_sp_missing_profile_title( $parts ) {
+	$parts['title'] = __( 'Profile not found', 'gend-society' );
+	return $parts;
+}
+
+add_action( 'wp_enqueue_scripts', 'gend_society_sp_missing_profile_styles', 20 );
+/**
+ * Styles for the "profile not found" card (only on that page).
+ */
+function gend_society_sp_missing_profile_styles() {
+	if ( ! gend_society_sp_is_missing_profile() ) {
+		return;
+	}
+	wp_register_style( 'gend-society-missing-profile', false, array(), GEND_SOCIETY_VERSION );
+	wp_enqueue_style( 'gend-society-missing-profile' );
+	wp_add_inline_style(
+		'gend-society-missing-profile',
+		'.gs-nf-profile{box-sizing:border-box;width:100%;max-width:880px;margin:clamp(28px,6vw,72px) auto;padding:0 16px}'
+		. '.gs-nf-card{overflow:hidden;border:1px solid rgba(255,255,255,.12);border-radius:22px;background:linear-gradient(180deg,rgba(18,24,38,.96),rgba(10,14,24,.98));box-shadow:0 30px 80px rgba(0,0,0,.35);color:#e8edf5;text-align:center;animation:gs-nf-in .5s cubic-bezier(.2,.8,.2,1) both}'
+		. '.gs-nf-cover{height:clamp(140px,26vw,240px);background:linear-gradient(135deg,#1b2a44,#0d1524) center/cover no-repeat;position:relative}'
+		. '.gs-nf-cover::after{content:"";position:absolute;inset:0;background:linear-gradient(180deg,rgba(10,14,24,0) 40%,rgba(10,14,24,.9))}'
+		. '.gs-nf-body{position:relative;padding:0 clamp(20px,5vw,56px) clamp(28px,5vw,48px)}'
+		. '.gs-nf-photo{width:128px;height:128px;margin:-64px auto 14px;border-radius:50%;border:4px solid #0f1626;background:#1b2436;overflow:hidden;box-shadow:0 12px 30px rgba(0,0,0,.4);filter:grayscale(.35)}'
+		. '.gs-nf-photo img{display:block;width:100%;height:100%;object-fit:cover}'
+		. '.gs-nf-code{margin:0;font-size:12px;font-weight:700;letter-spacing:.3em;color:#6ec1e4}'
+		. '.gs-nf-title{margin:6px 0 10px;font-size:clamp(26px,4vw,38px);line-height:1.15;color:#fff}'
+		. '.gs-nf-desc{max-width:52ch;margin:0 auto 24px;font-size:16px;line-height:1.6;color:rgba(232,237,245,.78)}'
+		. '.gs-nf-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:10px}'
+		. '.gs-nf-btn{display:inline-flex;align-items:center;padding:12px 22px;border-radius:999px;font-weight:700;font-size:15px;text-decoration:none;color:#0b1220;background:linear-gradient(135deg,#97e46e,#6ec1e4);transition:transform .2s,box-shadow .2s}'
+		. '.gs-nf-btn:hover{transform:translateY(-1px);box-shadow:0 10px 26px rgba(110,193,228,.3);color:#0b1220}'
+		. '.gs-nf-btn.is-ghost{color:#e8edf5;background:transparent;border:1px solid rgba(255,255,255,.22)}'
+		. '.gs-nf-btn.is-ghost:hover{border-color:#6ec1e4;color:#fff;box-shadow:none}'
+		. '@keyframes gs-nf-in{from{opacity:0;transform:translateY(12px)}to{opacity:1;transform:none}}'
+		. '@media (prefers-reduced-motion:reduce){.gs-nf-card{animation:none}.gs-nf-btn{transition:none}}'
+	);
+}
+
 /* ── Menu icons ─────────────────────────────────────────────────────────── */
 
 /**
