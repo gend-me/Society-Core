@@ -481,7 +481,7 @@ function gend_society_sp_register_rest() {
 	);
 	register_rest_route(
 		'gend-society/v1',
-		'/social-pages/(?P<scope>groups|profiles)/(?P<action>menu|tab-layout|page|page-update|page-order|page-delete|sidebar|sidebar-default|sidebar-update|sidebar-delete|header|header-default|directory|photos)',
+		'/social-pages/(?P<scope>groups|profiles)/(?P<action>menu|tab-layout|page|page-update|page-order|page-delete|sidebar|sidebar-default|sidebar-update|sidebar-delete|header|header-default|directory|photos|card-stat)',
 		array(
 			'methods'             => 'POST',
 			'callback'            => 'gend_society_sp_rest_action',
@@ -783,8 +783,59 @@ function gend_society_sp_rest_state( WP_REST_Request $req ) {
 			),
 			'sampleUrl'  => $sample,
 			'photos'     => gend_society_sp_photos( $scope ),
+			'cardStats'  => gend_society_sp_card_stats( $scope ),
 		)
 	);
+}
+
+/**
+ * Directory card statistics switches. Youzify's own on/off options (the same
+ * ones its Groups / Members Directory settings edit); unset means on.
+ *
+ * @param string $scope groups|profiles.
+ * @return array Key => [title, description].
+ */
+function gend_society_sp_card_stat_keys( $scope ) {
+	if ( 'groups' === $scope ) {
+		return array(
+			'youzify_enable_gd_groups_statistics'         => array( __( 'Show statistics', 'gend-society' ), __( 'The numbers row on every group card. Off hides all of them.', 'gend-society' ) ),
+			'youzify_enable_gd_group_posts_statistics'    => array( __( 'Posts', 'gend-society' ), __( 'How many posts the group has.', 'gend-society' ) ),
+			'youzify_enable_gd_group_activity_statistics' => array( __( 'Activity', 'gend-society' ), __( 'When the group was last active.', 'gend-society' ) ),
+			'youzify_enable_gd_group_members_statistics'  => array( __( 'Members', 'gend-society' ), __( 'How many members the group has.', 'gend-society' ) ),
+		);
+	}
+	return array(
+		'youzify_enable_md_users_statistics'          => array( __( 'Show statistics', 'gend-society' ), __( 'The numbers row on every member card. Off hides all of them.', 'gend-society' ) ),
+		'youzify_enable_md_user_posts_statistics'     => array( __( 'Posts', 'gend-society' ), __( 'How many posts the member has written.', 'gend-society' ) ),
+		'youzify_enable_md_user_comments_statistics'  => array( __( 'Comments', 'gend-society' ), __( 'How many comments the member has left.', 'gend-society' ) ),
+		'youzify_enable_md_user_views_statistics'     => array( __( 'Profile views', 'gend-society' ), __( 'How often the profile has been viewed.', 'gend-society' ) ),
+		'youzify_enable_md_user_friends_statistics'   => array( __( 'Friends', 'gend-society' ), __( 'How many friends the member has.', 'gend-society' ) ),
+		'youzify_enable_md_user_followers_statistics' => array( __( 'Followers', 'gend-society' ), __( 'How many members follow them.', 'gend-society' ) ),
+		'youzify_enable_md_user_following_statistics' => array( __( 'Following', 'gend-society' ), __( 'How many members they follow.', 'gend-society' ) ),
+		'youzify_enable_md_user_points_statistics'    => array( __( 'Points', 'gend-society' ), __( 'The member’s points balance.', 'gend-society' ) ),
+	);
+}
+
+/**
+ * Directory card statistics with their current state.
+ *
+ * @param string $scope groups|profiles.
+ * @return array|null Null when Youzify is not active.
+ */
+function gend_society_sp_card_stats( $scope ) {
+	if ( ! function_exists( 'youzify_option' ) ) {
+		return null;
+	}
+	$out = array();
+	foreach ( gend_society_sp_card_stat_keys( $scope ) as $key => $text ) {
+		$out[] = array(
+			'key'   => $key,
+			'title' => $text[0],
+			'desc'  => $text[1],
+			'on'    => 'off' !== youzify_option( $key, 'on' ),
+		);
+	}
+	return $out;
 }
 
 /**
@@ -1021,6 +1072,15 @@ function gend_society_sp_rest_action( WP_REST_Request $req ) {
 			}
 			update_post_meta( $id, '_gdc_is_site_default', '1' );
 			return rest_ensure_response( array( 'saved' => true ) );
+
+		case 'card-stat':
+			$keys = gend_society_sp_card_stat_keys( $scope );
+			$key  = isset( $body['key'] ) ? (string) $body['key'] : '';
+			if ( ! function_exists( 'youzify_update_option' ) || ! isset( $keys[ $key ] ) ) {
+				return new WP_Error( 'gs_sp_card_stat', __( 'Unknown setting.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			youzify_update_option( $key, empty( $body['on'] ) ? 'off' : 'on' );
+			return rest_ensure_response( array( 'cardStats' => gend_society_sp_card_stats( $scope ) ) );
 
 		case 'photos':
 			if ( ! function_exists( 'youzify_update_option' ) ) {

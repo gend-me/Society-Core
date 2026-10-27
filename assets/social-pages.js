@@ -818,7 +818,56 @@
 						} );
 					} }, icon( 'edit' ), D.directory.published ? __( 'Edit', 'gend-society' ) : __( 'Design', 'gend-society' ) ) ) );
 			return section( 4, isGroups ? __( 'Group directory', 'gend-society' ) : __( 'Members directory', 'gend-society' ),
-				isGroups ? __( 'The page that lists every group.', 'gend-society' ) : __( 'The page that lists every member.', 'gend-society' ), h( 'div', { class: 'gs-sp-cards' }, card ) );
+				isGroups ? __( 'The page that lists every group.', 'gend-society' ) : __( 'The page that lists every member.', 'gend-society' ),
+				h( 'div', null, h( 'div', { class: 'gs-sp-cards' }, card ), statsPanel() ) );
+		}
+
+		// Card statistics switches (Youzify options); the per-stat switches dim while the master switch is off.
+		function statsPanel() {
+			if ( ! D.cardStats || ! D.cardStats.length ) {
+				return null;
+			}
+			var grid = h( 'div', { class: 'gs-sp-stats-grid' } );
+			var paint = function () {
+				var master = D.cardStats[ 0 ].on;
+				grid.querySelectorAll( '.gs-sp-stat' ).forEach( function ( el, i ) {
+					el.classList.toggle( 'is-muted', i > 0 && ! master );
+				} );
+			};
+			D.cardStats.forEach( function ( st, i ) {
+				var id = 'gs-sp-stat-' + st.key;
+				var input = h( 'input', { type: 'checkbox', role: 'switch', id: id, class: 'gs-sp-switch-input', checked: st.on ? true : null } );
+				input.addEventListener( 'change', function () {
+					var on = input.checked;
+					input.disabled = true;
+					post( 'card-stat', { key: st.key, on: on } ).then( function ( res ) {
+						input.disabled = false;
+						D.cardStats = res.cardStats || D.cardStats;
+						D.cardStats.forEach( function ( r ) {
+							if ( r.key === st.key ) {
+								st.on = r.on;
+							}
+						} );
+						input.checked = st.on;
+						paint();
+						toast( on ? sprintf( __( '%s shown on cards.', 'gend-society' ), st.title ) : sprintf( __( '%s hidden on cards.', 'gend-society' ), st.title ), 'ok' );
+					}, function ( e ) {
+						input.disabled = false;
+						input.checked = st.on;
+						fail( e );
+					} );
+				} );
+				grid.appendChild( h( 'div', { class: 'gs-sp-stat' + ( i === 0 ? ' is-master' : '' ) },
+					h( 'label', { for: id, class: 'gs-sp-stat-text' }, h( 'strong', null, st.title ), h( 'span', { class: 'gs-st-muted' }, st.desc ) ),
+					h( 'span', { class: 'gs-sp-switch' }, input, h( 'label', { for: id, class: 'gs-sp-switch-track', 'aria-hidden': 'true' } ) ) ) );
+			} );
+			paint();
+			return h( 'div', { class: 'gs-sp-photos gs-sp-stats' },
+				h( 'div', { class: 'gs-sp-photos-head' },
+					h( 'span', { class: 'gs-sp-card-ico' }, icon( 'chart-bar' ) ),
+					h( 'div', null, h( 'strong', null, __( 'Card statistics', 'gend-society' ) ),
+						h( 'p', { class: 'gs-st-muted' }, isGroups ? __( 'The numbers shown on each group’s card in the directory. Changes save straight away.', 'gend-society' ) : __( 'The numbers shown on each member’s card in the directory. Changes save straight away.', 'gend-society' ) ) ) ),
+				grid );
 		}
 
 		function fail( e ) {
