@@ -62,7 +62,9 @@ const VARIANTS = {
 		forbiddenTiers: ['hub', 'updater', 'container'],
 		// inc/support-access.php: wordpress.org review 2026-10-25 (remote administration). It stays in the
 		// customer tier for the full build; the wordpress.org build must never ship it again.
-		forbiddenPaths: ['themes/', 'inc/theme-bundle.php', 'inc/compat-aliases.php', 'inc/compat-bridges.php', 'chatflows/', 'inc/support-access.php'],
+		// inc/migration-*.php (Phase 110 paid migration: it serves the site's files over a signed route): full build only
+		// until the wordpress.org review team has answered.
+		forbiddenPaths: ['themes/', 'inc/theme-bundle.php', 'inc/compat-aliases.php', 'inc/compat-bridges.php', 'chatflows/', 'inc/support-access.php', 'inc/migration-preflight.php', 'inc/migration-export.php', 'inc/migration-serve.php'],
 		// Text that must not appear in any shipped wordpress.org file: the support-access grant/user and the
 		// raw SQL console (both removed from this build by bin/dist/wporg.exclude and @build-strip blocks).
 		forbiddenStrings: ['grant-admin-access', 'revoke-admin-access', 'gend_support', 'GEND_SOCIETY_SUPPORT_', 'hosting_query_run', 'gs-hosting-query-'],

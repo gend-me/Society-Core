@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.7.0
+Stable tag: 1.8.0
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -159,6 +159,14 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.8.0 =
+<!-- @build-strip-begin wporg -->
+* New: move your site to gend.me hosting from the GenD dashboard. Pre-flight checks, start or schedule the copy, live progress and retry. This needs a paid gend.me container plan; without one the dashboard only shows the plans available.
+<!-- @build-strip-end wporg -->
+<!-- @build-only-begin wporg -->
+* Maintenance release. Moving a site to gend.me hosting is not part of the WordPress.org version.
+<!-- @build-only-end wporg -->
 
 = 1.7.0 =
 * New Design Studio: Appearance > Editor (the Theme Editor) now opens a dashboard that gathers every design area in one sidebar: Branding (logo, favicon, site name, colour schemes, fonts, H1-H6, paragraph and link styles), App (header, menus, footer, 404, coming soon) and Content (page, post, blog, archive and category templates).

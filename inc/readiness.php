@@ -7,6 +7,17 @@
  * registered on standalone installs only. Reused by the Phase 110 migration
  * pre-flight: the check ids below are fixed.
  *
+ * Plan 110-09 (MIG-02): a $context argument. 'welcome' (default) is the 106
+ * card, unchanged. 'migration' appends, in this order, db_size, content_size,
+ * disk_free, max_execution_time, memory_limit, woocommerce, plugin_conflicts,
+ * plan_fit and estimate (from inc/migration-preflight.php when it is loaded),
+ * then rest_external once gend.me has answered a report; multisite becomes a
+ * blocker. A migration result also carries 'context' and 'totals' and is cached
+ * in its own option for 1 hour. render_card() has a read-only 'remote' mode for
+ * gend.me's front end (no form, inline CSS). This file still makes no remote
+ * call: the Re-run handler fires gend_society_readiness_rerun_done and the
+ * migration module reports from there.
+ *
  * Every HTTP request targets this site's own host (asserted before sending),
  * uses a 5 s timeout and never follows redirects. Nothing is sent to gend.me
  * or any third party. The loopback check reuses core Site Health.
@@ -42,19 +53,28 @@ if ( ! defined( 'GEND_SOCIETY_READINESS_TTL' ) ) {
 	define( 'GEND_SOCIETY_READINESS_TTL', 12 * 3600 );
 }
 
+if ( ! defined( 'GEND_SOCIETY_READINESS_MIGRATION_OPTION' ) ) {
+	define( 'GEND_SOCIETY_READINESS_MIGRATION_OPTION', 'gend_society_readiness_last_migration' );
+}
+
+if ( ! defined( 'GEND_SOCIETY_READINESS_MIGRATION_TTL' ) ) {
+	// Migration-context result lifetime: 1 hour.
+	define( 'GEND_SOCIETY_READINESS_MIGRATION_TTL', 3600 );
+}
+
 if ( ! function_exists( 'gend_society_readiness_item' ) ) {
 	/**
 	 * Build one check row.
 	 *
 	 * @param string $id      Fixed check id.
 	 * @param string $label   Translated label.
-	 * @param string $status  pass | warn | fail.
+	 * @param string $status  pass | warn | fail | info (info: migration rows that only report a value).
 	 * @param string $message Translated message.
 	 * @param bool   $blocker True when this must be fixed before migrating.
 	 * @return array{id:string,label:string,status:string,message:string,blocker:bool}
 	 */
 	function gend_society_readiness_item( string $id, string $label, string $status, string $message, bool $blocker = false ): array {
-		if ( ! in_array( $status, array( 'pass', 'warn', 'fail' ), true ) ) {
+		if ( ! in_array( $status, array( 'pass', 'warn', 'fail', 'info' ), true ) ) {
 			$status = 'warn';
 		}
 		return array(
@@ -332,10 +352,16 @@ if ( ! function_exists( 'gend_society_readiness_check_public_dns' ) ) {
 if ( ! function_exists( 'gend_society_readiness_check_multisite' ) ) {
 	/**
 	 * Info row: multisite networks cannot be moved. Null when not multisite.
+	 * In the migration context it is a blocker (110-09).
+	 *
+	 * @param string $context 'welcome' | 'migration'.
 	 */
-	function gend_society_readiness_check_multisite(): ?array {
+	function gend_society_readiness_check_multisite( string $context = 'welcome' ): ?array {
 		if ( ! is_multisite() ) {
 			return null;
+		}
+		if ( 'migration' === $context ) {
+			return gend_society_readiness_item( 'multisite', __( 'Multisite', 'gend-society' ), 'fail', __( 'Moving a multisite network is not supported. Only a single site can be migrated.', 'gend-society' ), true );
 		}
 		return gend_society_readiness_item( 'multisite', __( 'Multisite', 'gend-society' ), 'warn', __( 'Moving a multisite network is not supported.', 'gend-society' ) );
 	}
@@ -345,10 +371,12 @@ if ( ! function_exists( 'gend_society_readiness_collect' ) ) {
 	/**
 	 * Run every check now (no cache).
 	 *
+	 * @param string $context 'welcome' (the 106 checks) | 'migration' (plus the pre-flight rows, context, totals).
 	 * @return array{checked_at:int,checks:array<int,array>}
 	 */
-	function gend_society_readiness_collect(): array {
-		$checks = array(
+	function gend_society_readiness_collect( string $context = 'welcome' ): array {
+		$context = 'migration' === $context ? 'migration' : 'welcome';
+		$checks  = array(
 			gend_society_readiness_check_php(),
 			gend_society_readiness_check_sodium(),
 			gend_society_readiness_check_rest(),
@@ -356,14 +384,28 @@ if ( ! function_exists( 'gend_society_readiness_collect' ) ) {
 			gend_society_readiness_check_basic_auth(),
 			gend_society_readiness_check_public_dns(),
 		);
-		$multisite = gend_society_readiness_check_multisite();
+		$multisite = gend_society_readiness_check_multisite( $context );
 		if ( null !== $multisite ) {
 			$checks[] = $multisite;
 		}
-		return array(
+		$result = array(
 			'checked_at' => time(),
 			'checks'     => $checks,
 		);
+		if ( 'migration' === $context ) {
+			$result['context'] = 'migration';
+			$result['totals']  = array();
+			if ( function_exists( 'gend_society_migration_readiness_items' ) ) {
+				$extra            = gend_society_migration_readiness_items();
+				$result['checks'] = array_merge( $checks, (array) $extra['checks'] );
+				$result['totals'] = (array) $extra['totals'];
+			}
+			// Phase 110-15: may visitors download the export staging folder? (fixed id staging_exposed, appended)
+			if ( function_exists( 'gend_society_migration_staging_exposed_check' ) ) {
+				$result['checks'][] = gend_society_migration_staging_exposed_check();
+			}
+		}
+		return $result;
 	}
 }
 
@@ -371,10 +413,11 @@ if ( ! function_exists( 'gend_society_readiness_last' ) ) {
 	/**
 	 * Last stored readiness result, or null when never run.
 	 *
+	 * @param string $context 'welcome' | 'migration' (separate options).
 	 * @return array|null
 	 */
-	function gend_society_readiness_last(): ?array {
-		$stored = get_option( GEND_SOCIETY_READINESS_OPTION, null );
+	function gend_society_readiness_last( string $context = 'welcome' ): ?array {
+		$stored = get_option( 'migration' === $context ? GEND_SOCIETY_READINESS_MIGRATION_OPTION : GEND_SOCIETY_READINESS_OPTION, null );
 		if ( ! is_array( $stored ) || ! isset( $stored['checked_at'], $stored['checks'] ) || ! is_array( $stored['checks'] ) ) {
 			return null;
 		}
@@ -386,18 +429,22 @@ if ( ! function_exists( 'gend_society_readiness_run' ) ) {
 	/**
 	 * Run (or return the cached) readiness checks.
 	 *
-	 * @param bool $force Re-run even when a recent result is stored.
+	 * @param bool   $force   Re-run even when a recent result is stored.
+	 * @param string $context 'welcome' (option gend_society_readiness_last, 12 h) | 'migration'
+	 *                        (option gend_society_readiness_last_migration, 1 h).
 	 * @return array{checked_at:int,checks:array<int,array{id:string,label:string,status:string,message:string,blocker:bool}>}
 	 */
-	function gend_society_readiness_run( bool $force = false ): array {
+	function gend_society_readiness_run( bool $force = false, string $context = 'welcome' ): array {
+		$context = 'migration' === $context ? 'migration' : 'welcome';
+		$ttl     = 'migration' === $context ? GEND_SOCIETY_READINESS_MIGRATION_TTL : GEND_SOCIETY_READINESS_TTL;
 		if ( ! $force ) {
-			$last = gend_society_readiness_last();
-			if ( null !== $last && ( time() - (int) $last['checked_at'] ) < GEND_SOCIETY_READINESS_TTL ) {
+			$last = gend_society_readiness_last( $context );
+			if ( null !== $last && ( time() - (int) $last['checked_at'] ) < $ttl ) {
 				return $last;
 			}
 		}
-		$result = gend_society_readiness_collect();
-		update_option( GEND_SOCIETY_READINESS_OPTION, $result, false );
+		$result = gend_society_readiness_collect( $context );
+		update_option( 'migration' === $context ? GEND_SOCIETY_READINESS_MIGRATION_OPTION : GEND_SOCIETY_READINESS_OPTION, $result, false );
 		return $result;
 	}
 }
@@ -426,21 +473,34 @@ if ( ! function_exists( 'gend_society_readiness_render_card' ) ) {
 	/**
 	 * Echo the readiness card.
 	 *
-	 * @param array|null $result Result from gend_society_readiness_run(); null = last stored.
+	 * @param array|null $result  Result from gend_society_readiness_run(); null = last stored for $context.
+	 * @param string     $context 'welcome' | 'migration'.
+	 * @param string     $mode    'local' (wp-admin, with the Re-run form) | 'remote' (read-only display for gend.me's
+	 *                            front end: no form, no admin-only functions, CSS inline).
 	 */
-	function gend_society_readiness_render_card( ?array $result = null ): void {
+	function gend_society_readiness_render_card( ?array $result = null, string $context = 'welcome', string $mode = 'local' ): void {
+		$migration = 'migration' === $context;
 		if ( null === $result ) {
-			$result = gend_society_readiness_last();
+			$result = gend_society_readiness_last( $migration ? 'migration' : 'welcome' );
+		}
+		if ( 'remote' === $mode ) {
+			gend_society_readiness_render_card_remote( $result );
+			return;
 		}
 		$status_labels = array(
 			'pass' => __( 'OK', 'gend-society' ),
 			'warn' => __( 'Check', 'gend-society' ),
 			'fail' => __( 'Fix', 'gend-society' ),
+			'info' => __( 'Info', 'gend-society' ),
 		);
 		?>
 		<div class="gend-society-card gend-society-readiness">
 			<h2><?php esc_html_e( 'Site readiness', 'gend-society' ); ?></h2>
+<?php if ( $migration ) : ?>
+			<p class="description"><?php esc_html_e( 'These checks run on this server. When this site is connected, the results are shared with gend.me so it can check that your plans fit.', 'gend-society' ); ?></p>
+<?php else : ?>
 			<p class="description"><?php esc_html_e( 'Local checks only. These tests run on this server and talk to nobody but this site.', 'gend-society' ); ?></p>
+<?php endif; ?>
 			<?php if ( null === $result ) : ?>
 				<p><?php esc_html_e( 'The checks have not run yet.', 'gend-society' ); ?></p>
 			<?php else : ?>
@@ -496,6 +556,9 @@ if ( ! function_exists( 'gend_society_readiness_render_card' ) ) {
 			<?php if ( current_user_can( 'manage_options' ) ) : ?>
 				<form method="post" action="<?php echo esc_url( admin_url( 'admin-post.php' ) ); ?>">
 					<input type="hidden" name="action" value="gend_society_readiness_rerun" />
+<?php if ( $migration ) : ?>
+					<input type="hidden" name="context" value="migration" />
+<?php endif; ?>
 					<?php wp_nonce_field( 'gend_society_readiness_rerun' ); ?>
 					<?php submit_button( __( 'Re-run checks', 'gend-society' ), 'secondary', 'submit', false ); ?>
 				</form>
@@ -505,16 +568,122 @@ if ( ! function_exists( 'gend_society_readiness_render_card' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_readiness_render_card_remote' ) ) {
+	/**
+	 * Read-only card for gend.me's front end (the hub shows what the site reported). Same table markup as the
+	 * local card; no form and no admin-only functions; one scoped inline style block per request.
+	 *
+	 * @param array|null $result Reported result.
+	 */
+	function gend_society_readiness_render_card_remote( ?array $result ): void {
+		static $styled = false;
+		$status_labels = array(
+			'pass' => __( 'OK', 'gend-society' ),
+			'warn' => __( 'Check', 'gend-society' ),
+			'fail' => __( 'Fix', 'gend-society' ),
+			'info' => __( 'Info', 'gend-society' ),
+		);
+		if ( ! $styled ) {
+			$styled = true;
+			echo '<style>'
+				. '.gend-society-readiness--remote{box-sizing:border-box;max-width:100%;margin:0 0 16px;padding:16px 18px;border-radius:14px;background:rgba(15,23,42,.6);border:1px solid rgba(148,163,184,.25);color:#e2e8f0;}'
+				. '.gend-society-readiness--remote h2{margin:0 0 6px;font-size:1rem;font-weight:700;color:#f8fafc;}'
+				. '.gend-society-readiness--remote .description{margin:0 0 10px;font-size:.85rem;color:#94a3b8;}'
+				. '.gend-society-readiness--remote .gend-society-readiness-summary{margin:0 0 10px;font-size:.9rem;}'
+				. '.gend-society-readiness--remote .gend-society-readiness-summary.has-blockers{color:#fca5a5;}'
+				. '.gend-society-readiness--remote .gend-society-readiness-summary.no-blockers{color:#86efac;}'
+				. '.gend-society-readiness--remote .gend-society-readiness-table{width:100%;border-collapse:collapse;font-size:.85rem;}'
+				. '.gend-society-readiness--remote .gend-society-readiness-table td{padding:7px 8px;border-top:1px solid rgba(148,163,184,.15);vertical-align:top;}'
+				. '.gend-society-readiness--remote .gend-society-readiness-label{font-weight:600;white-space:nowrap;}'
+				. '.gend-society-readiness--remote .gend-society-badge{display:inline-block;padding:2px 9px;border-radius:999px;font-size:.72rem;font-weight:700;}'
+				. '.gend-society-readiness--remote .gend-society-badge--pass{background:rgba(34,197,94,.18);color:#86efac;}'
+				. '.gend-society-readiness--remote .gend-society-badge--warn{background:rgba(234,179,8,.18);color:#fde047;}'
+				. '.gend-society-readiness--remote .gend-society-badge--fail{background:rgba(239,68,68,.2);color:#fca5a5;}'
+				. '.gend-society-readiness--remote .gend-society-badge--info{background:rgba(56,189,248,.16);color:#7dd3fc;}'
+				. '</style>';
+		}
+		?>
+		<div class="gend-society-card gend-society-readiness gend-society-readiness--remote">
+			<h2><?php esc_html_e( 'Site readiness', 'gend-society' ); ?></h2>
+			<?php if ( null === $result ) : ?>
+				<p class="description"><?php esc_html_e( 'Your site has not reported its checks yet. Run them in your site\'s wp-admin.', 'gend-society' ); ?></p>
+			<?php else : ?>
+				<p class="description">
+					<?php
+					echo esc_html(
+						sprintf(
+							/* translators: %s: date and time. */
+							__( 'Checks reported by your site on %s. Re-run them in your site\'s wp-admin.', 'gend-society' ),
+							wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), (int) ( $result['checked_at'] ?? 0 ) )
+						)
+					);
+					?>
+				</p>
+				<?php
+				$blockers = count( gend_society_readiness_blockers( $result ) );
+				?>
+				<p class="gend-society-readiness-summary <?php echo $blockers ? 'has-blockers' : 'no-blockers'; ?>">
+					<strong>
+					<?php
+					if ( 0 === $blockers ) {
+						esc_html_e( 'No blockers found', 'gend-society' );
+					} else {
+						echo esc_html(
+							sprintf(
+								/* translators: %d: number of blocking items. */
+								_n( '%d item to fix before migrating', '%d items to fix before migrating', $blockers, 'gend-society' ),
+								$blockers
+							)
+						);
+					}
+					?>
+					</strong>
+				</p>
+				<table class="widefat striped gend-society-readiness-table">
+					<tbody>
+					<?php foreach ( (array) ( $result['checks'] ?? array() ) as $check ) : ?>
+						<?php
+						if ( ! is_array( $check ) ) {
+							continue;
+						}
+						$status = isset( $check['status'], $status_labels[ $check['status'] ] ) ? (string) $check['status'] : 'warn';
+						?>
+						<tr data-check="<?php echo esc_attr( (string) ( $check['id'] ?? '' ) ); ?>">
+							<td class="gend-society-readiness-label"><?php echo esc_html( (string) ( $check['label'] ?? '' ) ); ?></td>
+							<td class="gend-society-readiness-status"><span class="gend-society-badge gend-society-badge--<?php echo esc_attr( $status ); ?>"><?php echo esc_html( $status_labels[ $status ] ); ?></span></td>
+							<td class="gend-society-readiness-message"><?php echo esc_html( (string) ( $check['message'] ?? '' ) ); ?></td>
+						</tr>
+					<?php endforeach; ?>
+					</tbody>
+				</table>
+			<?php endif; ?>
+		</div>
+		<?php
+	}
+}
+
 if ( ! function_exists( 'gend_society_readiness_handle_rerun' ) ) {
 	/**
-	 * Admin-post handler for "Re-run checks".
+	 * Admin-post handler for "Re-run checks". With context=migration (110-09) it finishes the size walk within this
+	 * request's budget, runs the migration checks and fires gend_society_readiness_rerun_done (the migration module
+	 * reports to gend.me from there).
 	 */
 	function gend_society_readiness_handle_rerun(): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'You are not allowed to do that.', 'gend-society' ), '', array( 'response' => 403 ) );
 		}
 		check_admin_referer( 'gend_society_readiness_rerun' );
-		gend_society_readiness_run( true );
+		$context = ( isset( $_POST['context'] ) && 'migration' === sanitize_key( wp_unslash( $_POST['context'] ) ) ) ? 'migration' : 'welcome';
+		if ( 'migration' === $context && function_exists( 'gend_society_migration_sizing_step' ) ) {
+			gend_society_migration_sizing_reset();
+			$met      = (int) ini_get( 'max_execution_time' );
+			$deadline = microtime( true ) + ( $met > 0 ? max( 2, min( 20, $met - 8 ) ) : 20 );
+			do {
+				$step = gend_society_migration_sizing_step( max( 1.0, min( 15.0, $deadline - microtime( true ) ) ) );
+			} while ( empty( $step['done'] ) && microtime( true ) < $deadline );
+		}
+		$result = gend_society_readiness_run( true, $context );
+		do_action( 'gend_society_readiness_rerun_done', $context, $result );
 		$back = function_exists( 'gend_society_welcome_page_url' ) ? gend_society_welcome_page_url() : admin_url();
 		$ref  = wp_get_referer();
 		wp_safe_redirect( $ref ? $ref : $back );

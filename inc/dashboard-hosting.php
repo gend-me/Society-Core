@@ -247,6 +247,70 @@ if ( ! function_exists( 'gend_society_hosting_plan_upgrade_data_attrs' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_migrate_cta_markup' ) ) {
+    /**
+     * Phase 110-09 (M7): the Storage "Start Migration" CTA for a standalone (connected) install.
+     *
+     * A local copy of vendor-app-manager gdc_render_migrate_containers_cta() (inc/integrations/
+     * woocommerce-account-memberships.php ~12639), which does not exist on a customer host: same style block (emitted
+     * once per request), same classes, icon, eyebrow, title and role chips. ONE copy change: the
+     * .gdc-migrate-cta__text paragraph. On gend.me paying starts the migration; for an install, paying only arms it
+     * and the owner starts the copy later.
+     *
+     * @param string $button_html The surface-specific trigger (styled via .gdc-migrate-cta__btn).
+     * @return string
+     */
+    function gend_society_migrate_cta_markup( $button_html ) {
+        static $styled = false;
+        $out = '';
+        if ( ! $styled ) {
+            $styled = true;
+            $out   .= '<style>'
+                . '.gdc-migrate-cta{box-sizing:border-box;max-width:100%;position:relative;display:flex;align-items:center;gap:22px;flex-wrap:wrap;margin:0 0 20px;padding:22px 24px;border-radius:18px;overflow:hidden;'
+                .   'background:linear-gradient(135deg,rgba(15,23,42,.92),rgba(17,24,39,.86));border:1px solid rgba(125,211,252,.22);box-shadow:0 18px 40px rgba(2,6,23,.45),inset 0 1px 0 rgba(255,255,255,.04);}'
+                . '.gdc-migrate-cta::before{content:"";position:absolute;inset:0;pointer-events:none;background:radial-gradient(600px 160px at 0% 0%,rgba(34,211,238,.14),transparent 60%),radial-gradient(500px 160px at 100% 100%,rgba(168,85,247,.14),transparent 60%);}'
+                . '.gdc-migrate-cta>*{position:relative;}'
+                . '.gdc-migrate-cta__icon{flex:0 0 56px;height:56px;border-radius:16px;display:flex;align-items:center;justify-content:center;background:linear-gradient(135deg,rgba(34,211,238,.22),rgba(168,85,247,.22));border:1px solid rgba(125,211,252,.30);color:#7dd3fc;}'
+                . '.gdc-migrate-cta__icon svg{width:28px;height:28px;}'
+                . '.gdc-migrate-cta__body{flex:1 1 220px;min-width:0;}'
+                . '.gdc-migrate-cta__eyebrow{font-size:.68rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase;color:#67e8f9;}'
+                . '.gdc-migrate-cta__title{margin:4px 0 6px;font-size:1.12rem;font-weight:800;color:#f8fafc;line-height:1.25;}'
+                . '.gdc-migrate-cta__text{margin:0;font-size:.88rem;line-height:1.55;color:#94a3b8;}'
+                . '.gdc-migrate-cta__roles{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px;}'
+                . '.gdc-migrate-cta__role{display:inline-flex;align-items:center;gap:6px;padding:5px 11px;border-radius:999px;font-size:.74rem;font-weight:700;color:#e2e8f0;background:rgba(255,255,255,.05);border:1px solid rgba(255,255,255,.10);}'
+                . '.gdc-migrate-cta__role i{width:7px;height:7px;border-radius:50%;display:inline-block;}'
+                . '.gdc-migrate-cta__btn,.gdc-migrate-cta__btn:visited{flex:0 0 auto;display:inline-flex;align-items:center;gap:10px;padding:13px 22px;border-radius:12px;border:0;cursor:pointer;text-decoration:none !important;'
+                .   'font-weight:800;font-size:.9rem;letter-spacing:.02em;color:#04111d !important;background:linear-gradient(135deg,#22d3ee,#818cf8);box-shadow:0 10px 26px rgba(34,211,238,.28);transition:transform .18s ease,box-shadow .18s ease,filter .18s ease;}'
+                . '.gdc-migrate-cta__btn:hover{transform:translateY(-2px);box-shadow:0 16px 34px rgba(34,211,238,.38);filter:brightness(1.06);}'
+                . '.gdc-migrate-cta__btn:focus-visible{outline:2px solid #7dd3fc;outline-offset:3px;}'
+                . '.gdc-migrate-cta__arrow{transition:transform .18s ease;}'
+                . '.gdc-migrate-cta__btn:hover .gdc-migrate-cta__arrow{transform:translateX(3px);}'
+                . '@media (max-width:640px){.gdc-migrate-cta__btn{width:100%;justify-content:center;}}'
+                . '</style>';
+        }
+        $roles = array(
+            array( __( 'Media', 'gend-society' ), '#22d3ee' ),
+            array( __( 'Codebase', 'gend-society' ), '#a78bfa' ),
+            array( __( 'Database', 'gend-society' ), '#34d399' ),
+        );
+        $chips = '';
+        foreach ( $roles as $r ) {
+            $chips .= '<span class="gdc-migrate-cta__role"><i style="background:' . esc_attr( $r[1] ) . ';"></i>' . esc_html( $r[0] ) . '</span>';
+        }
+        $out .= '<div class="gdc-migrate-cta" role="region" aria-label="' . esc_attr__( 'Migrate to Independent Storage Containers', 'gend-society' ) . '">'
+            . '<div class="gdc-migrate-cta__icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M21 8 12 3 3 8l9 5 9-5Z"/><path d="m3 13 9 5 9-5"/><path d="m3 18 9 5 9-5"/></svg></div>'
+            . '<div class="gdc-migrate-cta__body">'
+            .   '<div class="gdc-migrate-cta__eyebrow">' . esc_html__( 'Scale beyond shared hosting', 'gend-society' ) . '</div>'
+            .   '<div class="gdc-migrate-cta__title">' . esc_html__( 'Migrate to Independent Storage Containers', 'gend-society' ) . '</div>'
+            .   '<p class="gdc-migrate-cta__text">' . esc_html__( 'After checkout, you start the copy when you\'re ready.', 'gend-society' ) . '</p>'
+            .   '<div class="gdc-migrate-cta__roles">' . $chips . '</div>'
+            . '</div>'
+            . $button_html
+            . '</div>';
+        return $out;
+    }
+}
+
 if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
     /**
      * The shared upgrade popup ([data-gs-upgrade-open] buttons: iframe checkout on gend.me, install-token picker
@@ -538,6 +602,38 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                 );
             }
         }
+
+        // Phase 110-09 (M7): a connected standalone install shows the same CTA (local copy of the markup). Before
+        // payment it opens gend.me's container wizard in the existing D14 popup ([data-gs-popup], top-level window);
+        // data-gs-migrate-cta lets 110-12 turn it into "Start migration" once the migration is armed. Hidden when not
+        // connected, when the wizard URL cannot be built and after Live. Hub/container never enter this branch.
+        $gs_sa_cta_html = '';
+        if ( $gs_sa && current_user_can( 'manage_options' )
+            && function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired()
+            && function_exists( 'gend_society_plan_container_wizard_url' ) && function_exists( 'gend_society_remote_membership_get_cached' ) ) {
+            $gs_sa_payload = gend_society_remote_membership_get_cached();
+            $gs_sa_live    = is_array( $gs_sa_payload ) && ! empty( $gs_sa_payload['migration']['live'] );
+            $gs_sa_wizard  = ( is_array( $gs_sa_payload ) && ! $gs_sa_live ) ? gend_society_plan_container_wizard_url( $gs_sa_payload ) : '';
+            // 110-12: 'wizard' before payment (the click opens the popup on the local wait page first, which keeps
+            // gend.me's pre-flight current; gs-dashboard-standalone.js), 'start' once armed (inline Start step),
+            // '' while scheduled / running / failed. 110-21: '' without the migration module (the wordpress.org build
+            // ships none), since paying would arm a migration that build cannot start.
+            $gs_sa_cta_mode = ( '' !== $gs_sa_wizard && function_exists( 'gend_society_migration_cta_mode' ) ) ? gend_society_migration_cta_mode( $gs_sa_payload ) : '';
+            if ( 'wizard' === $gs_sa_cta_mode ) {
+                if ( function_exists( 'gend_society_migration_queue_report' ) ) {
+                    gend_society_migration_queue_report();
+                }
+                $gs_sa_cta_html = gend_society_migrate_cta_markup(
+                    '<a class="gdc-migrate-cta__btn" data-gs-popup data-gs-migrate-cta="1" href="' . esc_url( $gs_sa_wizard ) . '" target="_blank" rel="opener">'
+                    . '<span>' . esc_html__( 'Start Migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></a>'
+                );
+            } elseif ( 'start' === $gs_sa_cta_mode ) {
+                $gs_sa_cta_html = gend_society_migrate_cta_markup(
+                    '<a class="gdc-migrate-cta__btn" data-gs-migrate-cta="1" data-gs-start-inline="1" href="#gs-mig-start-step">'
+                    . '<span>' . esc_html__( 'Start migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></a>'
+                );
+            }
+        }
         ?>
         <div style="display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; flex-wrap: wrap; margin-bottom: 14px;">
             <div>
@@ -581,6 +677,9 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                 . ' data-embed-url="' . esc_url( $gs_migrate_url ) . '">'
                 . '<span>' . esc_html__( 'Start Migration', 'gend-society' ) . '</span><span class="gdc-migrate-cta__arrow" aria-hidden="true">&rarr;</span></button>'
             );
+        }
+        if ( $gs_sa_cta_html !== '' ) {
+            echo $gs_sa_cta_html; // phpcs:ignore WordPress.Security.EscapeOutput -- built from escaped parts.
         }
         ?>
 

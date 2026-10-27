@@ -16,3 +16,7 @@ _routes.json maps a route (path after /install/{id}/) to {status, file}. "hub/*"
 (known container_only areas -> 409 after_migration, unknown -> 404 unknown_area); "*" matches every route.
 membership/change-plan answers 409 plan_not_allowed when the posted plan_id is not in the scenario's
 membership.json checkout_allowed_plan_ids.
+
+110-12: regenerated with C:/tmp/livepull/phase110/tools/gen-contract-110.py (the phase109 generator pointed at the 110 trees):
+the /membership "migration" block gains the 110-11 additive keys state, can_start, can_retry, can_cancel, scheduled_at, error.
+The VAM contract output is byte-identical to the hand-edited vam-110 files (110-11).

@@ -422,6 +422,40 @@ if ( ! function_exists( 'gend_society_plan_change_plan_url' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_plan_container_wizard_url' ) ) {
+	/**
+	 * gend.me's container wizard for this site's membership ('' when it cannot be built safely). Phase 110-09 (M7).
+	 *
+	 * The page the hub's own Storage "Start Migration" CTA opens: my-account/memberships/ with
+	 * gdc_open_modal=<membership id>&gdc_auto_migrate=1, which renders gdc_render_change_hosting_plan_modal_core()
+	 * and launches its Code -> Media -> Database wizard. Built from the scheme + host (+ port) of the hub's
+	 * membership_url, with the same rules as gend_society_plan_change_plan_url(): a URL on the paired hub host only,
+	 * and only for a real membership id. The target is kept in this one function (110-10 may switch it to the
+	 * ui=embed group=hosting form).
+	 *
+	 * @param array $membership /membership payload.
+	 */
+	function gend_society_plan_container_wizard_url( array $membership ): string {
+		$mid = (int) ( $membership['membership_id'] ?? 0 );
+		$url = isset( $membership['membership_url'] ) && is_string( $membership['membership_url'] ) ? trim( $membership['membership_url'] ) : '';
+		if ( $mid <= 0 || '' === $url || ! gend_society_plan_is_hub_url( $url ) ) {
+			return '';
+		}
+		$u = wp_parse_url( $url );
+		if ( ! is_array( $u ) || empty( $u['scheme'] ) || empty( $u['host'] ) ) {
+			return '';
+		}
+		$base = strtolower( $u['scheme'] ) . '://' . $u['host'] . ( isset( $u['port'] ) ? ':' . (int) $u['port'] : '' );
+		return add_query_arg(
+			array(
+				'gdc_open_modal'   => $mid,
+				'gdc_auto_migrate' => 1,
+			),
+			$base . '/my-account/memberships/'
+		);
+	}
+}
+
 if ( ! function_exists( 'gend_society_plan_unlock' ) ) {
 	/**
 	 * Normalise an unlock_plan value to null or {id, slug, name}. A bare slug is looked up in the tiers.
