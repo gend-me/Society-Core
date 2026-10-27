@@ -608,6 +608,12 @@ return array(
 			'note'  => 'Projects → Memberships → Joined: group-header cards with AJAX search.',
 		),
 		array(
+			'file'  => 'inc/scroll-scene.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Scroll Scene block: backgrounds that zoom, pan or cross-fade with the scroll (dynamic, media-library images).',
+		),
+		array(
 			'file'  => 'inc/login-style.php',
 			'tier'  => 'core',
 			'needs' => array( 'skin' ),
