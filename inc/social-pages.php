@@ -481,7 +481,7 @@ function gend_society_sp_register_rest() {
 	);
 	register_rest_route(
 		'gend-society/v1',
-		'/social-pages/(?P<scope>groups|profiles)/(?P<action>menu|tab-layout|page|page-update|page-order|page-delete|sidebar|sidebar-default|sidebar-update|sidebar-delete|header|header-default|directory|photos|card-stat)',
+		'/social-pages/(?P<scope>groups|profiles)/(?P<action>menu|tab-layout|page|page-update|page-order|page-delete|sidebar|sidebar-default|sidebar-update|sidebar-delete|header|header-default|directory|photos|card-stat|not-found|privacy|menu-icon)',
 		array(
 			'methods'             => 'POST',
 			'callback'            => 'gend_society_sp_rest_action',
@@ -580,6 +580,11 @@ function gend_society_sp_menu( $scope ) {
 			++$i;
 		}
 	}
+	$icons = gend_society_sp_menu_icons( $scope );
+	foreach ( $rows as $k => $row ) {
+		$rows[ $k ]['icon']        = isset( $icons[ $row['slug'] ] ) ? (string) $icons[ $row['slug'] ] : '';
+		$rows[ $k ]['defaultIcon'] = gend_society_sp_default_icon( $row['slug'], $scope );
+	}
 	usort(
 		$rows,
 		function ( $a, $b ) {
@@ -587,6 +592,146 @@ function gend_society_sp_menu( $scope ) {
 		}
 	);
 	return $rows;
+}
+
+/* ── Menu icons ─────────────────────────────────────────────────────────── */
+
+/**
+ * Option holding the chosen menu icons: array( 'groups' => array( slug => key ), 'profiles' => … ).
+ */
+const GEND_SOCIETY_SP_MENU_ICONS = 'gend_society_sp_menu_icons';
+
+/**
+ * Icons the builder offers for menu tabs (24×24 line drawings, currentColor stroke).
+ *
+ * @return array Key => array( label, svg inner markup ).
+ */
+function gend_society_sp_icon_library() {
+	return array(
+		'pulse'      => array( __( 'Activity', 'gend-society' ), '<path d="M3 12h4l2.5-7 5 14 2.5-7H21"/>' ),
+		'user'       => array( __( 'Person', 'gend-society' ), '<circle cx="12" cy="9" r="3.5"/><path d="M5 20a7 7 0 0 1 14 0"/>' ),
+		'users'      => array( __( 'People', 'gend-society' ), '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>' ),
+		'network'    => array( __( 'Connections', 'gend-society' ), '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7.5" x2="11" y2="15.5"/><line x1="16" y1="7.5" x2="13" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/>' ),
+		'invite'     => array( __( 'Invite', 'gend-society' ), '<circle cx="9" cy="8" r="3.5"/><path d="M3 20a6 6 0 0 1 12 0"/><line x1="19" y1="6" x2="19" y2="14"/><line x1="15" y1="10" x2="23" y2="10"/>' ),
+		'grid'       => array( __( 'Grid', 'gend-society' ), '<rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/>' ),
+		'cube'       => array( __( 'Apps', 'gend-society' ), '<path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/>' ),
+		'kanban'     => array( __( 'Projects', 'gend-society' ), '<rect x="3" y="3" width="5" height="18" rx="1"/><rect x="10" y="3" width="5" height="12" rx="1"/><rect x="17" y="3" width="4" height="7" rx="1"/>' ),
+		'monitor'    => array( __( 'Screen', 'gend-society' ), '<rect x="2" y="3" width="20" height="14" rx="2"/><line x1="8" y1="21" x2="16" y2="21"/><line x1="12" y1="17" x2="12" y2="21"/>' ),
+		'book'       => array( __( 'Plan', 'gend-society' ), '<path d="M4 19.5A2.5 2.5 0 0 1 6.5 17H20"/><path d="M6.5 2H20v20H6.5A2.5 2.5 0 0 1 4 19.5v-15A2.5 2.5 0 0 1 6.5 2z"/><line x1="9" y1="7" x2="15" y2="7"/><line x1="9" y1="11" x2="15" y2="11"/>' ),
+		'document'   => array( __( 'Document', 'gend-society' ), '<path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/>' ),
+		'contract'   => array( __( 'Contract', 'gend-society' ), '<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="13" y2="16"/>' ),
+		'folder'     => array( __( 'Folder', 'gend-society' ), '<path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/>' ),
+		'image'      => array( __( 'Media', 'gend-society' ), '<rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="8.5" cy="8.5" r="1.5"/><polyline points="21 15 16 10 5 21"/>' ),
+		'calendar'   => array( __( 'Calendar', 'gend-society' ), '<rect x="3" y="4.5" width="18" height="16" rx="2"/><line x1="3" y1="9" x2="21" y2="9"/><line x1="8" y1="2.5" x2="8" y2="6.5"/><line x1="16" y1="2.5" x2="16" y2="6.5"/>' ),
+		'clock'      => array( __( 'Clock', 'gend-society' ), '<circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>' ),
+		'chat'       => array( __( 'Messages', 'gend-society' ), '<path d="M21 12a8 8 0 0 1-12 7l-5 2 1.5-5A8 8 0 1 1 21 12z"/>' ),
+		'forum'      => array( __( 'Forum', 'gend-society' ), '<path d="M21 12a4 4 0 0 1-4 4H9l-4 3V8a4 4 0 0 1 4-4h8a4 4 0 0 1 4 4z"/><line x1="9" y1="10" x2="17" y2="10"/><line x1="9" y1="13" x2="14" y2="13"/>' ),
+		'bell'       => array( __( 'Notifications', 'gend-society' ), '<path d="M18 8a6 6 0 0 0-12 0c0 7-3 9-3 9h18s-3-2-3-9"/><path d="M13.5 21a2 2 0 0 1-3 0"/>' ),
+		'wallet'     => array( __( 'Wallet', 'gend-society' ), '<rect x="2.5" y="6.5" width="19" height="13" rx="2"/><path d="M2.5 10.5h19"/><rect x="15" y="14" width="4" height="3" rx="0.8"/>' ),
+		'dollar'     => array( __( 'Payments', 'gend-society' ), '<line x1="12" y1="1" x2="12" y2="23"/><path d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"/>' ),
+		'chart'      => array( __( 'Growth', 'gend-society' ), '<path d="M3 17l5-5 4 4 8-9"/><polyline points="14 7 21 7 21 14"/>' ),
+		'bars'       => array( __( 'Stats', 'gend-society' ), '<line x1="6" y1="20" x2="6" y2="12"/><line x1="12" y1="20" x2="12" y2="5"/><line x1="18" y1="20" x2="18" y2="9"/>' ),
+		'cart'       => array( __( 'Store', 'gend-society' ), '<circle cx="9" cy="20" r="1.5"/><circle cx="18" cy="20" r="1.5"/><path d="M2 3h3l2.7 12.4a2 2 0 0 0 2 1.6h8.6a2 2 0 0 0 2-1.6L22 7H6"/>' ),
+		'tag'        => array( __( 'Tag', 'gend-society' ), '<path d="M20.6 13.4 13.4 20.6a2 2 0 0 1-2.8 0L3 13V3h10l7.6 7.6a2 2 0 0 1 0 2.8z"/><circle cx="7.5" cy="7.5" r="1.2"/>' ),
+		'badge'      => array( __( 'Membership', 'gend-society' ), '<rect x="3" y="5" width="18" height="14" rx="2"/><circle cx="9" cy="11.5" r="2.2"/><path d="M6 17a3 3 0 0 1 6 0"/><line x1="14.5" y1="10" x2="19" y2="10"/><line x1="14.5" y1="13" x2="18" y2="13"/>' ),
+		'share'      => array( __( 'Share', 'gend-society' ), '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><line x1="8.2" y1="10.8" x2="15.8" y2="6.2"/><line x1="8.2" y1="13.2" x2="15.8" y2="17.8"/>' ),
+		'cloud'      => array( __( 'Hosting', 'gend-society' ), '<path d="M17.5 19a4.5 4.5 0 1 0-1.4-8.78A6 6 0 0 0 4 12.5 4.5 4.5 0 0 0 6.5 19h11z"/>' ),
+		'bolt'       => array( __( 'Power', 'gend-society' ), '<polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/>' ),
+		'sparkle'    => array( __( 'AI', 'gend-society' ), '<path d="M12 3l1.9 4.6L18.5 9l-4.6 1.4L12 15l-1.9-4.6L5.5 9l4.6-1.4L12 3z"/><path d="M19 14l.8 2 2 .8-2 .8-.8 2-.8-2-2-.8 2-.8.8-2z"/>' ),
+		'code'       => array( __( 'Code', 'gend-society' ), '<polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/>' ),
+		'sliders'    => array( __( 'Settings', 'gend-society' ), '<line x1="4" y1="6" x2="20" y2="6"/><circle cx="9" cy="6" r="2"/><line x1="4" y1="12" x2="20" y2="12"/><circle cx="15" cy="12" r="2"/><line x1="4" y1="18" x2="20" y2="18"/><circle cx="8" cy="18" r="2"/>' ),
+		'home'       => array( __( 'Home', 'gend-society' ), '<path d="M3 11l9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M10 20v-6h4v6"/>' ),
+		'star'       => array( __( 'Star', 'gend-society' ), '<polygon points="12 2 15.1 8.3 22 9.3 17 14.1 18.2 21 12 17.8 5.8 21 7 14.1 2 9.3 8.9 8.3 12 2"/>' ),
+		'heart'      => array( __( 'Heart', 'gend-society' ), '<path d="M20.8 4.6a5.5 5.5 0 0 0-7.8 0L12 5.7l-1-1.1a5.5 5.5 0 0 0-7.8 7.8L12 21l8.8-8.6a5.5 5.5 0 0 0 0-7.8z"/>' ),
+		'shield'     => array( __( 'Shield', 'gend-society' ), '<path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>' ),
+		'lock'       => array( __( 'Private', 'gend-society' ), '<rect x="4" y="11" width="16" height="10" rx="2"/><path d="M8 11V7a4 4 0 0 1 8 0v4"/>' ),
+		'globe'      => array( __( 'Globe', 'gend-society' ), '<circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15 15 0 0 1 0 20 15 15 0 0 1 0-20z"/>' ),
+		'rocket'     => array( __( 'Launch', 'gend-society' ), '<path d="M4.5 16.5c-1.5 1.3-2 5-2 5s3.7-.5 5-2c.7-.8.7-2.1-.1-2.9a2.2 2.2 0 0 0-2.9-.1z"/><path d="M12 15l-3-3a22 22 0 0 1 2-3.9A12.9 12.9 0 0 1 22 2c0 2.7-.8 7.5-6 11a22.4 22.4 0 0 1-4 2z"/><path d="M9 12H4s.6-3 2-4c1.6-1.1 5 0 5 0"/><path d="M12 15v5s3-.6 4-2c1.1-1.6 0-5 0-5"/>' ),
+		'target'     => array( __( 'Target', 'gend-society' ), '<circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5"/><circle cx="12" cy="12" r="1"/>' ),
+		'briefcase'  => array( __( 'Work', 'gend-society' ), '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>' ),
+		'megaphone'  => array( __( 'Marketing', 'gend-society' ), '<path d="M3 11v3a1 1 0 0 0 1 1h3l5 4V6L7 10H4a1 1 0 0 0-1 1z"/><path d="M16 8a5 5 0 0 1 0 8"/><path d="M19 5a9 9 0 0 1 0 14"/>' ),
+		'graduation' => array( __( 'Learning', 'gend-society' ), '<path d="M22 10 12 5 2 10l10 5 10-5z"/><path d="M6 12v5c3 2 9 2 12 0v-5"/>' ),
+	);
+}
+
+/**
+ * A library icon as markup for the menu it is shown in.
+ *
+ * @param string $key   Library key.
+ * @param string $scope groups|profiles.
+ * @return string Empty when the key is unknown.
+ */
+function gend_society_sp_icon_svg( $key, $scope ) {
+	$lib = gend_society_sp_icon_library();
+	if ( ! isset( $lib[ $key ] ) ) {
+		return '';
+	}
+	// Match each menu's own icons: groups draw 16px at stroke 2, profiles size by CSS at 1.75.
+	$attrs = 'groups' === $scope ? 'width="16" height="16" stroke-width="2"' : 'stroke-width="1.75"';
+	return '<svg ' . $attrs . ' viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">' . $lib[ $key ][1] . '</svg>';
+}
+
+/**
+ * Chosen icon keys for a menu.
+ *
+ * @param string $scope groups|profiles.
+ * @return array Slug => key.
+ */
+function gend_society_sp_menu_icons( $scope ) {
+	$all = get_option( GEND_SOCIETY_SP_MENU_ICONS, array() );
+	return isset( $all[ $scope ] ) && is_array( $all[ $scope ] ) ? $all[ $scope ] : array();
+}
+
+/**
+ * The icon a tab shows without a choice (each menu's built-in drawing).
+ *
+ * @param string $slug  Tab slug.
+ * @param string $scope groups|profiles.
+ * @return string
+ */
+function gend_society_sp_default_icon( $slug, $scope ) {
+	$GLOBALS['gend_society_sp_icon_bypass'] = true;
+	$svg = '';
+	if ( 'groups' === $scope && function_exists( 'psoo_bridge_nav_icon' ) ) {
+		$svg = psoo_bridge_nav_icon( $slug );
+	} elseif ( 'profiles' === $scope && function_exists( 'gend_society_get_profile_nav_icon' ) ) {
+		$svg = gend_society_get_profile_nav_icon( $slug );
+	}
+	unset( $GLOBALS['gend_society_sp_icon_bypass'] );
+	return (string) $svg;
+}
+
+add_filter( 'psoo_bridge_nav_icon', 'gend_society_sp_group_nav_icon', 10, 2 );
+/**
+ * Group menu: the chosen icon in place of the built-in one.
+ *
+ * @param string $svg  Built-in icon.
+ * @param string $slug Tab slug.
+ * @return string
+ */
+function gend_society_sp_group_nav_icon( $svg, $slug ) {
+	if ( ! empty( $GLOBALS['gend_society_sp_icon_bypass'] ) ) {
+		return $svg;
+	}
+	$icons  = gend_society_sp_menu_icons( 'groups' );
+	$chosen = isset( $icons[ $slug ] ) ? gend_society_sp_icon_svg( $icons[ $slug ], 'groups' ) : '';
+	return '' !== $chosen ? $chosen : $svg;
+}
+
+add_filter( 'gend_society_profile_nav_icon', 'gend_society_sp_profile_nav_icon', 10, 2 );
+/**
+ * Profile menu: the chosen icon in place of the built-in one.
+ *
+ * @param string $svg  Empty, or an earlier filter's icon.
+ * @param string $slug Tab slug.
+ * @return string
+ */
+function gend_society_sp_profile_nav_icon( $svg, $slug ) {
+	if ( ! empty( $GLOBALS['gend_society_sp_icon_bypass'] ) ) {
+		return $svg;
+	}
+	$icons = gend_society_sp_menu_icons( 'profiles' );
+	return isset( $icons[ $slug ] ) ? gend_society_sp_icon_svg( $icons[ $slug ], 'profiles' ) : $svg;
 }
 
 /**
@@ -784,7 +929,71 @@ function gend_society_sp_rest_state( WP_REST_Request $req ) {
 			'sampleUrl'  => $sample,
 			'photos'     => gend_society_sp_photos( $scope ),
 			'cardStats'  => gend_society_sp_card_stats( $scope ),
+			'notFound'   => 'profiles' === $scope ? gend_society_sp_not_found() : null,
+			'privacy'    => 'profiles' === $scope ? gend_society_sp_privacy() : null,
+			'icons'      => array_map(
+				function ( $key ) use ( $scope ) {
+					$lib = gend_society_sp_icon_library();
+					return array(
+						'key'   => $key,
+						'label' => $lib[ $key ][0],
+						'svg'   => gend_society_sp_icon_svg( $key, $scope ),
+					);
+				},
+				array_keys( gend_society_sp_icon_library() )
+			),
 		)
+	);
+}
+
+/**
+ * Privacy & trust switches (the same settings Member Management › Settings edits).
+ * Account deletion is BuddyPress's `bp-disable-account-deletion`, stored inverted.
+ *
+ * @return array|null Null when Youzify is not active.
+ */
+function gend_society_sp_privacy() {
+	if ( ! function_exists( 'youzify_option' ) ) {
+		return null;
+	}
+	$deletion = function_exists( 'bp_get_option' ) ? bp_get_option( 'bp-disable-account-deletion' ) : youzify_option( 'bp-disable-account-deletion' );
+	return array(
+		array(
+			'key'   => 'youzify_allow_private_profiles',
+			'title' => __( 'Allow private profiles', 'gend-society' ),
+			'desc'  => __( 'Members can choose to make their profile private.', 'gend-society' ),
+			'on'    => 'on' === youzify_options( 'youzify_allow_private_profiles' ),
+		),
+		array(
+			'key'   => 'youzify_enable_account_verification',
+			'title' => __( 'Verified badges', 'gend-society' ),
+			'desc'  => __( 'Show a verified badge next to members you have verified.', 'gend-society' ),
+			'on'    => 'on' === youzify_options( 'youzify_enable_account_verification' ),
+		),
+		array(
+			'key'   => 'bp-disable-account-deletion',
+			'title' => __( 'Let members delete their account', 'gend-society' ),
+			'desc'  => __( 'Members can permanently delete their own account from their settings.', 'gend-society' ),
+			'on'    => 0 == $deletion, // phpcs:ignore Universal.Operators.StrictComparisons -- stored as 0/1 or "0"/"1".
+		),
+	);
+}
+
+/**
+ * "Profile not found" page fields: Youzify's own options (the same ones
+ * Member Management › Settings edits). Empty text falls back to Youzify's default.
+ *
+ * @return array|null Null when Youzify is not active.
+ */
+function gend_society_sp_not_found() {
+	if ( ! function_exists( 'youzify_options' ) ) {
+		return null;
+	}
+	return array(
+		'desc'   => (string) youzify_options( 'youzify_profile_404_desc' ),
+		'button' => (string) youzify_options( 'youzify_profile_404_button' ),
+		'photo'  => (string) youzify_option( 'youzify_profile_404_photo', '' ),
+		'cover'  => (string) youzify_option( 'youzify_profile_404_cover', '' ),
 	);
 }
 
@@ -1081,6 +1290,59 @@ function gend_society_sp_rest_action( WP_REST_Request $req ) {
 			}
 			youzify_update_option( $key, empty( $body['on'] ) ? 'off' : 'on' );
 			return rest_ensure_response( array( 'cardStats' => gend_society_sp_card_stats( $scope ) ) );
+
+		case 'menu-icon':
+			$icon = isset( $body['icon'] ) ? sanitize_key( $body['icon'] ) : '';
+			$lib  = gend_society_sp_icon_library();
+			if ( '' === $slug || ( '' !== $icon && ! isset( $lib[ $icon ] ) ) ) {
+				return new WP_Error( 'gs_sp_icon', __( 'Unknown icon.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			$all = get_option( GEND_SOCIETY_SP_MENU_ICONS, array() );
+			$all = is_array( $all ) ? $all : array();
+			if ( ! isset( $all[ $scope ] ) || ! is_array( $all[ $scope ] ) ) {
+				$all[ $scope ] = array();
+			}
+			if ( '' === $icon ) {
+				unset( $all[ $scope ][ $slug ] );
+			} else {
+				$all[ $scope ][ $slug ] = $icon;
+			}
+			update_option( GEND_SOCIETY_SP_MENU_ICONS, $all );
+			return rest_ensure_response( array( 'icon' => $icon ) );
+
+		case 'privacy':
+			$key = isset( $body['key'] ) ? (string) $body['key'] : '';
+			$on  = ! empty( $body['on'] );
+			if ( 'profiles' !== $scope || ! function_exists( 'youzify_update_option' ) || ! in_array( $key, array( 'youzify_allow_private_profiles', 'youzify_enable_account_verification', 'bp-disable-account-deletion' ), true ) ) {
+				return new WP_Error( 'gs_sp_privacy', __( 'Unknown setting.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			if ( 'bp-disable-account-deletion' === $key ) {
+				youzify_update_option( $key, $on ? 0 : 1 );
+			} else {
+				youzify_update_option( $key, $on ? 'on' : 'off' );
+			}
+			return rest_ensure_response( array( 'privacy' => gend_society_sp_privacy() ) );
+
+		case 'not-found':
+			$field = isset( $body['field'] ) ? (string) $body['field'] : '';
+			if ( 'profiles' !== $scope || ! function_exists( 'youzify_update_option' ) || ! in_array( $field, array( 'desc', 'button', 'photo', 'cover' ), true ) ) {
+				return new WP_Error( 'gs_sp_not_found', __( 'Unknown setting.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			$raw = isset( $body['value'] ) ? (string) $body['value'] : '';
+			if ( 'desc' === $field ) {
+				$val = sanitize_textarea_field( $raw );
+			} elseif ( 'button' === $field ) {
+				$val = sanitize_text_field( $raw );
+			} else {
+				$val = esc_url_raw( trim( $raw ) );
+			}
+			$key = 'youzify_profile_404_' . $field;
+			if ( '' === trim( $val ) ) {
+				youzify_delete_option( $key );
+			} else {
+				youzify_update_option( $key, $val );
+			}
+			return rest_ensure_response( array( 'notFound' => gend_society_sp_not_found() ) );
 
 		case 'photos':
 			if ( ! function_exists( 'youzify_update_option' ) ) {

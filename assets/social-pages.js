@@ -89,38 +89,90 @@
 		}
 
 		/* ── Drag to reorder ────────────────────────────────────────────── */
-		// Rows carry data-key; dragging by the handle, or Alt+Up/Down on it.
+		// Rows carry data-key; drag by the handle (pointer events: mouse, touch and pen), or Alt+Up/Down on it.
 		function sortable( list, onDone ) {
-			var dragging = null;
-			list.addEventListener( 'dragstart', function ( e ) {
-				var row = e.target.closest && e.target.closest( '[data-key]' );
-				if ( ! row || row.parentNode !== list ) {
-					return;
-				}
-				dragging = row;
-				row.classList.add( 'is-dragging' );
-				e.dataTransfer.effectAllowed = 'move';
-				e.dataTransfer.setData( 'text/plain', row.getAttribute( 'data-key' ) );
-			} );
-			list.addEventListener( 'dragover', function ( e ) {
-				if ( ! dragging ) {
+			var drag = null;
+			var rowsOf = function () {
+				return Array.prototype.filter.call( list.children, function ( r ) {
+					return r.hasAttribute( 'data-key' );
+				} );
+			};
+			var keys = function () {
+				return rowsOf().map( function ( r ) {
+					return r.getAttribute( 'data-key' );
+				} );
+			};
+			var move = function ( e ) {
+				if ( ! drag || e.pointerId !== drag.id ) {
 					return;
 				}
 				e.preventDefault();
-				var over = e.target.closest && e.target.closest( '[data-key]' );
-				if ( ! over || over === dragging || over.parentNode !== list ) {
+				var rows = rowsOf();
+				for ( var i = 0; i < rows.length; i++ ) {
+					var r = rows[ i ];
+					if ( r === drag.row ) {
+						continue;
+					}
+					var b = r.getBoundingClientRect();
+					if ( e.clientY >= b.top && e.clientY <= b.bottom ) {
+						list.insertBefore( drag.row, e.clientY > b.top + b.height / 2 ? r.nextSibling : r );
+						break;
+					}
+				}
+				// Scroll the nearest scrolling pane when dragging near its edges.
+				var pane = list.parentNode;
+				while ( pane && pane !== document.body && ! ( pane.scrollHeight > pane.clientHeight && /auto|scroll/.test( getComputedStyle( pane ).overflowY ) ) ) {
+					pane = pane.parentNode;
+				}
+				pane = pane && pane !== document.body ? pane : document.scrollingElement;
+				var pr = pane === document.scrollingElement ? { top: 0, bottom: window.innerHeight } : pane.getBoundingClientRect();
+				if ( e.clientY < pr.top + 60 ) {
+					pane.scrollTop -= 12;
+				} else if ( e.clientY > pr.bottom - 60 ) {
+					pane.scrollTop += 12;
+				}
+			};
+			var end = function ( e ) {
+				if ( ! drag || e.pointerId !== drag.id ) {
 					return;
 				}
-				var r = over.getBoundingClientRect();
-				list.insertBefore( dragging, e.clientY > r.top + r.height / 2 ? over.nextSibling : over );
+				var d = drag;
+				drag = null;
+				document.removeEventListener( 'pointermove', move, true );
+				document.removeEventListener( 'pointerup', end, true );
+				document.removeEventListener( 'pointercancel', end, true );
+				d.row.classList.remove( 'is-dragging' );
+				list.classList.remove( 'is-sorting' );
+				try {
+					d.grip.releasePointerCapture( e.pointerId );
+				} catch ( er ) {}
+				if ( keys().join( '|' ) !== d.before ) {
+					onDone( keys() );
+				}
+			};
+			// A native drag (text or image) would cancel the pointer mid-move.
+			list.addEventListener( 'dragstart', function ( e ) {
+				if ( drag || ( e.target.closest && e.target.closest( '.gs-sp-handle' ) ) ) {
+					e.preventDefault();
+				}
 			} );
-			list.addEventListener( 'dragend', function () {
-				if ( ! dragging ) {
+			list.addEventListener( 'pointerdown', function ( e ) {
+				var grip = e.target.closest && e.target.closest( '.gs-sp-handle' );
+				var row = grip && grip.closest( '[data-key]' );
+				if ( drag || ! row || row.parentNode !== list || ( e.pointerType === 'mouse' && e.button !== 0 ) ) {
 					return;
 				}
-				dragging.classList.remove( 'is-dragging' );
-				dragging = null;
-				onDone( keys() );
+				e.preventDefault();
+				drag = { row: row, grip: grip, id: e.pointerId, before: keys().join( '|' ) };
+				row.classList.add( 'is-dragging' );
+				list.classList.add( 'is-sorting' );
+				// Moves are tracked on the document; capture only keeps touch from scrolling away.
+				try {
+					grip.setPointerCapture( e.pointerId );
+				} catch ( er ) {}
+				document.addEventListener( 'pointermove', move, true );
+				document.addEventListener( 'pointerup', end, true );
+				document.addEventListener( 'pointercancel', end, true );
 			} );
 			list.addEventListener( 'keydown', function ( e ) {
 				if ( ! e.altKey || ( e.key !== 'ArrowUp' && e.key !== 'ArrowDown' ) ) {
@@ -141,20 +193,12 @@
 					onDone( keys() );
 				}
 			} );
-			function keys() {
-				return Array.prototype.map.call( list.querySelectorAll( ':scope > [data-key]' ), function ( r ) {
-					return r.getAttribute( 'data-key' );
-				} );
-			}
 		}
 		function handle( label ) {
-			return h( 'button', { type: 'button', class: 'gs-sp-handle', draggable: 'true', title: __( 'Drag to reorder (or Alt + arrow keys)', 'gend-society' ), 'aria-label': label }, icon( 'menu' ) );
+			return h( 'button', { type: 'button', class: 'gs-sp-handle', title: __( 'Drag to reorder (or Alt + arrow keys)', 'gend-society' ), 'aria-label': label }, icon( 'menu' ) );
 		}
-		// Only the handle starts a drag, so inputs in the row keep working.
+		// Rows reorder from their handle only (see sortable), so inputs in the row keep working.
 		function dragRow( row ) {
-			row.addEventListener( 'mousedown', function ( e ) {
-				row.draggable = !! ( e.target.closest && e.target.closest( '.gs-sp-handle' ) );
-			} );
 			return row;
 		}
 
@@ -347,6 +391,77 @@
 				h( 'div', null, list, photosPanel() ), add );
 		}
 
+		// Image picker row: preview, URL field, media library, "Use default". save(url) resolves with the stored URL.
+		function imageRow( shape, title, hint, value, save, done ) {
+			var current = value || '';
+			var preview = h( 'div', { class: 'gs-sp-photo-prev is-' + shape } );
+			var input = h( 'input', { type: 'text', inputmode: 'url', class: 'gs-st-input', value: current,
+				placeholder: __( 'Paste an image URL or choose one', 'gend-society' ), 'aria-label': title } );
+			var clear = h( 'button', { type: 'button', class: 'gs-st-btn is-text is-sm' }, __( 'Use default', 'gend-society' ) );
+			var paint = function ( url ) {
+				preview.classList.toggle( 'is-empty', ! url );
+				preview.style.setProperty( '--gs-img', url ? 'url("' + url.replace( /["\\]/g, '' ) + '")' : 'none' );
+				preview.textContent = '';
+				if ( ! url ) {
+					preview.appendChild( icon( 'format-image' ) );
+				}
+				clear.hidden = ! url;
+			};
+			var commit = function ( url ) {
+				url = ( url || '' ).trim();
+				if ( url === current ) {
+					return;
+				}
+				paint( url );
+				save( url ).then( function ( stored ) {
+					current = stored || '';
+					input.value = current;
+					paint( current );
+					if ( done ) {
+						done();
+					}
+					toast( url ? __( 'Photo saved.', 'gend-society' ) : __( 'Photo cleared.', 'gend-society' ), 'ok' );
+				}, function ( e ) {
+					input.value = current;
+					paint( current );
+					fail( e );
+				} );
+			};
+			input.addEventListener( 'change', function () {
+				commit( input.value );
+			} );
+			input.addEventListener( 'keydown', function ( e ) {
+				if ( e.key === 'Enter' ) {
+					e.preventDefault();
+					commit( input.value );
+				}
+			} );
+			clear.addEventListener( 'click', function () {
+				input.value = '';
+				commit( '' );
+			} );
+			var pick = h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+				if ( ! window.wp || ! wp.media ) {
+					input.focus();
+					return;
+				}
+				var frame = wp.media( { title: title, library: { type: 'image' }, multiple: false, button: { text: __( 'Use this image', 'gend-society' ) } } );
+				frame.on( 'select', function () {
+					var a = frame.state().get( 'selection' ).first().toJSON();
+					input.value = a.url;
+					commit( a.url );
+				} );
+				frame.open();
+			} }, icon( 'upload' ), __( 'Choose image', 'gend-society' ) );
+			paint( current );
+			return h( 'div', { class: 'gs-sp-photo' }, preview,
+				h( 'div', { class: 'gs-sp-photo-body' },
+					h( 'strong', null, title ),
+					h( 'p', { class: 'gs-st-muted' }, hint ),
+					input,
+					h( 'div', { class: 'gs-sp-photo-actions' }, pick, clear ) ) );
+		}
+
 		// Default avatar + cover (Youzify options), shown until a member or group uploads their own.
 		function photosPanel() {
 			if ( ! D.photos ) {
@@ -358,70 +473,12 @@
 				chip.textContent = sprintf( __( '%d of 2 set', 'gend-society' ), n );
 			};
 			var row = function ( part, title, hint ) {
-				var preview = h( 'div', { class: 'gs-sp-photo-prev is-' + part } );
-				var input = h( 'input', { type: 'text', inputmode: 'url', class: 'gs-st-input', value: D.photos[ part ] || '',
-					placeholder: __( 'Paste an image URL or choose one', 'gend-society' ), 'aria-label': title } );
-				var clear = h( 'button', { type: 'button', class: 'gs-st-btn is-text is-sm' }, __( 'Use default', 'gend-society' ) );
-				var paint = function ( url ) {
-					preview.classList.toggle( 'is-empty', ! url );
-					preview.style.setProperty( '--gs-img', url ? 'url("' + url.replace( /["\\]/g, '' ) + '")' : 'none' );
-					preview.textContent = '';
-					if ( ! url ) {
-						preview.appendChild( icon( 'format-image' ) );
-					}
-					clear.hidden = ! url;
-				};
-				var save = function ( url ) {
-					url = ( url || '' ).trim();
-					if ( url === ( D.photos[ part ] || '' ) ) {
-						return;
-					}
-					paint( url );
-					post( 'photos', { part: part, url: url } ).then( function ( res ) {
+				return imageRow( part, title, hint, D.photos[ part ], function ( url ) {
+					return post( 'photos', { part: part, url: url } ).then( function ( res ) {
 						D.photos = res.photos || D.photos;
-						input.value = D.photos[ part ] || '';
-						paint( D.photos[ part ] );
-						paintChip();
-						toast( url ? __( 'Default photo saved.', 'gend-society' ) : __( 'Default photo cleared.', 'gend-society' ), 'ok' );
-					}, function ( e ) {
-						input.value = D.photos[ part ] || '';
-						paint( D.photos[ part ] );
-						fail( e );
+						return D.photos[ part ];
 					} );
-				};
-				input.addEventListener( 'change', function () {
-					save( input.value );
-				} );
-				input.addEventListener( 'keydown', function ( e ) {
-					if ( e.key === 'Enter' ) {
-						e.preventDefault();
-						save( input.value );
-					}
-				} );
-				clear.addEventListener( 'click', function () {
-					input.value = '';
-					save( '' );
-				} );
-				var pick = h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
-					if ( ! window.wp || ! wp.media ) {
-						input.focus();
-						return;
-					}
-					var frame = wp.media( { title: title, library: { type: 'image' }, multiple: false, button: { text: __( 'Use this image', 'gend-society' ) } } );
-					frame.on( 'select', function () {
-						var a = frame.state().get( 'selection' ).first().toJSON();
-						input.value = a.url;
-						save( a.url );
-					} );
-					frame.open();
-				} }, icon( 'upload' ), __( 'Choose image', 'gend-society' ) );
-				paint( D.photos[ part ] );
-				return h( 'div', { class: 'gs-sp-photo' }, preview,
-					h( 'div', { class: 'gs-sp-photo-body' },
-						h( 'strong', null, title ),
-						h( 'p', { class: 'gs-st-muted' }, hint ),
-						input,
-						h( 'div', { class: 'gs-sp-photo-actions' }, pick, clear ) ) );
+				}, paintChip );
 			};
 			paintChip();
 			return h( 'div', { class: 'gs-sp-photos' },
@@ -489,6 +546,90 @@
 				__( 'Drag tabs into order, rename them and hide the ones you don’t need. Open a tab to give it different pages for different people, each with its own layout.', 'gend-society' ), list, add );
 		}
 
+		// Icon button + picker for a menu tab. Icons are server-made SVG (the builder's own library).
+		function iconPicker( r ) {
+			var btn = h( 'button', { type: 'button', class: 'gs-sp-icon-btn', 'aria-haspopup': 'true', 'aria-expanded': 'false' } );
+			var paint = function () {
+				var lib = r.icon && ( D.icons || [] ).filter( function ( i ) {
+					return i.key === r.icon;
+				} )[ 0 ];
+				btn.innerHTML = lib ? lib.svg : ( r.defaultIcon || '' );
+				btn.classList.toggle( 'is-custom', !! lib );
+				btn.title = sprintf( __( 'Icon for %s: click to change', 'gend-society' ), r.label || r.defaultLabel );
+				btn.setAttribute( 'aria-label', btn.title );
+			};
+			var pop = null;
+			var close = function () {
+				if ( pop ) {
+					pop.remove();
+					pop = null;
+					btn.setAttribute( 'aria-expanded', 'false' );
+					document.removeEventListener( 'mousedown', outside, true );
+					document.removeEventListener( 'keydown', esc, true );
+				}
+			};
+			var outside = function ( e ) {
+				if ( pop && ! pop.contains( e.target ) && e.target !== btn && ! btn.contains( e.target ) ) {
+					close();
+				}
+			};
+			var esc = function ( e ) {
+				if ( e.key === 'Escape' ) {
+					close();
+					btn.focus();
+				}
+			};
+			var choose = function ( key ) {
+				var was = r.icon || '';
+				close();
+				if ( key === was ) {
+					return;
+				}
+				r.icon = key;
+				paint();
+				post( 'menu-icon', { slug: r.slug, icon: key } ).then( function () {
+					toast( __( 'Menu icon saved.', 'gend-society' ), 'ok' );
+				}, function ( e ) {
+					r.icon = was;
+					paint();
+					fail( e );
+				} );
+			};
+			btn.addEventListener( 'click', function ( e ) {
+				e.stopPropagation();
+				if ( pop ) {
+					close();
+					return;
+				}
+				var grid = h( 'div', { class: 'gs-sp-icon-grid', role: 'listbox', 'aria-label': __( 'Icons', 'gend-society' ) } );
+				var def = h( 'button', { type: 'button', role: 'option', class: 'gs-sp-icon-opt is-default' + ( r.icon ? '' : ' is-on' ), 'aria-selected': r.icon ? 'false' : 'true', title: __( 'Default icon', 'gend-society' ), onclick: function () {
+					choose( '' );
+				} } );
+				def.innerHTML = r.defaultIcon || '';
+				def.appendChild( h( 'span', null, __( 'Default', 'gend-society' ) ) );
+				grid.appendChild( def );
+				( D.icons || [] ).forEach( function ( ic ) {
+					var o = h( 'button', { type: 'button', role: 'option', class: 'gs-sp-icon-opt' + ( r.icon === ic.key ? ' is-on' : '' ), 'aria-selected': r.icon === ic.key ? 'true' : 'false', title: ic.label, onclick: function () {
+						choose( ic.key );
+					} } );
+					o.innerHTML = ic.svg;
+					o.appendChild( h( 'span', null, ic.label ) );
+					grid.appendChild( o );
+				} );
+				pop = h( 'div', { class: 'gs-sp-icon-pop' }, h( 'div', { class: 'gs-sp-icon-pop-head' }, h( 'strong', null, sprintf( __( 'Icon for %s', 'gend-society' ), r.label || r.defaultLabel ) ) ), grid );
+				btn.parentNode.appendChild( pop );
+				btn.setAttribute( 'aria-expanded', 'true' );
+				document.addEventListener( 'mousedown', outside, true );
+				document.addEventListener( 'keydown', esc, true );
+				var on = grid.querySelector( '.is-on' ) || grid.firstChild;
+				if ( on ) {
+					on.focus();
+				}
+			} );
+			paint();
+			return h( 'span', { class: 'gs-sp-icon-wrap' }, btn );
+		}
+
 		function menuRow( r, saveMenu ) {
 			var pages = pagesOf( r.slug );
 			var open = openTab === r.slug;
@@ -532,7 +673,7 @@
 					fillTab( body, r );
 				}
 			} }, icon( 'arrow-down-alt2' ) );
-			var head = h( 'div', { class: 'gs-sp-tab-head' }, handle( sprintf( __( 'Move %s', 'gend-society' ), r.label || r.defaultLabel ) ), label, slug, count, eye, toggle );
+			var head = h( 'div', { class: 'gs-sp-tab-head' }, handle( sprintf( __( 'Move %s', 'gend-society' ), r.label || r.defaultLabel ) ), iconPicker( r ), label, slug, count, eye, toggle );
 			head.addEventListener( 'click', function ( e ) {
 				if ( e.target === head || e.target === count ) {
 					toggle.click();
@@ -822,52 +963,125 @@
 				h( 'div', null, h( 'div', { class: 'gs-sp-cards' }, card ), statsPanel() ) );
 		}
 
-		// Card statistics switches (Youzify options); the per-stat switches dim while the master switch is off.
-		function statsPanel() {
-			if ( ! D.cardStats || ! D.cardStats.length ) {
-				return null;
-			}
+		// On/off switch list saved one switch at a time through `action`; the response carries the list under `stateKey`.
+		// With `master`, the first switch gates the rest (they dim while it is off).
+		function switchList( stateKey, action, master, message, onSaved ) {
 			var grid = h( 'div', { class: 'gs-sp-stats-grid' } );
 			var paint = function () {
-				var master = D.cardStats[ 0 ].on;
+				var gate = ! master || D[ stateKey ][ 0 ].on;
 				grid.querySelectorAll( '.gs-sp-stat' ).forEach( function ( el, i ) {
-					el.classList.toggle( 'is-muted', i > 0 && ! master );
+					el.classList.toggle( 'is-muted', i > 0 && ! gate );
 				} );
+				if ( onSaved ) {
+					onSaved();
+				}
 			};
-			D.cardStats.forEach( function ( st, i ) {
-				var id = 'gs-sp-stat-' + st.key;
+			D[ stateKey ].forEach( function ( st, i ) {
+				var id = 'gs-sp-' + stateKey + '-' + st.key;
 				var input = h( 'input', { type: 'checkbox', role: 'switch', id: id, class: 'gs-sp-switch-input', checked: st.on ? true : null } );
 				input.addEventListener( 'change', function () {
 					var on = input.checked;
 					input.disabled = true;
-					post( 'card-stat', { key: st.key, on: on } ).then( function ( res ) {
+					post( action, { key: st.key, on: on } ).then( function ( res ) {
 						input.disabled = false;
-						D.cardStats = res.cardStats || D.cardStats;
-						D.cardStats.forEach( function ( r ) {
+						D[ stateKey ] = res[ stateKey ] || D[ stateKey ];
+						D[ stateKey ].forEach( function ( r ) {
 							if ( r.key === st.key ) {
 								st.on = r.on;
 							}
 						} );
 						input.checked = st.on;
 						paint();
-						toast( on ? sprintf( __( '%s shown on cards.', 'gend-society' ), st.title ) : sprintf( __( '%s hidden on cards.', 'gend-society' ), st.title ), 'ok' );
+						toast( message( st, on ), 'ok' );
 					}, function ( e ) {
 						input.disabled = false;
 						input.checked = st.on;
 						fail( e );
 					} );
 				} );
-				grid.appendChild( h( 'div', { class: 'gs-sp-stat' + ( i === 0 ? ' is-master' : '' ) },
+				grid.appendChild( h( 'div', { class: 'gs-sp-stat' + ( master && i === 0 ? ' is-master' : '' ) },
 					h( 'label', { for: id, class: 'gs-sp-stat-text' }, h( 'strong', null, st.title ), h( 'span', { class: 'gs-st-muted' }, st.desc ) ),
 					h( 'span', { class: 'gs-sp-switch' }, input, h( 'label', { for: id, class: 'gs-sp-switch-track', 'aria-hidden': 'true' } ) ) ) );
 			} );
 			paint();
+			return grid;
+		}
+
+		// Card statistics switches (Youzify options).
+		function statsPanel() {
+			if ( ! D.cardStats || ! D.cardStats.length ) {
+				return null;
+			}
 			return h( 'div', { class: 'gs-sp-photos gs-sp-stats' },
 				h( 'div', { class: 'gs-sp-photos-head' },
 					h( 'span', { class: 'gs-sp-card-ico' }, icon( 'chart-bar' ) ),
 					h( 'div', null, h( 'strong', null, __( 'Card statistics', 'gend-society' ) ),
 						h( 'p', { class: 'gs-st-muted' }, isGroups ? __( 'The numbers shown on each group’s card in the directory. Changes save straight away.', 'gend-society' ) : __( 'The numbers shown on each member’s card in the directory. Changes save straight away.', 'gend-society' ) ) ) ),
-				grid );
+				switchList( 'cardStats', 'card-stat', true, function ( st, on ) {
+					return on ? sprintf( __( '%s shown on cards.', 'gend-society' ), st.title ) : sprintf( __( '%s hidden on cards.', 'gend-society' ), st.title );
+				} ) );
+		}
+
+		// Privacy & trust switches (profiles only).
+		function privacySection() {
+			if ( isGroups || ! D.privacy || ! D.privacy.length ) {
+				return null;
+			}
+			var chip = h( 'span', { class: 'gs-sp-photos-chip' } );
+			var list = switchList( 'privacy', 'privacy', false, function ( st, on ) {
+				return sprintf( on ? __( '%s: on.', 'gend-society' ) : __( '%s: off.', 'gend-society' ), st.title );
+			}, function () {
+				chip.textContent = sprintf( __( '%1$d of %2$d on', 'gend-society' ), D.privacy.filter( function ( r ) {
+					return r.on;
+				} ).length, D.privacy.length );
+			} );
+			return section( 6, __( 'Privacy & trust', 'gend-society' ),
+				__( 'What members control about their own profile and account. Changes save straight away.', 'gend-society' ),
+				h( 'div', { class: 'gs-sp-photos gs-sp-stats' }, list ), chip );
+		}
+
+		// Profile not found page (Youzify options): message, button text, photo, cover.
+		function notFoundSection() {
+			if ( isGroups || ! D.notFound ) {
+				return null;
+			}
+			var nf = D.notFound;
+			var save = function ( field, value ) {
+				return post( 'not-found', { field: field, value: value } ).then( function ( res ) {
+					D.notFound = nf = res.notFound || nf;
+					return nf[ field ];
+				} );
+			};
+			var textField = function ( field, title, hint, multi ) {
+				var id = 'gs-sp-nf-' + field;
+				var el = h( multi ? 'textarea' : 'input', multi ? { id: id, class: 'gs-st-input gs-sp-nf-text', rows: 3 } : { id: id, type: 'text', class: 'gs-st-input' } );
+				el.value = nf[ field ] || '';
+				el.addEventListener( 'change', function () {
+					var v = el.value;
+					save( field, v ).then( function ( stored ) {
+						el.value = stored || '';
+						toast( __( 'Saved.', 'gend-society' ), 'ok' );
+					}, function ( e ) {
+						el.value = nf[ field ] || '';
+						fail( e );
+					} );
+				} );
+				return h( 'div', { class: 'gs-sp-nf-field' },
+					h( 'label', { for: id }, h( 'strong', null, title ), h( 'span', { class: 'gs-st-muted' }, hint ) ), el );
+			};
+			var img = function ( field, shape, title, hint ) {
+				return imageRow( shape, title, hint, nf[ field ], function ( url ) {
+					return save( field, url );
+				} );
+			};
+			return section( 5, __( 'Profile not found page', 'gend-society' ),
+				__( 'What visitors see when a profile does not exist or was removed. Changes save straight away.', 'gend-society' ),
+				h( 'div', { class: 'gs-sp-photos gs-sp-nf' },
+					textField( 'desc', __( 'Message', 'gend-society' ), __( 'Explain what happened and where to go next.', 'gend-society' ), true ),
+					textField( 'button', __( 'Button text', 'gend-society' ), __( 'The label on the button shown on that page.', 'gend-society' ) ),
+					h( 'div', { class: 'gs-sp-photos-grid' },
+						img( 'photo', 'avatar', __( 'Photo', 'gend-society' ), __( 'Shown in place of the profile photo.', 'gend-society' ) ),
+						img( 'cover', 'cover', __( 'Cover', 'gend-society' ), __( 'Shown in place of the profile cover.', 'gend-society' ) ) ) ) );
 		}
 
 		function fail( e ) {
@@ -891,6 +1105,14 @@
 			content.appendChild( menuSection() );
 			content.appendChild( sidebarSection() );
 			content.appendChild( directorySection() );
+			var nfs = notFoundSection();
+			if ( nfs ) {
+				content.appendChild( nfs );
+			}
+			var prs = privacySection();
+			if ( prs ) {
+				content.appendChild( prs );
+			}
 			if ( wrap.parentNode ) {
 				wrap.parentNode.scrollTop = y;
 			}
