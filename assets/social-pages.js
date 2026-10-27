@@ -14,8 +14,9 @@
 		var api = kit.api;
 		var toast = kit.toast;
 		var errMsg = kit.errMsg;
-		var scope = hit.item.scope === 'profiles' ? 'profiles' : 'groups';
+		var scope = hit.item.scope === 'profiles' || hit.item.scope === 'activity' ? hit.item.scope : 'groups';
 		var isGroups = scope === 'groups';
+		var isActivity = scope === 'activity';
 		var base = '/gend-society/v1/social-pages/' + scope;
 		var D = null; // Builder state from the server.
 		var openTab = null; // Expanded menu tab slug.
@@ -392,12 +393,13 @@
 		}
 
 		// Image picker row: preview, URL field, media library, "Use default". save(url) resolves with the stored URL.
-		function imageRow( shape, title, hint, value, save, done ) {
+		function imageRow( shape, title, hint, value, save, done, opts ) {
+			opts = opts || {};
 			var current = value || '';
 			var preview = h( 'div', { class: 'gs-sp-photo-prev is-' + shape } );
 			var input = h( 'input', { type: 'text', inputmode: 'url', class: 'gs-st-input', value: current,
 				placeholder: __( 'Paste an image URL or choose one', 'gend-society' ), 'aria-label': title } );
-			var clear = h( 'button', { type: 'button', class: 'gs-st-btn is-text is-sm' }, __( 'Use default', 'gend-society' ) );
+			var clear = h( 'button', { type: 'button', class: 'gs-st-btn is-text is-sm' }, opts.clearLabel || __( 'Use default', 'gend-society' ) );
 			var paint = function ( url ) {
 				preview.classList.toggle( 'is-empty', ! url );
 				preview.style.setProperty( '--gs-img', url ? 'url("' + url.replace( /["\\]/g, '' ) + '")' : 'none' );
@@ -420,7 +422,9 @@
 					if ( done ) {
 						done();
 					}
-					toast( url ? __( 'Photo saved.', 'gend-society' ) : __( 'Photo cleared.', 'gend-society' ), 'ok' );
+					if ( ! opts.quiet ) {
+						toast( url ? __( 'Photo saved.', 'gend-society' ) : __( 'Photo cleared.', 'gend-society' ), 'ok' );
+					}
 				}, function ( e ) {
 					input.value = current;
 					paint( current );
@@ -1088,12 +1092,190 @@
 			toast( errMsg( e ), 'error' );
 		}
 
+		/* ── Activity feed (scope "activity") ───────────────────────────── */
+		// One on/off row in the same look as the other switch lists.
+		function switchRow( id, title, desc, on, onChange ) {
+			var input = h( 'input', { type: 'checkbox', role: 'switch', id: id, class: 'gs-sp-switch-input', checked: on ? true : null } );
+			input.addEventListener( 'change', function () {
+				onChange( input );
+			} );
+			return h( 'div', { class: 'gs-sp-stat' },
+				h( 'label', { for: id, class: 'gs-sp-stat-text' }, h( 'strong', null, title ), h( 'span', { class: 'gs-st-muted' }, desc ) ),
+				h( 'span', { class: 'gs-sp-switch' }, input, h( 'label', { for: id, class: 'gs-sp-switch-track', 'aria-hidden': 'true' } ) ) );
+		}
+
+		function feedSection() {
+			var card = h( 'div', { class: 'gs-sp-card gs-sp-dir' },
+				h( 'div', { class: 'gs-sp-card-main' },
+					h( 'span', { class: 'gs-sp-card-ico' }, icon( 'rss' ) ),
+					h( 'div', null, h( 'strong', null, __( 'Activity feed layout', 'gend-society' ) ),
+						h( 'div', { class: 'gs-sp-tags' }, h( 'span', { class: 'gs-st-badge ' + ( D.feed.published ? 'is-custom' : 'is-missing' ) }, D.feed.published ? __( 'Block layout live', 'gend-society' ) : __( 'Youzify layout (not designed yet)', 'gend-society' ) ) ) ) ),
+				h( 'div', { class: 'gs-sp-card-actions' },
+					D.feed.url ? h( 'a', { class: 'gs-st-btn is-ghost is-sm', href: D.feed.url, target: '_blank', rel: 'noopener' }, icon( 'external' ), __( 'View', 'gend-society' ) ) : null,
+					h( 'button', { type: 'button', class: 'gs-st-btn is-primary is-sm', onclick: function ( e ) {
+						var btn = e.currentTarget;
+						btn.disabled = true;
+						post( 'feed' ).then( function ( res ) {
+							btn.disabled = false;
+							openDrawer( card, 'feed', __( 'Activity feed layout', 'gend-society' ), res.editUrl, reload );
+						}, function ( er ) {
+							btn.disabled = false;
+							fail( er );
+						} );
+					} }, icon( 'edit' ), D.feed.published ? __( 'Edit', 'gend-society' ) : __( 'Design', 'gend-society' ) ) ) );
+			return section( 1, __( 'Feed layout', 'gend-society' ), __( 'How the activity feed page looks: its blocks, columns and styling.', 'gend-society' ), h( 'div', { class: 'gs-sp-cards' }, card ) );
+		}
+
+		function reactionsSection() {
+			var R = D.reactions;
+			if ( ! R ) {
+				return section( 2, __( 'Reactions', 'gend-society' ), __( 'Turn on the Activity Reactions extension to let members react to posts.', 'gend-society' ), null );
+			}
+			var save = function ( key, value ) {
+				return post( 'reaction-setting', { key: key, value: value } ).then( function ( res ) {
+					D.reactions = R = res.reactions || R;
+					toast( __( 'Saved.', 'gend-society' ), 'ok' );
+				} );
+			};
+			var toggle = function ( key ) {
+				return function ( input ) {
+					input.disabled = true;
+					save( key, input.checked ).then( function () {
+						input.disabled = false;
+					}, function ( e ) {
+						input.disabled = false;
+						input.checked = ! input.checked;
+						fail( e );
+					} );
+				};
+			};
+			var select = function ( key, label ) {
+				var sel = h( 'select', { class: 'gs-st-input', 'aria-label': label, onchange: function () {
+					save( key, sel.value ).then( null, function ( e ) {
+						sel.value = R[ key ];
+						fail( e );
+					} );
+				} } );
+				R.emojis.forEach( function ( em ) {
+					sel.appendChild( h( 'option', { value: em.id, selected: R[ key ] === em.id ? true : null }, em.title ) );
+				} );
+				return sel;
+			};
+			var titleInput = h( 'input', { type: 'text', class: 'gs-st-input', value: R.title, 'aria-label': __( 'Like button title', 'gend-society' ) } );
+			titleInput.addEventListener( 'change', function () {
+				save( 'title', titleInput.value ).then( function () {
+					titleInput.value = R.title;
+				}, fail );
+			} );
+			var field = function ( title, desc, control ) {
+				return h( 'div', { class: 'gs-sp-stat gs-sp-field' },
+					h( 'div', { class: 'gs-sp-stat-text' }, h( 'strong', null, title ), h( 'span', { class: 'gs-st-muted' }, desc ) ), control );
+			};
+			var general = h( 'div', { class: 'gs-sp-photos gs-sp-stats' },
+				h( 'div', { class: 'gs-sp-stats-grid' },
+					switchRow( 'gs-sp-rx-posts', __( 'Reactions on posts', 'gend-society' ), __( 'Members can react to activity posts.', 'gend-society' ), R.posts, toggle( 'posts' ) ),
+					switchRow( 'gs-sp-rx-comments', __( 'Reactions on comments', 'gend-society' ), __( 'Members can react to comments on posts.', 'gend-society' ), R.comments, toggle( 'comments' ) ) ),
+				h( 'div', { class: 'gs-sp-rx-fields' },
+					field( __( 'Like button title', 'gend-society' ), __( 'The label on the like button.', 'gend-society' ), titleInput ),
+					field( __( 'Favorites tab reaction', 'gend-society' ), __( 'Posts with this reaction appear in a member’s Favorites tab.', 'gend-society' ), select( 'favorite', __( 'Favorites tab reaction', 'gend-society' ) ) ),
+					field( __( 'Like button reaction', 'gend-society' ), __( 'Clicking the like button gives this reaction.', 'gend-society' ), select( 'like', __( 'Like button reaction', 'gend-society' ) ) ) ) );
+
+			// Emoji list: drag to order, edit in place, add new.
+			var formSlot = h( 'div', { class: 'gs-sp-rx-form-slot' } );
+			var grid = h( 'div', { class: 'gs-sp-rx-grid' } );
+			var openForm = function ( em ) {
+				formSlot.textContent = '';
+				var cur = em || { id: '', title: '', description: '', image: '', visible: true };
+				var title = h( 'input', { type: 'text', class: 'gs-st-input', value: cur.title, placeholder: __( 'e.g. Celebrate', 'gend-society' ) } );
+				var desc = h( 'input', { type: 'text', class: 'gs-st-input', value: cur.description, placeholder: __( 'e.g. Celebrated posts', 'gend-society' ) } );
+				var image = cur.image;
+				var pickRow = imageRow( 'avatar', __( 'Emoji image', 'gend-society' ), __( 'A square PNG or SVG, shown small.', 'gend-society' ), image, function ( url ) {
+					image = url;
+					return Promise.resolve( url );
+				}, null, { clearLabel: __( 'Remove', 'gend-society' ), quiet: true } );
+				var vis = h( 'input', { type: 'checkbox', role: 'switch', id: 'gs-sp-rx-vis', class: 'gs-sp-switch-input', checked: cur.visible ? true : null } );
+				var saveBtn = h( 'button', { type: 'button', class: 'gs-st-btn is-primary is-sm', onclick: function () {
+					saveBtn.disabled = true;
+					post( 'emoji', { id: cur.id, title: title.value, description: desc.value, image: image, visible: vis.checked } ).then( function ( res ) {
+						D.reactions = res.reactions || D.reactions;
+						toast( cur.id ? __( 'Reaction updated.', 'gend-society' ) : __( 'Reaction added.', 'gend-society' ), 'ok' );
+						draw();
+					}, function ( e ) {
+						saveBtn.disabled = false;
+						fail( e );
+					} );
+				} }, icon( 'yes' ), cur.id ? __( 'Save reaction', 'gend-society' ) : __( 'Add reaction', 'gend-society' ) );
+				var form = h( 'div', { class: 'gs-sp-rx-form' },
+					h( 'div', { class: 'gs-sp-rx-form-head' }, h( 'strong', null, cur.id ? sprintf( __( 'Edit “%s”', 'gend-society' ), cur.title ) : __( 'New reaction', 'gend-society' ) ),
+						h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+							formSlot.textContent = '';
+						} }, __( 'Cancel', 'gend-society' ) ) ),
+					h( 'div', { class: 'gs-sp-rx-form-grid' },
+						h( 'label', { class: 'gs-sp-nf-field' }, h( 'strong', null, __( 'Title', 'gend-society' ) ), title ),
+						h( 'label', { class: 'gs-sp-nf-field' }, h( 'strong', null, __( 'Description', 'gend-society' ) ), desc ) ),
+					pickRow,
+					h( 'div', { class: 'gs-sp-stat' },
+						h( 'label', { for: 'gs-sp-rx-vis', class: 'gs-sp-stat-text' }, h( 'strong', null, __( 'Show this reaction', 'gend-society' ) ), h( 'span', { class: 'gs-st-muted' }, __( 'Hidden reactions stay on past posts but can’t be picked.', 'gend-society' ) ) ),
+						h( 'span', { class: 'gs-sp-switch' }, vis, h( 'label', { for: 'gs-sp-rx-vis', class: 'gs-sp-switch-track', 'aria-hidden': 'true' } ) ) ),
+					h( 'div', { class: 'gs-sp-photo-actions' }, saveBtn ) );
+				formSlot.appendChild( form );
+				title.focus();
+			};
+			R.emojis.forEach( function ( em ) {
+				var used = em.id === R.like || em.id === R.favorite;
+				var del = h( 'button', { type: 'button', class: 'gs-sp-eye is-danger', title: used ? __( 'Used by the like button or Favorites tab', 'gend-society' ) : __( 'Delete', 'gend-society' ), disabled: used ? true : null, 'aria-label': sprintf( __( 'Delete %s', 'gend-society' ), em.title ), onclick: function () {
+					kit.confirmBox( __( 'Delete this reaction?', 'gend-society' ), sprintf( __( '“%s” will no longer be offered. Posts that already have it keep their count.', 'gend-society' ), em.title ), [ { label: __( 'Cancel', 'gend-society' ), value: false }, { label: __( 'Delete', 'gend-society' ), value: true, primary: true } ] ).then( function ( ok ) {
+						if ( ! ok ) {
+							return;
+						}
+						post( 'emoji-delete', { id: em.id } ).then( function ( res ) {
+							D.reactions = res.reactions || D.reactions;
+							toast( __( 'Reaction deleted.', 'gend-society' ), 'ok' );
+							draw();
+						}, fail );
+					} );
+				} }, icon( 'trash' ) );
+				var img = h( 'span', { class: 'gs-sp-rx-img' } );
+				img.style.setProperty( '--gs-img', em.image ? 'url("' + em.image.replace( /["\\]/g, '' ) + '")' : 'none' );
+				grid.appendChild( h( 'div', { class: 'gs-sp-rx' + ( em.visible ? '' : ' is-hidden' ), 'data-key': em.id },
+					handle( sprintf( __( 'Move %s', 'gend-society' ), em.title ) ),
+					img,
+					h( 'span', { class: 'gs-sp-rx-name' }, h( 'strong', null, em.title ), em.visible ? null : h( 'span', { class: 'gs-st-muted' }, __( 'Hidden', 'gend-society' ) ) ),
+					h( 'button', { type: 'button', class: 'gs-sp-eye', title: __( 'Edit', 'gend-society' ), 'aria-label': sprintf( __( 'Edit %s', 'gend-society' ), em.title ), onclick: function () {
+						openForm( em );
+					} }, icon( 'edit' ) ),
+					del ) );
+			} );
+			sortable( grid, function ( ids ) {
+				post( 'emoji-order', { ids: ids } ).then( function ( res ) {
+					D.reactions = R = res.reactions || R;
+					toast( __( 'Order saved.', 'gend-society' ), 'ok' );
+				}, function ( e ) {
+					fail( e );
+					reload();
+				} );
+			} );
+			var add = h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+				openForm( null );
+			} }, icon( 'plus-alt2' ), __( 'Add reaction', 'gend-society' ) );
+			return section( 2, __( 'Reactions', 'gend-society' ), __( 'How members react to posts and comments. Drag the reactions to set their order. Changes save straight away.', 'gend-society' ),
+				h( 'div', null, general,
+					h( 'div', { class: 'gs-sp-photos' },
+						h( 'div', { class: 'gs-sp-photos-head' },
+							h( 'span', { class: 'gs-sp-card-ico' }, icon( 'smiley' ) ),
+							h( 'div', null, h( 'strong', null, __( 'Reactions', 'gend-society' ) ),
+								h( 'p', { class: 'gs-st-muted' }, sprintf( __( '%d reactions. Drag to reorder.', 'gend-society' ), R.emojis.length ) ) ) ),
+						formSlot, grid ) ), add );
+		}
+
 		/* ── Draw ───────────────────────────────────────────────────────── */
 		var content = h( 'div', { class: 'gs-sp-sections' }, kit.loadingView() );
 		var wrap = h( 'div', { class: 'gs-st-pad gs-sp' }, kit.crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ),
-			h( 'p', { class: 'gs-st-intro' }, isGroups
-				? __( 'Everything group pages show, on one page: the header, the menu and the pages behind each tab (different ones for visitors, members, roles and plans), the sidebars, and the group directory.', 'gend-society' )
-				: __( 'Everything profiles show, on one page: the header, the menu and the pages behind each tab (different ones for visitors, friends and member types), the sidebars, and the members directory.', 'gend-society' ) ),
+			h( 'p', { class: 'gs-st-intro' }, isActivity
+				? __( 'The activity feed on one page: its layout, and how members react to posts and comments.', 'gend-society' )
+				: isGroups
+					? __( 'Everything group pages show, on one page: the header, the menu and the pages behind each tab (different ones for visitors, members, roles and plans), the sidebars, and the group directory.', 'gend-society' )
+					: __( 'Everything profiles show, on one page: the header, the menu and the pages behind each tab (different ones for visitors, friends and member types), the sidebars, and the members directory.', 'gend-society' ) ),
 			content );
 		function draw() {
 			var y = wrap.parentNode ? wrap.parentNode.scrollTop : 0;
@@ -1101,6 +1283,14 @@
 				drawer.close( true );
 			}
 			content.textContent = '';
+			if ( isActivity ) {
+				content.appendChild( feedSection() );
+				content.appendChild( reactionsSection() );
+				if ( wrap.parentNode ) {
+					wrap.parentNode.scrollTop = y;
+				}
+				return;
+			}
 			content.appendChild( headerSection() );
 			content.appendChild( menuSection() );
 			content.appendChild( sidebarSection() );

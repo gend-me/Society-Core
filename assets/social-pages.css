@@ -302,3 +302,25 @@ body.gs-studio-page .gs-studio textarea.gs-st-input { background: rgba(0, 0, 0, 
 	opacity: 1; transform: scale(1.012); position: relative; z-index: 5;
 	border-color: var(--st-accent); box-shadow: 0 16px 40px rgba(0, 0, 0, .45), 0 0 0 2px rgba(151, 228, 110, .25);
 }
+
+/* Activity feed: reactions */
+.gs-studio .gs-sp-rx-fields { display: flex; flex-direction: column; margin-top: 6px; }
+.gs-studio .gs-sp-field .gs-st-input { flex: 0 1 260px; min-width: 160px; }
+.gs-studio .gs-sp-rx-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(min(100%, 220px), 1fr)); gap: 8px; }
+.gs-studio .gs-sp-rx {
+	display: flex; align-items: center; gap: 8px; padding: 8px 8px 8px 6px; border: 1px solid var(--st-border); border-radius: 12px;
+	background: var(--st-card); transition: border-color .2s, background .2s, box-shadow .2s, transform .2s var(--st-ease);
+}
+.gs-studio .gs-sp-rx:hover { border-color: var(--st-border-hi); background: var(--st-card-hi); }
+.gs-studio .gs-sp-rx.is-hidden { opacity: .55; }
+.gs-studio .gs-sp-rx.is-dragging { opacity: 1; transform: scale(1.03); position: relative; z-index: 5; border-color: var(--st-accent); box-shadow: 0 16px 40px rgba(0, 0, 0, .45); }
+.gs-studio .gs-sp-rx-img { flex: none; width: 34px; height: 34px; border-radius: 50%; background: var(--gs-img, none) center / contain no-repeat !important; }
+.gs-studio .gs-sp-rx-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gs-studio .gs-sp-rx-name strong { font-size: 13.5px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-studio .gs-sp-rx-name span { font-size: 11.5px; }
+.gs-studio .gs-sp-eye.is-danger:hover:not(:disabled) { color: var(--st-danger); }
+.gs-studio .gs-sp-eye:disabled { opacity: .35; cursor: not-allowed; }
+.gs-studio .gs-sp-rx-form { margin-bottom: 12px; padding: 14px; border: 1px solid var(--st-accent); border-radius: 14px; background: rgba(151, 228, 110, .04); display: flex; flex-direction: column; gap: 12px; animation: gs-sp-rise .25s var(--st-ease) both; }
+.gs-studio .gs-sp-rx-form-head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.gs-studio .gs-sp-rx-form-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 240px), 1fr)); gap: 12px; }
+.gs-studio .gs-sp-rx-form .gs-sp-photo { background: transparent; }

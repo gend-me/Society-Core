@@ -488,6 +488,207 @@ function gend_society_sp_register_rest() {
 			'permission_callback' => $perm,
 		)
 	);
+	register_rest_route(
+		'gend-society/v1',
+		'/social-pages/activity',
+		array(
+			'methods'             => 'GET',
+			'callback'            => 'gend_society_sp_activity_state',
+			'permission_callback' => $perm,
+		)
+	);
+	register_rest_route(
+		'gend-society/v1',
+		'/social-pages/activity/(?P<action>feed|reaction-setting|emoji|emoji-delete|emoji-order)',
+		array(
+			'methods'             => 'POST',
+			'callback'            => 'gend_society_sp_activity_action',
+			'permission_callback' => $perm,
+		)
+	);
+}
+
+/* ── Activity feed: layout + reactions ──────────────────────────────────── */
+
+/**
+ * Reactions are the Activity Reactions extension's own options (the same ones
+ * its Youzify settings tab edits): switches and texts as Youzify options, the
+ * emoji list in yz_reaction_emojis with a visible-only copy and a next-ID counter.
+ *
+ * @return bool
+ */
+function gend_society_sp_has_reactions() {
+	return function_exists( 'yzar_option' );
+}
+
+/**
+ * Stores a reactions setting where the extension reads it.
+ *
+ * @param string $key   Option.
+ * @param mixed  $value Value.
+ */
+function gend_society_sp_reaction_update( $key, $value ) {
+	if ( function_exists( 'youzify_update_option' ) ) {
+		youzify_update_option( $key, $value );
+	} else {
+		update_option( $key, $value );
+	}
+}
+
+/**
+ * Saves the emoji list (and the copy of visible ones the front end uses).
+ *
+ * @param array $emojis Key => emoji.
+ */
+function gend_society_sp_save_emojis( $emojis ) {
+	update_option( 'yz_reaction_emojis', $emojis );
+	update_option(
+		'yz_reaction_emojis_list',
+		array_filter(
+			$emojis,
+			function ( $e ) {
+				return isset( $e['visibility'] ) && 'true' === $e['visibility'];
+			}
+		)
+	);
+}
+
+/**
+ * Activity builder state.
+ *
+ * @return WP_REST_Response
+ */
+function gend_society_sp_activity_state() {
+	$layout    = function_exists( 'gend_society_ds_layout' ) ? gend_society_ds_layout( 'activity' ) : null;
+	$reactions = null;
+	if ( gend_society_sp_has_reactions() ) {
+		$emojis = get_option( 'yz_reaction_emojis', array() );
+		$list   = array();
+		foreach ( is_array( $emojis ) ? $emojis : array() as $key => $e ) {
+			$list[] = array(
+				'id'          => (string) $key,
+				'title'       => isset( $e['title'] ) ? (string) $e['title'] : '',
+				'description' => isset( $e['description'] ) ? (string) $e['description'] : '',
+				'image'       => isset( $e['image'] ) ? (string) $e['image'] : '',
+				'visible'     => isset( $e['visibility'] ) && 'true' === $e['visibility'],
+			);
+		}
+		$first     = $list ? $list[0]['id'] : '';
+		$reactions = array(
+			'posts'    => 'off' !== yzar_option( 'yz_enable_posts_reaction', 'on' ),
+			'comments' => 'off' !== yzar_option( 'yz_enable_comments_reaction', 'on' ),
+			'title'    => (string) yzar_option( 'yz_default_like_button_title', __( 'Like', 'gend-society' ) ),
+			'favorite' => (string) ( yzar_option( 'yz_favorite_reaction_id' ) ? yzar_option( 'yz_favorite_reaction_id' ) : $first ),
+			'like'     => (string) yzar_option( 'yz_like_reaction_id', 'yz_emoji_1' ),
+			'emojis'   => $list,
+		);
+	}
+	return rest_ensure_response(
+		array(
+			'feed'      => array(
+				'published' => (bool) $layout,
+				'url'       => function_exists( 'bp_get_activity_directory_permalink' ) ? bp_get_activity_directory_permalink() : '',
+			),
+			'reactions' => $reactions,
+		)
+	);
+}
+
+/**
+ * Activity builder actions.
+ *
+ * @param WP_REST_Request $req Request.
+ * @return WP_REST_Response|WP_Error
+ */
+function gend_society_sp_activity_action( WP_REST_Request $req ) {
+	$action = $req['action'];
+	$body   = (array) $req->get_json_params();
+	if ( 'feed' === $action ) {
+		$id = function_exists( 'gend_society_ds_layout_id' ) ? gend_society_ds_layout_id( 'activity' ) : 0;
+		if ( ! $id ) {
+			return new WP_Error( 'gs_sp_feed', __( 'The feed layout could not be opened.', 'gend-society' ), array( 'status' => 500 ) );
+		}
+		return rest_ensure_response( array( 'editUrl' => gend_society_sp_edit_url( $id ) ) );
+	}
+	if ( ! gend_society_sp_has_reactions() ) {
+		return new WP_Error( 'gs_sp_reactions', __( 'Activity Reactions is not active.', 'gend-society' ), array( 'status' => 400 ) );
+	}
+	$emojis = get_option( 'yz_reaction_emojis', array() );
+	$emojis = is_array( $emojis ) ? $emojis : array();
+
+	switch ( $action ) {
+		case 'reaction-setting':
+			$key = isset( $body['key'] ) ? (string) $body['key'] : '';
+			$val = isset( $body['value'] ) ? $body['value'] : '';
+			if ( 'posts' === $key || 'comments' === $key ) {
+				gend_society_sp_reaction_update( 'posts' === $key ? 'yz_enable_posts_reaction' : 'yz_enable_comments_reaction', $val ? 'on' : 'off' );
+			} elseif ( 'title' === $key ) {
+				$t = sanitize_text_field( (string) $val );
+				gend_society_sp_reaction_update( 'yz_default_like_button_title', '' !== $t ? $t : __( 'Like', 'gend-society' ) );
+			} elseif ( 'favorite' === $key || 'like' === $key ) {
+				if ( ! isset( $emojis[ (string) $val ] ) ) {
+					return new WP_Error( 'gs_sp_reactions', __( 'Unknown reaction.', 'gend-society' ), array( 'status' => 400 ) );
+				}
+				gend_society_sp_reaction_update( 'favorite' === $key ? 'yz_favorite_reaction_id' : 'yz_like_reaction_id', (string) $val );
+			} else {
+				return new WP_Error( 'gs_sp_reactions', __( 'Unknown setting.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			break;
+
+		case 'emoji':
+			$id    = isset( $body['id'] ) ? sanitize_key( $body['id'] ) : '';
+			$title = isset( $body['title'] ) ? sanitize_text_field( (string) $body['title'] ) : '';
+			$image = isset( $body['image'] ) ? esc_url_raw( trim( (string) $body['image'] ) ) : '';
+			if ( '' === $title || '' === $image ) {
+				return new WP_Error( 'gs_sp_reactions', __( 'An emoji needs a title and an image.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			if ( '' === $id ) {
+				$next = max( 1, (int) get_option( 'yz_next_emoji_nbr', 1 ) );
+				while ( isset( $emojis[ 'yz_emoji_' . $next ] ) ) {
+					++$next;
+				}
+				$id = 'yz_emoji_' . $next;
+				update_option( 'yz_next_emoji_nbr', $next + 1 );
+			} elseif ( ! isset( $emojis[ $id ] ) ) {
+				return new WP_Error( 'gs_sp_reactions', __( 'Unknown reaction.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			$emojis[ $id ] = array(
+				'visibility'  => empty( $body['visible'] ) ? 'false' : 'true',
+				'image'       => $image,
+				'title'       => $title,
+				'description' => isset( $body['description'] ) ? sanitize_text_field( (string) $body['description'] ) : '',
+			);
+			gend_society_sp_save_emojis( $emojis );
+			break;
+
+		case 'emoji-delete':
+			$id = isset( $body['id'] ) ? sanitize_key( $body['id'] ) : '';
+			if ( ! isset( $emojis[ $id ] ) ) {
+				return new WP_Error( 'gs_sp_reactions', __( 'Unknown reaction.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			if ( count( $emojis ) < 2 ) {
+				return new WP_Error( 'gs_sp_reactions', __( 'Keep at least one reaction.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			if ( yzar_option( 'yz_like_reaction_id', 'yz_emoji_1' ) === $id || yzar_option( 'yz_favorite_reaction_id' ) === $id ) {
+				return new WP_Error( 'gs_sp_reactions', __( 'This reaction is used by the like button or the Favorites tab. Pick another one there first.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			unset( $emojis[ $id ] );
+			gend_society_sp_save_emojis( $emojis );
+			break;
+
+		case 'emoji-order':
+			$ids = isset( $body['ids'] ) && is_array( $body['ids'] ) ? array_map( 'sanitize_key', $body['ids'] ) : array();
+			$out = array();
+			foreach ( $ids as $id ) {
+				if ( isset( $emojis[ $id ] ) ) {
+					$out[ $id ] = $emojis[ $id ];
+				}
+			}
+			$out += $emojis; // Anything not listed keeps its place at the end.
+			gend_society_sp_save_emojis( $out );
+			break;
+	}
+	return gend_society_sp_activity_state();
 }
 
 /**

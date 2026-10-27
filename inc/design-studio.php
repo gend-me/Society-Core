@@ -421,39 +421,33 @@ function gend_society_studio_sections() {
 			'requires' => __( 'Social Profiles', 'gend-society' ),
 			'groups'   => array(
 				// One page each: header, menu + pages by audience, sidebars, directory (inc/social-pages.php).
-				// The separate settings screens only when that builder is missing.
+				// The separate settings screens only when that builder is missing. One page per entry, so no headings.
 				array(
-					'label' => __( 'Profile', 'gend-society' ),
-					'items' => $sp_ready && $profiles
-						? array( array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'profiles' ) )
-						: array(
-							array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
-							array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
-							array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
-						),
-				),
-				array(
-					'label' => __( 'Groups', 'gend-society' ),
-					'items' => $sp_ready && $builder
-						? array( array( 'id' => 'group-pages', 'label' => __( 'Group Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'groups' ) )
-						: array(
-							array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
-							array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
-							array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
-						),
-				),
-				array(
-					'label' => __( 'Activity Feed', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'activity-styling', 'label' => __( 'Styling', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : $yz( 'youzify-panel', 'wall' ) ),
-						array( 'id' => 'activity-reactions', 'label' => __( 'Activity Reactions', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-extensions-settings', 'activity-reactions' ) ),
-					),
-				),
-				array(
-					'label'  => __( 'Styling', 'gend-society' ),
-					'active' => function_exists( 'gend_society_yz_rest_get' ),
-					'items'  => array(
-						array( 'id' => 'youzify-styles', 'label' => __( 'Youzify Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'youzify' ),
+					'items' => array_merge(
+						$sp_ready && $profiles
+							? array( array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'profiles' ) )
+							: array(
+								array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
+								array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
+								array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
+							),
+						$sp_ready && $builder
+							? array( array( 'id' => 'group-pages', 'label' => __( 'Group Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'groups' ) )
+							: array(
+								array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
+								array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
+								array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
+							),
+						// Feed layout + reactions on one page; the old two screens only without the builder.
+						$sp_ready
+							? array( array( 'id' => 'activity-feed', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'activity' ) )
+							: array(
+								array( 'id' => 'activity-styling', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : $yz( 'youzify-panel', 'wall' ) ),
+								array( 'id' => 'activity-reactions', 'label' => __( 'Activity Reactions', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-extensions-settings', 'activity-reactions' ) ),
+							),
+						function_exists( 'gend_society_yz_rest_get' )
+							? array( array( 'id' => 'youzify-styles', 'label' => __( 'Youzify Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'youzify' ) )
+							: array()
 					),
 				),
 			),
