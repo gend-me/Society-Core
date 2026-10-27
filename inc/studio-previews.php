@@ -257,6 +257,13 @@ function gend_society_pv_canvas_styles() {
 		. '.gs-pv-add.is-site:hover{background:rgba(182,8,201,.14)}'
 		. '.gs-lh-hint{margin:0 0 6px;padding:8px 12px;border-radius:10px;background:rgba(110,193,228,.1);color:#9fd6ee;font:500 12px/1.4 system-ui,sans-serif}'
 		. '.gs-lh-loading{padding:18px;color:#8a94a6;font:500 13px system-ui,sans-serif}'
+		// Edit in place: what can be clicked shows itself on hover.
+		. '.gs-lh-preview.is-editable [data-gs-k=text]{cursor:text;border-radius:4px;transition:outline-color .15s,box-shadow .15s;outline:1px dashed transparent;outline-offset:3px}'
+		. '.gs-lh-preview.is-editable [data-gs-k=text]:hover{outline-color:rgba(151,228,110,.6)}'
+		. '.gs-lh-preview.is-editable [data-gs-k=text]:focus{outline:2px solid #97e46e;box-shadow:0 0 0 6px rgba(151,228,110,.12)}'
+		. '.gs-lh-preview.is-editable [data-gs-k=img],.gs-lh-preview.is-editable [data-gs-k=bg]{cursor:pointer;transition:outline-color .15s,filter .15s;outline:2px dashed transparent;outline-offset:2px}'
+		. '.gs-lh-preview.is-editable [data-gs-k=img]:hover{outline-color:#6ec1e4;filter:brightness(1.08)}'
+		. '.gs-lh-preview.is-editable [data-gs-k=bg]:hover:not(:has([data-gs-k=text]:hover)){outline-color:#6ec1e4}'
 		. '.gs-lh-frame{width:100%;min-height:520px;border:0;border-radius:14px;background:#0b0e14}';
 	// The live page's own stylesheets are copied into the canvas by assets/studio-previews.js.
 	wp_register_style( 'gend-society-studio-canvas', false, array(), GEND_SOCIETY_VERSION );
