@@ -171,7 +171,8 @@ function gend_society_davinci_save_api_costs_ajax() {
     if ( ! $group_id ) wp_send_json_error( array( 'message' => 'no_group' ), 400 );
 
     // Authorize: site admin OR admin of THIS group.
-    $allowed = current_user_can( 'manage_options' )
+    // Security 2026-10-18: network admin (not any sub-site admin) or this group's admins/mods.
+    $allowed = is_super_admin()
         || ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( get_current_user_id(), $group_id ) )
         || ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( get_current_user_id(), $group_id ) );
     if ( ! $allowed ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
@@ -2264,8 +2265,22 @@ function gend_society_group_render_davinci_ai_suite( $group_id ) {
 
 function gend_society_dv_leo_admin_ok( $group_id ) {
     if ( ! is_user_logged_in() ) return false;
-    if ( current_user_can( 'manage_options' ) || is_super_admin() ) return true; // site-admin check, not a hub signal (104 audit)
+    // Security 2026-10-18: was manage_options, which every hub sub-site admin has for ANY group.
+    if ( is_super_admin() ) return true;
     return function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( get_current_user_id(), (int) $group_id );
+}
+
+/**
+ * Security 2026-10-18: a Leo purchase target must belong to the group (member of the group or a
+ * user of the site linked to it, which is the list the Members sub-tab shows).
+ */
+function gend_society_dv_leo_target_ok( $group_id, $member_id ) {
+    $member_id = (int) $member_id;
+    if ( $member_id <= 0 || ! get_userdata( $member_id ) ) return false;
+    if ( function_exists( 'groups_is_user_member' ) && groups_is_user_member( $member_id, (int) $group_id ) ) return true;
+    $site_id = function_exists( 'groups_get_groupmeta' ) ? (int) groups_get_groupmeta( (int) $group_id, 'gdc_site_id', true ) : 0;
+    if ( $site_id <= 0 ) $site_id = get_current_blog_id();
+    return is_user_member_of_blog( $member_id, $site_id );
 }
 
 /** Published AI Builder Token package products (hub main site). */
@@ -2400,6 +2415,8 @@ function gend_society_dv_leo_buy_ajax() {
     $pkg_id    = isset( $_POST['package_id'] ) ? (int) $_POST['package_id'] : 0;
     if ( ! $group_id || ! gend_society_dv_leo_admin_ok( $group_id ) ) wp_send_json_error( array( 'message' => 'forbidden' ), 403 );
     if ( ! $member_id || ! get_userdata( $member_id ) ) wp_send_json_error( array( 'message' => __( 'Member not found.', 'gend-society' ) ), 404 );
+    // Security 2026-10-18: only members of this group / its site.
+    if ( ! gend_society_dv_leo_target_ok( $group_id, $member_id ) ) wp_send_json_error( array( 'message' => __( 'Member not found.', 'gend-society' ) ), 404 );
 
     $pkg = null;
     foreach ( gend_society_dv_leo_packages() as $cand ) { if ( $cand['id'] === $pkg_id ) { $pkg = $cand; break; } }
@@ -2466,6 +2483,8 @@ function gend_society_dv_leo_contract_ajax() {
         $role   = sanitize_key( (string) ( $_POST['role'] ?? '' ) );
         $pkg_id = (int) ( $_POST['package_id'] ?? 0 );
         $cad    = in_array( $_POST['cadence'] ?? '', array( 'daily', 'weekly', 'monthly' ), true ) ? (string) $_POST['cadence'] : 'monthly';
+        // Security 2026-10-18: drop ids that are not members of this group / its site.
+        $ids = array_values( array_filter( $ids, function ( $mid ) use ( $group_id ) { return gend_society_dv_leo_target_ok( $group_id, $mid ); } ) );
         if ( 'members' === $target && empty( $ids ) ) wp_send_json_error( array( 'message' => __( 'Pick at least one member.', 'gend-society' ) ), 400 );
         if ( 'role' === $target && '' === $role && '' === trim( (string) ( $_POST['roles'] ?? '' ) ) ) wp_send_json_error( array( 'message' => __( 'Pick at least one role.', 'gend-society' ) ), 400 );
         $pkg = null;
@@ -2487,7 +2506,14 @@ function gend_society_dv_leo_contract_ajax() {
         $updated = false;
         if ( $cid !== '' ) {
             foreach ( $list as $i => $c ) {
-                if ( ( $c['id'] ?? '' ) === $cid ) { $list[ $i ] = array_merge( $c, $patch ); $updated = true; break; }
+                if ( ( $c['id'] ?? '' ) === $cid ) {
+                    $list[ $i ] = array_merge( $c, $patch );
+                    // Security 2026-10-18: the contract is billed to whoever last edited it, never to
+                    // another admin's wallet.
+                    $list[ $i ]['createdBy'] = get_current_user_id();
+                    $updated = true;
+                    break;
+                }
             }
         }
         if ( ! $updated ) {
@@ -2508,6 +2534,8 @@ function gend_society_dv_leo_contract_ajax() {
             if ( ( $c['id'] ?? '' ) === $cid ) {
                 if ( 'delete' === $op ) continue;
                 $c['active'] = empty( $c['active'] );
+                // Security 2026-10-18: re-activating bills the admin who turns it on.
+                if ( $c['active'] ) $c['createdBy'] = get_current_user_id();
             }
             $next[] = $c;
         }
@@ -2569,9 +2597,19 @@ function gend_society_dv_leo_contracts_run() {
             }
 
             $payer = (int) ( $c['createdBy'] ?? 0 );
+            // Security 2026-10-18: the payer must still administer this group (or be a network admin).
+            $payer_ok = $payer > 0 && ( is_super_admin( $payer )
+                || ( function_exists( 'groups_is_user_admin' ) && groups_is_user_admin( $payer, (int) $group_id ) ) );
+            if ( ! $payer_ok ) {
+                $all[ $group_id ][ $i ]['lastNote'] = 'payer is no longer a group admin — paused';
+                $all[ $group_id ][ $i ]['active']   = false;
+                $dirty = true;
+                continue;
+            }
             $ok = 0; $skip = 0;
             foreach ( $ids as $mid ) {
                 if ( ! get_userdata( $mid ) ) { $skip++; continue; }
+                if ( ( $c['targetType'] ?? '' ) !== 'role' && ! gend_society_dv_leo_target_ok( (int) $group_id, $mid ) ) { $skip++; continue; }
                 $charged = gend_society_dv_leo_charge( $payer, $pkg['price'], $mid, $pkg['name'] );
                 if ( is_wp_error( $charged ) ) { $skip++; continue; }
                 gend_society_dv_leo_credit( $mid, $pkg['tokens'] );

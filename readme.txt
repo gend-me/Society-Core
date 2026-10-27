@@ -162,11 +162,19 @@ Disconnecting the site from gend.me stops all of the above.
 
 = 1.8.0 =
 <!-- @build-strip-begin wporg -->
-* Move your site to gend.me hosting: pre-flight checks, start or schedule the copy, live progress, retry.
+* New: move your site to gend.me hosting from the GenD dashboard. Pre-flight checks, start or schedule the copy, live progress and retry. This needs a paid gend.me container plan; without one the dashboard only shows the plans available.
 <!-- @build-strip-end wporg -->
 <!-- @build-only-begin wporg -->
-* Maintenance release.
+* Maintenance release. Moving a site to gend.me hosting is not part of the WordPress.org version.
 <!-- @build-only-end wporg -->
+
+= 1.7.0 =
+* New Design Studio: Appearance > Editor (the Theme Editor) now opens a dashboard that gathers every design area in one sidebar: Branding (logo, favicon, site name, colour schemes, fonts, H1-H6, paragraph and link styles), App (header, menus, footer, 404, coming soon) and Content (page, post, blog, archive and category templates).
+* Colour and type changes show in a live preview of your own site before you save them.
+* Templates open in the WordPress block editor inside the studio. The standard Site Editor is still one click away.
+* Each GenD app you turn on adds its own design areas: Store, Sales, Projects, Social and Bank.
+* New block templates for simple, variable, grouped and external products, affiliate dashboard, team dashboard and wallet pages. A page only uses one once you have customised it, so nothing changes until you do.
+* Fixes an error message in the Site Editor when editing templates.
 
 = 1.6.1 =
 * Fixes a fatal error on single-site installs in the admin menu.

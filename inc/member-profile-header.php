@@ -950,6 +950,116 @@ function gend_society_profile_group_gas( $group_id, $group_url ) {
 // Hook into youzify_profile_before_header (fires before the <header> element)
 // so our section renders first. The original header + navbar are hidden via CSS.
 
+// ─── Profile tab bar items ─────────────────────────────────────────────────
+// The tabs the header's nav bar shows, in order (shared with the Profile Menu
+// block of inc/profile-styling.php so both always list the same tabs).
+function gend_society_profile_header_nav_items( $user_id ) {
+    // ── Nav ───────────────────────────────────────────────────────────────────
+    $nav_items         = function_exists( 'youzify_get_profile_primary_nav' )
+                          ? (array) youzify_get_profile_primary_nav() : [];
+
+    // Apply requested society stylings modifications to the nav array
+    foreach ( $nav_items as $index => $item ) {
+        // Show the groups tab as "Projects" (was "App Projects", originally "Groups").
+        if ( $item->slug === 'groups' ) {
+            $item->name = str_replace( array( 'App Projects', 'Groups' ), 'Projects', $item->name );
+        }
+    }
+
+    // Remove "Society" + "Visitors" + "Activity" from the primary nav.
+    // Visitors → moved under Connections by gdc_visitors_to_friends_subnav()
+    // Activity → moved under App Projects (groups) by gdc_activity_to_groups_subnav()
+    foreach ( $nav_items as $index => $item ) {
+        if ( $item->slug === 'society' || strpos( strip_tags( $item->name ), 'Society' ) !== false ) {
+            unset( $nav_items[ $index ] );
+            continue;
+        }
+        if ( $item->slug === 'visitors' || strpos( strip_tags( $item->name ), 'Visitors' ) !== false ) {
+            unset( $nav_items[ $index ] );
+            continue;
+        }
+        if ( $item->slug === 'activity' ) {
+            unset( $nav_items[ $index ] );
+            continue;
+        }
+        // Remove the "Files"/"Portfolio" (media) tab — its sub-tabs now live
+        // under the Overview tab. The underlying media component/route stays
+        // registered so the Overview Media iframe (/media/?gdc_tab_only=1) still
+        // resolves; we only drop the visible nav entry.
+        if ( $item->slug === 'files' || $item->slug === 'bp-files' || $item->slug === 'media'
+             || strpos( strip_tags( $item->name ), 'Files' ) !== false
+             || strpos( strip_tags( $item->name ), 'Portfolio' ) !== false ) {
+            unset( $nav_items[ $index ] );
+        }
+    }
+
+    // Portfolio (Files/media) tab removed above — just re-index.
+    $nav_items = array_values( $nav_items );
+
+    // ── Messages + Settings are GONE from the nav ─────────────────────────
+    // (they used to be re-added here from the raw BP nav). Messages is
+    // dropped outright; Settings moved onto the profile photo hover as a
+    // gear icon (top-left) that opens the settings screen in a POPUP —
+    // see the avatar markup below. Defensively strip both in case another
+    // layer injected them into the Youzify primary nav.
+    foreach ( $nav_items as $index => $item ) {
+        if ( in_array( $item->slug, [ 'messages', 'settings' ], true ) ) {
+            unset( $nav_items[ $index ] );
+        }
+    }
+    $nav_items = array_values( $nav_items );
+
+    // ── Insert "Invest" right after Connections (friends) ──────────────────────
+    // Guarantees placement regardless of where Youzify orders the registered tab.
+    if ( bp_is_my_profile() ) {
+        $invest_obj = (object) [
+            'name' => 'Contracts',
+            'slug' => 'invest',
+            'link' => trailingslashit( bp_displayed_user_domain() ) . 'invest/',
+        ];
+        // Drop any pre-existing invest entry to avoid duplicates, then re-insert.
+        foreach ( $nav_items as $i => $it ) {
+            if ( isset( $it->slug ) && $it->slug === 'invest' ) { unset( $nav_items[ $i ] ); }
+        }
+        $nav_items  = array_values( $nav_items );
+        $insert_at  = count( $nav_items );
+        foreach ( $nav_items as $i => $it ) {
+            if ( isset( $it->slug ) && ( $it->slug === 'friends'
+                 || stripos( strip_tags( (string) $it->name ), 'Connection' ) !== false ) ) {
+                $insert_at = $i + 1;
+                break;
+            }
+        }
+        array_splice( $nav_items, $insert_at, 0, [ $invest_obj ] );
+    }
+
+    // ── Canonical nav order (desktop AND phone base order): Overview,
+    // App Projects (groups), Contracts (invest), Calendar, Connections
+    // (friends), Wallet. Anything unlisted keeps its relative order after.
+    $gdc_nav_order = [ 'overview' => 1, 'groups' => 2, 'invest' => 3, 'member-calendar' => 4, 'friends' => 5, 'member-wallet' => 6 ];
+    $gdc_nav_pos   = 0;
+    foreach ( $nav_items as $it ) {
+        // Stable sort: remember each item's source index as the tiebreaker.
+        $it->_src = $gdc_nav_pos++;
+    }
+    usort( $nav_items, function ( $a, $b ) use ( $gdc_nav_order ) {
+        $oa = $gdc_nav_order[ $a->slug ] ?? 99;
+        $ob = $gdc_nav_order[ $b->slug ] ?? 99;
+        return ( $oa - $ob ) ?: ( $a->_src - $b->_src );
+    } );
+
+    // ── Calendar + Connections moved under Projects → My Projects (tabs right of My Tasks, own profile — see
+    // inc/profile-board-tabs.php). Their routes stay (the tabs frame them), only the top-nav items go.
+    $nav_items = array_values( array_filter( $nav_items, function ( $it ) {
+        return ! in_array( isset( $it->slug ) ? $it->slug : '', array( 'member-calendar', 'friends' ), true );
+    } ) );
+
+    // Profile Styling (inc/profile-styling.php): saved labels, order and hidden tabs.
+    $nav_items = (array) apply_filters( 'gend_society_profile_nav_items', $nav_items, $user_id );
+
+    return $nav_items;
+}
+
 add_action( 'youzify_profile_before_header', 'gend_society_render_profile_header', 1 );
 function gend_society_render_profile_header() {
     if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
@@ -1140,113 +1250,15 @@ function gend_society_render_profile_header() {
         }
     }
 
-    // ── Nav ───────────────────────────────────────────────────────────────────
-    $nav_items         = function_exists( 'youzify_get_profile_primary_nav' )
-                          ? (array) youzify_get_profile_primary_nav() : [];
+    // ── Nav ── (tab bar items: gend_society_profile_header_nav_items(), below)
+    $nav_items = gend_society_profile_header_nav_items( $user_id );
 
-    // Apply requested society stylings modifications to the nav array
-    foreach ( $nav_items as $index => $item ) {
-        // Show the groups tab as "Projects" (was "App Projects", originally "Groups").
-        if ( $item->slug === 'groups' ) {
-            $item->name = str_replace( array( 'App Projects', 'Groups' ), 'Projects', $item->name );
-        }
-    }
-
-    // Remove "Society" + "Visitors" + "Activity" from the primary nav.
-    // Visitors → moved under Connections by gdc_visitors_to_friends_subnav()
-    // Activity → moved under App Projects (groups) by gdc_activity_to_groups_subnav()
-    foreach ( $nav_items as $index => $item ) {
-        if ( $item->slug === 'society' || strpos( strip_tags( $item->name ), 'Society' ) !== false ) {
-            unset( $nav_items[ $index ] );
-            continue;
-        }
-        if ( $item->slug === 'visitors' || strpos( strip_tags( $item->name ), 'Visitors' ) !== false ) {
-            unset( $nav_items[ $index ] );
-            continue;
-        }
-        if ( $item->slug === 'activity' ) {
-            unset( $nav_items[ $index ] );
-            continue;
-        }
-        // Remove the "Files"/"Portfolio" (media) tab — its sub-tabs now live
-        // under the Overview tab. The underlying media component/route stays
-        // registered so the Overview Media iframe (/media/?gdc_tab_only=1) still
-        // resolves; we only drop the visible nav entry.
-        if ( $item->slug === 'files' || $item->slug === 'bp-files' || $item->slug === 'media'
-             || strpos( strip_tags( $item->name ), 'Files' ) !== false
-             || strpos( strip_tags( $item->name ), 'Portfolio' ) !== false ) {
-            unset( $nav_items[ $index ] );
-        }
-    }
-
-    // Portfolio (Files/media) tab removed above — just re-index.
-    $nav_items = array_values( $nav_items );
-
-    // ── Messages + Settings are GONE from the nav ─────────────────────────
-    // (they used to be re-added here from the raw BP nav). Messages is
-    // dropped outright; Settings moved onto the profile photo hover as a
-    // gear icon (top-left) that opens the settings screen in a POPUP —
-    // see the avatar markup below. Defensively strip both in case another
-    // layer injected them into the Youzify primary nav.
-    foreach ( $nav_items as $index => $item ) {
-        if ( in_array( $item->slug, [ 'messages', 'settings' ], true ) ) {
-            unset( $nav_items[ $index ] );
-        }
-    }
-    $nav_items = array_values( $nav_items );
     // The gear popup target (own profile only) — chrome-stripped for the
     // iframe via the existing ?gdc_tab_only=1 mechanism.
     $gdc_settings_popup_url = '';
     if ( $is_own_profile && function_exists( 'bp_get_settings_slug' ) ) {
         $gdc_settings_popup_url = add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . bp_get_settings_slug() ) );
     }
-    if ( false ) { // retired restore loop kept out of the execution path
-    }
-
-    // ── Insert "Invest" right after Connections (friends) ──────────────────────
-    // Guarantees placement regardless of where Youzify orders the registered tab.
-    if ( bp_is_my_profile() ) {
-        $invest_obj = (object) [
-            'name' => 'Contracts',
-            'slug' => 'invest',
-            'link' => trailingslashit( bp_displayed_user_domain() ) . 'invest/',
-        ];
-        // Drop any pre-existing invest entry to avoid duplicates, then re-insert.
-        foreach ( $nav_items as $i => $it ) {
-            if ( isset( $it->slug ) && $it->slug === 'invest' ) { unset( $nav_items[ $i ] ); }
-        }
-        $nav_items  = array_values( $nav_items );
-        $insert_at  = count( $nav_items );
-        foreach ( $nav_items as $i => $it ) {
-            if ( isset( $it->slug ) && ( $it->slug === 'friends'
-                 || stripos( strip_tags( (string) $it->name ), 'Connection' ) !== false ) ) {
-                $insert_at = $i + 1;
-                break;
-            }
-        }
-        array_splice( $nav_items, $insert_at, 0, [ $invest_obj ] );
-    }
-
-    // ── Canonical nav order (desktop AND phone base order): Overview,
-    // App Projects (groups), Contracts (invest), Calendar, Connections
-    // (friends), Wallet. Anything unlisted keeps its relative order after.
-    $gdc_nav_order = [ 'overview' => 1, 'groups' => 2, 'invest' => 3, 'member-calendar' => 4, 'friends' => 5, 'member-wallet' => 6 ];
-    $gdc_nav_pos   = 0;
-    foreach ( $nav_items as $it ) {
-        // Stable sort: remember each item's source index as the tiebreaker.
-        $it->_src = $gdc_nav_pos++;
-    }
-    usort( $nav_items, function ( $a, $b ) use ( $gdc_nav_order ) {
-        $oa = $gdc_nav_order[ $a->slug ] ?? 99;
-        $ob = $gdc_nav_order[ $b->slug ] ?? 99;
-        return ( $oa - $ob ) ?: ( $a->_src - $b->_src );
-    } );
-
-    // ── Calendar + Connections moved under Projects → My Projects (tabs right of My Tasks, own profile — see
-    // inc/profile-board-tabs.php). Their routes stay (the tabs frame them), only the top-nav items go.
-    $nav_items = array_values( array_filter( $nav_items, function ( $it ) {
-        return ! in_array( isset( $it->slug ) ? $it->slug : '', array( 'member-calendar', 'friends' ), true );
-    } ) );
 
     $current_component = bp_current_component();
 

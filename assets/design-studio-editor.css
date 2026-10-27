@@ -1,0 +1,376 @@
+/* GenD Society - Design Studio: GenD skin for the block editor shown inside the studio
+   (site-editor.php?gs_studio_embed=1). Loaded last in <head> by inc/design-studio.php.
+   Only editor chrome is restyled; the canvas (your site) is untouched. */
+
+body.gs-studio-embed {
+	--st-bg: #0b0e14;
+	--st-panel: #111622;
+	--st-panel-2: #161c2a;
+	--st-border: rgba(255, 255, 255, .09);
+	--st-border-hi: rgba(255, 255, 255, .18);
+	--st-text: #e8edf5;
+	--st-muted: #8b98b0;
+	--st-accent: #97e46e;
+	--st-accent-ink: #0d1a06;
+	--st-magenta: #b608c9;
+	--wp-admin-theme-color: #97e46e;
+	--wp-admin-theme-color--rgb: 151, 228, 110;
+	--wp-admin-theme-color-darker-10: #84d55a;
+	--wp-admin-theme-color-darker-10--rgb: 132, 213, 90;
+	--wp-admin-theme-color-darker-20: #72c548;
+	--wp-admin-theme-color-darker-20--rgb: 114, 197, 72;
+	--wp-components-color-accent: #97e46e;
+	--wp-components-color-accent-darker-10: #84d55a;
+	--wp-components-color-accent-darker-20: #72c548;
+	--wp-components-color-accent-inverted: #0d1a06;
+	--wp-components-color-background: #111622;
+	--wp-components-color-foreground: #e8edf5;
+	--wp-components-color-foreground-inverted: #0b0e14;
+	--wp-components-color-gray-100: #1a2130;
+	--wp-components-color-gray-200: #232b3c;
+	--wp-components-color-gray-300: #2e3749;
+	--wp-components-color-gray-400: #4a556b;
+	--wp-components-color-gray-600: #8b98b0;
+	--wp-components-color-gray-700: #aab4c7;
+	--wp-components-color-gray-800: #d3d9e4;
+	background: var(--st-bg);
+	color: var(--st-text);
+}
+
+/* ── Frame: header bar, sidebars, footer ────────────────────────────── */
+body.gs-studio-embed .edit-site-layout,
+body.gs-studio-embed .edit-site-layout__content,
+body.gs-studio-embed .edit-site-layout__canvas-container,
+body.gs-studio-embed .interface-interface-skeleton,
+body.gs-studio-embed .interface-interface-skeleton__body,
+body.gs-studio-embed .interface-interface-skeleton__content,
+body.gs-studio-embed .editor-visual-editor,
+body.gs-studio-embed .edit-site-visual-editor,
+body.gs-studio-embed .block-editor-iframe__container,
+body.gs-studio-embed .editor-styles-wrapper-container {
+	background: var(--st-bg) !important;
+}
+body.gs-studio-embed .editor-header,
+body.gs-studio-embed .edit-site-header-edit-mode,
+body.gs-studio-embed .interface-interface-skeleton__header {
+	background: linear-gradient(180deg, #121826, #0e131e) !important;
+	border-bottom: 1px solid var(--st-border) !important;
+	color: var(--st-text);
+}
+body.gs-studio-embed .interface-interface-skeleton__sidebar,
+body.gs-studio-embed .interface-interface-skeleton__secondary-sidebar,
+body.gs-studio-embed .interface-complementary-area,
+body.gs-studio-embed .interface-complementary-area__fill,
+body.gs-studio-embed .editor-sidebar,
+body.gs-studio-embed .editor-list-view-sidebar,
+body.gs-studio-embed .editor-inserter-sidebar,
+body.gs-studio-embed .block-editor-inserter__panel-content,
+body.gs-studio-embed .block-editor-inserter__main-area,
+body.gs-studio-embed .block-editor-inserter__menu,
+body.gs-studio-embed .block-editor-tabbed-sidebar,
+body.gs-studio-embed .block-editor-inserter__panel-header,
+body.gs-studio-embed .block-editor-inserter__search,
+body.gs-studio-embed .block-editor-inserter__category-panel,
+body.gs-studio-embed .editor-post-publish-panel,
+body.gs-studio-embed .entities-saved-states__panel,
+body.gs-studio-embed .components-panel,
+body.gs-studio-embed .components-panel__header,
+body.gs-studio-embed .components-panel__body,
+body.gs-studio-embed .block-editor-block-inspector,
+body.gs-studio-embed .editor-global-styles-sidebar,
+body.gs-studio-embed .edit-site-global-styles-sidebar,
+body.gs-studio-embed .components-navigator-screen,
+body.gs-studio-embed .components-navigator-provider {
+	background: var(--st-panel) !important;
+	color: var(--st-text) !important;
+	border-color: var(--st-border) !important;
+}
+body.gs-studio-embed .interface-interface-skeleton__sidebar,
+body.gs-studio-embed .interface-interface-skeleton__secondary-sidebar {
+	border-color: var(--st-border) !important;
+}
+body.gs-studio-embed .interface-interface-skeleton__footer,
+body.gs-studio-embed .block-editor-block-breadcrumb {
+	background: #0e131e !important;
+	border-top-color: var(--st-border) !important;
+	color: var(--st-muted) !important;
+}
+
+/* Text inside the chrome. */
+body.gs-studio-embed .interface-complementary-area h1,
+body.gs-studio-embed .interface-complementary-area h2,
+body.gs-studio-embed .interface-complementary-area h3,
+body.gs-studio-embed .components-panel__body-title,
+body.gs-studio-embed .components-panel__body-toggle,
+body.gs-studio-embed .components-base-control__label,
+body.gs-studio-embed .components-base-control__help,
+body.gs-studio-embed .components-truncate,
+body.gs-studio-embed .components-text,
+body.gs-studio-embed .components-heading,
+body.gs-studio-embed .block-editor-block-card__title,
+body.gs-studio-embed .block-editor-block-card__description,
+body.gs-studio-embed .editor-document-bar__post-title,
+body.gs-studio-embed .editor-document-bar__post-type-label,
+body.gs-studio-embed .block-editor-inserter__panel-title,
+body.gs-studio-embed .block-editor-block-types-list__item-title,
+body.gs-studio-embed .block-editor-list-view-block-select-button,
+body.gs-studio-embed .block-editor-list-view-block__title,
+body.gs-studio-embed .interface-complementary-area-header,
+body.gs-studio-embed .block-editor-block-breadcrumb__button,
+body.gs-studio-embed .block-editor-block-breadcrumb__current {
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .components-base-control__help,
+body.gs-studio-embed .block-editor-block-card__description,
+body.gs-studio-embed .editor-document-bar__post-type-label,
+body.gs-studio-embed .block-editor-inserter__panel-title {
+	color: var(--st-muted) !important;
+}
+body.gs-studio-embed .components-panel__body {
+	border-top-color: var(--st-border) !important;
+	border-bottom-color: var(--st-border) !important;
+}
+body.gs-studio-embed .components-panel__body-toggle:hover,
+body.gs-studio-embed .components-panel__body.is-opened > .components-panel__body-title:hover {
+	background: rgba(255, 255, 255, .04) !important;
+}
+
+/* Document bar (title pill in the header). */
+body.gs-studio-embed .editor-document-bar {
+	background: rgba(255, 255, 255, .06) !important;
+	border: 1px solid var(--st-border) !important;
+	border-radius: 10px !important;
+}
+body.gs-studio-embed .editor-document-bar:hover { background: rgba(255, 255, 255, .1) !important; }
+
+/* ── Buttons, tabs, icons ───────────────────────────────────────────── */
+body.gs-studio-embed .editor-header .components-button:not(.is-primary),
+body.gs-studio-embed .interface-complementary-area .components-button:not(.is-primary):not(.is-pressed),
+body.gs-studio-embed .components-panel .components-button:not(.is-primary):not(.is-pressed),
+body.gs-studio-embed .block-editor-list-view-leaf .components-button,
+body.gs-studio-embed .block-editor-inserter__menu .components-button:not(.is-primary) {
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .editor-header .components-button:not(.is-primary):hover,
+body.gs-studio-embed .interface-complementary-area .components-button:not(.is-primary):hover {
+	color: #fff !important;
+	background: rgba(255, 255, 255, .08) !important;
+}
+body.gs-studio-embed .editor-header .components-button.is-pressed,
+body.gs-studio-embed .editor-header .components-button.is-pressed:hover {
+	background: rgba(151, 228, 110, .16) !important;
+	color: var(--st-accent) !important;
+}
+body.gs-studio-embed .components-button.is-primary {
+	background: var(--st-accent) !important;
+	color: var(--st-accent-ink) !important;
+	border-radius: 9px !important;
+	font-weight: 600;
+	box-shadow: 0 4px 16px rgba(151, 228, 110, .25) !important;
+}
+body.gs-studio-embed .components-button.is-primary:disabled,
+body.gs-studio-embed .components-button.is-primary[aria-disabled="true"] {
+	background: rgba(151, 228, 110, .25) !important;
+	color: rgba(13, 26, 6, .6) !important;
+	box-shadow: none !important;
+}
+body.gs-studio-embed .components-button.is-secondary {
+	color: var(--st-text) !important;
+	box-shadow: inset 0 0 0 1px var(--st-border-hi) !important;
+	background: transparent !important;
+}
+body.gs-studio-embed .editor-document-tools__inserter-toggle.components-button {
+	background: var(--st-accent) !important;
+	color: var(--st-accent-ink) !important;
+	border-radius: 9px !important;
+}
+body.gs-studio-embed .components-tab-panel__tabs-item,
+body.gs-studio-embed .components-tabs__tab,
+body.gs-studio-embed [role="tab"] {
+	color: var(--st-muted) !important;
+}
+body.gs-studio-embed .components-tab-panel__tabs-item.is-active,
+body.gs-studio-embed [role="tab"][aria-selected="true"] {
+	color: var(--st-text) !important;
+	box-shadow: inset 0 -2px 0 var(--st-accent) !important;
+}
+body.gs-studio-embed .interface-complementary-area svg,
+body.gs-studio-embed .editor-header svg,
+body.gs-studio-embed .block-editor-list-view-leaf svg,
+body.gs-studio-embed .block-editor-block-types-list svg,
+body.gs-studio-embed .components-panel svg {
+	fill: currentColor;
+}
+body.gs-studio-embed .block-editor-block-icon { color: var(--st-text) !important; }
+body.gs-studio-embed .block-editor-block-types-list__item:hover {
+	background: rgba(255, 255, 255, .05) !important;
+}
+body.gs-studio-embed .block-editor-list-view-leaf.is-selected td,
+body.gs-studio-embed .block-editor-list-view-leaf.is-selected .block-editor-list-view-block-contents {
+	background: rgba(151, 228, 110, .14) !important;
+	color: #fff !important;
+}
+body.gs-studio-embed .block-editor-list-view-leaf:hover td { background: rgba(255, 255, 255, .05); }
+
+body.gs-studio-embed .block-editor-inserter__close-button,
+body.gs-studio-embed .block-editor-tabbed-sidebar__close-button {
+	background: transparent !important;
+	color: var(--st-text) !important;
+}
+
+/* ── Form controls ──────────────────────────────────────────────────── */
+body.gs-studio-embed .interface-complementary-area input[type="text"],
+body.gs-studio-embed .interface-complementary-area input[type="number"],
+body.gs-studio-embed .interface-complementary-area input[type="url"],
+body.gs-studio-embed .interface-complementary-area input[type="search"],
+body.gs-studio-embed .interface-complementary-area textarea,
+body.gs-studio-embed .interface-complementary-area select,
+body.gs-studio-embed .block-editor-inserter__search input,
+body.gs-studio-embed .components-input-control__input,
+body.gs-studio-embed .components-select-control__input,
+body.gs-studio-embed .components-text-control__input,
+body.gs-studio-embed .components-textarea-control__input,
+body.gs-studio-embed .components-search-control__input,
+body.gs-studio-embed .components-form-token-field__input-container {
+	background: rgba(0, 0, 0, .28) !important;
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .components-input-control__backdrop,
+body.gs-studio-embed .components-select-control__backdrop {
+	border-color: var(--st-border-hi) !important;
+}
+body.gs-studio-embed .components-toggle-group-control,
+body.gs-studio-embed .components-toggle-group-control-option-base {
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .components-toggle-group-control {
+	background: rgba(0, 0, 0, .25) !important;
+	border-color: var(--st-border-hi) !important;
+}
+body.gs-studio-embed .components-toggle-group-control [aria-checked="true"],
+body.gs-studio-embed .components-toggle-group-control-option-base[data-active-item] {
+	color: var(--st-accent-ink) !important;
+}
+body.gs-studio-embed .components-tools-panel-header,
+body.gs-studio-embed .components-tools-panel-header h2 { color: var(--st-text) !important; }
+body.gs-studio-embed .components-item-group,
+body.gs-studio-embed .components-item {
+	background: transparent !important;
+	color: var(--st-text) !important;
+	border-color: var(--st-border) !important;
+}
+
+/* ── Popovers and menus (rendered at body level) ─────────────────────── */
+body.gs-studio-embed .components-popover__content,
+body.gs-studio-embed .components-dropdown__content .components-popover__content,
+body.gs-studio-embed .block-editor-block-toolbar,
+body.gs-studio-embed .block-editor-block-contextual-toolbar,
+body.gs-studio-embed .components-accessible-toolbar,
+body.gs-studio-embed .components-toolbar-group,
+body.gs-studio-embed .components-toolbar {
+	background: #141a26 !important;
+	color: var(--st-text) !important;
+	border-color: var(--st-border-hi) !important;
+}
+body.gs-studio-embed .components-popover__content {
+	border-radius: 12px !important;
+	box-shadow: 0 18px 50px rgba(0, 0, 0, .5) !important;
+	outline-color: var(--st-border-hi) !important;
+}
+body.gs-studio-embed .components-popover__content .components-button,
+body.gs-studio-embed .components-menu-item__button,
+body.gs-studio-embed .components-menu-group__label,
+body.gs-studio-embed .block-editor-block-toolbar .components-button,
+body.gs-studio-embed .components-toolbar .components-button {
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .components-menu-item__button:hover,
+body.gs-studio-embed .components-popover__content .components-button:hover {
+	background: rgba(255, 255, 255, .07) !important;
+	color: #fff !important;
+}
+body.gs-studio-embed .components-menu-group + .components-menu-group { border-top-color: var(--st-border) !important; }
+body.gs-studio-embed .components-menu-item__info,
+body.gs-studio-embed .components-menu-items-choice .components-menu-item__info { color: var(--st-muted) !important; }
+
+/* Modals keep the dark look too (save dialog, pattern pickers). */
+body.gs-studio-embed .components-modal__frame {
+	background: #141a26 !important;
+	color: var(--st-text) !important;
+	border: 1px solid var(--st-border-hi);
+	border-radius: 16px !important;
+}
+body.gs-studio-embed .components-modal__header {
+	background: #141a26 !important;
+	border-bottom-color: var(--st-border) !important;
+}
+body.gs-studio-embed .components-modal__header-heading { color: var(--st-text) !important; }
+
+/* Notices and snackbars. */
+body.gs-studio-embed .components-snackbar {
+	background: #1a2232 !important;
+	color: var(--st-text) !important;
+	border: 1px solid rgba(151, 228, 110, .4);
+	border-radius: 12px !important;
+}
+
+/* ── No WordPress branding inside the studio ─────────────────────────── */
+body.gs-studio-embed .edit-site-site-hub,
+body.gs-studio-embed .edit-site-layout__view-mode-toggle,
+body.gs-studio-embed .edit-site-layout__view-mode-toggle-container,
+body.gs-studio-embed .edit-site-site-icon,
+body.gs-studio-embed .editor-header__back-button,
+body.gs-studio-embed .edit-site-layout__hub,
+body.gs-studio-embed .edit-site-site-hub__view-mode-toggle-container,
+body.gs-studio-embed .edit-site-welcome-guide,
+body.gs-studio-embed .edit-site-more-menu__welcome-guide,
+body.gs-studio-embed .editor-keyboard-shortcut-help-modal__trigger {
+	display: none !important;
+}
+
+/* Scrollbars */
+body.gs-studio-embed ::-webkit-scrollbar { width: 8px; height: 8px; }
+body.gs-studio-embed ::-webkit-scrollbar-thumb { background: rgba(255, 255, 255, .14); border-radius: 4px; }
+body.gs-studio-embed ::-webkit-scrollbar-track { background: transparent; }
+
+/* The header keeps a 64px column for the (hidden) WordPress button: pull the toolbar into it. */
+body.gs-studio-embed .editor-header__toolbar { margin-left: -52px; }
+
+/* Code editor (Options > Code editor / Edit as HTML): readable in the dark skin. */
+body.gs-studio-embed .editor-text-editor,
+body.gs-studio-embed .edit-post-text-editor,
+body.gs-studio-embed .editor-text-editor__body,
+body.gs-studio-embed .edit-post-text-editor__body {
+	background: var(--st-bg) !important;
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .editor-post-text-editor,
+body.gs-studio-embed .block-editor-block-list__block-html-textarea,
+body.gs-studio-embed .editor-text-editor textarea:not(.editor-post-title__input) {
+	background: #0e131e !important;
+	color: #e8edf5 !important;
+	border: 1px solid rgba(255, 255, 255, .14) !important;
+	border-radius: 10px !important;
+	font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace !important;
+	font-size: 13px !important;
+	line-height: 1.6 !important;
+}
+body.gs-studio-embed .editor-post-text-editor { min-height: 60vh; }
+body.gs-studio-embed .editor-text-editor__toolbar,
+body.gs-studio-embed .edit-post-text-editor__toolbar {
+	background: var(--st-panel) !important;
+	color: var(--st-text) !important;
+}
+body.gs-studio-embed .editor-text-editor__toolbar h2,
+body.gs-studio-embed .edit-post-text-editor__toolbar h2 { color: var(--st-muted) !important; }
+body.gs-studio-embed .editor-post-title__input,
+body.gs-studio-embed .editor-post-title { color: var(--st-text) !important; background: transparent !important; }
+
+/* Code editor: server-rendered sections -> editable HTML */
+.gs-lh-banner { margin: 0 0 14px; padding: 14px 16px; border-radius: 14px; border: 1px solid rgba(110, 193, 228, .35); background: rgba(110, 193, 228, .08); color: #d7e3f4; display: grid; gap: 10px; }
+.gs-lh-banner p { margin: 0; font-size: 13px; line-height: 1.5; }
+.gs-lh-banner.is-done p, .gs-lh-banner.is-done .gs-lh-btn { display: none; }
+.gs-lh-btn { justify-self: start; padding: 8px 14px; border-radius: 10px; border: 0; background: #97e46e; color: #0b0e14; font-weight: 600; cursor: pointer; }
+.gs-lh-btn[disabled] { opacity: .6; cursor: wait; }
+.gs-lh-banner summary { cursor: pointer; color: #6ec1e4; font-size: 12px; }
+.gs-lh-banner code { display: block; margin-top: 6px; white-space: normal; word-break: break-word; font-size: 11.5px; line-height: 1.7; color: #b9c4d6; background: transparent; }

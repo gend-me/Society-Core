@@ -80,6 +80,24 @@ return array(
 			'needs' => array( 'skin' ),
 		),
 		array(
+			'file'  => 'inc/design-studio.php',
+			'tier'  => 'core',
+			'needs' => array( 'skin' ),
+			'note'  => 'Design Studio: replaces the Site Editor landing screen; live style preview endpoint + style-guide page.',
+		),
+		array(
+			'file'  => 'inc/site-sidebars.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Site sidebars: optional left/right sidebar per area (pages, blog, shop, social), block template parts, added around the template <main>.',
+		),
+		array(
+			'file'  => 'inc/design-studio-templates.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Studio block templates (product types, plugin dashboard pages); join the hierarchy only once customised.',
+		),
+		array(
 			'file'  => 'inc/frontend-bar.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
@@ -236,6 +254,48 @@ return array(
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
 			'note'  => 'Member profile header (terminal-style header + nav bar).',
+		),
+		array(
+			'file'  => 'inc/profile-styling.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Profile Styling: block-built profile headers, tab layouts and menu (after member-profile-header: takes over its header hook).',
+		),
+		array(
+			'file'  => 'inc/profile-widgets.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Profile Widget block: any profile Overview widget as a block; new Overview tab layouts start with today\'s widgets.',
+		),
+		array(
+			'file'  => 'inc/directory-styling.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Directory Styling: block layouts for the members / groups directories and the activity feed (published layouts only).',
+		),
+		array(
+			'file'  => 'inc/activity-blocks.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Activity wall blocks: filter bar, post form, feed and sidebar for the Activity feed layout (same markup and scripts as the wall).',
+		),
+		array(
+			'file'  => 'inc/youzify-assets.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Youzify styling control: stops Youzify front-end CSS where block layouts replaced it, or per area (scripts keep loading).',
+		),
+		array(
+			'file'  => 'inc/studio-previews.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Live previews of Social templates in the block editor (?gs_studio_view= parts, live CSS in the canvas).',
+		),
+		array(
+			'file'  => 'inc/live-html.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Live HTML: Social template blocks convert to Custom HTML with {{tokens}} filled per group / member (live parts stay live).',
 		),
 		array(
 			'file'  => 'inc/member-calendar.php',

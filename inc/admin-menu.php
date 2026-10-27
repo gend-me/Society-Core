@@ -136,7 +136,7 @@ function gend_society_register_admin_menu()
             'none',
             7
         );
-        add_submenu_page('gs-social', __('Social Profiles', 'gend-society'), __('Social Profiles', 'gend-society'), 'manage_options', 'gdc-social-network-settings', 'sn_render_network_settings_page');
+        add_submenu_page('gs-social', __('Member Management', 'gend-society'), __('Member Management', 'gend-society'), 'manage_options', 'gdc-social-network-settings', 'sn_render_network_settings_page');
 
         remove_submenu_page('gs-social', 'gs-social');
     }
