@@ -343,7 +343,96 @@
 				} );
 			} }, icon( 'plus-alt2' ), __( 'New header', 'gend-society' ) );
 			return section( 1, isGroups ? __( 'Group header', 'gend-society' ) : __( 'Profile header', 'gend-society' ),
-				isGroups ? __( 'The banner, identity and menu at the top of every group.', 'gend-society' ) : __( 'The cover, avatar, name and menu at the top of every profile.', 'gend-society' ), list, add );
+				isGroups ? __( 'The banner, identity and menu at the top of every group.', 'gend-society' ) : __( 'The cover, avatar, name and menu at the top of every profile.', 'gend-society' ),
+				h( 'div', null, list, photosPanel() ), add );
+		}
+
+		// Default avatar + cover (Youzify options), shown until a member or group uploads their own.
+		function photosPanel() {
+			if ( ! D.photos ) {
+				return null;
+			}
+			var chip = h( 'span', { class: 'gs-sp-photos-chip' } );
+			var paintChip = function () {
+				var n = ( D.photos.avatar ? 1 : 0 ) + ( D.photos.cover ? 1 : 0 );
+				chip.textContent = sprintf( __( '%d of 2 set', 'gend-society' ), n );
+			};
+			var row = function ( part, title, hint ) {
+				var preview = h( 'div', { class: 'gs-sp-photo-prev is-' + part } );
+				var input = h( 'input', { type: 'text', inputmode: 'url', class: 'gs-st-input', value: D.photos[ part ] || '',
+					placeholder: __( 'Paste an image URL or choose one', 'gend-society' ), 'aria-label': title } );
+				var clear = h( 'button', { type: 'button', class: 'gs-st-btn is-text is-sm' }, __( 'Use default', 'gend-society' ) );
+				var paint = function ( url ) {
+					preview.classList.toggle( 'is-empty', ! url );
+					preview.style.setProperty( '--gs-img', url ? 'url("' + url.replace( /["\\]/g, '' ) + '")' : 'none' );
+					preview.textContent = '';
+					if ( ! url ) {
+						preview.appendChild( icon( 'format-image' ) );
+					}
+					clear.hidden = ! url;
+				};
+				var save = function ( url ) {
+					url = ( url || '' ).trim();
+					if ( url === ( D.photos[ part ] || '' ) ) {
+						return;
+					}
+					paint( url );
+					post( 'photos', { part: part, url: url } ).then( function ( res ) {
+						D.photos = res.photos || D.photos;
+						input.value = D.photos[ part ] || '';
+						paint( D.photos[ part ] );
+						paintChip();
+						toast( url ? __( 'Default photo saved.', 'gend-society' ) : __( 'Default photo cleared.', 'gend-society' ), 'ok' );
+					}, function ( e ) {
+						input.value = D.photos[ part ] || '';
+						paint( D.photos[ part ] );
+						fail( e );
+					} );
+				};
+				input.addEventListener( 'change', function () {
+					save( input.value );
+				} );
+				input.addEventListener( 'keydown', function ( e ) {
+					if ( e.key === 'Enter' ) {
+						e.preventDefault();
+						save( input.value );
+					}
+				} );
+				clear.addEventListener( 'click', function () {
+					input.value = '';
+					save( '' );
+				} );
+				var pick = h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+					if ( ! window.wp || ! wp.media ) {
+						input.focus();
+						return;
+					}
+					var frame = wp.media( { title: title, library: { type: 'image' }, multiple: false, button: { text: __( 'Use this image', 'gend-society' ) } } );
+					frame.on( 'select', function () {
+						var a = frame.state().get( 'selection' ).first().toJSON();
+						input.value = a.url;
+						save( a.url );
+					} );
+					frame.open();
+				} }, icon( 'upload' ), __( 'Choose image', 'gend-society' ) );
+				paint( D.photos[ part ] );
+				return h( 'div', { class: 'gs-sp-photo' }, preview,
+					h( 'div', { class: 'gs-sp-photo-body' },
+						h( 'strong', null, title ),
+						h( 'p', { class: 'gs-st-muted' }, hint ),
+						input,
+						h( 'div', { class: 'gs-sp-photo-actions' }, pick, clear ) ) );
+			};
+			paintChip();
+			return h( 'div', { class: 'gs-sp-photos' },
+				h( 'div', { class: 'gs-sp-photos-head' },
+					h( 'span', { class: 'gs-sp-card-ico' }, icon( 'format-image' ) ),
+					h( 'div', null, h( 'strong', null, __( 'Default photos', 'gend-society' ) ),
+						h( 'p', { class: 'gs-st-muted' }, isGroups ? __( 'Shown on groups until an organizer uploads their own.', 'gend-society' ) : __( 'Shown on profiles until a member uploads their own.', 'gend-society' ) ) ),
+					chip ),
+				h( 'div', { class: 'gs-sp-photos-grid' },
+					row( 'avatar', isGroups ? __( 'Default group avatar', 'gend-society' ) : __( 'Default avatar', 'gend-society' ), __( 'A square image works best.', 'gend-society' ) ),
+					row( 'cover', isGroups ? __( 'Default group cover', 'gend-society' ) : __( 'Default cover', 'gend-society' ), __( 'A wide landscape image works best.', 'gend-society' ) ) ) );
 		}
 
 		function pagesOf( slug ) {

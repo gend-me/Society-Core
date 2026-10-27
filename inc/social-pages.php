@@ -481,7 +481,7 @@ function gend_society_sp_register_rest() {
 	);
 	register_rest_route(
 		'gend-society/v1',
-		'/social-pages/(?P<scope>groups|profiles)/(?P<action>menu|tab-layout|page|page-update|page-order|page-delete|sidebar|sidebar-default|sidebar-update|sidebar-delete|header|header-default|directory)',
+		'/social-pages/(?P<scope>groups|profiles)/(?P<action>menu|tab-layout|page|page-update|page-order|page-delete|sidebar|sidebar-default|sidebar-update|sidebar-delete|header|header-default|directory|photos)',
 		array(
 			'methods'             => 'POST',
 			'callback'            => 'gend_society_sp_rest_action',
@@ -782,8 +782,29 @@ function gend_society_sp_rest_state( WP_REST_Request $req ) {
 				'features'    => (object) $features,
 			),
 			'sampleUrl'  => $sample,
+			'photos'     => gend_society_sp_photos( $scope ),
 		)
 	);
+}
+
+/**
+ * Default avatar and cover, shown until a member or group uploads their own.
+ * These are Youzify's own options (the same ones Member Management › Settings
+ * edits), so both screens stay in step.
+ *
+ * @param string $scope groups|profiles.
+ * @return array|null Null when Youzify is not active.
+ */
+function gend_society_sp_photos( $scope ) {
+	if ( ! function_exists( 'youzify_option' ) ) {
+		return null;
+	}
+	$kind = 'groups' === $scope ? 'groups' : 'profiles';
+	$out  = array();
+	foreach ( array( 'avatar', 'cover' ) as $part ) {
+		$out[ $part ] = (string) youzify_option( 'youzify_default_' . $kind . '_' . $part, '' );
+	}
+	return $out;
 }
 
 /**
@@ -1000,6 +1021,23 @@ function gend_society_sp_rest_action( WP_REST_Request $req ) {
 			}
 			update_post_meta( $id, '_gdc_is_site_default', '1' );
 			return rest_ensure_response( array( 'saved' => true ) );
+
+		case 'photos':
+			if ( ! function_exists( 'youzify_update_option' ) ) {
+				return new WP_Error( 'gs_sp_photos', __( 'Default photos need Youzify.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			$part = isset( $body['part'] ) ? (string) $body['part'] : '';
+			if ( ! in_array( $part, array( 'avatar', 'cover' ), true ) ) {
+				return new WP_Error( 'gs_sp_photos', __( 'Unknown photo.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			$key = 'youzify_default_' . ( 'groups' === $scope ? 'groups' : 'profiles' ) . '_' . $part;
+			$url = isset( $body['url'] ) ? esc_url_raw( trim( (string) $body['url'] ) ) : '';
+			if ( '' === $url ) {
+				youzify_delete_option( $key );
+			} else {
+				youzify_update_option( $key, $url );
+			}
+			return rest_ensure_response( array( 'photos' => gend_society_sp_photos( $scope ) ) );
 
 	}
 	return new WP_Error( 'gs_sp_action', __( 'Unknown action.', 'gend-society' ), array( 'status' => 400 ) );

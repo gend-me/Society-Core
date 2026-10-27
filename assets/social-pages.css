@@ -209,3 +209,27 @@ body.gs-studio-page .gs-studio input[type="text"].gs-sp-title { background: tran
 body.gs-studio-page .gs-studio input[type="text"].gs-sp-title:hover { border-color: var(--st-border) !important; }
 body.gs-studio-page .gs-studio input[type="text"]:focus { border-color: var(--st-accent) !important; box-shadow: 0 0 0 2px rgba(151, 228, 110, .18) !important; }
 body.gs-studio-page .gs-studio .gs-sp-slug.is-edit input[type="text"] { color: var(--st-blue) !important; }
+
+/* Default photos (inside the header section) */
+.gs-studio .gs-sp-photos { margin-top: 14px; padding: 16px; border: 1px solid var(--st-border); border-radius: 16px; background: rgba(0, 0, 0, .14); }
+.gs-studio .gs-sp-photos-head { display: flex; align-items: center; gap: 12px; margin-bottom: 14px; }
+.gs-studio .gs-sp-photos-head strong { display: block; font-size: 14px; }
+.gs-studio .gs-sp-photos-head p { margin: 2px 0 0; }
+.gs-studio .gs-sp-photos-chip { margin-left: auto; padding: 4px 11px; border: 1px solid var(--st-border); border-radius: 99px; font-size: 12px; font-weight: 600; color: var(--st-text); white-space: nowrap; }
+.gs-studio .gs-sp-photos-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(min(100%, 360px), 1fr)); gap: 12px; }
+.gs-studio .gs-sp-photo { display: flex; align-items: flex-start; gap: 14px; padding: 14px; border: 1px solid var(--st-border); border-radius: var(--st-radius); background: var(--st-card); min-width: 0; }
+.gs-studio .gs-sp-photo-prev {
+	flex: none; display: grid; place-items: center; width: 76px; height: 76px; border-radius: 50%;
+	border: 1px solid var(--st-border); color: var(--st-muted);
+	background: var(--gs-img, none) center / cover no-repeat, rgba(255, 255, 255, .04) !important;
+}
+.gs-studio .gs-sp-photo-prev.is-cover { width: 128px; height: 76px; border-radius: 12px; }
+.gs-studio .gs-sp-photo-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.gs-studio .gs-sp-photo-body p { margin: 0; }
+.gs-studio .gs-sp-photo-body .gs-st-input { width: 100%; }
+.gs-studio .gs-sp-photo-actions { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.gs-studio .gs-st-btn.is-text { border-color: transparent; background: transparent; color: var(--st-blue); }
+.gs-studio .gs-st-btn.is-text:hover { text-decoration: underline; }
+@media (max-width: 520px) {
+	.gs-studio .gs-sp-photo { flex-direction: column; }
+}
