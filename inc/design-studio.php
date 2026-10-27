@@ -286,6 +286,7 @@ function gend_society_studio_sections() {
 	$profiles    = function_exists( 'gend_society_ps_rest_state' ) ? admin_url( 'admin.php?page=gs-studio-profile-styling' ) : '';
 	$p_header_id = $profiles ? gend_society_ps_default_header_id() : 0;
 	$layouts     = function_exists( 'gend_society_ds_layout_id' );
+	$sp_ready    = function_exists( 'gend_society_sp_rest_state' ) && $layouts;
 	$layout_url  = function ( $slug ) {
 		return admin_url( 'admin.php?page=gs-studio-layout&layout=' . $slug );
 	};
@@ -419,25 +420,27 @@ function gend_society_studio_sections() {
 			'active'   => $has_social,
 			'requires' => __( 'Social Profiles', 'gend-society' ),
 			'groups'   => array(
+				// One page each: header, menu + pages by audience, sidebars, directory (inc/social-pages.php).
+				// The separate settings screens only when that builder is missing.
 				array(
 					'label' => __( 'Profile', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
-						// Profile headers, tab layouts and menu are block-built (Profile Styling); Youzify settings only without it.
-						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
-						array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
-						// The right sidebar, as Profile Widget blocks (inc/profile-widgets.php).
-						array( 'id' => 'profile-sidebar', 'label' => __( 'Profile Sidebar', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts && function_exists( 'gend_society_pw_default_sidebar' ) ? $layout_url( 'profile-sidebar' ) : $yz( 'youzify-profile-settings', 'widgets' ) ),
-					),
+					'items' => $sp_ready && $profiles
+						? array( array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'profiles' ) )
+						: array(
+							array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
+							array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
+							array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
+						),
 				),
 				array(
 					'label' => __( 'Groups', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
-						// Group headers and pages are block-built (Group Styling); Youzify settings only when that builder is missing.
-						array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
-						array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
-					),
+					'items' => $sp_ready && $builder
+						? array( array( 'id' => 'group-pages', 'label' => __( 'Group Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'groups' ) )
+						: array(
+							array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
+							array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
+							array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
+						),
 				),
 				array(
 					'label' => __( 'Activity Feed', 'gend-society' ),
@@ -683,7 +686,15 @@ function gend_society_studio_enqueue( $hook ) {
 	$css = 'assets/design-studio.css';
 	$js  = 'assets/design-studio.js';
 	wp_enqueue_style( 'gs-design-studio', GEND_SOCIETY_URL . $css, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) );
-	wp_enqueue_script( 'gs-design-studio', GEND_SOCIETY_URL . $js, array( 'wp-api-fetch', 'wp-i18n', 'wp-url' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
+	$deps = array( 'wp-api-fetch', 'wp-i18n', 'wp-url' );
+	if ( function_exists( 'gend_society_sp_rest_state' ) ) {
+		// Social › Group / Profile Pages builder.
+		wp_enqueue_style( 'gs-social-pages', GEND_SOCIETY_URL . 'assets/social-pages.css', array( 'gs-design-studio' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/social-pages.css' ) );
+		wp_enqueue_script( 'gs-social-pages', GEND_SOCIETY_URL . 'assets/social-pages.js', array( 'wp-api-fetch', 'wp-i18n' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/social-pages.js' ), true );
+		wp_set_script_translations( 'gs-social-pages', 'gend-society' );
+		$deps[] = 'gs-social-pages';
+	}
+	wp_enqueue_script( 'gs-design-studio', GEND_SOCIETY_URL . $js, $deps, GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
 	wp_set_script_translations( 'gs-design-studio', 'gend-society' );
 
 	$theme      = wp_get_theme();
@@ -765,6 +776,20 @@ function gend_society_studio_embed_css() {
 		. 'html.wp-toolbar{padding-top:0!important}#wpcontent,#wpfooter{margin-left:0!important}#wpbody-content{padding-top:0!important}'
 		. 'body.gs-studio-embed .edit-site-layout__view-mode-toggle-container,body.gs-studio-embed .edit-site-site-hub__view-mode-toggle-container,body.gs-studio-embed .editor-header__back-button,body.gs-studio-embed .edit-site-layout__hub,body.gs-studio-embed .edit-post-fullscreen-mode-close{visibility:hidden!important;pointer-events:none!important}'
 		. '</style>';
+}
+
+add_action( 'admin_enqueue_scripts', 'gend_society_studio_visual_editor_script', 99 );
+/**
+ * Every block editor opens in the visual editor. The studio's "Edit as HTML"
+ * switches to the code editor, and WordPress saves that choice for all
+ * editors (no blocks, empty settings sidebar), so it never carries over.
+ */
+function gend_society_studio_visual_editor_script() {
+	foreach ( array( 'wp-edit-site', 'wp-edit-post' ) as $handle ) {
+		if ( wp_script_is( $handle, 'enqueued' ) ) {
+			wp_add_inline_script( $handle, 'wp.domReady(function(){try{if(wp.data.select("core/preferences").get("core","editorMode")==="text"){wp.data.dispatch("core/preferences").set("core","editorMode","visual");}}catch(e){}});' );
+		}
+	}
 }
 
 add_action( 'admin_enqueue_scripts', 'gend_society_studio_embed_editor_script' );

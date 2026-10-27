@@ -372,6 +372,11 @@
 	}
 
 	wp.domReady( function () {
+		// "Edit as HTML" switches to the code editor, and WordPress saves that
+		// choice for every editor. Studio editors always open visually.
+		if ( editorMode() === 'text' ) {
+			switchMode( 'visual' );
+		}
 		var addQueued = false;
 		new window.MutationObserver( function () {
 			if ( ! addQueued ) {

@@ -800,6 +800,10 @@
 	}
 	function viewPanel( hit ) {
 		var p = hit.item.panel;
+		// Panels from their own scripts (e.g. assets/social-pages.js).
+		if ( window.gsStudioPanels && window.gsStudioPanels[ p ] ) {
+			return window.gsStudioPanels[ p ]( hit, { h: h, icon: icon, api: api, toast: toast, confirmBox: confirmBox, promptBox: promptBox, crumbs: crumbs, errMsg: errMsg, loadingView: loadingView, debounce: debounce } );
+		}
 		var needsStyles = p === 'palettes' || p === 'fonts';
 		if ( needsStyles && ! cfg.globalStylesId ) {
 			return emptyState( 'warning', __( 'Styles are not available', 'gend-society' ), __( 'Your active theme does not support global styles, so colours and type are set by the theme.', 'gend-society' ) );

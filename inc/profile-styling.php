@@ -155,6 +155,15 @@ function gend_society_ps_resolve( $post_type, $user_id, $tab = '' ) {
 			}
 		}
 	}
+	/**
+	 * Filters the template a member's profile gets (Social Pages: the viewer's page for a tab).
+	 *
+	 * @param WP_Post|null $found     Template.
+	 * @param string       $post_type gdc_profile_header or gdc_profile_tab.
+	 * @param int          $user_id   Profile member.
+	 * @param string       $tab       Tab slug.
+	 */
+	$found         = apply_filters( 'gend_society_ps_resolve', $found, $post_type, $user_id, $tab );
 	$cache[ $key ] = $found;
 	return $found;
 }
@@ -266,7 +275,13 @@ function gend_society_ps_tab_close() {
 	gend_society_ps_tab_content( (string) ob_get_clean() );
 	$tab = sanitize_html_class( (string) get_post_meta( $tpl->ID, '_gdc_tab_slug', true ) );
 	// Keep the tab's own wrapper classes, so its styles still apply to the blocks.
-	echo '<div class="gdc-profile-tab-layout youzify-tab youzify-' . esc_attr( $tab ) . '">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored template.
+	/**
+	 * Filters a tab layout's output (Social Pages: a sidebar beside it).
+	 *
+	 * @param string $html Rendered layout.
+	 * @param string $tab  Tab slug.
+	 */
+	echo apply_filters( 'gend_society_ps_tab_output', '<div class="gdc-profile-tab-layout youzify-tab youzify-' . esc_attr( $tab ) . '">' . do_blocks( $tpl->post_content ) . '</div>', $tab ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored template.
 }
 
 /* ── Menu (label / order / hidden) ──────────────────────────────────────── */

@@ -268,6 +268,12 @@ return array(
 			'note'  => 'Profile Styling: block-built profile headers, tab layouts and menu (after member-profile-header: takes over its header hook).',
 		),
 		array(
+			'file'  => 'inc/social-pages.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Social Pages: per-tab pages by audience (visitors, roles, member/group types, plan features) and per-page layout + sidebar for groups and profiles; API for the studio Group / Profile Pages builder.',
+		),
+		array(
 			'file'  => 'inc/profile-widgets.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
