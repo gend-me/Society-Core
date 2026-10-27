@@ -406,7 +406,7 @@
 
 	// The style guide section that matches what is being edited.
 	function guideAnchor() {
-		var byItem = { logo: 'gsg-logo', favicon: 'gsg-icons', 'site-name': 'gsg-cover', palettes: 'gsg-colour' };
+		var byItem = { logo: 'gsg-logo', favicon: 'gsg-icons', 'site-name': 'gsg-cover', palettes: 'gsg-colour', voice: 'gsg-voice', 'app-styling': 'gsg-style', cast: 'gsg-cast' };
 		if ( current.item === 'fonts' ) {
 			var byEl = { heading: 'gsg-faces', p: 'gsg-type-p', a: 'gsg-comp-links', button: 'gsg-comp-buttons' };
 			return byEl[ S.typeEl ] || 'gsg-type-' + ( S.typeEl || 'h1' );
@@ -802,7 +802,7 @@
 		var p = hit.item.panel;
 		// Panels from their own scripts (e.g. assets/social-pages.js).
 		if ( window.gsStudioPanels && window.gsStudioPanels[ p ] ) {
-			return window.gsStudioPanels[ p ]( hit, { h: h, icon: icon, api: api, toast: toast, confirmBox: confirmBox, promptBox: promptBox, crumbs: crumbs, errMsg: errMsg, loadingView: loadingView, debounce: debounce } );
+			return window.gsStudioPanels[ p ]( hit, { h: h, icon: icon, api: api, toast: toast, confirmBox: confirmBox, promptBox: promptBox, crumbs: crumbs, errMsg: errMsg, loadingView: loadingView, debounce: debounce, panelLayout: panelLayout, reloadPreview: reloadPreview, pickImage: pickImage } );
 		}
 		var needsStyles = p === 'palettes' || p === 'fonts';
 		if ( needsStyles && ! cfg.globalStylesId ) {

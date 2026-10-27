@@ -86,6 +86,12 @@ return array(
 			'note'  => 'Design Studio: replaces the Site Editor landing screen; live style preview endpoint + style-guide page.',
 		),
 		array(
+			'file'  => 'inc/brand-kit.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Brand kit: Voice and Tone, App Styling and Cast Members for the Design Studio and the Brand Guidelines page; adds the brand brief to AI chats on this site (aipa_system_context) and serves it at /brand-kit/brief.',
+		),
+		array(
 			'file'  => 'inc/page-heading.php',
 			'tier'  => 'core',
 			'needs' => array(),

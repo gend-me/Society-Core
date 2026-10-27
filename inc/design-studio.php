@@ -299,7 +299,7 @@ function gend_society_studio_sections() {
 			'id'     => 'branding',
 			'label'  => __( 'Branding', 'gend-society' ),
 			'icon'   => 'art',
-			'blurb'  => __( 'Logo, colours and type that every page shares.', 'gend-society' ),
+			'blurb'  => __( 'Logo, colours, type, styling, voice and cast: the brand every page and every AI request shares.', 'gend-society' ),
 			'active' => true,
 			'groups' => array(
 				array(
@@ -309,6 +309,9 @@ function gend_society_studio_sections() {
 						array( 'id' => 'site-name', 'label' => __( 'Site Name', 'gend-society' ), 'kind' => 'panel', 'panel' => 'site-name' ),
 						array( 'id' => 'palettes', 'label' => __( 'Colour Schemes', 'gend-society' ), 'kind' => 'panel', 'panel' => 'palettes' ),
 						array( 'id' => 'fonts', 'label' => __( 'Font Types', 'gend-society' ), 'kind' => 'panel', 'panel' => 'fonts' ),
+						array( 'id' => 'voice', 'label' => __( 'Voice & Tone', 'gend-society' ), 'kind' => 'panel', 'panel' => 'brand-voice' ),
+						array( 'id' => 'app-styling', 'label' => __( 'App Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'brand-style' ),
+						array( 'id' => 'cast', 'label' => __( 'Cast Members', 'gend-society' ), 'kind' => 'panel', 'panel' => 'brand-cast' ),
 					),
 				),
 			),
@@ -688,6 +691,14 @@ function gend_society_studio_enqueue( $hook ) {
 		wp_set_script_translations( 'gs-social-pages', 'gend-society' );
 		$deps[] = 'gs-social-pages';
 	}
+	if ( function_exists( 'gend_society_bk_get' ) ) {
+		// Branding › Voice & Tone, App Styling, Cast Members (inc/brand-kit.php).
+		wp_enqueue_style( 'gs-brand-kit-demo', GEND_SOCIETY_URL . 'assets/brand-kit-demo.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit-demo.css' ) );
+		wp_enqueue_style( 'gs-brand-kit', GEND_SOCIETY_URL . 'assets/brand-kit.css', array( 'gs-design-studio' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit.css' ) );
+		wp_enqueue_script( 'gs-brand-kit', GEND_SOCIETY_URL . 'assets/brand-kit.js', array( 'wp-api-fetch', 'wp-i18n' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit.js' ), true );
+		wp_set_script_translations( 'gs-brand-kit', 'gend-society' );
+		$deps[] = 'gs-brand-kit';
+	}
 	wp_enqueue_script( 'gs-design-studio', GEND_SOCIETY_URL . $js, $deps, GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
 	wp_set_script_translations( 'gs-design-studio', 'gend-society' );
 
@@ -988,6 +999,7 @@ function gend_society_studio_specimen_page() {
 	$css = 'assets/design-studio-guide.css';
 	$js  = 'assets/design-studio-guide.js';
 	wp_enqueue_style( 'gs-studio-guide', GEND_SOCIETY_URL . $css, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) );
+	wp_enqueue_style( 'gs-brand-kit-demo', GEND_SOCIETY_URL . 'assets/brand-kit-demo.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit-demo.css' ) );
 	wp_enqueue_script( 'gs-studio-guide', GEND_SOCIETY_URL . $js, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
 
 	$name    = get_bloginfo( 'name' );
@@ -1078,13 +1090,18 @@ function gend_society_studio_specimen_page() {
 
 	<nav class="gsg-index">
 		<?php
-		$chapters = array(
+		// Written chapters (inc/brand-kit.php) sit between the components and the closing spread.
+		$kit_chapters = function_exists( 'gend_society_bk_guide_chapters' ) ? gend_society_bk_guide_chapters() : array();
+		$chapters     = array(
 			'logo'       => __( 'Logo', 'gend-society' ),
 			'colour'     => __( 'Colour', 'gend-society' ),
 			'type'       => __( 'Typography', 'gend-society' ),
 			'components' => __( 'Components', 'gend-society' ),
-			'in-use'     => __( 'In use', 'gend-society' ),
 		);
+		foreach ( $kit_chapters as $kid => $kc ) {
+			$chapters[ $kid ] = $kc[0];
+		}
+		$chapters['in-use'] = __( 'In use', 'gend-society' );
 		$n = 0;
 		foreach ( $chapters as $id => $label ) :
 			++$n;
@@ -1185,9 +1202,28 @@ function gend_society_studio_specimen_page() {
 		</div>
 	</section>
 
+	<?php
+	$kn = 4;
+	foreach ( $kit_chapters as $kid => $kc ) :
+		++$kn;
+		?>
+	<section class="gsg-chapter" id="gsg-<?php echo esc_attr( $kid ); ?>">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num"><?php echo esc_html( sprintf( '%02d', $kn ) ); ?></span>
+			<div class="gsg-chapter-title"><?php echo esc_html( $kc[0] ); ?></div>
+			<div class="gsg-chapter-lede"><?php echo esc_html( $kc[1] ); ?></div>
+		</header>
+		<?php if ( '' !== $kc[2] ) : ?>
+			<div class="gsg-bk"><?php echo $kc[2]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in gend_society_bk_guide_chapters(). ?></div>
+		<?php else : ?>
+			<div class="gsg-bk-empty"><?php esc_html_e( 'Not written yet. Fill this chapter in from the Design Studio’s Branding screens.', 'gend-society' ); ?></div>
+		<?php endif; ?>
+	</section>
+	<?php endforeach; ?>
+
 	<section class="gsg-chapter" id="gsg-in-use">
 		<header class="gsg-chapter-head">
-			<span class="gsg-num">05</span>
+			<span class="gsg-num"><?php echo esc_html( sprintf( '%02d', $kn + 1 ) ); ?></span>
 			<div class="gsg-chapter-title"><?php esc_html_e( 'In use', 'gend-society' ); ?></div>
 			<div class="gsg-chapter-lede"><?php esc_html_e( 'Everything together, as visitors will meet it.', 'gend-society' ); ?></div>
 		</header>
