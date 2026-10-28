@@ -103,9 +103,71 @@
 		return node.innerHTML;
 	}
 	// One media picker for the page, pointed at whichever image was chosen last.
+	// It opens on the image being replaced: shown in its bar, and selected when it's in the library.
 	var mediaFrame = null;
 	var mediaPick = null;
-	function pickMedia( title, onPick ) {
+	var mediaAsk = 0;
+	// "photo-1024x768.png", "photo-scaled.webp" and "photo.png" are the same image.
+	function imageKey( url ) {
+		var name = String( url || '' ).split( /[?#]/ )[ 0 ].split( '/' ).pop();
+		try {
+			name = decodeURIComponent( name );
+		} catch ( e ) {}
+		return name.replace( /\.[a-z0-9]+$/i, '' ).replace( /-(\d+x\d+|scaled|rotated|e\d{10,})$/i, '' ).toLowerCase();
+	}
+	function findAttachment( current ) {
+		var m = / wp-image-(\d+) /.exec( ' ' + ( current.className || '' ) + ' ' );
+		if ( m ) {
+			return Promise.resolve( parseInt( m[ 1 ], 10 ) );
+		}
+		var key = imageKey( current.url );
+		if ( ! key || /^data:/.test( current.url ) ) {
+			return Promise.resolve( 0 );
+		}
+		return wp.apiFetch( { path: '/wp/v2/media?media_type=image&per_page=20&_fields=id,source_url,media_details&search=' + encodeURIComponent( key.replace( /[-_]+/g, ' ' ) ) } ).then( function ( list ) {
+			var hit = ( list || [] ).filter( function ( a ) {
+				var urls = [ a.source_url ];
+				var sizes = ( a.media_details && a.media_details.sizes ) || {};
+				Object.keys( sizes ).forEach( function ( k ) {
+					urls.push( sizes[ k ].source_url );
+				} );
+				return urls.some( function ( u ) {
+					return imageKey( u ) === key;
+				} );
+			} )[ 0 ];
+			return hit ? hit.id : 0;
+		} ).catch( function () {
+			return 0;
+		} );
+	}
+	function showCurrent( current ) {
+		var root = mediaFrame.$el[ 0 ];
+		var bar = root.querySelector( '.gs-hv-current' );
+		if ( ! bar ) {
+			bar = document.createElement( 'div' );
+			bar.className = 'gs-hv-current';
+			root.appendChild( bar );
+		}
+		bar.textContent = '';
+		if ( ! current || ! current.url ) {
+			bar.hidden = true;
+			return;
+		}
+		bar.hidden = false;
+		var img = document.createElement( 'img' );
+		img.src = current.url;
+		img.alt = '';
+		var txt = document.createElement( 'span' );
+		var lab = document.createElement( 'small' );
+		lab.textContent = __( 'Replacing', 'gend-society' );
+		var name = document.createElement( 'b' );
+		name.textContent = String( current.url ).split( /[?#]/ )[ 0 ].split( '/' ).pop();
+		txt.appendChild( lab );
+		txt.appendChild( name );
+		bar.appendChild( img );
+		bar.appendChild( txt );
+	}
+	function pickMedia( title, onPick, current ) {
 		if ( ! wp.media ) {
 			notify( __( 'The media library could not load.', 'gend-society' ), 'error' );
 			return;
@@ -121,6 +183,32 @@
 			} );
 		}
 		mediaFrame.open();
+		mediaFrame.modal.$el.addClass( 'gs-hv-media' );
+		showCurrent( current );
+		var selection = mediaFrame.state().get( 'selection' );
+		selection.reset( [] );
+		var ask = ++mediaAsk;
+		if ( current && current.url ) {
+			findAttachment( current ).then( function ( id ) {
+				if ( ! id || ask !== mediaAsk ) {
+					return;
+				}
+				var att = wp.media.attachment( id );
+				att.fetch().then( function () {
+					if ( ask === mediaAsk ) {
+						selection.reset( [ att ] );
+					}
+				} );
+			} );
+		}
+	}
+	// The image an element shows now: its source, or its background's URL.
+	function currentImage( node, kind ) {
+		if ( kind === 'img' ) {
+			return { url: node.currentSrc || node.getAttribute( 'src' ), className: node.getAttribute( 'class' ) || '' };
+		}
+		var m = BG_URL.exec( node.getAttribute( 'style' ) || '' );
+		return { url: m ? m[ 2 ] : '', className: '' };
 	}
 	function applyImage( node, kind, a ) {
 		if ( kind === 'img' ) {
@@ -440,7 +528,7 @@
 							applyImage( src, kind, a );
 						} );
 						notify( __( 'Image replaced. Save the page to keep it.', 'gend-society' ) );
-					} );
+					}, currentImage( t, kind ) );
 				} );
 				on( 'focusout', function ( e ) {
 					var t = e.target;
