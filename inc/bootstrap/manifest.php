@@ -98,6 +98,12 @@ return array(
 			'note'  => 'Custom HTML blocks in every block editor: shown as the page looks in a live frame (their scripts run), text edited by clicking it, images replaced from the media library; Edit HTML shows the code.',
 		),
 		array(
+			'file'  => 'inc/taxonomy-templates.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Category templates: the block template each blog category, product category and product attribute uses (Design Studio Blog Archives / Product Categories & Attributes); the choice goes first in the template hierarchy.',
+		),
+		array(
 			'file'  => 'inc/page-heading.php',
 			'tier'  => 'core',
 			'needs' => array(),

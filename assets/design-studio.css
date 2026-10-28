@@ -561,3 +561,32 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-sb-width, .gs-st-sb-sticky { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #c6cfdf; }
 .gs-st-sb-width input[type=range] { width: 140px; accent-color: var(--st-accent); }
 .gs-st-sb-sticky input { accent-color: var(--st-accent); }
+
+/* ── Category templates (Blog Archives, Product Categories & Attributes) ── */
+.gs-st-tt-group { margin: 0 0 34px; }
+.gs-st-tt-sub { margin: 22px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--st-muted); }
+.gs-st-tt-list { display: flex; flex-direction: column; gap: 8px; }
+.gs-st-tt-item { border: 1px solid var(--st-border); border-radius: var(--st-radius); background: var(--st-card); transition: border-color .2s; scroll-margin-top: 16px; }
+.gs-st-tt-item.is-open { border-color: rgba(151, 228, 110, .45); }
+.gs-st-tt-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+.gs-st-tt-row.is-all { padding: 14px; }
+.gs-st-tt-row.is-all .gs-st-tpl-thumb { width: 92px; height: 64px; padding: 8px; gap: 4px; margin: 0; flex: none; }
+.gs-st-tt-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gs-st-tt-name strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-st-tt-row.is-all .gs-st-tt-name strong { font-size: 16px; }
+.gs-st-tt-name small { color: var(--st-muted); font-size: 12px; }
+.gs-studio .gs-st-tt-row select.gs-st-input { width: 260px; max-width: 40%; height: 34px; }
+.gs-st-tt-row .gs-st-btn { flex: none; }
+.gs-st-tt-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--st-ease); }
+.gs-st-tt-item.is-open .gs-st-tt-drawer { grid-template-rows: 1fr; }
+.gs-st-tt-drawer-in { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.gs-st-tt-item.is-open .gs-st-tt-drawer-in { border-top: 1px solid var(--st-border); }
+.gs-st-tt-drawer-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; font-size: 13px; color: var(--st-muted); }
+.gs-st-tt-drawer-head span:not(.dashicons) { flex: 1; }
+.gs-st-tt-drawer-in .gs-st-editor { flex: none; height: min(80vh, 860px); border-radius: 0 0 var(--st-radius) var(--st-radius); overflow: hidden; }
+@media (max-width: 782px) {
+	.gs-st-tt-row { flex-wrap: wrap; }
+	.gs-st-tt-name { flex-basis: 100%; }
+	.gs-studio .gs-st-tt-row select.gs-st-input { flex: 1; max-width: none; width: auto; }
+	.gs-st-tt-row.is-all .gs-st-tpl-thumb { display: none; }
+}

@@ -345,9 +345,8 @@ function gend_society_studio_sections() {
 					'items' => array(
 						array( 'id' => 'page-templates', 'label' => __( 'Page Templates', 'gend-society' ), 'kind' => 'templates', 'match' => 'page' ),
 						array( 'id' => 'single', 'label' => __( 'Blog Post Templates', 'gend-society' ), 'kind' => 'template', 'slug' => 'single' ),
-						array( 'id' => 'home', 'label' => __( 'Blog All', 'gend-society' ), 'kind' => 'template', 'slug' => 'home', 'fallback' => 'index' ),
+						array( 'id' => 'blog-archives', 'label' => __( 'Blog Archives', 'gend-society' ), 'kind' => 'taxtemplates', 'set' => 'blog' ),
 						array( 'id' => 'archive', 'label' => __( 'All Archives', 'gend-society' ), 'kind' => 'template', 'slug' => 'archive', 'fallback' => 'index' ),
-						array( 'id' => 'category', 'label' => __( 'Category Templates', 'gend-society' ), 'kind' => 'template', 'slug' => 'category', 'fallback' => 'archive' ),
 					),
 				),
 			),
@@ -365,7 +364,7 @@ function gend_society_studio_sections() {
 					'items' => array(
 						array( 'id' => 'archive-product', 'label' => __( 'Product Catalog', 'gend-society' ), 'kind' => 'template', 'slug' => 'archive-product' ),
 						array( 'id' => 'product-search-results', 'label' => __( 'Product Search Results', 'gend-society' ), 'kind' => 'template', 'slug' => 'product-search-results' ),
-						array( 'id' => 'taxonomy-product_attribute', 'label' => __( 'Products by Attribute', 'gend-society' ), 'kind' => 'template', 'slug' => 'taxonomy-product_attribute' ),
+						array( 'id' => 'product-taxonomies', 'label' => __( 'Product Categories & Attributes', 'gend-society' ), 'kind' => 'taxtemplates', 'set' => 'store' ),
 						array( 'id' => 'page-cart', 'label' => __( 'Cart', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-cart' ),
 						array( 'id' => 'mini-cart', 'label' => __( 'Mini-Cart', 'gend-society' ), 'kind' => 'part', 'slug' => 'mini-cart' ),
 						array( 'id' => 'page-checkout', 'label' => __( 'Checkout', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-checkout' ),
