@@ -116,6 +116,12 @@ return array(
 			'note'  => 'Shortcode customiser: per-site colours, hidden sections, wording and CSS for plugin components that are shortcodes (Sales Team), applied on do_shortcode_tag; edited in the Design Studio.',
 		),
 		array(
+			'file'  => 'inc/sales-blocks.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Sales blocks: each Sales Team component as a block (live preview; its own colours, sections, wording and CSS on top of the site-wide Customise settings). Needs inc/shortcode-customizer.php.',
+		),
+		array(
 			'file'  => 'inc/page-heading.php',
 			'tier'  => 'core',
 			'needs' => array(),

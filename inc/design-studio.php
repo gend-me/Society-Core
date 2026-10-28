@@ -978,7 +978,9 @@ function gend_society_studio_shortcode_preview() {
 	// Or one page's content (?gs_studio_page_preview=id): the template editor's preview of a dashboard page.
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
 	$page = isset( $_GET['gs_studio_page_preview'] ) ? get_post( absint( $_GET['gs_studio_page_preview'] ) ) : null;
-	if ( ! current_user_can( 'edit_theme_options' ) ) {
+	// Post editors may preview the Sales components (rendered as themselves, as on any page).
+	$is_component = '' !== $tag && function_exists( 'gend_society_scx_schema' ) && isset( gend_society_scx_schema()[ $tag ] );
+	if ( ! current_user_can( 'edit_theme_options' ) && ! ( $is_component && ! $page && current_user_can( 'edit_posts' ) ) ) {
 		return;
 	}
 	// The studio's Customise card previews unsaved settings on the plain component.
@@ -995,7 +997,13 @@ function gend_society_studio_shortcode_preview() {
 		add_filter( 'show_admin_bar', '__return_false' );
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
 		$sc_id = isset( $_GET['gs_studio_sc_id'] ) ? sanitize_key( wp_unslash( $_GET['gs_studio_sc_id'] ) ) : '';
-		$html  = do_shortcode( '[' . $tag . ( '' !== $sc_id ? ' id="' . $sc_id . '"' : '' ) . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+		if ( $is_component && isset( $_GET['gs_scx_block'] ) && function_exists( 'gend_society_sb_render' ) ) {
+			// A Sales block's own settings (?gs_scx_block=JSON), as the block renders them.
+			$custom = json_decode( wp_unslash( $_GET['gs_scx_block'] ), true ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitised in gend_society_scx_sanitize().
+			$html   = gend_society_sb_render( $tag, is_array( $custom ) ? $custom : array(), false );
+		} else {
+			$html = do_shortcode( '[' . $tag . ( '' !== $sc_id ? ' id="' . $sc_id . '"' : '' ) . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+		}
 	} else {
 		return;
 	}

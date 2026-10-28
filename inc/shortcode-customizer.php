@@ -142,6 +142,9 @@ function gend_society_scx_sanitize( $tag, $in ) {
 		}
 	}
 	$keys = wp_list_pluck( isset( $def['sections'] ) ? $def['sections'] : array(), 'key' );
+	if ( ! empty( $in['ownHide'] ) ) {
+		$out['ownHide'] = true;
+	}
 	foreach ( (array) ( $in['hide'] ?? array() ) as $k ) {
 		if ( in_array( $k, $keys, true ) ) {
 			$out['hide'][] = $k;
@@ -182,8 +185,41 @@ function gend_society_scx_apply( $output, $tag ) {
 	if ( ! isset( $schema[ $tag ] ) ) {
 		return $output;
 	}
-	$s = gend_society_scx_get( $tag );
-	if ( ! $s['colors'] && ! $s['hide'] && ! $s['texts'] && '' === $s['css'] ) {
+	return gend_society_scx_render( $output, $tag, gend_society_scx_get( $tag ) );
+}
+
+/**
+ * A block's own settings on top of the site's: its colours and wording win,
+ * its section list (when it has one) replaces the site's, its CSS is added.
+ *
+ * @param string $tag   Shortcode tag.
+ * @param array  $block The block's settings (already sanitised).
+ * @return array
+ */
+function gend_society_scx_merge( $tag, $block ) {
+	$site = gend_society_scx_get( $tag );
+	return array(
+		'colors' => array_merge( (array) $site['colors'], (array) $block['colors'] ),
+		'hide'   => ! empty( $block['ownHide'] ) ? (array) $block['hide'] : (array) $site['hide'],
+		'texts'  => array_merge( (array) $site['texts'], (array) $block['texts'] ),
+		'css'    => $site['css'],
+		// Nested under the block's own scope in gend_society_scx_render().
+		'blockCss' => $block['css'],
+	);
+}
+
+/**
+ * Applies settings to a component's output, scoped to its own wrapper.
+ *
+ * @param string $output Component output.
+ * @param string $tag    Shortcode tag.
+ * @param array  $s      Settings [ colors, hide, texts, css ].
+ * @param string $scope  Wrapper class; one per block so blocks do not share styles.
+ * @return string
+ */
+function gend_society_scx_render( $output, $tag, $s, $scope = '' ) {
+	$schema = gend_society_scx_schema();
+	if ( ! isset( $schema[ $tag ] ) || ( ! $s['colors'] && ! $s['hide'] && ! $s['texts'] && '' === $s['css'] && empty( $s['blockCss'] ) ) ) {
 		return $output;
 	}
 	if ( $s['texts'] ) {
@@ -203,7 +239,7 @@ function gend_society_scx_apply( $output, $tag ) {
 			$output
 		);
 	}
-	$scope = '.gs-scx-' . sanitize_html_class( $tag );
+	$scope = '.' . sanitize_html_class( $scope ? $scope : 'gs-scx-' . $tag );
 	$css   = '';
 	if ( $s['colors'] ) {
 		$css .= $scope . '{';
@@ -226,7 +262,10 @@ function gend_society_scx_apply( $output, $tag ) {
 		$css .= implode( ',', $sels ) . '{display:none!important}';
 	}
 	$css .= $s['css'];
-	$html = '<div class="gs-scx ' . esc_attr( substr( $scope, 1 ) ) . '" style="display:contents">' . $output . '</div>';
+	if ( ! empty( $s['blockCss'] ) ) {
+		$css .= $scope . '{' . $s['blockCss'] . '}';
+	}
+	$html = '<div class="gs-scx gs-scx-' . esc_attr( sanitize_html_class( $tag ) ) . ' ' . esc_attr( substr( $scope, 1 ) ) . '" style="display:contents">' . $output . '</div>';
 	if ( '' !== $css ) {
 		$html .= '<style>' . $css . '</style>'; // phpcs:ignore -- sanitised in gend_society_scx_sanitize().
 	}
@@ -283,7 +322,10 @@ function gend_society_scx_register_rest() {
 			array(
 				'methods'             => 'GET',
 				'callback'            => 'gend_society_scx_rest_get',
-				'permission_callback' => $can,
+				// Read-only: post editors need the texts to reword a Sales block.
+				'permission_callback' => function () {
+					return current_user_can( 'edit_posts' );
+				},
 			),
 			array(
 				'methods'             => 'POST',
