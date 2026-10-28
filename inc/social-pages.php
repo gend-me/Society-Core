@@ -499,7 +499,7 @@ function gend_society_sp_register_rest() {
 	);
 	register_rest_route(
 		'gend-society/v1',
-		'/social-pages/activity/(?P<action>feed|reaction-setting|emoji|emoji-delete|emoji-order)',
+		'/social-pages/activity/(?P<action>feed|reaction-setting|emoji|emoji-delete|emoji-order|wall)',
 		array(
 			'methods'             => 'POST',
 			'callback'            => 'gend_society_sp_activity_action',
@@ -590,6 +590,7 @@ function gend_society_sp_activity_state() {
 				'url'       => function_exists( 'bp_get_activity_directory_permalink' ) ? bp_get_activity_directory_permalink() : '',
 			),
 			'reactions' => $reactions,
+			'wall'      => gend_society_sp_wall_state(),
 		)
 	);
 }
@@ -603,6 +604,10 @@ function gend_society_sp_activity_state() {
 function gend_society_sp_activity_action( WP_REST_Request $req ) {
 	$action = $req['action'];
 	$body   = (array) $req->get_json_params();
+	if ( 'wall' === $action ) {
+		$saved = gend_society_sp_wall_save( isset( $body['key'] ) ? (string) $body['key'] : '', isset( $body['value'] ) ? $body['value'] : null );
+		return is_wp_error( $saved ) ? $saved : gend_society_sp_activity_state();
+	}
 	if ( 'feed' === $action ) {
 		$id = function_exists( 'gend_society_ds_layout_id' ) ? gend_society_ds_layout_id( 'activity' ) : 0;
 		if ( ! $id ) {
@@ -689,6 +694,295 @@ function gend_society_sp_activity_action( WP_REST_Request $req ) {
 			break;
 	}
 	return gend_society_sp_activity_state();
+}
+
+/* ── Activity wall settings (Member Management › Activity Wall) ─────────── */
+
+/**
+ * Youzify's admin helpers for these settings (post types, countries) load only
+ * in wp-admin; the studio talks to REST, so load them here.
+ */
+function gend_society_sp_wall_load() {
+	if ( ! defined( 'YOUZIFY_ADMIN_CORE' ) ) {
+		return;
+	}
+	$dir = trailingslashit( YOUZIFY_ADMIN_CORE );
+	if ( ! function_exists( 'youzify_activity_post_types' ) && file_exists( $dir . 'functions/youzify-general-functions.php' ) ) {
+		require_once $dir . 'functions/youzify-general-functions.php';
+	}
+	if ( ! function_exists( 'youzify_alpha2_countries' ) && file_exists( $dir . 'general-settings/youzify-settings-wall.php' ) ) {
+		require_once $dir . 'general-settings/youzify-settings-wall.php';
+	}
+}
+
+/**
+ * The Activity Wall tab's settings, grouped as it groups them: Youzify
+ * options, read with their defaults and saved the way its panel saves them.
+ * Field types: switch (on/off), number, select, tags (list of words),
+ * countries, layout, secret (a key that is never sent to the page).
+ *
+ * @return array[]
+ */
+function gend_society_sp_wall_schema() {
+	$sw  = static function ( $key, $title, $desc ) {
+		return array( 'key' => $key, 'type' => 'switch', 'title' => $title, 'desc' => $desc );
+	};
+	$num = static function ( $key, $title, $desc, $min = 0, $max = 1000 ) {
+		return array( 'key' => $key, 'type' => 'number', 'title' => $title, 'desc' => $desc, 'min' => $min, 'max' => $max );
+	};
+	$tag = static function ( $key, $title, $desc ) {
+		return array( 'key' => $key, 'type' => 'tags', 'title' => $title, 'desc' => $desc );
+	};
+	gend_society_sp_wall_load();
+	$types = function_exists( 'youzify_activity_post_types' ) ? youzify_activity_post_types() : array();
+	$posts = array();
+	foreach ( $types as $type => $name ) {
+		$posts[] = array( 'key' => 'post_type:' . $type, 'type' => 'switch', 'title' => wp_strip_all_tags( $name ), 'desc' => '' );
+	}
+	$groups = array(
+		array( 'id' => 'general', 'icon' => 'admin-settings', 'title' => __( 'General', 'gend-society' ), 'desc' => __( 'How the wall loads and previews links.', 'gend-society' ), 'fields' => array(
+			$sw( 'youzify_enable_wall_url_preview', __( 'Link previews', 'gend-society' ), __( 'Show a preview of links typed into the post form.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_activity_loader', __( 'Infinite loading', 'gend-society' ), __( 'Load more posts as members scroll.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_activity_effects', __( 'Loading effect', 'gend-society' ), __( 'Fade posts in as they load.', 'gend-society' ) ),
+			array( 'key' => 'youzify_activity_stream_layout', 'type' => 'layout', 'title' => __( 'Sidebar side', 'gend-society' ), 'desc' => __( 'Where the sidebar sits on the activity page (when the feed layout above isn’t designed yet).', 'gend-society' ), 'opts' => array( 'youzify-wall-left-sidebar' => __( 'Left', 'gend-society' ), 'youzify-wall-right-sidebar' => __( 'Right', 'gend-society' ) ) ),
+		) ),
+		array( 'id' => 'form', 'icon' => 'edit', 'title' => __( 'Posting form', 'gend-society' ), 'desc' => __( 'What members can add to a post.', 'gend-society' ), 'fields' => array(
+			$sw( 'youzify_activity_privacy', __( 'Privacy', 'gend-society' ), __( 'Members choose who sees each post.', 'gend-society' ) ),
+			$sw( 'youzify_activity_mood', __( 'Feeling / activity', 'gend-society' ), __( 'Members add how they feel or what they’re doing.', 'gend-society' ) ),
+			$sw( 'youzify_activity_tag_friends', __( 'Tag friends', 'gend-society' ), __( 'Members tag friends in posts.', 'gend-society' ) ),
+			$sw( 'youzify_activity_checkin', __( 'Check in', 'gend-society' ), __( 'Members add a location.', 'gend-society' ) ),
+		) ),
+		array( 'id' => 'buttons', 'icon' => 'thumbs-up', 'title' => __( 'Post buttons', 'gend-society' ), 'desc' => __( 'The buttons under each post and comment.', 'gend-society' ), 'fields' => array(
+			$sw( 'youzify_enable_wall_posts_likes', __( 'Likes', 'gend-society' ), __( 'Members like posts.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_posts_comments', __( 'Comments', 'gend-society' ), __( 'Members comment on posts.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_posts_reply', __( 'Replies', 'gend-society' ), __( 'Members reply to comments.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_posts_shares', __( 'Shares', 'gend-society' ), __( 'Members share posts to their own wall.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_posts_deletion', __( 'Delete button', 'gend-society' ), __( 'Members delete their own posts.', 'gend-society' ) ),
+			$sw( 'youzify_wall_comments_gif', __( 'GIFs in comments', 'gend-society' ), __( 'Members add GIFs to comments.', 'gend-society' ) ),
+		) ),
+		array( 'id' => 'display', 'icon' => 'filter', 'title' => __( 'Filters, embeds and pinned posts', 'gend-society' ), 'desc' => __( 'Filter bars, embedded media and posts admins pin to the top.', 'gend-society' ), 'fields' => array(
+			$sw( 'youzify_enable_wall_filter_bar', __( 'Profile activity filter', 'gend-society' ), __( 'Filter bar on each profile’s activity.', 'gend-society' ) ),
+			$sw( 'youzify_enable_activity_directory_filter_bar', __( 'Activity page filter', 'gend-society' ), __( 'Filter bar on the activity page.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_posts_embeds', __( 'Embeds in posts', 'gend-society' ), __( 'Videos and links play inside posts.', 'gend-society' ) ),
+			$sw( 'youzify_enable_wall_comments_embeds', __( 'Embeds in comments', 'gend-society' ), __( 'Videos and links play inside comments.', 'gend-society' ) ),
+			$sw( 'youzify_enable_activity_sticky_posts', __( 'Pinned posts on the activity page', 'gend-society' ), __( 'Admins pin or unpin posts.', 'gend-society' ) ),
+			$sw( 'youzify_enable_groups_sticky_posts', __( 'Pinned posts in groups', 'gend-society' ), __( 'Group admins pin or unpin posts.', 'gend-society' ) ),
+		) ),
+		array( 'id' => 'paging', 'icon' => 'list-view', 'title' => __( 'Posts per page', 'gend-society' ), 'desc' => __( 'How many posts load at a time.', 'gend-society' ), 'fields' => array(
+			$num( 'youzify_activity_wall_posts_per_page', __( 'Activity page', 'gend-society' ), __( 'The site-wide activity page.', 'gend-society' ), 1, 500 ),
+			$num( 'youzify_profile_wall_posts_per_page', __( 'Profiles', 'gend-society' ), __( 'Each member’s activity.', 'gend-society' ), 1, 500 ),
+			$num( 'youzify_groups_wall_posts_per_page', __( 'Groups', 'gend-society' ), __( 'Each group’s activity.', 'gend-society' ), 1, 500 ),
+		) ),
+		array( 'id' => 'attachments', 'icon' => 'media-document', 'title' => __( 'Attachments', 'gend-society' ), 'desc' => __( 'Files members attach to posts and comments.', 'gend-society' ), 'fields' => array(
+			$num( 'youzify_attachments_max_nbr', __( 'Photos per post', 'gend-society' ), __( 'Most photos in one photo or slideshow post.', 'gend-society' ), 1, 1000 ),
+			$num( 'youzify_attachments_max_size', __( 'Post file size (MB)', 'gend-society' ), __( 'Largest file a post can carry.', 'gend-society' ), 1, 1024 ),
+			$tag( 'youzify_atts_allowed_images_exts', __( 'Image types', 'gend-society' ), __( 'File extensions allowed for images.', 'gend-society' ) ),
+			$tag( 'youzify_atts_allowed_videos_exts', __( 'Video types', 'gend-society' ), __( 'File extensions allowed for videos.', 'gend-society' ) ),
+			$tag( 'youzify_atts_allowed_audios_exts', __( 'Audio types', 'gend-society' ), __( 'File extensions allowed for audio.', 'gend-society' ) ),
+			$tag( 'youzify_atts_allowed_files_exts', __( 'File types', 'gend-society' ), __( 'File extensions allowed for other files.', 'gend-society' ) ),
+			$sw( 'youzify_wall_comments_attachments', __( 'Attachments in comments', 'gend-society' ), __( 'Members attach files to comments.', 'gend-society' ) ),
+			$num( 'youzify_wall_comments_attachments_max_size', __( 'Comment file size (MB)', 'gend-society' ), __( 'Largest file a comment can carry.', 'gend-society' ), 1, 1024 ),
+			$tag( 'youzify_wall_comments_attachments_extensions', __( 'Comment file types', 'gend-society' ), __( 'File extensions allowed in comments.', 'gend-society' ) ),
+		) ),
+		array( 'id' => 'post-types', 'icon' => 'visibility', 'title' => __( 'Post types on the wall', 'gend-society' ), 'desc' => __( 'Which kinds of activity show up. Turning one off hides those posts.', 'gend-society' ), 'fields' => $posts ),
+		array( 'id' => 'moderation', 'icon' => 'shield', 'title' => __( 'Moderation', 'gend-society' ), 'desc' => __( 'Words that can’t be used in posts or comments.', 'gend-society' ), 'fields' => array(
+			$tag( 'youzify_moderation_keys', __( 'Forbidden words', 'gend-society' ), __( 'Posts and comments with these words are refused.', 'gend-society' ) ),
+		) ),
+		array( 'id' => 'polls', 'icon' => 'chart-bar', 'title' => __( 'Polls', 'gend-society' ), 'desc' => __( 'Poll posts: how they are made and voted on.', 'gend-society' ), 'fields' => array(
+			$sw( 'yzap_poll_multi_options', __( 'Single or multiple choice', 'gend-society' ), __( 'Members choose whether a poll allows several answers.', 'gend-society' ) ),
+			array( 'key' => 'yzap_poll_options_selection', 'type' => 'select', 'title' => __( 'Default voting', 'gend-society' ), 'desc' => __( 'How a new poll votes unless changed.', 'gend-society' ), 'opts' => array( 'single' => __( 'One answer', 'gend-society' ), 'multi' => __( 'Several answers', 'gend-society' ) ) ),
+			$num( 'yzap_poll_options_limit', __( 'Most answers', 'gend-society' ), __( 'Answers a poll can have.', 'gend-society' ), 2, 100 ),
+			$sw( 'yzap_poll_options_image_enable', __( 'Answer images', 'gend-society' ), __( 'Members add an image to each answer.', 'gend-society' ) ),
+			$sw( 'yzap_poll_options_image', __( 'Require answer images', 'gend-society' ), __( 'Every answer must have an image.', 'gend-society' ) ),
+			$sw( 'yzap_poll_options_result', __( 'Show results', 'gend-society' ), __( 'Members see the results.', 'gend-society' ) ),
+			$sw( 'yzap_poll_revote', __( 'Change vote', 'gend-society' ), __( 'Members change their vote after voting.', 'gend-society' ) ),
+			$sw( 'yzap_poll_list_voters', __( 'Show voters', 'gend-society' ), __( 'Members see who voted.', 'gend-society' ) ),
+			$num( 'yzap_poll_limit_voters', __( 'Voters shown', 'gend-society' ), __( 'Most voters listed per answer.', 'gend-society' ), 1, 1000 ),
+			array( 'key' => 'yzap_poll_options_redirection', 'type' => 'select', 'title' => __( 'Poll opens on', 'gend-society' ), 'desc' => __( 'What a poll post shows first.', 'gend-society' ), 'opts' => array( 'poll' => __( 'The answers', 'gend-society' ), 'result' => __( 'The results', 'gend-society' ) ) ),
+		) ),
+		array( 'id' => 'checkin', 'icon' => 'location', 'title' => __( 'Check in', 'gend-society' ), 'desc' => __( 'Locations members add to posts (uses Google Maps).', 'gend-society' ), 'fields' => array(
+			array( 'key' => 'youzify_google_map_api_key', 'type' => 'secret', 'title' => __( 'Google Maps API key', 'gend-society' ), 'desc' => __( 'Needed for check-ins. The saved key is never shown here.', 'gend-society' ) ),
+			array( 'key' => 'youzify_google_map_allowed_countries', 'type' => 'countries', 'title' => __( 'Countries', 'gend-society' ), 'desc' => __( 'Locations members can pick from. Leave empty for every country.', 'gend-society' ) ),
+		) ),
+		array( 'id' => 'emoji', 'icon' => 'smiley', 'title' => __( 'Emoji', 'gend-society' ), 'desc' => __( 'Where members can add emoji.', 'gend-society' ), 'fields' => array(
+			$sw( 'youzify_enable_posts_emoji', __( 'In posts', 'gend-society' ), __( 'Emoji picker in the post form.', 'gend-society' ) ),
+			$sw( 'youzify_enable_comments_emoji', __( 'In comments', 'gend-society' ), __( 'Emoji picker in comments.', 'gend-society' ) ),
+			$sw( 'youzify_enable_messages_emoji', __( 'In messages', 'gend-society' ), __( 'Emoji picker in private messages.', 'gend-society' ) ),
+		) ),
+	);
+	return $groups;
+}
+
+/**
+ * Activity types turned off on the wall (Youzify keeps "off" ones).
+ *
+ * @return string[]
+ */
+function gend_society_sp_wall_unallowed() {
+	$off = youzify_option( 'youzify_unallowed_activities', array() );
+	$off = is_array( $off ) ? $off : array();
+	if ( in_array( 'friendship_accepted,friendship_created', $off, true ) ) {
+		$off[] = 'friendship_accepted';
+		$off[] = 'friendship_created';
+	}
+	return $off;
+}
+
+/**
+ * Settings with their current values (null when Youzify is not active).
+ *
+ * @return array|null
+ */
+function gend_society_sp_wall_state() {
+	if ( ! function_exists( 'youzify_options' ) || ! function_exists( 'youzify_update_option' ) || ! current_user_can( 'manage_options' ) ) {
+		return null;
+	}
+	$off    = gend_society_sp_wall_unallowed();
+	$groups = gend_society_sp_wall_schema();
+	foreach ( $groups as &$group ) {
+		foreach ( $group['fields'] as &$f ) {
+			if ( 0 === strpos( $f['key'], 'post_type:' ) ) {
+				$f['value'] = ! in_array( substr( $f['key'], 10 ), $off, true );
+				continue;
+			}
+			$v = youzify_options( $f['key'] );
+			switch ( $f['type'] ) {
+				case 'switch':
+					$f['value'] = 'on' === $v;
+					break;
+				case 'number':
+					$f['value'] = (int) $v;
+					break;
+				case 'tags':
+				case 'countries':
+					$f['value'] = array_values( array_map( 'strval', is_array( $v ) ? $v : array_filter( array_map( 'trim', explode( ',', (string) $v ) ) ) ) );
+					break;
+				case 'secret':
+					$f['value'] = '' !== trim( (string) $v );
+					break;
+				default:
+					$f['value'] = (string) $v;
+			}
+		}
+		unset( $f );
+	}
+	unset( $group );
+	return array(
+		'groups'    => $groups,
+		'countries' => function_exists( 'youzify_alpha2_countries' ) ? youzify_alpha2_countries() : array(),
+	);
+}
+
+/**
+ * Saves one wall setting where Youzify reads it.
+ *
+ * @param string $key   Setting key from gend_society_sp_wall_schema().
+ * @param mixed  $value New value.
+ * @return true|WP_Error
+ */
+function gend_society_sp_wall_save( $key, $value ) {
+	if ( ! function_exists( 'youzify_options' ) || ! function_exists( 'youzify_update_option' ) ) {
+		return new WP_Error( 'gs_sp_wall', __( 'The Social Network must be active to change these settings.', 'gend-society' ), array( 'status' => 400 ) );
+	}
+	// The same check as the Activity Wall tab itself.
+	if ( ! current_user_can( 'manage_options' ) ) {
+		return new WP_Error( 'gs_sp_wall', __( 'You can’t change these settings.', 'gend-society' ), array( 'status' => 403 ) );
+	}
+	$field = null;
+	foreach ( gend_society_sp_wall_schema() as $group ) {
+		foreach ( $group['fields'] as $f ) {
+			if ( $f['key'] === $key ) {
+				$field = $f;
+			}
+		}
+	}
+	if ( ! $field ) {
+		return new WP_Error( 'gs_sp_wall', __( 'Unknown setting.', 'gend-society' ), array( 'status' => 400 ) );
+	}
+
+	// Post types: the list of the ones turned off (a status also covers plain updates).
+	if ( 0 === strpos( $key, 'post_type:' ) ) {
+		$type = substr( $key, 10 );
+		$off  = array_values( array_diff( gend_society_sp_wall_unallowed(), array( 'friendship_accepted,friendship_created' ) ) );
+		$drop = 'activity_status' === $type ? array( 'activity_status', 'activity_update' ) : array( $type );
+		$off  = array_values( array_diff( $off, $drop ) );
+		if ( ! $value ) {
+			$off = array_merge( $off, $drop );
+		}
+		$off = array_values( array_unique( $off ) );
+		if ( $off ) {
+			youzify_update_option( 'youzify_unallowed_activities', $off );
+		} else {
+			youzify_delete_option( 'youzify_unallowed_activities' );
+		}
+		return true;
+	}
+
+	switch ( $field['type'] ) {
+		case 'switch':
+			$v = $value ? 'on' : 'off';
+			break;
+		case 'number':
+			$v = (string) max( (int) $field['min'], min( (int) $field['max'], (int) $value ) );
+			break;
+		case 'select':
+		case 'layout':
+			$v = (string) $value;
+			if ( ! isset( $field['opts'][ $v ] ) ) {
+				return new WP_Error( 'gs_sp_wall', __( 'Unknown option.', 'gend-society' ), array( 'status' => 400 ) );
+			}
+			break;
+		case 'tags':
+			$v = array();
+			foreach ( is_array( $value ) ? $value : array() as $word ) {
+				$word = sanitize_text_field( (string) $word );
+				if ( '' !== $word && ! in_array( $word, $v, true ) ) {
+					$v[] = $word;
+				}
+			}
+			break;
+		case 'countries':
+			$all = function_exists( 'youzify_alpha2_countries' ) ? youzify_alpha2_countries() : array();
+			$v   = array_values( array_intersect( array_unique( array_map( 'strval', is_array( $value ) ? $value : array() ) ), array_keys( $all ) ) );
+			break;
+		case 'secret':
+			$v = sanitize_text_field( (string) $value );
+			break;
+		default:
+			return new WP_Error( 'gs_sp_wall', __( 'Unknown setting.', 'gend-society' ), array( 'status' => 400 ) );
+	}
+
+	// As Youzify's panel: empty or default values are removed, others stored.
+	$defaults = function_exists( 'youzify_default_options' ) ? youzify_default_options() : array();
+	if ( empty( $v ) || ( isset( $defaults[ $key ] ) && $v == $defaults[ $key ] ) ) { // phpcs:ignore Universal.Operators.StrictComparisons.LooseEqual -- Youzify compares loosely ("5" == 5).
+		youzify_delete_option( $key );
+	} else {
+		youzify_update_option( $key, $v, false );
+	}
+
+	// Polls also read three grouped options, rebuilt from every poll setting.
+	if ( 0 === strpos( $key, 'yzap_' ) ) {
+		$maps = array(
+			'youzify_poll_form_options'   => array( 'yzap_poll_options_limit' => 'options_limit', 'yzap_poll_multi_options' => 'multi_options', 'yzap_poll_options_selection' => 'options_selection', 'yzap_poll_options_image' => 'options_image', 'yzap_poll_options_image_enable' => 'options_image_enable' ),
+			'youzify_poll_result_options' => array( 'yzap_poll_list_voters' => 'list_voters', 'yzap_poll_limit_voters' => 'limit_voters', 'yzap_poll_options_image_enable' => 'options_image_enable' ),
+			'youzify_poll_post_options'   => array( 'yzap_poll_options_result' => 'options_result', 'yzap_poll_options_redirection' => 'options_redirection', 'yzap_poll_revote' => 'poll_revote' ),
+		);
+		foreach ( $maps as $option => $map ) {
+			$set = array();
+			foreach ( $map as $from => $to ) {
+				$val = youzify_options( $from );
+				if ( ! empty( $val ) ) {
+					$set[ $to ] = $val;
+				}
+			}
+			if ( $set ) {
+				update_option( $option, $set );
+			} else {
+				delete_option( $option );
+			}
+		}
+	}
+	return true;
 }
 
 /**

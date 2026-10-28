@@ -1268,11 +1268,242 @@
 						formSlot, grid ) ), add );
 		}
 
+		// Activity wall settings (Member Management › Activity Wall), one group per card.
+		// Each field saves on its own; the server answers with every value again.
+		function wallSection() {
+			var W = D.wall;
+			if ( ! W ) {
+				return null;
+			}
+			var fieldOf = function ( key ) {
+				var found = null;
+				W.groups.forEach( function ( g ) {
+					g.fields.forEach( function ( f ) {
+						if ( f.key === key ) {
+							found = f;
+						}
+					} );
+				} );
+				return found;
+			};
+			var save = function ( f, value, message ) {
+				return post( 'wall', { key: f.key, value: value } ).then( function ( res ) {
+					D.wall = W = res.wall || W;
+					var now = fieldOf( f.key );
+					if ( now ) {
+						f.value = now.value;
+					}
+					toast( message || __( 'Saved.', 'gend-society' ), 'ok' );
+					return f.value;
+				}, function ( e ) {
+					fail( e );
+					throw e;
+				} );
+			};
+			var row = function ( f, control ) {
+				return h( 'div', { class: 'gs-sp-stat gs-sp-field' },
+					h( 'div', { class: 'gs-sp-stat-text' }, h( 'strong', null, f.title ), f.desc ? h( 'span', { class: 'gs-st-muted' }, f.desc ) : null ), control );
+			};
+			// A list of words as chips: type and press Enter (or a comma) to add.
+			var chips = function ( f, labelOf, suggestions ) {
+				var box = h( 'div', { class: 'gs-sp-chips' } );
+				var input = h( 'input', { type: 'text', class: 'gs-st-input gs-sp-chip-input', placeholder: suggestions ? __( 'Add a country…', 'gend-society' ) : __( 'Add…', 'gend-society' ), 'aria-label': f.title } );
+				var list = null;
+				if ( suggestions ) {
+					list = h( 'datalist', { id: 'gs-sp-dl-' + f.key } );
+					Object.keys( suggestions ).forEach( function ( code ) {
+						list.appendChild( h( 'option', { value: suggestions[ code ] } ) );
+					} );
+					input.setAttribute( 'list', 'gs-sp-dl-' + f.key );
+				}
+				var paint = function () {
+					box.textContent = '';
+					( f.value || [] ).forEach( function ( v ) {
+						box.appendChild( h( 'span', { class: 'gs-sp-chip' }, labelOf( v ),
+							h( 'button', { type: 'button', 'aria-label': sprintf( __( 'Remove %s', 'gend-society' ), labelOf( v ) ), onclick: function () {
+								save( f, f.value.filter( function ( x ) {
+									return x !== v;
+								} ), sprintf( __( '%s removed.', 'gend-society' ), labelOf( v ) ) ).then( paint, paint );
+							} }, '×' ) ) );
+					} );
+					if ( ! ( f.value || [] ).length ) {
+						box.appendChild( h( 'span', { class: 'gs-st-muted gs-sp-chip-none' }, suggestions ? __( 'Every country', 'gend-society' ) : __( 'None', 'gend-society' ) ) );
+					}
+				};
+				var add = function () {
+					var raw = input.value.split( ',' ).map( function ( s ) {
+						return s.trim();
+					} ).filter( Boolean );
+					if ( ! raw.length ) {
+						return;
+					}
+					var next = ( f.value || [] ).slice();
+					raw.forEach( function ( word ) {
+						var v = word;
+						if ( suggestions ) {
+							v = Object.keys( suggestions ).filter( function ( code ) {
+								return suggestions[ code ].toLowerCase() === word.toLowerCase() || code.toLowerCase() === word.toLowerCase();
+							} )[ 0 ];
+						} else {
+							v = word.replace( /^\./, '' );
+						}
+						if ( v && next.indexOf( v ) === -1 ) {
+							next.push( v );
+						}
+					} );
+					input.value = '';
+					if ( next.length !== ( f.value || [] ).length ) {
+						save( f, next ).then( paint, paint );
+					}
+				};
+				input.addEventListener( 'keydown', function ( e ) {
+					if ( e.key === 'Enter' || e.key === ',' ) {
+						e.preventDefault();
+						add();
+					}
+				} );
+				input.addEventListener( 'change', function () {
+					if ( suggestions ) {
+						add();
+					}
+				} );
+				paint();
+				return h( 'div', { class: 'gs-sp-stat gs-sp-field gs-sp-field-wide' },
+					h( 'div', { class: 'gs-sp-stat-text' }, h( 'strong', null, f.title ), h( 'span', { class: 'gs-st-muted' }, f.desc ) ),
+					h( 'div', { class: 'gs-sp-chips-wrap' }, box, input, list ) );
+			};
+			var control = function ( f ) {
+				var id = 'gs-sp-wall-' + f.key.replace( /[^a-z0-9_-]/gi, '-' );
+				switch ( f.type ) {
+					case 'switch':
+						return switchRow( id, f.title, f.desc, f.value, function ( input ) {
+							var on = input.checked;
+							input.disabled = true;
+							save( f, on, sprintf( on ? __( '%s: on.', 'gend-society' ) : __( '%s: off.', 'gend-society' ), f.title ) ).then( function () {
+								input.disabled = false;
+								input.checked = !! f.value;
+							}, function () {
+								input.disabled = false;
+								input.checked = !! f.value;
+							} );
+						} );
+					case 'number':
+						var num = h( 'input', { type: 'number', id: id, class: 'gs-st-input gs-sp-num', min: f.min, max: f.max, value: f.value, 'aria-label': f.title } );
+						num.addEventListener( 'change', function () {
+							save( f, parseInt( num.value, 10 ) || 0 ).then( function () {
+								num.value = f.value;
+							}, function () {
+								num.value = f.value;
+							} );
+						} );
+						return row( f, num );
+					case 'select':
+						var sel = h( 'select', { id: id, class: 'gs-st-input', 'aria-label': f.title } );
+						Object.keys( f.opts ).forEach( function ( k ) {
+							sel.appendChild( h( 'option', { value: k, selected: f.value === k ? true : null }, f.opts[ k ] ) );
+						} );
+						sel.addEventListener( 'change', function () {
+							save( f, sel.value ).then( null, function () {
+								sel.value = f.value;
+							} );
+						} );
+						return row( f, sel );
+					case 'layout':
+						var seg = h( 'div', { class: 'gs-sp-seg', role: 'radiogroup', 'aria-label': f.title } );
+						var paintSeg = function () {
+							seg.querySelectorAll( 'button' ).forEach( function ( b ) {
+								b.setAttribute( 'aria-checked', b.dataset.v === f.value ? 'true' : 'false' );
+							} );
+						};
+						Object.keys( f.opts ).forEach( function ( k ) {
+							seg.appendChild( h( 'button', { type: 'button', role: 'radio', 'data-v': k, onclick: function () {
+								if ( k !== f.value ) {
+									save( f, k ).then( paintSeg, paintSeg );
+								}
+							} }, f.opts[ k ] ) );
+						} );
+						paintSeg();
+						return row( f, seg );
+					case 'tags':
+						return chips( f, function ( v ) {
+							return v;
+						} );
+					case 'countries':
+						return chips( f, function ( v ) {
+							return W.countries[ v ] || v;
+						}, W.countries );
+					case 'secret':
+						var badge = h( 'span', { class: 'gs-st-badge' } );
+						var key = h( 'input', { type: 'password', id: id, class: 'gs-st-input', autocomplete: 'off', 'aria-label': f.title } );
+						var clear = h( 'button', { type: 'button', class: 'gs-st-btn is-ghost is-sm', onclick: function () {
+							save( f, '', __( 'Key removed.', 'gend-society' ) ).then( paintKey, paintKey );
+						} }, __( 'Remove', 'gend-society' ) );
+						var paintKey = function () {
+							badge.textContent = f.value ? __( 'Key saved', 'gend-society' ) : __( 'Not set', 'gend-society' );
+							badge.className = 'gs-st-badge ' + ( f.value ? 'is-custom' : 'is-missing' );
+							key.placeholder = f.value ? __( 'Paste a new key to replace it', 'gend-society' ) : __( 'Paste the key', 'gend-society' );
+							clear.hidden = ! f.value;
+						};
+						key.addEventListener( 'change', function () {
+							if ( ! key.value.trim() ) {
+								return;
+							}
+							save( f, key.value.trim(), __( 'Key saved.', 'gend-society' ) ).then( function () {
+								key.value = '';
+								paintKey();
+							}, paintKey );
+						} );
+						paintKey();
+						return h( 'div', { class: 'gs-sp-stat gs-sp-field gs-sp-field-wide' },
+							h( 'div', { class: 'gs-sp-stat-text' }, h( 'strong', null, f.title, ' ', badge ), h( 'span', { class: 'gs-st-muted' }, f.desc ) ),
+							h( 'div', { class: 'gs-sp-key' }, key, clear ) );
+				}
+				return null;
+			};
+			var cards = W.groups.map( function ( g, i ) {
+				var switches = h( 'div', { class: 'gs-sp-stats-grid' } );
+				var others = h( 'div', { class: 'gs-sp-rx-fields' } );
+				g.fields.forEach( function ( f ) {
+					var c = control( f );
+					if ( c ) {
+						( f.type === 'switch' ? switches : others ).appendChild( c );
+					}
+				} );
+				var count = g.fields.filter( function ( f ) {
+					return f.type === 'switch';
+				} );
+				var chip = count.length > 2 ? h( 'span', { class: 'gs-sp-photos-chip' }, sprintf( __( '%1$d of %2$d on', 'gend-society' ), count.filter( function ( f ) {
+					return f.value;
+				} ).length, count.length ) ) : null;
+				var det = h( 'details', { class: 'gs-sp-photos gs-sp-stats gs-sp-wall-group', open: i === 0 ? true : null },
+					h( 'summary', { class: 'gs-sp-photos-head' },
+						h( 'span', { class: 'gs-sp-card-ico' }, icon( g.icon ) ),
+						h( 'div', null, h( 'strong', null, g.title ), h( 'p', { class: 'gs-st-muted' }, g.desc ) ),
+						chip,
+						h( 'span', { class: 'gs-sp-wall-caret', 'aria-hidden': 'true' }, icon( 'arrow-down-alt2' ) ) ),
+					switches.childNodes.length ? switches : null,
+					others.childNodes.length ? others : null );
+				if ( chip ) {
+					det.addEventListener( 'change', function () {
+						setTimeout( function () {
+							chip.textContent = sprintf( __( '%1$d of %2$d on', 'gend-society' ), count.filter( function ( f ) {
+								return f.value;
+							} ).length, count.length );
+						}, 400 );
+					} );
+				}
+				return det;
+			} );
+			return section( 3, __( 'Wall settings', 'gend-society' ),
+				__( 'How the activity wall works: the post form, buttons, attachments, polls, moderation and more. The same settings as Member Management › Activity Wall. Changes save straight away.', 'gend-society' ),
+				h( 'div', { class: 'gs-sp-wall' }, cards ) );
+		}
+
 		/* ── Draw ───────────────────────────────────────────────────────── */
 		var content = h( 'div', { class: 'gs-sp-sections' }, kit.loadingView() );
 		var wrap = h( 'div', { class: 'gs-st-pad gs-sp' }, kit.crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ),
 			h( 'p', { class: 'gs-st-intro' }, isActivity
-				? __( 'The activity feed on one page: its layout, and how members react to posts and comments.', 'gend-society' )
+				? __( 'The activity feed on one page: its layout, how members react to posts and comments, and how the wall works.', 'gend-society' )
 				: isGroups
 					? __( 'Everything group pages show, on one page: the header, the menu and the pages behind each tab (different ones for visitors, members, roles and plans), the sidebars, and the group directory.', 'gend-society' )
 					: __( 'Everything profiles show, on one page: the header, the menu and the pages behind each tab (different ones for visitors, friends and member types), the sidebars, and the members directory.', 'gend-society' ) ),
@@ -1286,6 +1517,10 @@
 			if ( isActivity ) {
 				content.appendChild( feedSection() );
 				content.appendChild( reactionsSection() );
+				var ws = wallSection();
+				if ( ws ) {
+					content.appendChild( ws );
+				}
 				if ( wrap.parentNode ) {
 					wrap.parentNode.scrollTop = y;
 				}
