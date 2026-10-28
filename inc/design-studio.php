@@ -360,26 +360,15 @@ function gend_society_studio_sections() {
 			'requires' => __( 'Store Management', 'gend-society' ),
 			'groups'   => array(
 				array(
-					'label' => __( 'Shopping', 'gend-society' ),
 					'items' => array(
 						array( 'id' => 'archive-product', 'label' => __( 'Product Catalog', 'gend-society' ), 'kind' => 'template', 'slug' => 'archive-product' ),
 						array( 'id' => 'product-search-results', 'label' => __( 'Product Search Results', 'gend-society' ), 'kind' => 'template', 'slug' => 'product-search-results' ),
 						array( 'id' => 'product-taxonomies', 'label' => __( 'Product Categories & Attributes', 'gend-society' ), 'kind' => 'taxtemplates', 'set' => 'store' ),
+						array( 'id' => 'product-templates', 'label' => __( 'Product Templates', 'gend-society' ), 'kind' => 'producttemplates' ),
 						array( 'id' => 'page-cart', 'label' => __( 'Cart', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-cart' ),
 						array( 'id' => 'mini-cart', 'label' => __( 'Mini-Cart', 'gend-society' ), 'kind' => 'part', 'slug' => 'mini-cart' ),
 						array( 'id' => 'page-checkout', 'label' => __( 'Checkout', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-checkout' ),
 						array( 'id' => 'order-confirmation', 'label' => __( 'Order Confirmation', 'gend-society' ), 'kind' => 'template', 'slug' => 'order-confirmation' ),
-					),
-				),
-				array(
-					'label' => __( 'Products', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'single-product', 'label' => __( 'Single Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product' ),
-						array( 'id' => 'add-to-cart', 'label' => __( 'Add to Cart', 'gend-society' ), 'kind' => 'part', 'slug' => 'add-to-cart' ),
-						array( 'id' => 'product-simple', 'label' => __( 'Simple Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-simple' ),
-						array( 'id' => 'product-external', 'label' => __( 'External Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-external' ),
-						array( 'id' => 'product-variable', 'label' => __( 'Variable Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-variable' ),
-						array( 'id' => 'product-grouped', 'label' => __( 'Grouped Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-grouped' ),
 					),
 				),
 			),
@@ -417,7 +406,7 @@ function gend_society_studio_sections() {
 			'id'       => 'social',
 			'label'    => __( 'Social', 'gend-society' ),
 			'icon'     => 'groups',
-			'blurb'    => __( 'Member profiles, groups and the activity feed.', 'gend-society' ),
+			'blurb'    => __( 'Member profiles, groups, the activity feed and wallets.', 'gend-society' ),
 			'active'   => $has_social,
 			'requires' => __( 'Social Profiles', 'gend-society' ),
 			'groups'   => array(
@@ -448,22 +437,10 @@ function gend_society_studio_sections() {
 							),
 						function_exists( 'gend_society_yz_rest_get' )
 							? array( array( 'id' => 'youzify-styles', 'label' => __( 'Youzify Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'youzify' ) )
+							: array(),
+						$has_rewards || $has_cp
+							? array( array( 'id' => 'wallet', 'label' => __( 'Wallet Pages', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-wallet' ) )
 							: array()
-					),
-				),
-			),
-		),
-		array(
-			'id'       => 'bank',
-			'label'    => __( 'Bank', 'gend-society' ),
-			'icon'     => 'money-alt',
-			'blurb'    => __( 'Wallet pages where members see their balances.', 'gend-society' ),
-			'active'   => $has_rewards || $has_cp,
-			'requires' => __( 'Reward Programs', 'gend-society' ),
-			'groups'   => array(
-				array(
-					'items' => array(
-						array( 'id' => 'wallet', 'label' => __( 'Wallet Pages', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-wallet' ),
 					),
 				),
 			),
@@ -998,11 +975,25 @@ add_action( 'template_redirect', 'gend_society_studio_shortcode_preview', 0 );
 function gend_society_studio_shortcode_preview() {
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
 	$tag = isset( $_GET['gs_studio_shortcode'] ) ? sanitize_key( wp_unslash( $_GET['gs_studio_shortcode'] ) ) : '';
-	if ( '' === $tag || ! current_user_can( 'edit_theme_options' ) || ! shortcode_exists( $tag ) ) {
+	// Or one page's content (?gs_studio_page_preview=id): the template editor's preview of a dashboard page.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+	$page = isset( $_GET['gs_studio_page_preview'] ) ? get_post( absint( $_GET['gs_studio_page_preview'] ) ) : null;
+	if ( ! current_user_can( 'edit_theme_options' ) ) {
 		return;
 	}
-	add_filter( 'show_admin_bar', '__return_false' );
-	$html = do_shortcode( '[' . $tag . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+	if ( $page && 'page' === $page->post_type && 'publish' === $page->post_status ) {
+		$GLOBALS['post'] = $page; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- the page's shortcodes read the current post.
+		setup_postdata( $page );
+		add_filter( 'show_admin_bar', '__return_false' );
+		$html = apply_filters( 'the_content', $page->post_content ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core filter.
+	} elseif ( '' !== $tag && shortcode_exists( $tag ) ) {
+		add_filter( 'show_admin_bar', '__return_false' );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+		$sc_id = isset( $_GET['gs_studio_sc_id'] ) ? sanitize_key( wp_unslash( $_GET['gs_studio_sc_id'] ) ) : '';
+		$html  = do_shortcode( '[' . $tag . ( '' !== $sc_id ? ' id="' . $sc_id . '"' : '' ) . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+	} else {
+		return;
+	}
 	?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -1015,6 +1006,7 @@ function gend_society_studio_shortcode_preview() {
 <body <?php body_class( 'gs-studio-preview' ); ?>>
 <div class="gs-sc-preview"><?php echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- shortcode output. ?></div>
 	<?php wp_footer(); ?>
+<script>(function(){var s=function(){if(parent!==window){parent.postMessage({gsPreviewHeight:document.documentElement.scrollHeight},'*');}};addEventListener('load',s);if(window.ResizeObserver){new ResizeObserver(s).observe(document.body);}})();</script>
 </body>
 </html>
 	<?php

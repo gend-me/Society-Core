@@ -104,6 +104,12 @@ return array(
 			'note'  => 'Category templates: the block template each blog category, product category and product attribute uses (Design Studio Blog Archives / Product Categories & Attributes); the choice goes first in the template hierarchy.',
 		),
 		array(
+			'file'  => 'inc/product-templates.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Product templates: the block template product pages use by product type, category or attribute (Design Studio Product Templates); goes in the single product template hierarchy.',
+		),
+		array(
 			'file'  => 'inc/page-heading.php',
 			'tier'  => 'core',
 			'needs' => array(),

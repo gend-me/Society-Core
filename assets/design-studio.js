@@ -24,6 +24,7 @@
 		media: {}, // attachment id => media object
 		menus: null,
 		tax: {}, // set => category template groups
+		pt: null, // product templates: types, cats, attrs, map
 		previewCss: '',
 		previewMode: 'specimen',
 		device: 'desktop',
@@ -687,6 +688,8 @@
 			view = viewTemplate( hit );
 		} else if ( it.kind === 'templates' ) {
 			view = viewTemplateList( hit );
+		} else if ( it.kind === 'producttemplates' ) {
+			view = viewProductTemplates( hit );
 		} else if ( it.kind === 'taxtemplates' ) {
 			view = viewTaxTemplates( hit );
 		} else if ( it.kind === 'menus' ) {
@@ -1981,6 +1984,75 @@
 		return frameView( titleOf( t ), canvasUrl( t ) );
 	}
 
+	/* ── Rows whose editor (or settings) slide down under them; one open at a time ── */
+	function drawerSet() {
+		var openWrap = null;
+		function shut( w ) {
+			w.classList.remove( 'is-open' );
+			w.removeAttribute( 'data-open' );
+			setTimeout( function () {
+				if ( ! w.classList.contains( 'is-open' ) ) {
+					w.querySelector( '.gs-st-tt-drawer-in' ).textContent = '';
+				}
+			}, 450 );
+		}
+		// Opens `id` in this row's drawer (head line + body), or closes it when it is already open.
+		function toggle( wrap, id, head, body ) {
+			if ( openWrap && openWrap !== wrap ) {
+				shut( openWrap );
+			}
+			if ( wrap.getAttribute( 'data-open' ) === id ) {
+				shut( wrap );
+				openWrap = null;
+				return;
+			}
+			var inner = wrap.querySelector( '.gs-st-tt-drawer-in' );
+			inner.textContent = '';
+			inner.appendChild( h( 'div', { class: 'gs-st-tt-drawer-head' }, head, h( 'button', { type: 'button', class: 'gs-st-btn is-sm is-ghost', onclick: function () {
+				shut( wrap );
+				openWrap = null;
+			} }, icon( 'arrow-up-alt2' ), __( 'Close', 'gend-society' ) ) ) );
+			inner.appendChild( body );
+			wrap.classList.add( 'is-open' );
+			wrap.setAttribute( 'data-open', id );
+			openWrap = wrap;
+			setTimeout( function () {
+				wrap.scrollIntoView( { behavior: 'smooth', block: 'start' } );
+			}, 60 );
+		}
+		function toggleEditor( wrap, t ) {
+			S.stylesStale = true;
+			toggle( wrap, 'edit', [ icon( 'edit' ), h( 'span', null, sprintf( __( 'Editing "%s"', 'gend-society' ), titleOf( t ) ) ) ], frameView( titleOf( t ), canvasUrl( t ) ) );
+		}
+		return {
+			toggle: toggle,
+			toggleEditor: toggleEditor,
+			wrap: function ( key, row ) {
+				return h( 'div', { class: 'gs-st-tt-item', 'data-tt': key }, row, h( 'div', { class: 'gs-st-tt-drawer' }, h( 'div', { class: 'gs-st-tt-drawer-in' } ) ) );
+			},
+			editBtn: function ( getWrap, t ) {
+				return h( 'button', { type: 'button', class: 'gs-st-btn is-sm gs-st-tt-edit', onclick: function () {
+					toggleEditor( getWrap(), t );
+				} }, icon( 'edit' ), __( 'Edit', 'gend-society' ) );
+			},
+			// A row is being replaced: it is no longer the open one.
+			forget: function ( wrap ) {
+				if ( openWrap === wrap ) {
+					openWrap = null;
+				}
+			},
+			// Re-draws the page (after a template was created) with that row's editor open.
+			reopen: function ( key ) {
+				render();
+				var w = main.querySelector( '[data-tt="' + key + '"]' );
+				var b = w && w.querySelector( '.gs-st-tt-edit' );
+				if ( b ) {
+					b.click();
+				}
+			},
+		};
+	}
+
 	/* ── Category templates (Blog Archives, Product Categories & Attributes) ── */
 	function loadTax( set ) {
 		return api( { path: '/gend-society/v1/studio/tax-templates?set=' + set } ).then( function ( r ) {
@@ -2018,55 +2090,10 @@
 			return wait;
 		}
 		var page = h( 'div', { class: 'gs-st-pad gs-st-tt' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, set === 'store' ? __( 'The layout used for every product category and attribute page, and the ones that get their own.', 'gend-society' ) : __( 'The layout used for every blog category page, and the categories that get their own.', 'gend-society' ) ) );
-		var openWrap = null;
-		// One editor open at a time; it slides down under its row.
-		function shut( w ) {
-			w.classList.remove( 'is-open' );
-			setTimeout( function () {
-				if ( ! w.classList.contains( 'is-open' ) ) {
-					w.querySelector( '.gs-st-tt-drawer-in' ).textContent = '';
-				}
-			}, 450 );
-		}
-		function toggle( wrap, t ) {
-			if ( openWrap && openWrap !== wrap ) {
-				shut( openWrap );
-			}
-			if ( wrap.classList.contains( 'is-open' ) ) {
-				shut( wrap );
-				openWrap = null;
-				return;
-			}
-			var inner = wrap.querySelector( '.gs-st-tt-drawer-in' );
-			inner.textContent = '';
-			inner.appendChild( h( 'div', { class: 'gs-st-tt-drawer-head' }, icon( 'edit' ), h( 'span', null, sprintf( __( 'Editing "%s"', 'gend-society' ), titleOf( t ) ) ), h( 'button', { type: 'button', class: 'gs-st-btn is-sm is-ghost', onclick: function () {
-				toggle( wrap, t );
-			} }, icon( 'arrow-up-alt2' ), __( 'Close', 'gend-society' ) ) ) );
-			inner.appendChild( frameView( titleOf( t ), canvasUrl( t ) ) );
-			S.stylesStale = true;
-			wrap.classList.add( 'is-open' );
-			openWrap = wrap;
-			setTimeout( function () {
-				wrap.scrollIntoView( { behavior: 'smooth', block: 'start' } );
-			}, 60 );
-		}
-		function drawerWrap( key, row ) {
-			return h( 'div', { class: 'gs-st-tt-item', 'data-tt': key }, row, h( 'div', { class: 'gs-st-tt-drawer' }, h( 'div', { class: 'gs-st-tt-drawer-in' } ) ) );
-		}
-		function editBtn( getWrap, t ) {
-			return h( 'button', { type: 'button', class: 'gs-st-btn is-sm gs-st-tt-edit', onclick: function () {
-				toggle( getWrap(), t );
-			} }, icon( 'edit' ), __( 'Edit', 'gend-society' ) );
-		}
-		// Re-draws the page after a template was created, with its editor open.
-		function reopen( key ) {
-			render();
-			var w = main.querySelector( '[data-tt="' + key + '"]' );
-			var b = w && w.querySelector( '.gs-st-tt-edit' );
-			if ( b ) {
-				b.click();
-			}
-		}
+		var d = drawerSet();
+		var editBtn = d.editBtn;
+		var reopen = d.reopen;
+		var drawerWrap = d.wrap;
 		function baseRow( g ) {
 			var t = S.templates[ g.base ];
 			var fb = S.templates[ g.fallback ];
@@ -2110,9 +2137,7 @@
 			sel.addEventListener( 'change', function () {
 				sel.disabled = true;
 				assign( sel.value ).then( function () {
-					if ( openWrap === wrap ) {
-						openWrap = null;
-					}
+					d.forget( wrap );
 					wrap.replaceWith( itemRow( g, it ) );
 					toast( sprintf( __( '%s updated.', 'gend-society' ), it.name ), 'ok' );
 				}, function ( e ) {
@@ -2154,6 +2179,129 @@
 			} ) ) : h( 'p', { class: 'gs-st-muted' }, __( 'None yet.', 'gend-society' ) ) ) );
 		} );
 		return page;
+	}
+
+	/* ── Product Templates: product page templates by type, category, attribute ── */
+	function isProductTemplate( slug ) {
+		return slug === 'single-product' || slug.indexOf( 'single-product-' ) === 0 || slug.indexOf( 'product-template-' ) === 0;
+	}
+	function viewProductTemplates( hit ) {
+		if ( ! S.templatesLoaded || ! S.pt ) {
+			var wait = loadingView();
+			Promise.all( [ ensureTemplates(), S.pt ? null : api( { path: '/gend-society/v1/studio/product-templates' } ).then( function ( r ) {
+				S.pt = r;
+			} ) ] ).then( render, function ( e ) {
+				wait.textContent = errMsg( e );
+			} );
+			return wait;
+		}
+		var d = drawerSet();
+		var pt = S.pt;
+		var by = {
+			types: { label: __( 'Product types', 'gend-society' ), list: pt.types },
+			cats: { label: __( 'Product categories', 'gend-society' ), list: pt.cats },
+			attrs: { label: __( 'Product attributes', 'gend-society' ), list: pt.attrs },
+		};
+		var nameOf = function ( kind, id ) {
+			var x = by[ kind ].list.filter( function ( o ) {
+				return String( o.id ) === String( id );
+			} )[ 0 ];
+			return x ? x.name : String( id );
+		};
+		// Which template has this type / category / attribute now.
+		var ownerOf = function ( kind, id ) {
+			var out = '';
+			Object.keys( pt.map ).some( function ( slug ) {
+				if ( ( pt.map[ slug ][ kind ] || [] ).map( String ).indexOf( String( id ) ) !== -1 ) {
+					out = slug;
+					return true;
+				}
+				return false;
+			} );
+			return out;
+		};
+		var chips = function ( slug ) {
+			var a = pt.map[ slug ] || {};
+			var out = [];
+			[ 'types', 'cats', 'attrs' ].forEach( function ( kind ) {
+				( a[ kind ] || [] ).forEach( function ( id ) {
+					out.push( h( 'span', { class: 'gs-st-pt-chip is-' + kind }, nameOf( kind, id ) ) );
+				} );
+			} );
+			return out;
+		};
+		function assignForm( t, wrap ) {
+			var a = pt.map[ t.slug ] || {};
+			var boxes = [];
+			var groups = [ 'types', 'cats', 'attrs' ].filter( function ( kind ) {
+				return by[ kind ].list.length;
+			} ).map( function ( kind ) {
+				return h( 'fieldset', { class: 'gs-st-pt-set' }, h( 'legend', null, by[ kind ].label ), h( 'div', { class: 'gs-st-pt-opts' }, by[ kind ].list.map( function ( o ) {
+					var owner = ownerOf( kind, o.id );
+					var cb = h( 'input', { type: 'checkbox', checked: ( a[ kind ] || [] ).map( String ).indexOf( String( o.id ) ) !== -1 } );
+					boxes.push( { kind: kind, id: o.id, cb: cb } );
+					var other = owner && owner !== t.slug && S.templates[ owner ] ? titleOf( S.templates[ owner ] ) : '';
+					return h( 'label', { class: 'gs-st-pt-opt', title: other ? sprintf( __( 'Now uses "%s"; ticking it moves it here.', 'gend-society' ), other ) : null }, cb, h( 'span', null, o.name ), other ? h( 'small', null, other ) : null );
+				} ) ) );
+			} );
+			var save = h( 'button', { type: 'button', class: 'gs-st-btn is-primary is-sm', onclick: function () {
+				var data = { template: t.slug, types: [], cats: [], attrs: [] };
+				boxes.forEach( function ( b ) {
+					if ( b.cb.checked ) {
+						data[ b.kind ].push( b.id );
+					}
+				} );
+				save.disabled = true;
+				api( { path: '/gend-society/v1/studio/product-templates', method: 'POST', data: data } ).then( function ( r ) {
+					pt.map = r.map;
+					toast( sprintf( __( '%s assignments saved.', 'gend-society' ), titleOf( t ) ), 'ok' );
+					render();
+				}, function ( e ) {
+					save.disabled = false;
+					toast( errMsg( e ), 'error' );
+				} );
+			} }, icon( 'saved' ), __( 'Save', 'gend-society' ) );
+			return h( 'div', { class: 'gs-st-pt-form' }, h( 'p', { class: 'gs-st-muted' }, __( 'Product pages use this template when the product is in a ticked category, has a ticked attribute, or is a ticked type (in that order). Each can belong to one template.', 'gend-society' ) ), groups, h( 'div', { class: 'gs-st-row' }, save ) );
+		}
+		function row( t, i ) {
+			var key = 'pt:' + t.slug;
+			var wrap;
+			var isBase = t.slug === 'single-product';
+			var assigned = chips( t.slug );
+			var assign = isBase ? null : h( 'button', { type: 'button', class: 'gs-st-btn is-sm is-ghost', onclick: function () {
+				d.toggle( wrap, 'assign', [ icon( 'tag' ), h( 'span', null, sprintf( __( 'Where "%s" is used', 'gend-society' ), titleOf( t ) ) ) ], assignForm( t, wrap ) );
+			} }, icon( 'tag' ), __( 'Assign', 'gend-society' ) );
+			var st = statusOf( t );
+			var note = isBase ? h( 'small', null, __( 'Every product not covered by another template', 'gend-society' ) ) : assigned.length ? h( 'div', { class: 'gs-st-pt-chips' }, assigned ) : h( 'small', null, __( 'Not assigned', 'gend-society' ) );
+			wrap = d.wrap( key, h( 'div', { class: 'gs-st-tt-row' + ( isBase ? ' is-all' : '' ), style: { '--i': i } }, isBase ? h( 'span', { class: 'gs-st-tpl-thumb' }, h( 'i' ), h( 'i' ), h( 'i' ) ) : null, h( 'div', { class: 'gs-st-tt-name' }, h( 'strong', null, titleOf( t ) ), note ), h( 'span', { class: 'gs-st-badge is-' + st.key }, st.label ), assign, d.editBtn( function () {
+				return wrap;
+			}, t ) ) );
+			return wrap;
+		}
+		var list = Object.keys( S.templates ).filter( isProductTemplate ).sort( function ( a, b ) {
+			return a === 'single-product' ? -1 : b === 'single-product' ? 1 : titleOf( S.templates[ a ] ).localeCompare( titleOf( S.templates[ b ] ) );
+		} ).map( function ( k ) {
+			return S.templates[ k ];
+		} );
+		var add = h( 'button', { type: 'button', class: 'gs-st-btn is-primary', onclick: function () {
+			promptBox( __( 'New product template', 'gend-society' ), __( 'Give it a name. It starts as a copy of your Single Product template; then assign it to product types, categories or attributes.', 'gend-society' ), __( 'Template name', 'gend-society' ), __( 'e.g. Memberships', 'gend-society' ) ).then( function ( name ) {
+				if ( ! name ) {
+					return;
+				}
+				var slug = 'product-template-' + name.toLowerCase().replace( /[^a-z0-9]+/g, '-' ).replace( /^-|-$/g, '' );
+				if ( S.templates[ slug ] ) {
+					toast( __( 'A template with that name already exists.', 'gend-society' ), 'error' );
+					return;
+				}
+				createTemplate( { kind: 'template', slug: slug, label: name }, S.templates[ 'single-product' ] ).then( loadTemplates ).then( function () {
+					toast( sprintf( __( '%s created.', 'gend-society' ), name ), 'ok' );
+					d.reopen( 'pt:' + slug );
+				}, function ( e ) {
+					toast( errMsg( e ), 'error' );
+				} );
+			} );
+		} }, icon( 'plus-alt2' ), __( 'New product template', 'gend-society' ) );
+		return h( 'div', { class: 'gs-st-pad gs-st-tt' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), h( 'p', { class: 'gs-st-intro' }, __( 'The layouts your product pages use, and which product types, categories and attributes each one is for. Edit opens the template builder.', 'gend-society' ) ), h( 'div', { class: 'gs-st-tt-list' }, list.map( row ) ), h( 'div', { class: 'gs-st-row', style: { 'margin-top': '18px' } }, add ) );
 	}
 
 	function viewMenus( hit ) {

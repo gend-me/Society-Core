@@ -590,3 +590,18 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 	.gs-studio .gs-st-tt-row select.gs-st-input { flex: 1; max-width: none; width: auto; }
 	.gs-st-tt-row.is-all .gs-st-tpl-thumb { display: none; }
 }
+/* Product Templates: where each template is used. */
+.gs-st-pt-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.gs-st-pt-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 99px; font-size: 11px; font-weight: 600; border: 1px solid var(--st-border); color: var(--st-text); }
+.gs-st-pt-chip.is-types { color: var(--st-accent); border-color: rgba(151, 228, 110, .35); }
+.gs-st-pt-chip.is-cats { color: var(--st-blue); border-color: rgba(110, 193, 228, .35); }
+.gs-st-pt-chip.is-attrs { color: #d68cf0; border-color: rgba(214, 140, 240, .35); }
+.gs-st-pt-form { padding: 6px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.gs-st-pt-form > p { margin: 0; font-size: 13px; }
+.gs-st-pt-set { margin: 0; padding: 0; border: 0; min-width: 0; }
+.gs-st-pt-set legend { padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--st-muted); }
+.gs-st-pt-opts { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow: auto; }
+.gs-st-pt-opt { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--st-border); border-radius: 99px; font-size: 13px; cursor: pointer; }
+.gs-st-pt-opt:has(input:checked) { border-color: rgba(151, 228, 110, .5); background: rgba(151, 228, 110, .08); }
+.gs-st-pt-opt input { accent-color: var(--st-accent); margin: 0; }
+.gs-st-pt-opt small { color: var(--st-muted); font-size: 11px; }
