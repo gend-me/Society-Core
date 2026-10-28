@@ -923,6 +923,32 @@
 					t.setAttribute( 'spellcheck', 'true' );
 					t.dataset.gsBefore = t.innerHTML;
 				} );
+				// The part of the frame on screen in the editor, in the frame's own view.
+				var onScreen = function () {
+					var r = frame.getBoundingClientRect();
+					return { top: Math.max( 0, -r.top ), bottom: Math.min( r.height, view.innerHeight - r.top ) };
+				};
+				// Where an element can actually be seen: clipped by its overflow boxes and by the screen.
+				var seen = function ( t ) {
+					var r = t.getBoundingClientRect();
+					var box = { top: r.top, left: r.left, right: r.right, bottom: r.bottom };
+					for ( var p = t.parentElement; p && p !== doc.body; p = p.parentElement ) {
+						var cs = doc.defaultView.getComputedStyle( p );
+						if ( cs.overflowX !== 'visible' || cs.overflowY !== 'visible' ) {
+							var c = p.getBoundingClientRect();
+							box.top = Math.max( box.top, c.top );
+							box.left = Math.max( box.left, c.left );
+							box.right = Math.min( box.right, c.right );
+							box.bottom = Math.min( box.bottom, c.bottom );
+						}
+					}
+					var v = onScreen();
+					box.top = Math.max( box.top, v.top );
+					box.bottom = Math.min( box.bottom, v.bottom );
+					box.left = Math.max( box.left, 0 );
+					box.right = Math.min( box.right, doc.defaultView.innerWidth );
+					return box;
+				};
 				// Images: a "Replace image" chip on hover, so clicks still work (tabs, sliders, links).
 				var chip = doc.createElement( 'button' );
 				chip.type = 'button';
@@ -938,11 +964,15 @@
 					}
 					target = t;
 					t.classList.add( 'gs-hv-on' );
-					var r = t.getBoundingClientRect();
+					// Top right of the part that can be seen (a cropped or wide image's own corner can be off screen).
+					var r = seen( t );
 					var w = doc.defaultView;
 					chip.style.display = 'inline-flex';
-					chip.style.top = Math.max( r.top + w.scrollY + 10, w.scrollY + 10 ) + 'px';
-					chip.style.left = Math.max( r.right + w.scrollX - chip.offsetWidth - 10, r.left + w.scrollX + 10 ) + 'px';
+					if ( r.bottom - r.top < 20 || r.right - r.left < 20 ) {
+						r = t.getBoundingClientRect();
+					}
+					chip.style.top = ( Math.max( r.top + 10, onScreen().top + 10 ) + w.scrollY ) + 'px';
+					chip.style.left = ( Math.max( r.right - chip.offsetWidth - 10, r.left + 10, 8 ) + w.scrollX ) + 'px';
 				};
 				var hide = function () {
 					hideT = setTimeout( function () {
@@ -1011,10 +1041,7 @@
 					}
 				} );
 				// Fonts, sizes, styles, colours, links and alignment for the text being edited.
-				var tb = textToolbar( doc, on, commitText, function () {
-					var r = frame.getBoundingClientRect();
-					return { top: Math.max( 0, -r.top ), bottom: Math.min( r.height, view.innerHeight - r.top ) };
-				} );
+				var tb = textToolbar( doc, on, commitText, onScreen );
 				lis( view, 'scroll', tb.place, { passive: true } );
 				cleanup.push( tb.destroy );
 				on( 'keydown', function ( e ) {
