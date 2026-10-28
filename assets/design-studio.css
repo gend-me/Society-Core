@@ -605,3 +605,16 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-pt-opt:has(input:checked) { border-color: rgba(151, 228, 110, .5); background: rgba(151, 228, 110, .08); }
 .gs-st-pt-opt input { accent-color: var(--st-accent); margin: 0; }
 .gs-st-pt-opt small { color: var(--st-muted); font-size: 11px; }
+/* Customise a shortcode component. */
+.gs-st-scx { display: flex; flex-direction: column; gap: 10px; }
+.gs-st-scx > p { margin: 0; font-size: 13px; }
+.gs-st-scx-h { margin: 8px 0 0; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--st-muted); }
+.gs-st-scx-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.gs-st-scx-color { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--st-border); border-radius: 10px; cursor: pointer; }
+.gs-st-scx-color.is-set { border-color: rgba(151, 228, 110, .45); }
+.gs-st-scx-color input[type=color] { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; flex: none; }
+.gs-st-scx-color span { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+.gs-st-scx-color small { color: var(--st-muted); font-size: 11px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.gs-st-scx-color .gs-st-icon-btn[hidden] { display: none; }
+.gs-st-scx-texts { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow: auto; padding-right: 4px; }
+.gs-st-scx-texts .gs-st-field > span { font-size: 12px; color: var(--st-muted); }

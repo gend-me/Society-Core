@@ -110,6 +110,12 @@ return array(
 			'note'  => 'Product templates: the block template product pages use by product type, category or attribute (Design Studio Product Templates); goes in the single product template hierarchy.',
 		),
 		array(
+			'file'  => 'inc/shortcode-customizer.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Shortcode customiser: per-site colours, hidden sections, wording and CSS for plugin components that are shortcodes (Sales Team), applied on do_shortcode_tag; edited in the Design Studio.',
+		),
+		array(
 			'file'  => 'inc/page-heading.php',
 			'tier'  => 'core',
 			'needs' => array(),

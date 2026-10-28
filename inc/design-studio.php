@@ -981,6 +981,11 @@ function gend_society_studio_shortcode_preview() {
 	if ( ! current_user_can( 'edit_theme_options' ) ) {
 		return;
 	}
+	// The studio's Customise card previews unsaved settings on the plain component.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+	if ( ! empty( $_GET['gs_scx_off'] ) ) {
+		$GLOBALS['gend_society_scx_off'] = true;
+	}
 	if ( $page && 'page' === $page->post_type && 'publish' === $page->post_status ) {
 		$GLOBALS['post'] = $page; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- the page's shortcodes read the current post.
 		setup_postdata( $page );

@@ -1086,7 +1086,8 @@
 	function panelShortcode( hit ) {
 		var tag = hit.item.tag;
 		var ctl = h( 'div', { class: 'gs-st-controls' }, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, hit.item.label ), loadingView() );
-		var split = h( 'div', { class: 'gs-st-split' }, ctl, previewPane( { url: cfg.homeUrl + ( cfg.homeUrl.indexOf( '?' ) === -1 ? '?' : '&' ) + 'gs_studio_shortcode=' + encodeURIComponent( tag ), title: __( 'Live preview (as you)', 'gend-society' ) } ) );
+		var split = h( 'div', { class: 'gs-st-split' }, ctl, previewPane( { url: cfg.homeUrl + ( cfg.homeUrl.indexOf( '?' ) === -1 ? '?' : '&' ) + 'gs_studio_shortcode=' + encodeURIComponent( tag ) + '&gs_scx_off=1', title: __( 'Live preview (as you)', 'gend-society' ) } ) );
+		var frame = previewFrame;
 		api( { path: '/gend-society/v1/studio/shortcode?tag=' + encodeURIComponent( tag ) } ).then( function ( d ) {
 			ctl.textContent = '';
 			var code = '[' + d.tag + ']';
@@ -1133,6 +1134,7 @@
 			ctl.appendChild( h( 'div', { class: 'gs-st-stack' },
 				h( 'div', null, crumbs( hit ), h( 'h1', { class: 'gs-st-title' }, d.label ), h( 'p', { class: 'gs-st-intro' }, d.description ) ),
 				h( 'div', { class: 'gs-st-sc-code' }, h( 'code', null, code ), copyBtn ),
+				scxCard( tag, frame ),
 				d.shows.length ? section( __( 'What it shows', 'gend-society' ), h( 'ul', { class: 'gs-st-sc-list' }, d.shows.map( function ( x ) {
 					return h( 'li', null, x );
 				} ) ) ) : null,
@@ -1146,6 +1148,230 @@
 			ctl.textContent = errMsg( e );
 		} );
 		return split;
+	}
+
+	/* ── Customise a shortcode component (inc/shortcode-customizer.php) ──── */
+	// Applies unsaved settings to the preview (rendered with customisation off).
+	function scxApply( frame, data, draft ) {
+		var doc;
+		try {
+			doc = frame.contentDocument;
+		} catch ( e ) {
+			return;
+		}
+		if ( ! doc || ! doc.head ) {
+			return;
+		}
+		var css = '.gs-sc-preview{';
+		data.colors.forEach( function ( c ) {
+			if ( draft.colors[ c.key ] ) {
+				c.vars.forEach( function ( v ) {
+					css += v + ':' + draft.colors[ c.key ] + ';';
+				} );
+			}
+		} );
+		css += '}';
+		var sels = [];
+		data.sections.forEach( function ( sec ) {
+			if ( draft.hide.indexOf( sec.key ) !== -1 ) {
+				sec.selectors.forEach( function ( s ) {
+					sels.push( '.gs-sc-preview ' + s );
+				} );
+			}
+		} );
+		if ( sels.length ) {
+			css += sels.join( ',' ) + '{display:none!important}';
+		}
+		css += draft.css || '';
+		var st = doc.getElementById( 'gs-scx-draft' );
+		if ( ! st ) {
+			st = doc.createElement( 'style' );
+			st.id = 'gs-scx-draft';
+			doc.head.appendChild( st );
+		}
+		st.textContent = css;
+		Array.prototype.forEach.call( doc.querySelectorAll( '.gs-sc-preview :is(h1,h2,h3,h4,h5,h6,button,span.aas-tab-label)' ), function ( el ) {
+			if ( el.children.length && ! el.hasAttribute( 'data-gs-scx-orig' ) ) {
+				return;
+			}
+			if ( ! el.hasAttribute( 'data-gs-scx-orig' ) ) {
+				el.setAttribute( 'data-gs-scx-orig', el.textContent.replace( /\s+/g, ' ' ).trim() );
+			}
+			var orig = el.getAttribute( 'data-gs-scx-orig' );
+			el.textContent = draft.texts[ orig ] || orig;
+		} );
+		// A hidden tab may be the open one: open the first one left.
+		Array.prototype.forEach.call( doc.querySelectorAll( '.gs-sc-preview [role=tablist]' ), function ( l ) {
+			var active = l.querySelector( 'button.is-active' );
+			if ( active && active.offsetParent === null ) {
+				var next = Array.prototype.filter.call( l.querySelectorAll( 'button' ), function ( b ) {
+					return b.offsetParent !== null;
+				} )[ 0 ];
+				if ( next ) {
+					next.click();
+				}
+			}
+		} );
+	}
+	function scxCard( tag, frame ) {
+		var card = h( 'div', { class: 'gs-st-card is-flat gs-st-scx' }, h( 'h3', null, __( 'Customise', 'gend-society' ) ), loadingView() );
+		api( { path: '/gend-society/v1/studio/shortcode-custom?tag=' + encodeURIComponent( tag ) } ).then( function ( data ) {
+			var saved = JSON.stringify( data.settings );
+			var draft = clone( data.settings );
+			draft.colors = Array.isArray( draft.colors ) ? {} : draft.colors;
+			draft.texts = Array.isArray( draft.texts ) ? {} : draft.texts;
+			saved = JSON.stringify( draft );
+			var saveBtn;
+			var update = function () {
+				scxApply( frame, data, draft );
+				saveBtn.disabled = JSON.stringify( draft ) === saved;
+			};
+			var swatches = [];
+			// Unset colours start at the component's own value (read from the preview).
+			var syncDefaults = function () {
+				var doc;
+				try {
+					doc = frame.contentDocument;
+				} catch ( e ) {
+					return;
+				}
+				var box = doc && doc.querySelector( '.gs-sc-preview' );
+				if ( ! box ) {
+					return;
+				}
+				swatches.forEach( function ( sw ) {
+					if ( draft.colors[ sw.key ] ) {
+						return;
+					}
+					var cs = getComputedStyle( box );
+					var v = '';
+					sw.vars.some( function ( name ) {
+						v = cs.getPropertyValue( name ).trim();
+						return !! v;
+					} );
+					var rgb = v.match( /^rgba?\(\s*(\d+)[\s,]+(\d+)[\s,]+(\d+)/i );
+					if ( rgb ) {
+						v = '#' + [ rgb[ 1 ], rgb[ 2 ], rgb[ 3 ] ].map( function ( n ) {
+							return ( '0' + Number( n ).toString( 16 ) ).slice( -2 );
+						} ).join( '' );
+					} else if ( /^#[0-9a-f]{3}$/i.test( v ) ) {
+						v = '#' + v.slice( 1 ).split( '' ).map( function ( x ) {
+							return x + x;
+						} ).join( '' );
+					}
+					if ( /^#[0-9a-f]{6}$/i.test( v ) ) {
+						sw.input.value = v.toLowerCase();
+					}
+				} );
+			};
+			frame.addEventListener( 'load', function () {
+				scxApply( frame, data, draft );
+				syncDefaults();
+			} );
+			var colors = data.colors.length ? h( 'div', { class: 'gs-st-scx-colors' }, data.colors.map( function ( c ) {
+				var input = h( 'input', { type: 'color', value: draft.colors[ c.key ] || '#97e46e', 'aria-label': c.label } );
+				var reset = h( 'button', { type: 'button', class: 'gs-st-icon-btn', title: __( 'Use the default', 'gend-society' ), 'aria-label': __( 'Use the default', 'gend-society' ), hidden: ! draft.colors[ c.key ] }, icon( 'no-alt' ) );
+				var row = h( 'label', { class: 'gs-st-scx-color' + ( draft.colors[ c.key ] ? ' is-set' : '' ) }, input, h( 'span', null, c.label, h( 'small', null, draft.colors[ c.key ] || __( 'Default', 'gend-society' ) ) ), reset );
+				swatches.push( { key: c.key, vars: c.vars, input: input } );
+				input.addEventListener( 'input', function () {
+					draft.colors[ c.key ] = input.value;
+					row.classList.add( 'is-set' );
+					row.querySelector( 'small' ).textContent = input.value;
+					reset.hidden = false;
+					update();
+				} );
+				reset.addEventListener( 'click', function ( e ) {
+					e.preventDefault();
+					delete draft.colors[ c.key ];
+					row.classList.remove( 'is-set' );
+					row.querySelector( 'small' ).textContent = __( 'Default', 'gend-society' );
+					reset.hidden = true;
+					update();
+					syncDefaults();
+				} );
+				return row;
+			} ) ) : null;
+			var sections = data.sections.length ? h( 'div', { class: 'gs-st-pt-opts' }, data.sections.map( function ( sec ) {
+				var cb = h( 'input', { type: 'checkbox', checked: draft.hide.indexOf( sec.key ) === -1 } );
+				cb.addEventListener( 'change', function () {
+					draft.hide = draft.hide.filter( function ( k ) {
+						return k !== sec.key;
+					} );
+					if ( ! cb.checked ) {
+						draft.hide.push( sec.key );
+					}
+					update();
+				} );
+				return h( 'label', { class: 'gs-st-pt-opt' }, cb, h( 'span', null, sec.label ) );
+			} ) ) : null;
+			var texts = data.texts.length ? h( 'div', { class: 'gs-st-scx-texts' }, data.texts.map( function ( t ) {
+				var input = h( 'input', { type: 'text', class: 'gs-st-input', value: draft.texts[ t ] || '', placeholder: t, 'aria-label': t } );
+				input.addEventListener( 'input', function () {
+					if ( input.value.trim() ) {
+						draft.texts[ t ] = input.value.trim();
+					} else {
+						delete draft.texts[ t ];
+					}
+					update();
+				} );
+				return h( 'label', { class: 'gs-st-field' }, h( 'span', null, t ), input );
+			} ) ) : h( 'p', { class: 'gs-st-muted' }, __( 'No headings or buttons to rename.', 'gend-society' ) );
+			var css = h( 'textarea', { class: 'gs-st-input is-mono', rows: 5, placeholder: '.aas-card { border-radius: 20px; }', spellcheck: 'false' } );
+			css.value = draft.css || '';
+			css.addEventListener( 'input', debounce( function () {
+				draft.css = css.value;
+				update();
+			}, 250 ) );
+			saveBtn = h( 'button', { type: 'button', class: 'gs-st-btn is-primary', disabled: true, onclick: function () {
+				saveBtn.disabled = true;
+				api( { path: '/gend-society/v1/studio/shortcode-custom', method: 'POST', data: { tag: tag, settings: draft } } ).then( function ( r ) {
+					saved = JSON.stringify( r.settings );
+					draft = clone( r.settings );
+					draft.colors = Array.isArray( draft.colors ) ? {} : draft.colors;
+					draft.texts = Array.isArray( draft.texts ) ? {} : draft.texts;
+					saved = JSON.stringify( draft );
+					toast( __( 'Saved. Every page with this component now shows it this way.', 'gend-society' ), 'ok' );
+				}, function ( e ) {
+					saveBtn.disabled = false;
+					toast( errMsg( e ), 'error' );
+				} );
+			} }, icon( 'saved' ), __( 'Save', 'gend-society' ) );
+			var resetBtn = h( 'button', { type: 'button', class: 'gs-st-btn is-ghost', onclick: function () {
+				if ( ! window.confirm( __( 'Reset this component to how its plugin shows it?', 'gend-society' ) ) ) {
+					return;
+				}
+				api( { path: '/gend-society/v1/studio/shortcode-custom', method: 'POST', data: { tag: tag, settings: {} } } ).then( function () {
+					toast( __( 'Reset to the default.', 'gend-society' ), 'ok' );
+					render();
+				}, function ( e ) {
+					toast( errMsg( e ), 'error' );
+				} );
+			} }, icon( 'image-rotate' ), __( 'Reset all', 'gend-society' ) );
+			card.textContent = '';
+			append( card, [
+				h( 'h3', null, __( 'Customise', 'gend-society' ) ),
+				h( 'p', { class: 'gs-st-muted' }, __( 'Make it yours: colours, which parts show, and the wording. The preview updates as you go; Save applies it everywhere this component is used.', 'gend-society' ) ),
+				colors ? h( 'h4', { class: 'gs-st-scx-h' }, __( 'Colours', 'gend-society' ) ) : null,
+				colors,
+				sections ? h( 'h4', { class: 'gs-st-scx-h' }, __( 'Sections shown', 'gend-society' ) ) : null,
+				sections,
+				h( 'h4', { class: 'gs-st-scx-h' }, __( 'Wording', 'gend-society' ) ),
+				texts,
+				h( 'h4', { class: 'gs-st-scx-h' }, __( 'Extra CSS', 'gend-society' ) ),
+				css,
+				h( 'div', { class: 'gs-st-row' }, saveBtn, resetBtn ),
+			] );
+			scxApply( frame, data, draft );
+			syncDefaults();
+		}, function ( e ) {
+			card.textContent = '';
+			if ( e && e.code !== 'gs_scx_tag' ) {
+				card.appendChild( h( 'p', { class: 'gs-st-muted' }, errMsg( e ) ) );
+			} else {
+				card.remove();
+			}
+		} );
+		return card;
 	}
 
 	/* ── Sidebars: optional sidebar per area of the site ────────────────── */
