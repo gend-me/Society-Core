@@ -320,13 +320,12 @@ function gend_society_studio_sections() {
 			'id'     => 'app',
 			'label'  => __( 'App', 'gend-society' ),
 			'icon'   => 'layout',
-			'blurb'  => __( 'The frame around every page: header, menus and footer.', 'gend-society' ),
+			'blurb'  => __( 'The frame around every page: header, footer and sidebars.', 'gend-society' ),
 			'active' => true,
 			'groups' => array(
 				array(
 					'items' => array(
 						array( 'id' => 'header', 'label' => __( 'Header', 'gend-society' ), 'kind' => 'part', 'slug' => 'header' ),
-						array( 'id' => 'menus', 'label' => __( 'Menus', 'gend-society' ), 'kind' => 'menus' ),
 						array( 'id' => 'footer', 'label' => __( 'Footer', 'gend-society' ), 'kind' => 'part', 'slug' => 'footer' ),
 						array( 'id' => 'sidebars', 'label' => __( 'Sidebars', 'gend-society' ), 'kind' => 'panel', 'panel' => 'sidebars' ),
 						array( 'id' => '404', 'label' => __( 'Page 404', 'gend-society' ), 'kind' => 'template', 'slug' => '404' ),
