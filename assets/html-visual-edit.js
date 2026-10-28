@@ -246,12 +246,464 @@
 		+ '[data-gs-k=text]:focus{outline:2px solid #97e46e;box-shadow:0 0 0 6px rgba(151,228,110,.14)}'
 		+ '.gs-hv-on{outline:2px dashed #6ec1e4!important;outline-offset:2px}'
 		+ '.gs-hv-chip{position:absolute;z-index:2147483646;display:none;align-items:center;gap:6px;padding:7px 12px;border:0;border-radius:999px;background:#0b0e14;color:#fff;font:600 12px/1 system-ui,sans-serif;box-shadow:0 0 0 1px #6ec1e4,0 6px 20px rgba(0,0,0,.45);cursor:pointer}'
-		+ '.gs-hv-chip:hover{background:#6ec1e4;color:#0b0e14}';
+		+ '.gs-hv-chip:hover{background:#6ec1e4;color:#0b0e14}'
+		// The text toolbar: reset first (the page's own button and select styles apply in here).
+		+ '.gs-tb,.gs-tb *:not(svg):not(svg *){all:unset;box-sizing:border-box}'
+		+ '.gs-tb{position:absolute;z-index:2147483647;display:none;flex-direction:column;max-width:calc(100vw - 16px);padding:6px;border-radius:12px;background:#0b0e14;color:#e6edf7;font:500 13px/1 system-ui,-apple-system,sans-serif;box-shadow:0 0 0 1px rgba(110,193,228,.35),0 12px 32px rgba(0,0,0,.5);cursor:default}'
+		+ '.gs-tb.is-open{display:flex}.gs-tb [hidden]{display:none!important}'
+		+ '.gs-tb .gs-tb-row{display:flex;flex-wrap:wrap;align-items:center;gap:2px}'
+		+ '.gs-tb .gs-tb-sel{display:inline-block;height:30px;max-width:140px;padding:0 24px 0 10px;border-radius:8px;background:#151b26 url("data:image/svg+xml,%3Csvg xmlns=%27http://www.w3.org/2000/svg%27 width=%2710%27 height=%276%27%3E%3Cpath d=%27M1 1l4 4 4-4%27 stroke=%27%2394a3b8%27 fill=%27none%27 stroke-width=%271.5%27/%3E%3C/svg%3E") no-repeat right 9px center;color:#e6edf7;font:500 13px/30px system-ui,sans-serif;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;cursor:pointer}'
+		+ '.gs-tb .gs-tb-sel:hover{background-color:#1c2433}.gs-tb .gs-tb-sel option{background:#0b0e14;color:#e6edf7}'
+		+ '.gs-tb .gs-tb-sep{display:inline-block;width:1px;height:20px;margin:0 4px;background:rgba(255,255,255,.12)}'
+		+ '.gs-tb .gs-tb-btn{display:inline-flex;align-items:center;justify-content:center;width:30px;height:30px;border-radius:8px;color:#cbd5e1;font:700 15px/1 Georgia,serif;cursor:pointer}'
+		+ '.gs-tb .gs-tb-btn:hover{background:#1c2433;color:#fff}.gs-tb .gs-tb-btn.is-on{background:rgba(151,228,110,.16);color:#97e46e}'
+		+ '.gs-tb .gs-tb-btn[disabled]{opacity:.35;cursor:default}.gs-tb .gs-tb-btn[disabled]:hover{background:none}'
+		+ '.gs-tb .gs-tb-btn b{font-weight:800}.gs-tb .gs-tb-btn i{font-style:italic}.gs-tb .gs-tb-btn u{text-decoration:underline}.gs-tb .gs-tb-btn s{text-decoration:line-through}'
+		+ '.gs-tb .gs-tb-a{display:inline-flex;flex-direction:column;align-items:center;font:700 15px/1 Georgia,serif}'
+		+ '.gs-tb .gs-tb-line{display:block;width:14px;height:3px;margin-top:2px;border-radius:2px;background:linear-gradient(90deg,#f87171,#fbbf24,#97e46e,#6ec1e4,#a855f7)}'
+		+ '.gs-tb .gs-tb-hl{padding:2px 4px;border-radius:4px;background:#fbbf24;color:#0b0e14}'
+		+ '.gs-tb .gs-tb-panel{display:block;margin-top:6px;padding:10px;border-top:1px solid rgba(255,255,255,.08);min-width:240px}'
+		+ '.gs-tb .gs-tb-panel-title{display:block;margin:0 0 8px;color:#94a3b8;font:600 10px/1 system-ui,sans-serif;letter-spacing:.08em;text-transform:uppercase}'
+		+ '.gs-tb .gs-tb-swatches{display:grid;grid-template-columns:repeat(8,24px);gap:6px}'
+		+ '.gs-tb .gs-tb-swatch{display:block;width:24px;height:24px;border-radius:50%;box-shadow:inset 0 0 0 1px rgba(255,255,255,.25);cursor:pointer}'
+		+ '.gs-tb .gs-tb-swatch:hover{transform:scale(1.12);box-shadow:inset 0 0 0 1px rgba(255,255,255,.25),0 0 0 2px #6ec1e4}'
+		+ '.gs-tb .gs-tb-swatch.is-none{background:linear-gradient(135deg,transparent 45%,#f87171 45%,#f87171 55%,transparent 55%),#151b26!important}'
+		+ '.gs-tb .gs-tb-custom{display:flex;align-items:center;gap:8px;margin-top:10px;color:#cbd5e1;font:500 12px system-ui,sans-serif;cursor:pointer}'
+		+ '.gs-tb .gs-tb-custom input{display:block;width:28px;height:28px;border-radius:6px;overflow:hidden;cursor:pointer}'
+		+ '.gs-tb .gs-tb-link{display:flex;gap:6px}'
+		+ '.gs-tb .gs-tb-link input{display:block;flex:1;min-width:200px;height:32px;padding:0 10px;border-radius:8px;background:#151b26;color:#e6edf7;font:500 13px/32px system-ui,sans-serif;box-shadow:inset 0 0 0 1px rgba(255,255,255,.14)}'
+		+ '.gs-tb .gs-tb-link input:focus{box-shadow:inset 0 0 0 1px #6ec1e4}'
+		+ '.gs-tb .gs-tb-go{display:inline-flex;align-items:center;height:32px;padding:0 14px;border-radius:999px;background:#97e46e;color:#0b0e14;font:700 12px/1 system-ui,sans-serif;cursor:pointer}';
 	function frameDoc( head, bodyClass, html ) {
 		return '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">'
 			+ ( cfg.siteUrl ? '<base href="' + String( cfg.siteUrl ).replace( /"/g, '' ) + '" target="_self">' : '' )
 			+ head + '<style id="gs-hv-frame">' + FRAME_CSS + '</style></head><body class="' + bodyClass.replace( /"/g, '' ) + ' gs-hv-doc">'
 			+ html + '</body></html>';
+	}
+
+	// ── 2b. The text toolbar: fonts, sizes, styles, colours, links, alignment ──
+	// The site's own presets (theme.json), so text matches the rest of the site.
+	function presets() {
+		var s = ( wp.data.select( 'core/block-editor' ) && wp.data.select( 'core/block-editor' ).getSettings() ) || {};
+		var feat = ( s.__experimentalFeatures && s.__experimentalFeatures.typography ) || {};
+		var fams = [];
+		[ feat.fontFamilies, s.fontFamilies ].forEach( function ( src ) {
+			if ( ! src ) {
+				return;
+			}
+			( Array.isArray( src ) ? [ src ] : [ src.custom, src.theme, src.default ] ).forEach( function ( list ) {
+				( list || [] ).forEach( function ( f ) {
+					if ( f && f.fontFamily && ! fams.some( function ( x ) {
+						return x.fontFamily === f.fontFamily;
+					} ) ) {
+						fams.push( { name: f.name || f.slug, fontFamily: f.fontFamily } );
+					}
+				} );
+			} );
+		} );
+		var sizes = ( s.fontSizes || [] ).filter( function ( f ) {
+			return f && f.size;
+		} ).map( function ( f ) {
+			return { name: f.name || f.slug, size: /^\d+(\.\d+)?$/.test( String( f.size ) ) ? f.size + 'px' : String( f.size ) };
+		} );
+		if ( ! sizes.length ) {
+			sizes = [ 12, 14, 16, 18, 20, 24, 30, 36, 48, 60, 72 ].map( function ( n ) {
+				return { name: n + 'px', size: n + 'px' };
+			} );
+		}
+		var colors = ( s.colors || [] ).filter( function ( c ) {
+			return c && /^#|^rgb/i.test( c.color || '' );
+		} );
+		return { fams: fams, sizes: sizes, colors: colors };
+	}
+	var SVG = '<svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">';
+	var LINK_PATH = '<path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7"/><path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7"/>';
+	var TB_ICONS = {
+		bold: '<b>B</b>',
+		italic: '<i>I</i>',
+		underline: '<u>U</u>',
+		strikeThrough: '<s>S</s>',
+		color: '<span class="gs-tb-a">A<i class="gs-tb-line"></i></span>',
+		hilite: '<span class="gs-tb-a gs-tb-hl">A</span>',
+		link: SVG + LINK_PATH + '</svg>',
+		unlink: SVG + LINK_PATH + '<path d="M3 3l18 18"/></svg>',
+		left: SVG + '<path d="M4 6h16M4 12h10M4 18h14"/></svg>',
+		center: SVG + '<path d="M4 6h16M7 12h10M5 18h14"/></svg>',
+		right: SVG + '<path d="M4 6h16M10 12h10M6 18h14"/></svg>',
+		clear: SVG + '<path d="M6 5h12M12 5l-4 14M15 15l5 5M20 15l-5 5"/></svg>'
+	};
+	// The toolbar over the text being edited, built inside the frame. commitText(t, fn)
+	// writes a text's HTML back, and fn( element ) changes the element itself;
+	// shown() is the part of the frame on screen, { top, bottom } in the frame's own view.
+	function textToolbar( doc, on, commitText, shown ) {
+		var P = presets();
+		var win = doc.defaultView;
+		var active = null;
+		var range = null;
+		var h = function ( tag, cls, html ) {
+			var n = doc.createElement( tag );
+			if ( cls ) {
+				n.className = cls;
+			}
+			if ( html ) {
+				n.innerHTML = html;
+			}
+			return n;
+		};
+		var btn = function ( key, title ) {
+			var b = h( 'button', 'gs-tb-btn', TB_ICONS[ key ] );
+			b.type = 'button';
+			b.title = title;
+			b.setAttribute( 'aria-label', title );
+			b.dataset.cmd = key;
+			return b;
+		};
+		var select = function ( label, opts ) {
+			var s = h( 'select', 'gs-tb-sel' );
+			s.title = label;
+			s.appendChild( new win.Option( label, '' ) );
+			opts.forEach( function ( o ) {
+				s.appendChild( new win.Option( o[ 0 ], o[ 1 ] ) );
+			} );
+			return s;
+		};
+		var sep = function () {
+			return h( 'span', 'gs-tb-sep' );
+		};
+		var bar = h( 'div', 'gs-tb' );
+		bar.setAttribute( 'contenteditable', 'false' );
+		var row = h( 'div', 'gs-tb-row' );
+		var fam = select( __( 'Font', 'gend-society' ), P.fams.map( function ( f ) {
+			return [ f.name, f.fontFamily ];
+		} ) );
+		var size = select( __( 'Size', 'gend-society' ), P.sizes.map( function ( f ) {
+			return [ f.name, f.size ];
+		} ) );
+		[ fam, size, sep(),
+			btn( 'bold', __( 'Bold', 'gend-society' ) ), btn( 'italic', __( 'Italic', 'gend-society' ) ), btn( 'underline', __( 'Underline', 'gend-society' ) ), btn( 'strikeThrough', __( 'Strikethrough', 'gend-society' ) ), sep(),
+			btn( 'color', __( 'Text colour', 'gend-society' ) ), btn( 'hilite', __( 'Highlight', 'gend-society' ) ), sep(),
+			btn( 'link', __( 'Link', 'gend-society' ) ), btn( 'unlink', __( 'Remove link', 'gend-society' ) ), sep(),
+			btn( 'left', __( 'Align left', 'gend-society' ) ), btn( 'center', __( 'Align centre', 'gend-society' ) ), btn( 'right', __( 'Align right', 'gend-society' ) ), sep(),
+			btn( 'clear', __( 'Clear formatting', 'gend-society' ) ) ].forEach( function ( n ) {
+			row.appendChild( n );
+		} );
+		bar.appendChild( row );
+		// Colours and the link address open in a panel under the row.
+		var panel = h( 'div', 'gs-tb-panel' );
+		panel.hidden = true;
+		bar.appendChild( panel );
+		doc.body.appendChild( bar );
+
+		var place = function () {
+			if ( ! active ) {
+				return;
+			}
+			var r = active.getBoundingClientRect();
+			var bh = bar.offsetHeight;
+			var bw = bar.offsetWidth;
+			var vis = shown ? shown() : { top: 0, bottom: win.innerHeight };
+			var top = r.top - bh - 10;
+			if ( top < vis.top + 8 ) {
+				top = r.bottom + 10;
+			}
+			top = Math.max( vis.top + 8, Math.min( top, vis.bottom - bh - 8 ) );
+			var left = Math.max( 8, Math.min( r.left, win.innerWidth - bw - 8 ) );
+			bar.style.top = ( top + win.scrollY ) + 'px';
+			bar.style.left = ( left + win.scrollX ) + 'px';
+		};
+		// The link the selection is in, inside the text (or the text itself when it is a link).
+		var inLink = function () {
+			if ( ! active ) {
+				return null;
+			}
+			if ( active.tagName === 'A' ) {
+				return active;
+			}
+			var sel = doc.getSelection();
+			var n = sel && sel.rangeCount ? sel.getRangeAt( 0 ).commonAncestorContainer : null;
+			n = n && n.nodeType === 3 ? n.parentNode : n;
+			var a = n && n.closest ? n.closest( 'a' ) : null;
+			return a && active.contains( a ) ? a : null;
+		};
+		var refresh = function () {
+			var align = active ? win.getComputedStyle( active ).textAlign : '';
+			align = align === 'start' ? 'left' : ( align === 'end' ? 'right' : align );
+			Array.prototype.forEach.call( row.querySelectorAll( '[data-cmd]' ), function ( b ) {
+				var c = b.dataset.cmd;
+				var state = false;
+				if ( /^(bold|italic|underline|strikeThrough)$/.test( c ) ) {
+					try {
+						state = doc.queryCommandState( c );
+					} catch ( e ) {}
+				} else if ( /^(left|center|right)$/.test( c ) ) {
+					state = align === c;
+				} else if ( c === 'unlink' ) {
+					b.disabled = ! inLink() || inLink() === active;
+				}
+				b.classList.toggle( 'is-on', !! state );
+			} );
+		};
+		var show = function ( t ) {
+			active = t;
+			range = null;
+			panel.hidden = true;
+			bar.classList.add( 'is-open' );
+			place();
+			refresh();
+		};
+		var hide = function () {
+			active = null;
+			range = null;
+			panel.hidden = true;
+			bar.classList.remove( 'is-open' );
+		};
+		// Back to the text with its selection; with nothing selected, all of the text.
+		var restore = function ( whole ) {
+			active.focus( { preventScroll: true } );
+			var sel = doc.getSelection();
+			sel.removeAllRanges();
+			if ( range && ( ! range.collapsed || whole === false ) && active.contains( range.commonAncestorContainer ) ) {
+				sel.addRange( range );
+			} else {
+				var all = doc.createRange();
+				all.selectNodeContents( active );
+				sel.addRange( all );
+			}
+			doc.execCommand( 'styleWithCSS', false, true );
+		};
+		var done = function () {
+			var sel = doc.getSelection();
+			if ( sel && sel.rangeCount && active.contains( sel.getRangeAt( 0 ).commonAncestorContainer ) ) {
+				range = sel.getRangeAt( 0 ).cloneRange();
+			}
+			commitText( active );
+			refresh();
+			place();
+		};
+		// Any CSS property on the selection: mark it with a font name, then swap the mark for the real style.
+		var styleSel = function ( prop, value ) {
+			restore();
+			doc.execCommand( 'fontName', false, 'gshvmark' );
+			Array.prototype.forEach.call( active.querySelectorAll( '[style*="gshvmark"]' ), function ( s ) {
+				s.style.removeProperty( 'font-family' );
+				if ( value ) {
+					s.style.setProperty( prop, value );
+				}
+				// Spans inside with the same property would hide the new one.
+				Array.prototype.forEach.call( s.querySelectorAll( '[style]' ), function ( inner ) {
+					inner.style.removeProperty( prop );
+					if ( ! inner.getAttribute( 'style' ) ) {
+						inner.removeAttribute( 'style' );
+					}
+				} );
+				if ( ! s.getAttribute( 'style' ) && s.tagName === 'SPAN' ) {
+					s.replaceWith.apply( s, Array.prototype.slice.call( s.childNodes ) );
+				}
+			} );
+			done();
+		};
+		var title = function ( text ) {
+			var t = h( 'div', 'gs-tb-panel-title' );
+			t.textContent = text;
+			return t;
+		};
+		var colourPanel = function ( prop, label ) {
+			panel.textContent = '';
+			panel.appendChild( title( label ) );
+			var grid = h( 'div', 'gs-tb-swatches' );
+			P.colors.forEach( function ( c ) {
+				var s = h( 'button', 'gs-tb-swatch' );
+				s.type = 'button';
+				s.title = c.name || c.color;
+				s.style.background = c.color;
+				s.dataset.value = c.color;
+				grid.appendChild( s );
+			} );
+			var none = h( 'button', 'gs-tb-swatch is-none' );
+			none.type = 'button';
+			none.title = __( 'None', 'gend-society' );
+			none.dataset.value = '';
+			grid.appendChild( none );
+			panel.appendChild( grid );
+			var custom = h( 'label', 'gs-tb-custom' );
+			var input = h( 'input' );
+			input.type = 'color';
+			input.value = '#97e46e';
+			custom.appendChild( input );
+			custom.appendChild( doc.createTextNode( __( 'Custom colour', 'gend-society' ) ) );
+			panel.appendChild( custom );
+			grid.addEventListener( 'click', function ( e ) {
+				var s = e.target.closest( '.gs-tb-swatch' );
+				if ( s ) {
+					panel.hidden = true;
+					styleSel( prop, s.dataset.value );
+				}
+			} );
+			input.addEventListener( 'change', function () {
+				panel.hidden = true;
+				styleSel( prop, input.value );
+			} );
+			panel.hidden = false;
+			place();
+		};
+		var linkPanel = function () {
+			var a = inLink();
+			panel.textContent = '';
+			panel.appendChild( title( a ? __( 'Edit link', 'gend-society' ) : __( 'Add a link', 'gend-society' ) ) );
+			var form = h( 'form', 'gs-tb-link' );
+			var input = h( 'input' );
+			input.type = 'text';
+			input.placeholder = 'https://…  or  /page';
+			input.value = a ? a.getAttribute( 'href' ) || '' : '';
+			var ok = h( 'button', 'gs-tb-go' );
+			ok.type = 'submit';
+			ok.textContent = __( 'Apply', 'gend-society' );
+			form.appendChild( input );
+			form.appendChild( ok );
+			panel.appendChild( form );
+			input.addEventListener( 'input', function () {
+				input.setCustomValidity( '' );
+			} );
+			form.addEventListener( 'submit', function ( e ) {
+				e.preventDefault();
+				e.stopPropagation();
+				var url = input.value.trim();
+				if ( /^(javascript|data|vbscript):/i.test( url.replace( /\s+/g, '' ) ) ) {
+					input.setCustomValidity( __( 'That kind of link is not allowed.', 'gend-society' ) );
+					input.reportValidity();
+					return;
+				}
+				panel.hidden = true;
+				if ( a && a === active ) {
+					// The text is the link itself: its address is on the element.
+					if ( url ) {
+						active.setAttribute( 'href', url );
+						commitText( active, function ( src ) {
+							src.setAttribute( 'href', url );
+						} );
+					}
+					active.focus( { preventScroll: true } );
+					return;
+				}
+				restore( !! a );
+				if ( a ) {
+					if ( url ) {
+						a.setAttribute( 'href', url );
+					} else {
+						a.replaceWith.apply( a, Array.prototype.slice.call( a.childNodes ) );
+					}
+				} else if ( url ) {
+					doc.execCommand( 'createLink', false, url );
+				}
+				done();
+			} );
+			panel.hidden = false;
+			place();
+			input.focus();
+		};
+
+		// The toolbar keeps the text's selection, except in its own fields.
+		bar.addEventListener( 'mousedown', function ( e ) {
+			if ( ! e.target.closest( 'select, input' ) ) {
+				e.preventDefault();
+			}
+		} );
+		bar.addEventListener( 'click', function ( e ) {
+			var b = e.target.closest( '[data-cmd]' );
+			if ( ! b || ! active || b.disabled ) {
+				return;
+			}
+			e.preventDefault();
+			var c = b.dataset.cmd;
+			if ( c === 'color' || c === 'hilite' || c === 'link' ) {
+				if ( ! panel.hidden && panel.dataset.kind === c ) {
+					panel.hidden = true;
+					return;
+				}
+				panel.dataset.kind = c;
+				if ( c === 'link' ) {
+					linkPanel();
+				} else {
+					colourPanel( c === 'color' ? 'color' : 'background-color', c === 'color' ? __( 'Text colour', 'gend-society' ) : __( 'Highlight', 'gend-society' ) );
+				}
+			} else if ( c === 'unlink' ) {
+				var a = inLink();
+				if ( a && a !== active ) {
+					restore( false );
+					a.replaceWith.apply( a, Array.prototype.slice.call( a.childNodes ) );
+					done();
+				}
+			} else if ( /^(left|center|right)$/.test( c ) ) {
+				active.style.textAlign = c;
+				commitText( active, function ( src ) {
+					src.style.textAlign = c;
+				} );
+				refresh();
+			} else if ( c === 'clear' ) {
+				restore();
+				doc.execCommand( 'removeFormat' );
+				var sel = doc.getSelection();
+				Array.prototype.slice.call( active.querySelectorAll( 'span[style]' ) ).forEach( function ( s ) {
+					if ( sel.containsNode( s, true ) ) {
+						s.replaceWith.apply( s, Array.prototype.slice.call( s.childNodes ) );
+					}
+				} );
+				done();
+			} else {
+				restore();
+				doc.execCommand( c );
+				done();
+			}
+		} );
+		fam.addEventListener( 'change', function () {
+			if ( active && fam.value ) {
+				styleSel( 'font-family', fam.value );
+			}
+			fam.value = '';
+		} );
+		size.addEventListener( 'change', function () {
+			if ( active && size.value ) {
+				styleSel( 'font-size', size.value );
+			}
+			size.value = '';
+		} );
+
+		on( 'focusin', function ( e ) {
+			var t = e.target;
+			if ( t.getAttribute && t.getAttribute( 'data-gs-k' ) === 'text' && t !== active ) {
+				show( t );
+			}
+		} );
+		on( 'selectionchange', function () {
+			var sel = doc.getSelection();
+			if ( active && sel && sel.rangeCount && active.contains( sel.getRangeAt( 0 ).commonAncestorContainer ) ) {
+				range = sel.getRangeAt( 0 ).cloneRange();
+				refresh();
+			}
+		} );
+		on( 'pointerdown', function ( e ) {
+			if ( active && ! bar.contains( e.target ) && ! active.contains( e.target ) ) {
+				hide();
+			}
+		}, true );
+		on( 'keydown', function ( e ) {
+			if ( ! active || e.target !== active ) {
+				return;
+			}
+			if ( ( e.key === 'Enter' && ! e.shiftKey ) || e.key === 'Escape' ) {
+				hide();
+			} else if ( ( e.ctrlKey || e.metaKey ) && /^[biu]$/i.test( e.key ) ) {
+				setTimeout( done, 0 );
+			}
+		} );
+		win.addEventListener( 'scroll', place, { passive: true } );
+		return {
+			place: place,
+			destroy: function () {
+				win.removeEventListener( 'scroll', place );
+				bar.remove();
+			}
+		};
 	}
 
 	// The block's HTML: inner content since WordPress 7.1, the content attribute before.
@@ -530,23 +982,41 @@
 						notify( __( 'Image replaced. Save the page to keep it.', 'gend-society' ) );
 					}, currentImage( t, kind ) );
 				} );
+				// A text's HTML, and any change to the element itself, in one write.
+				var commitText = function ( t, extra ) {
+					var after = t.innerHTML;
+					if ( after === t.dataset.gsBefore && ! extra ) {
+						return;
+					}
+					var value = null;
+					if ( after !== t.dataset.gsBefore ) {
+						var clean = doc.createElement( 'div' );
+						clean.innerHTML = after;
+						value = cleanInline( clean );
+						t.dataset.gsBefore = after;
+					}
+					commitRef.current( t.getAttribute( 'data-gs-e' ), function ( src ) {
+						if ( value !== null ) {
+							src.innerHTML = value;
+						}
+						if ( extra ) {
+							extra( src );
+						}
+					} );
+				};
 				on( 'focusout', function ( e ) {
 					var t = e.target;
-					if ( ! t.getAttribute || t.getAttribute( 'data-gs-k' ) !== 'text' ) {
-						return;
+					if ( t.getAttribute && t.getAttribute( 'data-gs-k' ) === 'text' ) {
+						commitText( t );
 					}
-					var after = t.innerHTML;
-					if ( after === t.dataset.gsBefore ) {
-						return;
-					}
-					var clean = doc.createElement( 'div' );
-					clean.innerHTML = after;
-					var value = cleanInline( clean );
-					t.dataset.gsBefore = after;
-					commitRef.current( t.getAttribute( 'data-gs-e' ), function ( src ) {
-						src.innerHTML = value;
-					} );
 				} );
+				// Fonts, sizes, styles, colours, links and alignment for the text being edited.
+				var tb = textToolbar( doc, on, commitText, function () {
+					var r = frame.getBoundingClientRect();
+					return { top: Math.max( 0, -r.top ), bottom: Math.min( r.height, view.innerHeight - r.top ) };
+				} );
+				lis( view, 'scroll', tb.place, { passive: true } );
+				cleanup.push( tb.destroy );
 				on( 'keydown', function ( e ) {
 					if ( ! e.target.isContentEditable ) {
 						return;
