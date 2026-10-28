@@ -92,6 +92,12 @@ return array(
 			'note'  => 'Brand kit: Voice and Tone, App Styling and Cast Members for the Design Studio and the Brand Guidelines page; adds the brand brief to AI chats on this site (aipa_system_context) and serves it at /brand-kit/brief.',
 		),
 		array(
+			'file'  => 'inc/html-visual-edit.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Custom HTML blocks in every block editor: shown as the page looks in a live frame (their scripts run), text edited by clicking it, images replaced from the media library; Edit HTML shows the code.',
+		),
+		array(
 			'file'  => 'inc/page-heading.php',
 			'tier'  => 'core',
 			'needs' => array(),
