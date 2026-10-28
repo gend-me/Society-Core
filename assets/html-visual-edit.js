@@ -152,7 +152,7 @@
 		} );
 		return out;
 	}
-	var FRAME_CSS = 'html,body{margin:0}body{min-height:0!important;padding:0!important}'
+	var FRAME_CSS = 'html{scrollbar-width:none}html::-webkit-scrollbar{display:none}html,body{margin:0}body{min-height:0!important;padding:0!important}'
 		+ '[data-gs-k=text]{cursor:text;border-radius:4px;outline:1px dashed transparent;outline-offset:3px;transition:outline-color .15s,box-shadow .15s}'
 		+ '[data-gs-k=text]:hover{outline-color:rgba(151,228,110,.7)}'
 		+ '[data-gs-k=text]:focus{outline:2px solid #97e46e;box-shadow:0 0 0 6px rgba(151,228,110,.14)}'
@@ -206,7 +206,6 @@
 		// The frame shows an in-place edit the HTML state doesn't have yet; reload it on the next outside change (undo).
 		var stale = wp.element.useRef( false );
 		var reload = wp.element.useState( 0 );
-		var scrollAt = wp.element.useRef( 0 );
 		// The block's HTML with edit marks, and whether it can be written back safely.
 		var marked = wp.element.useMemo( function () {
 			var tpl = parse( content );
@@ -285,23 +284,61 @@
 				if ( ! doc || ! doc.body ) {
 					return;
 				}
-				// Height: the page's own, up to one screen; taller pages scroll inside the frame like the real page.
-				var cap = function () {
-					return Math.max( 320, Math.round( ( view.innerHeight || 800 ) - 40 ) );
+				// One scrollbar: the stage is as tall as the page, the frame is one
+				// screen that rides along it, and the canvas scroll drives the page's
+				// own scroll (sticky scenes and scroll effects play as on the site).
+				var stage = frame.parentNode;
+				var win = doc.defaultView;
+				var full = 0;
+				var screenH = 0;
+				var placed = 0;
+				var sync = function () {
+					var top = stage.getBoundingClientRect().top;
+					var at = Math.min( Math.max( -top, 0 ), Math.max( full - screenH, 0 ) );
+					frame.style.transform = at ? 'translateY(' + at + 'px)' : '';
+					placed = at;
+					if ( Math.abs( win.scrollY - at ) > 0.5 ) {
+						win.scrollTo( { top: at, behavior: 'instant' } );
+					}
 				};
 				var fit = function () {
-					var h = Math.max( doc.documentElement.scrollHeight, doc.body.scrollHeight );
-					frame.style.height = Math.min( Math.max( h, 60 ), cap() ) + 'px';
+					screenH = Math.max( 320, Math.round( view.innerHeight || 800 ) );
+					frame.style.height = screenH + 'px';
+					// The page's height without the frame's own screen in it.
+					var h = Math.max( 60, doc.body.scrollHeight, doc.documentElement.scrollHeight > screenH ? doc.documentElement.scrollHeight : 0 );
+					full = h;
+					screenH = Math.min( screenH, h );
+					frame.style.height = screenH + 'px';
+					stage.style.height = full + 'px';
+					sync();
 				};
-				frame.style.height = cap() + 'px';
 				fit();
-				view.addEventListener( 'resize', fit );
-				cleanup.push( function () {
-					view.removeEventListener( 'resize', fit );
-				} );
-				if ( scrollAt.current ) {
-					doc.defaultView.scrollTo( 0, scrollAt.current );
-				}
+				var lis = function ( target, type, fn, opts ) {
+					target.addEventListener( type, fn, opts );
+					cleanup.push( function () {
+						target.removeEventListener( type, fn, opts );
+					} );
+				};
+				lis( view, 'resize', fit );
+				lis( view, 'scroll', sync, { passive: true } );
+				// The wheel scrolls the editor, never the frame alone.
+				lis( doc, 'wheel', function ( e ) {
+					if ( e.ctrlKey ) {
+						return;
+					}
+					e.preventDefault();
+					var k = e.deltaMode === 1 ? 16 : ( e.deltaMode === 2 ? screenH : 1 );
+					view.scrollBy( { left: e.deltaX * k, top: e.deltaY * k, behavior: 'instant' } );
+				}, { passive: false } );
+				// The page scrolled itself (keyboard, a # link, a focused text): the editor follows.
+				lis( win, 'scroll', function () {
+					// Our own placement echoing back: nothing to follow.
+					if ( Math.abs( win.scrollY - placed ) <= 1 ) {
+						return;
+					}
+					view.scrollBy( { top: win.scrollY - placed, behavior: 'instant' } );
+					sync();
+				}, { passive: true } );
 				var tick = setInterval( fit, 400 );
 				setTimeout( function () {
 					clearInterval( tick );
@@ -475,12 +512,6 @@
 			frame.addEventListener( 'load', onLoad );
 			frame.srcdoc = frameDoc( themeStyles( host ), host.body ? host.body.className : '', html );
 			return function () {
-				// Back where you were after a reload.
-				try {
-					scrollAt.current = frame.contentWindow ? frame.contentWindow.scrollY : 0;
-				} catch ( e ) {
-					scrollAt.current = 0;
-				}
 				frame.removeEventListener( 'load', onLoad );
 				cleanup.forEach( function ( fn ) {
 					fn();
@@ -494,7 +525,8 @@
 				? __( 'Click any text to edit it. Hover an image for “Replace image”. Use “Edit HTML” in the toolbar for everything else.', 'gend-society' )
 				: ( marked.safe ? __( 'Nothing here can be edited in place. Use “Edit HTML” in the toolbar.', 'gend-society' ) : __( 'This section’s HTML can only be changed as code. Use “Edit HTML” in the toolbar.', 'gend-society' ) ) ) : null,
 			html === null ? el( 'div', { className: 'gs-lh-loading' }, __( 'Rendering…', 'gend-society' ) ) : null,
-			el( 'iframe', { ref: frameRef, className: 'gs-hv-frame', title: __( 'Section preview', 'gend-society' ), style: html === null ? { display: 'none' } : undefined } ) );
+			el( 'div', { className: 'gs-hv-stage', style: html === null ? { display: 'none' } : undefined },
+				el( 'iframe', { ref: frameRef, className: 'gs-hv-frame', title: __( 'Section preview', 'gend-society' ) } ) ) );
 	}
 
 	// ── 3. The block: visual by default, the code on request ──────────────

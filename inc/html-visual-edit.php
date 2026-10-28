@@ -49,7 +49,7 @@ function gend_society_hv_canvas_styles() {
 	if ( ! is_admin() ) {
 		return;
 	}
-	$css = '.gs-hv-frame{display:block;width:100%;height:420px;border:0;border-radius:10px;background:transparent}'
+	$css = '.gs-hv-stage{position:relative}.gs-hv-frame{display:block;width:100%;height:420px;border:0;border-radius:10px;background:transparent;will-change:transform}'
 		. '.gs-lh-hint{margin:0 0 6px;padding:8px 12px;border-radius:10px;background:rgba(110,193,228,.12);color:#2f7fa3;font:500 12px/1.4 system-ui,sans-serif}'
 		. '.gs-lh-loading{padding:18px;color:#8a94a6;font:500 13px system-ui,sans-serif}'
 		. '.gs-hv-code textarea{display:block;width:100%;box-sizing:border-box;padding:14px;border:1px solid rgba(110,193,228,.45);border-radius:10px;background:#0b0e14;color:#d7e3f4;font:12.5px/1.55 ui-monospace,Menlo,Consolas,monospace;tab-size:2;resize:vertical}';
