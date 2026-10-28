@@ -118,11 +118,11 @@ function gend_society_studio_group_layout_section() {
 		)
 	);
 	if ( $published ) {
-		$status = __( 'Block layout (published): it replaces the Youzify sidebar widgets on every group.', 'gend-society' );
+		$status = __( 'Block layout (published): every group’s sidebar uses it.', 'gend-society' );
 	} elseif ( $draft ) {
-		$status = __( 'Block layout (draft): groups still show the Youzify sidebar widgets until you publish it.', 'gend-society' );
+		$status = __( 'Block layout (draft): groups keep the default sidebar widgets until you publish it.', 'gend-society' );
 	} else {
-		$status = __( 'Youzify sidebar widgets (Group Administrators, Group Moderators).', 'gend-society' );
+		$status = __( 'Default sidebar widgets (Group Administrators, Group Moderators).', 'gend-society' );
 	}
 	echo '<section id="gs-group-layout"><h3>' . esc_html__( 'Layout & Sidebars', 'gend-society' ) . '</h3>'
 		. '<p class="description">' . esc_html__( 'The sidebar beside every group page, and the group Feed tab. Design them with blocks (Group Members, Group About, the activity blocks, any other block); each starts as a copy of today’s and goes live when you publish it.', 'gend-society' ) . '</p>'
@@ -158,9 +158,9 @@ function gend_society_studio_group_feed_row() {
 	if ( $published ) {
 		$status = __( 'Block layout (published): every group’s Feed tab uses it.', 'gend-society' );
 	} elseif ( $draft ) {
-		$status = __( 'Block layout (draft): groups still show the Youzify feed until you publish it.', 'gend-society' );
+		$status = __( 'Block layout (draft): groups keep the default feed until you publish it.', 'gend-society' );
 	} else {
-		$status = __( 'Youzify group feed (filter, posting, posts).', 'gend-society' );
+		$status = __( 'Default group feed (filter, posting, posts).', 'gend-society' );
 	}
 	return '<tr><td><strong>' . esc_html__( 'Group feed', 'gend-society' ) . '</strong></td><td>' . esc_html( $status ) . '</td>'
 		. '<td style="text-align:right"><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=gs-studio-layout&layout=group-feed' ) ) . '">' . esc_html( $published || $draft ? __( 'Edit the feed', 'gend-society' ) : __( 'Design the feed', 'gend-society' ) ) . '</a></td></tr>';
@@ -290,9 +290,6 @@ function gend_society_studio_sections() {
 	$layout_url  = function ( $slug ) {
 		return admin_url( 'admin.php?page=gs-studio-layout&layout=' . $slug );
 	};
-	$yz          = function ( $page, $tab = '' ) {
-		return admin_url( 'admin.php?page=' . $page . ( $tab ? '&tab=' . $tab : '' ) );
-	};
 
 	$sections = array(
 		array(
@@ -417,27 +414,20 @@ function gend_society_studio_sections() {
 						$sp_ready && $profiles
 							? array( array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'profiles' ) )
 							: array(
-								array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
-								array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
-								array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
+								array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : '' ),
+								array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : $profiles ),
+								array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ),
 							),
 						$sp_ready && $builder
 							? array( array( 'id' => 'group-pages', 'label' => __( 'Group Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'groups' ) )
 							: array(
-								array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
-								array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
-								array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
+								array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : '' ),
+								array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : $builder ),
+								array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ),
 							),
-						// Feed layout + reactions on one page; the old two screens only without the builder.
 						$sp_ready
 							? array( array( 'id' => 'activity-feed', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'activity' ) )
-							: array(
-								array( 'id' => 'activity-styling', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : $yz( 'youzify-panel', 'wall' ) ),
-								array( 'id' => 'activity-reactions', 'label' => __( 'Activity Reactions', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-extensions-settings', 'activity-reactions' ) ),
-							),
-						function_exists( 'gend_society_yz_rest_get' )
-							? array( array( 'id' => 'youzify-styles', 'label' => __( 'Youzify Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'youzify' ) )
-							: array(),
+							: array( array( 'id' => 'activity-styling', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : '' ) ),
 						$has_rewards || $has_cp
 							? array( array( 'id' => 'wallet', 'label' => __( 'Wallet Pages', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-wallet' ) )
 							: array()
@@ -457,6 +447,18 @@ function gend_society_studio_sections() {
 	// Drop inactive or empty groups so a section only lists what its plugins provide,
 	// and active sections left with nothing to show.
 	foreach ( $sections as $i => &$section ) {
+		// A settings screen with no URL (its builder is not installed) is left out.
+		foreach ( $section['groups'] as &$group ) {
+			$group['items'] = array_values(
+				array_filter(
+					$group['items'],
+					function ( $it ) {
+						return 'admin' !== $it['kind'] || ! empty( $it['url'] );
+					}
+				)
+			);
+		}
+		unset( $group );
 		$section['groups'] = array_values(
 			array_filter(
 				$section['groups'],
@@ -1000,7 +1002,13 @@ function gend_society_studio_shortcode_preview() {
 		if ( $is_component && isset( $_GET['gs_scx_block'] ) && function_exists( 'gend_society_sb_render' ) ) {
 			// A Sales block's own settings (?gs_scx_block=JSON), as the block renders them.
 			$custom = json_decode( wp_unslash( $_GET['gs_scx_block'] ), true ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitised in gend_society_scx_sanitize().
-			$html   = gend_society_sb_render( $tag, is_array( $custom ) ? $custom : array(), false );
+			$custom = is_array( $custom ) ? $custom : array();
+			if ( isset( $_GET['gs_dash_section'] ) && function_exists( 'gend_society_sb_dash_section' ) ) {
+				// One part of the Affiliate Dashboard (Affiliate Dashboard Section block).
+				$html = gend_society_sb_dash_section( sanitize_key( wp_unslash( $_GET['gs_dash_section'] ) ), empty( $_GET['gs_dash_noheader'] ), $custom, false );
+			} else {
+				$html = gend_society_sb_render( $tag, $custom, false );
+			}
 		} else {
 			$html = do_shortcode( '[' . $tag . ( '' !== $sc_id ? ' id="' . $sc_id . '"' : '' ) . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
 		}

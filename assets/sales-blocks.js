@@ -28,20 +28,20 @@
 		return texts[ tag ];
 	}
 
-	function previewSrc( tag, custom ) {
+	function previewSrc( tag, custom, extra ) {
 		var base = cfg.previewUrl + ( cfg.previewUrl.indexOf( '?' ) === -1 ? '?' : '&' ) + 'gs_studio_shortcode=' + encodeURIComponent( tag );
-		return base + '&gs_scx_block=' + encodeURIComponent( JSON.stringify( custom || {} ) );
+		return base + '&gs_scx_block=' + encodeURIComponent( JSON.stringify( custom || {} ) ) + ( extra || '' );
 	}
 
 	// The component, live; it posts its height (inc/design-studio.php preview page).
 	function Preview( props ) {
 		var ref = useRef( null );
 		var h = useState( 360 );
-		var src = useState( previewSrc( props.tag, props.custom ) );
-		var key = JSON.stringify( props.custom || {} );
+		var src = useState( previewSrc( props.tag, props.custom, props.extra ) );
+		var key = JSON.stringify( props.custom || {} ) + ( props.extra || '' );
 		useEffect( function () {
 			var t = setTimeout( function () {
-				src[ 1 ]( previewSrc( props.tag, props.custom ) );
+				src[ 1 ]( previewSrc( props.tag, props.custom, props.extra ) );
 			}, 500 );
 			return function () {
 				clearTimeout( t );
@@ -91,8 +91,8 @@
 		} );
 	}
 
-	function edit( name, title ) {
-		var b = cfg.blocks[ name ];
+	// b: { tag, colors, sections }; part: the Affiliate Dashboard Section block's own controls and preview params.
+	function edit( b, title, part ) {
 		return function ( props ) {
 			var custom = props.attributes.custom || {};
 			var set = function ( patch ) {
@@ -103,7 +103,8 @@
 			var hide = custom.ownHide ? custom.hide || [] : null;
 			var blockProps = be.useBlockProps( { className: 'gs-sales-block' } );
 			var inspector = el( be.InspectorControls, null,
-				el( C.PanelBody, { title: __( 'This block', 'gend-society' ) },
+				part ? el( C.PanelBody, { title: __( 'Dashboard part', 'gend-society' ) }, part.controls( props ) ) : null,
+				el( C.PanelBody, { title: __( 'This block', 'gend-society' ), initialOpen: ! part },
 					el( 'p', null, __( 'Changes here apply to this block only, on top of the site-wide look.', 'gend-society' ) ),
 					el( C.ExternalLink, { href: cfg.studioUrl }, __( 'Site-wide look: Design Studio › Sales', 'gend-society' ) )
 				),
@@ -144,7 +145,7 @@
 					} } )
 				)
 			);
-			return el( 'div', blockProps, inspector, el( Preview, { tag: b.tag, custom: custom, title: title } ) );
+			return el( 'div', blockProps, inspector, el( Preview, { tag: b.tag, custom: custom, title: title, extra: part ? part.extra( props.attributes ) : '' } ) );
 		};
 	}
 
@@ -160,10 +161,40 @@
 			title: title,
 			icon: 'chart-line',
 			category: 'gend-sales',
-			edit: edit( name, title ),
+			edit: edit( cfg.blocks[ name ], title ),
 			save: function () {
 				return null;
 			},
 		} );
 	} );
+
+	// Affiliate Dashboard Section: one part of the dashboard.
+	var dash = cfg.blocks[ 'gend-society/sales-affiliate-dashboard' ];
+	if ( cfg.dashSections && dash && ! ( wp.blocks.getBlockType( 'gend-society/sales-dashboard-section' ) || {} ).edit ) {
+		var partTitle = __( 'Affiliate Dashboard Section', 'gend-society' );
+		wp.blocks.registerBlockType( 'gend-society/sales-dashboard-section', {
+			apiVersion: 3,
+			title: partTitle,
+			icon: 'screenoptions',
+			category: 'gend-sales',
+			edit: edit( { tag: dash.tag, colors: dash.colors, sections: [] }, partTitle, {
+				controls: function ( props ) {
+					return [
+						el( C.SelectControl, { key: 's', label: __( 'Show', 'gend-society' ), value: props.attributes.section, options: cfg.dashSections, __nextHasNoMarginBottom: true, __next40pxDefaultSize: true, onChange: function ( v ) {
+							props.setAttributes( { section: v } );
+						} } ),
+						el( C.ToggleControl, { key: 'h', label: __( 'Show its header banner', 'gend-society' ), checked: props.attributes.showHeader !== false, __nextHasNoMarginBottom: true, onChange: function ( v ) {
+							props.setAttributes( { showHeader: v } );
+						} } ),
+					];
+				},
+				extra: function ( a ) {
+					return '&gs_dash_section=' + encodeURIComponent( a.section || 'payment-history' ) + ( a.showHeader === false ? '&gs_dash_noheader=1' : '' );
+				},
+			} ),
+			save: function () {
+				return null;
+			},
+		} );
+	}
 }( window.wp ) );
