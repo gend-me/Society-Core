@@ -760,6 +760,89 @@ function gend_society_studio_embed_canvas_css() {
 	wp_add_inline_style( 'gend-society-studio-canvas', 'html.block-editor-iframe__html{background:#0b0e14}' );
 }
 
+add_action( 'enqueue_block_assets', 'gend_society_studio_menu_canvas_css' );
+/**
+ * A menu edited on its own sits straight on the site background, without the
+ * header that gives it its colours there. When the site's text colour can't be
+ * read on its background (dark background, default dark text), the menu shows
+ * in a colour that can.
+ */
+function gend_society_studio_menu_canvas_css() {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+	$p = isset( $_GET['p'] ) ? sanitize_text_field( wp_unslash( $_GET['p'] ) ) : '';
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+	$type = isset( $_GET['postType'] ) ? sanitize_key( wp_unslash( $_GET['postType'] ) ) : '';
+	if ( ! is_admin() || ( 0 !== strpos( $p, '/wp_navigation/' ) && 'wp_navigation' !== $type ) || ! function_exists( 'wp_get_global_styles' ) ) {
+		return;
+	}
+	$bg   = gend_society_studio_rgb( wp_get_global_styles( array( 'color', 'background' ) ) );
+	$text = gend_society_studio_rgb( wp_get_global_styles( array( 'color', 'text' ) ) );
+	if ( ! $bg || ! $text || gend_society_studio_contrast( $bg, $text ) >= 3 ) {
+		return;
+	}
+	$fix = gend_society_studio_contrast( $bg, array( 255, 255, 255 ) ) >= gend_society_studio_contrast( $bg, array( 17, 17, 17 ) ) ? '#f1f5f9' : '#111111';
+	wp_register_style( 'gend-society-studio-menu-canvas', false, array(), GEND_SOCIETY_VERSION );
+	wp_enqueue_style( 'gend-society-studio-menu-canvas' );
+	wp_add_inline_style( 'gend-society-studio-menu-canvas', '.editor-styles-wrapper{color:' . $fix . '}' );
+}
+
+/**
+ * A colour from global styles (hex, or a palette preset reference) as RGB.
+ *
+ * @param mixed $value Colour value.
+ * @return int[]|null
+ */
+function gend_society_studio_rgb( $value ) {
+	if ( ! is_string( $value ) ) {
+		return null;
+	}
+	if ( preg_match( '/^var:preset\|color\|([a-z0-9-]+)$|var\(--wp--preset--color--([a-z0-9-]+)\)/i', $value, $m ) ) {
+		$slug = '' !== $m[1] ? $m[1] : $m[2];
+		$value = null;
+		foreach ( (array) wp_get_global_settings( array( 'color', 'palette' ) ) as $origin ) {
+			foreach ( (array) $origin as $c ) {
+				if ( isset( $c['slug'], $c['color'] ) && $c['slug'] === $slug ) {
+					$value = $c['color'];
+				}
+			}
+		}
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+	}
+	$hex = ltrim( trim( $value ), '#' );
+	if ( 3 === strlen( $hex ) ) {
+		$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+	}
+	if ( ! preg_match( '/^[0-9a-f]{6}/i', $hex ) ) {
+		return null;
+	}
+	return array( hexdec( substr( $hex, 0, 2 ) ), hexdec( substr( $hex, 2, 2 ) ), hexdec( substr( $hex, 4, 2 ) ) );
+}
+
+/**
+ * WCAG contrast ratio of two RGB colours.
+ *
+ * @param int[] $a Colour.
+ * @param int[] $b Colour.
+ * @return float
+ */
+function gend_society_studio_contrast( $a, $b ) {
+	$lum = function ( $c ) {
+		$l = array_map(
+			function ( $v ) {
+				$v /= 255;
+				return $v <= 0.03928 ? $v / 12.92 : pow( ( $v + 0.055 ) / 1.055, 2.4 );
+			},
+			$c
+		);
+		return 0.2126 * $l[0] + 0.7152 * $l[1] + 0.0722 * $l[2];
+	};
+	$x = $lum( $a );
+	$y = $lum( $b );
+	return ( max( $x, $y ) + 0.05 ) / ( min( $x, $y ) + 0.05 );
+}
+
 add_action( 'admin_head', 'gend_society_studio_embed_css', 99 );
 /**
  * Chromeless mode for screens shown inside the studio: hides the admin chrome
