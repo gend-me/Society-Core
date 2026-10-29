@@ -269,43 +269,8 @@
 		return convertBlocks( collect( wp.data.select( 'core/block-editor' ).getBlocks(), [] ), thenMode );
 	}
 
-	function HtmlPreview( props ) {
-		var state = wp.element.useState( null );
-		var html = state[ 0 ];
-		var setHtml = state[ 1 ];
-		wp.element.useEffect( function () {
-			var stop = false;
-			var t = setTimeout( function () {
-				wp.apiFetch( { path: '/gend-society/v1/live-html/render', method: 'POST', data: { html: props.content, postId: wp.data.select( 'core/editor' ).getCurrentPostId() } } ).then( function ( r ) {
-					if ( ! stop ) {
-						setHtml( r.html );
-					}
-				} ).catch( function () {
-					if ( ! stop ) {
-						setHtml( '' );
-					}
-				} );
-			}, 250 );
-			return function () {
-				stop = true;
-				clearTimeout( t );
-			};
-		}, [ props.content ] );
-		var blockProps = wp.blockEditor.useBlockProps( { className: 'gs-lh-preview' } );
-		return el( 'div', blockProps, html === null
-			? el( 'div', { className: 'gs-lh-loading' }, __( 'Rendering…', 'gend-society' ) )
-			: el( 'div', { dangerouslySetInnerHTML: { __html: html } } ) );
-	}
-
 	wp.hooks.addFilter( 'editor.BlockEdit', 'gend-society/studio-live-html', wp.compose.createHigherOrderComponent( function ( BlockEdit ) {
 		return function ( props ) {
-			if ( props.name === 'core/html' && /\{\{|data-gs-live-/.test( props.attributes.content || '' ) ) {
-				return props.isSelected
-					? el( wp.element.Fragment, null,
-						el( 'div', { className: 'gs-lh-hint' }, __( 'Live HTML: {{tokens}} fill in each group’s or member’s details; data-gs-live parts stay live. Click outside the block to preview it.', 'gend-society' ) ),
-						el( BlockEdit, props ) )
-					: el( HtmlPreview, { content: props.attributes.content } );
-			}
 			if ( ! props.isSelected || ! LIVE_PREFIX.test( props.name ) ) {
 				return el( BlockEdit, props );
 			}
@@ -372,6 +337,11 @@
 	}
 
 	wp.domReady( function () {
+		// "Edit as HTML" switches to the code editor, and WordPress saves that
+		// choice for every editor. Studio editors always open visually.
+		if ( editorMode() === 'text' ) {
+			switchMode( 'visual' );
+		}
 		var addQueued = false;
 		new window.MutationObserver( function () {
 			if ( ! addQueued ) {

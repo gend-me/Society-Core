@@ -810,7 +810,7 @@ function gend_society_build_frontend_profile_nav()
   }
 
   // Contracts (gend-society custom BP tab — slug 'invest', the wallet Fund content).
-  $items[] = ['label' => __('Contracts', 'gend-society'), 'url' => $base . 'invest/', 'icon' => 'dashicons-media-text'];
+  $items[] = ['label' => __('Commissions', 'gend-society'), 'url' => $base . 'invest/', 'icon' => 'dashicons-media-text'];
 
   // Wallet (gend-society custom BP tab — registered with slug 'member-wallet'
   // in member-profile-pages.php via bp_core_new_nav_item, so URL is

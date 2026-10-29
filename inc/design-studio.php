@@ -118,11 +118,11 @@ function gend_society_studio_group_layout_section() {
 		)
 	);
 	if ( $published ) {
-		$status = __( 'Block layout (published): it replaces the Youzify sidebar widgets on every group.', 'gend-society' );
+		$status = __( 'Block layout (published): every group’s sidebar uses it.', 'gend-society' );
 	} elseif ( $draft ) {
-		$status = __( 'Block layout (draft): groups still show the Youzify sidebar widgets until you publish it.', 'gend-society' );
+		$status = __( 'Block layout (draft): groups keep the default sidebar widgets until you publish it.', 'gend-society' );
 	} else {
-		$status = __( 'Youzify sidebar widgets (Group Administrators, Group Moderators).', 'gend-society' );
+		$status = __( 'Default sidebar widgets (Group Administrators, Group Moderators).', 'gend-society' );
 	}
 	echo '<section id="gs-group-layout"><h3>' . esc_html__( 'Layout & Sidebars', 'gend-society' ) . '</h3>'
 		. '<p class="description">' . esc_html__( 'The sidebar beside every group page, and the group Feed tab. Design them with blocks (Group Members, Group About, the activity blocks, any other block); each starts as a copy of today’s and goes live when you publish it.', 'gend-society' ) . '</p>'
@@ -158,9 +158,9 @@ function gend_society_studio_group_feed_row() {
 	if ( $published ) {
 		$status = __( 'Block layout (published): every group’s Feed tab uses it.', 'gend-society' );
 	} elseif ( $draft ) {
-		$status = __( 'Block layout (draft): groups still show the Youzify feed until you publish it.', 'gend-society' );
+		$status = __( 'Block layout (draft): groups keep the default feed until you publish it.', 'gend-society' );
 	} else {
-		$status = __( 'Youzify group feed (filter, posting, posts).', 'gend-society' );
+		$status = __( 'Default group feed (filter, posting, posts).', 'gend-society' );
 	}
 	return '<tr><td><strong>' . esc_html__( 'Group feed', 'gend-society' ) . '</strong></td><td>' . esc_html( $status ) . '</td>'
 		. '<td style="text-align:right"><a class="button button-primary" href="' . esc_url( admin_url( 'admin.php?page=gs-studio-layout&layout=group-feed' ) ) . '">' . esc_html( $published || $draft ? __( 'Edit the feed', 'gend-society' ) : __( 'Design the feed', 'gend-society' ) ) . '</a></td></tr>';
@@ -286,11 +286,9 @@ function gend_society_studio_sections() {
 	$profiles    = function_exists( 'gend_society_ps_rest_state' ) ? admin_url( 'admin.php?page=gs-studio-profile-styling' ) : '';
 	$p_header_id = $profiles ? gend_society_ps_default_header_id() : 0;
 	$layouts     = function_exists( 'gend_society_ds_layout_id' );
+	$sp_ready    = function_exists( 'gend_society_sp_rest_state' ) && $layouts;
 	$layout_url  = function ( $slug ) {
 		return admin_url( 'admin.php?page=gs-studio-layout&layout=' . $slug );
-	};
-	$yz          = function ( $page, $tab = '' ) {
-		return admin_url( 'admin.php?page=' . $page . ( $tab ? '&tab=' . $tab : '' ) );
 	};
 
 	$sections = array(
@@ -298,7 +296,7 @@ function gend_society_studio_sections() {
 			'id'     => 'branding',
 			'label'  => __( 'Branding', 'gend-society' ),
 			'icon'   => 'art',
-			'blurb'  => __( 'Logo, colours and type that every page shares.', 'gend-society' ),
+			'blurb'  => __( 'Logo, colours, type, styling, voice and cast: the brand every page and every AI request shares.', 'gend-society' ),
 			'active' => true,
 			'groups' => array(
 				array(
@@ -308,6 +306,9 @@ function gend_society_studio_sections() {
 						array( 'id' => 'site-name', 'label' => __( 'Site Name', 'gend-society' ), 'kind' => 'panel', 'panel' => 'site-name' ),
 						array( 'id' => 'palettes', 'label' => __( 'Colour Schemes', 'gend-society' ), 'kind' => 'panel', 'panel' => 'palettes' ),
 						array( 'id' => 'fonts', 'label' => __( 'Font Types', 'gend-society' ), 'kind' => 'panel', 'panel' => 'fonts' ),
+						array( 'id' => 'voice', 'label' => __( 'Voice & Tone', 'gend-society' ), 'kind' => 'panel', 'panel' => 'brand-voice' ),
+						array( 'id' => 'app-styling', 'label' => __( 'App Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'brand-style' ),
+						array( 'id' => 'cast', 'label' => __( 'Cast Members', 'gend-society' ), 'kind' => 'panel', 'panel' => 'brand-cast' ),
 					),
 				),
 			),
@@ -316,13 +317,12 @@ function gend_society_studio_sections() {
 			'id'     => 'app',
 			'label'  => __( 'App', 'gend-society' ),
 			'icon'   => 'layout',
-			'blurb'  => __( 'The frame around every page: header, menus and footer.', 'gend-society' ),
+			'blurb'  => __( 'The frame around every page: header, footer and sidebars.', 'gend-society' ),
 			'active' => true,
 			'groups' => array(
 				array(
 					'items' => array(
 						array( 'id' => 'header', 'label' => __( 'Header', 'gend-society' ), 'kind' => 'part', 'slug' => 'header' ),
-						array( 'id' => 'menus', 'label' => __( 'Menus', 'gend-society' ), 'kind' => 'menus' ),
 						array( 'id' => 'footer', 'label' => __( 'Footer', 'gend-society' ), 'kind' => 'part', 'slug' => 'footer' ),
 						array( 'id' => 'sidebars', 'label' => __( 'Sidebars', 'gend-society' ), 'kind' => 'panel', 'panel' => 'sidebars' ),
 						array( 'id' => '404', 'label' => __( 'Page 404', 'gend-society' ), 'kind' => 'template', 'slug' => '404' ),
@@ -342,9 +342,8 @@ function gend_society_studio_sections() {
 					'items' => array(
 						array( 'id' => 'page-templates', 'label' => __( 'Page Templates', 'gend-society' ), 'kind' => 'templates', 'match' => 'page' ),
 						array( 'id' => 'single', 'label' => __( 'Blog Post Templates', 'gend-society' ), 'kind' => 'template', 'slug' => 'single' ),
-						array( 'id' => 'home', 'label' => __( 'Blog All', 'gend-society' ), 'kind' => 'template', 'slug' => 'home', 'fallback' => 'index' ),
+						array( 'id' => 'blog-archives', 'label' => __( 'Blog Archives', 'gend-society' ), 'kind' => 'taxtemplates', 'set' => 'blog' ),
 						array( 'id' => 'archive', 'label' => __( 'All Archives', 'gend-society' ), 'kind' => 'template', 'slug' => 'archive', 'fallback' => 'index' ),
-						array( 'id' => 'category', 'label' => __( 'Category Templates', 'gend-society' ), 'kind' => 'template', 'slug' => 'category', 'fallback' => 'archive' ),
 					),
 				),
 			),
@@ -358,26 +357,15 @@ function gend_society_studio_sections() {
 			'requires' => __( 'Store Management', 'gend-society' ),
 			'groups'   => array(
 				array(
-					'label' => __( 'Shopping', 'gend-society' ),
 					'items' => array(
 						array( 'id' => 'archive-product', 'label' => __( 'Product Catalog', 'gend-society' ), 'kind' => 'template', 'slug' => 'archive-product' ),
 						array( 'id' => 'product-search-results', 'label' => __( 'Product Search Results', 'gend-society' ), 'kind' => 'template', 'slug' => 'product-search-results' ),
-						array( 'id' => 'taxonomy-product_attribute', 'label' => __( 'Products by Attribute', 'gend-society' ), 'kind' => 'template', 'slug' => 'taxonomy-product_attribute' ),
+						array( 'id' => 'product-taxonomies', 'label' => __( 'Product Categories & Attributes', 'gend-society' ), 'kind' => 'taxtemplates', 'set' => 'store' ),
+						array( 'id' => 'product-templates', 'label' => __( 'Product Templates', 'gend-society' ), 'kind' => 'producttemplates' ),
 						array( 'id' => 'page-cart', 'label' => __( 'Cart', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-cart' ),
 						array( 'id' => 'mini-cart', 'label' => __( 'Mini-Cart', 'gend-society' ), 'kind' => 'part', 'slug' => 'mini-cart' ),
 						array( 'id' => 'page-checkout', 'label' => __( 'Checkout', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-checkout' ),
 						array( 'id' => 'order-confirmation', 'label' => __( 'Order Confirmation', 'gend-society' ), 'kind' => 'template', 'slug' => 'order-confirmation' ),
-					),
-				),
-				array(
-					'label' => __( 'Products', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'single-product', 'label' => __( 'Single Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product' ),
-						array( 'id' => 'add-to-cart', 'label' => __( 'Add to Cart', 'gend-society' ), 'kind' => 'part', 'slug' => 'add-to-cart' ),
-						array( 'id' => 'product-simple', 'label' => __( 'Simple Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-simple' ),
-						array( 'id' => 'product-external', 'label' => __( 'External Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-external' ),
-						array( 'id' => 'product-variable', 'label' => __( 'Variable Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-variable' ),
-						array( 'id' => 'product-grouped', 'label' => __( 'Grouped Product', 'gend-society' ), 'kind' => 'template', 'slug' => 'single-product-type-grouped' ),
 					),
 				),
 			),
@@ -415,57 +403,34 @@ function gend_society_studio_sections() {
 			'id'       => 'social',
 			'label'    => __( 'Social', 'gend-society' ),
 			'icon'     => 'groups',
-			'blurb'    => __( 'Member profiles, groups and the activity feed.', 'gend-society' ),
+			'blurb'    => __( 'Member profiles, groups, the activity feed and wallets.', 'gend-society' ),
 			'active'   => $has_social,
 			'requires' => __( 'Social Profiles', 'gend-society' ),
 			'groups'   => array(
+				// One page each: header, menu + pages by audience, sidebars, directory (inc/social-pages.php).
+				// The separate settings screens only when that builder is missing. One page per entry, so no headings.
 				array(
-					'label' => __( 'Profile', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : $yz( 'youzify-panel', 'members-directory' ) ),
-						// Profile headers, tab layouts and menu are block-built (Profile Styling); Youzify settings only without it.
-						array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : ( $profiles ? $profiles : $yz( 'youzify-profile-settings', 'header' ) ) ),
-						array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ? $profiles : $yz( 'youzify-profile-settings', 'tabs' ) ),
-						// The right sidebar, as Profile Widget blocks (inc/profile-widgets.php).
-						array( 'id' => 'profile-sidebar', 'label' => __( 'Profile Sidebar', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts && function_exists( 'gend_society_pw_default_sidebar' ) ? $layout_url( 'profile-sidebar' ) : $yz( 'youzify-profile-settings', 'widgets' ) ),
-					),
-				),
-				array(
-					'label' => __( 'Groups', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : $yz( 'youzify-panel', 'groups-directory' ) ),
-						// Group headers and pages are block-built (Group Styling); Youzify settings only when that builder is missing.
-						array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : ( $builder ? $builder : $yz( 'youzify-panel', 'groups' ) . '#header' ) ),
-						array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ? $builder : $yz( 'youzify-panel', 'groups' ) ),
-					),
-				),
-				array(
-					'label' => __( 'Activity Feed', 'gend-society' ),
-					'items' => array(
-						array( 'id' => 'activity-styling', 'label' => __( 'Styling', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : $yz( 'youzify-panel', 'wall' ) ),
-						array( 'id' => 'activity-reactions', 'label' => __( 'Activity Reactions', 'gend-society' ), 'kind' => 'admin', 'url' => $yz( 'youzify-extensions-settings', 'activity-reactions' ) ),
-					),
-				),
-				array(
-					'label'  => __( 'Styling', 'gend-society' ),
-					'active' => function_exists( 'gend_society_yz_rest_get' ),
-					'items'  => array(
-						array( 'id' => 'youzify-styles', 'label' => __( 'Youzify Styling', 'gend-society' ), 'kind' => 'panel', 'panel' => 'youzify' ),
-					),
-				),
-			),
-		),
-		array(
-			'id'       => 'bank',
-			'label'    => __( 'Bank', 'gend-society' ),
-			'icon'     => 'money-alt',
-			'blurb'    => __( 'Wallet pages where members see their balances.', 'gend-society' ),
-			'active'   => $has_rewards || $has_cp,
-			'requires' => __( 'Reward Programs', 'gend-society' ),
-			'groups'   => array(
-				array(
-					'items' => array(
-						array( 'id' => 'wallet', 'label' => __( 'Wallet Pages', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-wallet' ),
+					'items' => array_merge(
+						$sp_ready && $profiles
+							? array( array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'profiles' ) )
+							: array(
+								array( 'id' => 'members-directory', 'label' => __( "Member's Directory", 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'members-directory' ) : '' ),
+								array( 'id' => 'profile-header', 'label' => __( 'Profile Header', 'gend-society' ), 'kind' => 'admin', 'url' => $p_header_id ? admin_url( 'post.php?post=' . $p_header_id . '&action=edit' ) : $profiles ),
+								array( 'id' => 'profile-pages', 'label' => __( 'Profile Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $profiles ),
+							),
+						$sp_ready && $builder
+							? array( array( 'id' => 'group-pages', 'label' => __( 'Group Pages', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'groups' ) )
+							: array(
+								array( 'id' => 'groups-directory', 'label' => __( 'Group Directory', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'groups-directory' ) : '' ),
+								array( 'id' => 'group-header', 'label' => __( 'Group Header', 'gend-society' ), 'kind' => 'admin', 'url' => $header_id ? admin_url( 'post.php?post=' . $header_id . '&action=edit' ) : $builder ),
+								array( 'id' => 'group-pages', 'label' => __( 'Group Pages, Menu & Layout', 'gend-society' ), 'kind' => 'admin', 'url' => $builder ),
+							),
+						$sp_ready
+							? array( array( 'id' => 'activity-feed', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'panel', 'panel' => 'social-pages', 'scope' => 'activity' ) )
+							: array( array( 'id' => 'activity-styling', 'label' => __( 'Activity Feed', 'gend-society' ), 'kind' => 'admin', 'url' => $layouts ? $layout_url( 'activity' ) : '' ) ),
+						$has_rewards || $has_cp
+							? array( array( 'id' => 'wallet', 'label' => __( 'Wallet Pages', 'gend-society' ), 'kind' => 'template', 'slug' => 'page-wallet' ) )
+							: array()
 					),
 				),
 			),
@@ -482,6 +447,18 @@ function gend_society_studio_sections() {
 	// Drop inactive or empty groups so a section only lists what its plugins provide,
 	// and active sections left with nothing to show.
 	foreach ( $sections as $i => &$section ) {
+		// A settings screen with no URL (its builder is not installed) is left out.
+		foreach ( $section['groups'] as &$group ) {
+			$group['items'] = array_values(
+				array_filter(
+					$group['items'],
+					function ( $it ) {
+						return 'admin' !== $it['kind'] || ! empty( $it['url'] );
+					}
+				)
+			);
+		}
+		unset( $group );
 		$section['groups'] = array_values(
 			array_filter(
 				$section['groups'],
@@ -683,7 +660,23 @@ function gend_society_studio_enqueue( $hook ) {
 	$css = 'assets/design-studio.css';
 	$js  = 'assets/design-studio.js';
 	wp_enqueue_style( 'gs-design-studio', GEND_SOCIETY_URL . $css, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) );
-	wp_enqueue_script( 'gs-design-studio', GEND_SOCIETY_URL . $js, array( 'wp-api-fetch', 'wp-i18n', 'wp-url' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
+	$deps = array( 'wp-api-fetch', 'wp-i18n', 'wp-url' );
+	if ( function_exists( 'gend_society_sp_rest_state' ) ) {
+		// Social › Group / Profile Pages builder.
+		wp_enqueue_style( 'gs-social-pages', GEND_SOCIETY_URL . 'assets/social-pages.css', array( 'gs-design-studio' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/social-pages.css' ) );
+		wp_enqueue_script( 'gs-social-pages', GEND_SOCIETY_URL . 'assets/social-pages.js', array( 'wp-api-fetch', 'wp-i18n' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/social-pages.js' ), true );
+		wp_set_script_translations( 'gs-social-pages', 'gend-society' );
+		$deps[] = 'gs-social-pages';
+	}
+	if ( function_exists( 'gend_society_bk_get' ) ) {
+		// Branding › Voice & Tone, App Styling, Cast Members (inc/brand-kit.php).
+		wp_enqueue_style( 'gs-brand-kit-demo', GEND_SOCIETY_URL . 'assets/brand-kit-demo.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit-demo.css' ) );
+		wp_enqueue_style( 'gs-brand-kit', GEND_SOCIETY_URL . 'assets/brand-kit.css', array( 'gs-design-studio' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit.css' ) );
+		wp_enqueue_script( 'gs-brand-kit', GEND_SOCIETY_URL . 'assets/brand-kit.js', array( 'wp-api-fetch', 'wp-i18n' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit.js' ), true );
+		wp_set_script_translations( 'gs-brand-kit', 'gend-society' );
+		$deps[] = 'gs-brand-kit';
+	}
+	wp_enqueue_script( 'gs-design-studio', GEND_SOCIETY_URL . $js, $deps, GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
 	wp_set_script_translations( 'gs-design-studio', 'gend-society' );
 
 	$theme      = wp_get_theme();
@@ -730,6 +723,103 @@ function gend_society_studio_body_class( $classes ) {
 	return $classes;
 }
 
+add_action( 'enqueue_block_assets', 'gend_society_studio_embed_canvas_css' );
+/**
+ * In a studio editor, the canvas around the page or part is dark like the
+ * studio (core's default is light grey, which showed around headers and footers).
+ */
+function gend_society_studio_embed_canvas_css() {
+	if ( ! is_admin() || ! gend_society_studio_is_embed() ) {
+		return;
+	}
+	wp_register_style( 'gend-society-studio-canvas', false, array(), GEND_SOCIETY_VERSION );
+	wp_enqueue_style( 'gend-society-studio-canvas' );
+	wp_add_inline_style( 'gend-society-studio-canvas', 'html.block-editor-iframe__html{background:#0b0e14}' );
+}
+
+add_action( 'enqueue_block_assets', 'gend_society_studio_menu_canvas_css' );
+/**
+ * A menu edited on its own sits straight on the site background, without the
+ * header that gives it its colours there. When the site's text colour can't be
+ * read on its background (dark background, default dark text), the menu shows
+ * in a colour that can.
+ */
+function gend_society_studio_menu_canvas_css() {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+	$p = isset( $_GET['p'] ) ? sanitize_text_field( wp_unslash( $_GET['p'] ) ) : '';
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
+	$type = isset( $_GET['postType'] ) ? sanitize_key( wp_unslash( $_GET['postType'] ) ) : '';
+	if ( ! is_admin() || ( 0 !== strpos( $p, '/wp_navigation/' ) && 'wp_navigation' !== $type ) || ! function_exists( 'wp_get_global_styles' ) ) {
+		return;
+	}
+	$bg   = gend_society_studio_rgb( wp_get_global_styles( array( 'color', 'background' ) ) );
+	$text = gend_society_studio_rgb( wp_get_global_styles( array( 'color', 'text' ) ) );
+	if ( ! $bg || ! $text || gend_society_studio_contrast( $bg, $text ) >= 3 ) {
+		return;
+	}
+	$fix = gend_society_studio_contrast( $bg, array( 255, 255, 255 ) ) >= gend_society_studio_contrast( $bg, array( 17, 17, 17 ) ) ? '#f1f5f9' : '#111111';
+	wp_register_style( 'gend-society-studio-menu-canvas', false, array(), GEND_SOCIETY_VERSION );
+	wp_enqueue_style( 'gend-society-studio-menu-canvas' );
+	wp_add_inline_style( 'gend-society-studio-menu-canvas', '.editor-styles-wrapper{color:' . $fix . '}' );
+}
+
+/**
+ * A colour from global styles (hex, or a palette preset reference) as RGB.
+ *
+ * @param mixed $value Colour value.
+ * @return int[]|null
+ */
+function gend_society_studio_rgb( $value ) {
+	if ( ! is_string( $value ) ) {
+		return null;
+	}
+	if ( preg_match( '/^var:preset\|color\|([a-z0-9-]+)$|var\(--wp--preset--color--([a-z0-9-]+)\)/i', $value, $m ) ) {
+		$slug = '' !== $m[1] ? $m[1] : $m[2];
+		$value = null;
+		foreach ( (array) wp_get_global_settings( array( 'color', 'palette' ) ) as $origin ) {
+			foreach ( (array) $origin as $c ) {
+				if ( isset( $c['slug'], $c['color'] ) && $c['slug'] === $slug ) {
+					$value = $c['color'];
+				}
+			}
+		}
+		if ( ! is_string( $value ) ) {
+			return null;
+		}
+	}
+	$hex = ltrim( trim( $value ), '#' );
+	if ( 3 === strlen( $hex ) ) {
+		$hex = $hex[0] . $hex[0] . $hex[1] . $hex[1] . $hex[2] . $hex[2];
+	}
+	if ( ! preg_match( '/^[0-9a-f]{6}/i', $hex ) ) {
+		return null;
+	}
+	return array( hexdec( substr( $hex, 0, 2 ) ), hexdec( substr( $hex, 2, 2 ) ), hexdec( substr( $hex, 4, 2 ) ) );
+}
+
+/**
+ * WCAG contrast ratio of two RGB colours.
+ *
+ * @param int[] $a Colour.
+ * @param int[] $b Colour.
+ * @return float
+ */
+function gend_society_studio_contrast( $a, $b ) {
+	$lum = function ( $c ) {
+		$l = array_map(
+			function ( $v ) {
+				$v /= 255;
+				return $v <= 0.03928 ? $v / 12.92 : pow( ( $v + 0.055 ) / 1.055, 2.4 );
+			},
+			$c
+		);
+		return 0.2126 * $l[0] + 0.7152 * $l[1] + 0.0722 * $l[2];
+	};
+	$x = $lum( $a );
+	$y = $lum( $b );
+	return ( max( $x, $y ) + 0.05 ) / ( min( $x, $y ) + 0.05 );
+}
+
 add_action( 'admin_head', 'gend_society_studio_embed_css', 99 );
 /**
  * Chromeless mode for screens shown inside the studio: hides the admin chrome
@@ -747,10 +837,24 @@ function gend_society_studio_embed_css() {
 	}
 	echo '<style id="gs-studio-embed-css">'
 		. 'body.gs-studio-embed{--gs-header-h:0px!important}body.gs-studio-embed::before,body.gs-studio-embed::after{display:none!important}:root{background:#0b0e14!important}'
-		. '#main-3d-header,.header-anchor-wrap,#wpadminbar,#adminmenumain,#wpfooter,aipa-widget,.gs-frontend-bar,.update-nag{display:none!important}'
+		. '#main-3d-header,.header-anchor-wrap,#wpadminbar,#adminmenumain,#wpfooter,aipa-widget,.gs-frontend-bar,.update-nag,.em-chat-widget,.em-chat-panel,#gm-cc,.gm-cc-open{display:none!important}'
 		. 'html.wp-toolbar{padding-top:0!important}#wpcontent,#wpfooter{margin-left:0!important}#wpbody-content{padding-top:0!important}'
 		. 'body.gs-studio-embed .edit-site-layout__view-mode-toggle-container,body.gs-studio-embed .edit-site-site-hub__view-mode-toggle-container,body.gs-studio-embed .editor-header__back-button,body.gs-studio-embed .edit-site-layout__hub,body.gs-studio-embed .edit-post-fullscreen-mode-close{visibility:hidden!important;pointer-events:none!important}'
 		. '</style>';
+}
+
+add_action( 'admin_enqueue_scripts', 'gend_society_studio_visual_editor_script', 99 );
+/**
+ * Every block editor opens in the visual editor. The studio's "Edit as HTML"
+ * switches to the code editor, and WordPress saves that choice for all
+ * editors (no blocks, empty settings sidebar), so it never carries over.
+ */
+function gend_society_studio_visual_editor_script() {
+	foreach ( array( 'wp-edit-site', 'wp-edit-post' ) as $handle ) {
+		if ( wp_script_is( $handle, 'enqueued' ) ) {
+			wp_add_inline_script( $handle, 'wp.domReady(function(){try{if(wp.data.select("core/preferences").get("core","editorMode")==="text"){wp.data.dispatch("core/preferences").set("core","editorMode","visual");}}catch(e){}});' );
+		}
+	}
 }
 
 add_action( 'admin_enqueue_scripts', 'gend_society_studio_embed_editor_script' );
@@ -772,7 +876,9 @@ function gend_society_studio_embed_editor_script() {
 		}
 		wp_add_inline_script(
 			$handle,
-			'wp.domReady(function(){try{var p=wp.data.dispatch("core/preferences");["welcomeGuide","welcomeGuideTemplate","welcomeGuidePage"].forEach(function(k){if(wp.data.select("core/preferences").get("' . $scope . '",k)!==false){p.set("' . $scope . '",k,false);}});}catch(e){}});'
+			// Also turn off Spotlight mode (dims every block but the selected one, so a one-block
+			// header looked faded) and distraction-free mode: the studio gives the editor its own frame.
+			'wp.domReady(function(){try{var p=wp.data.dispatch("core/preferences"),g=wp.data.select("core/preferences");["welcomeGuide","welcomeGuideTemplate","welcomeGuidePage"].forEach(function(k){if(g.get("' . $scope . '",k)!==false){p.set("' . $scope . '",k,false);}});["focusMode","distractionFree"].forEach(function(k){if(g.get("core",k)){p.set("core",k,false);}});}catch(e){}});'
 		);
 	}
 }
@@ -871,11 +977,44 @@ add_action( 'template_redirect', 'gend_society_studio_shortcode_preview', 0 );
 function gend_society_studio_shortcode_preview() {
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
 	$tag = isset( $_GET['gs_studio_shortcode'] ) ? sanitize_key( wp_unslash( $_GET['gs_studio_shortcode'] ) ) : '';
-	if ( '' === $tag || ! current_user_can( 'edit_theme_options' ) || ! shortcode_exists( $tag ) ) {
+	// Or one page's content (?gs_studio_page_preview=id): the template editor's preview of a dashboard page.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+	$page = isset( $_GET['gs_studio_page_preview'] ) ? get_post( absint( $_GET['gs_studio_page_preview'] ) ) : null;
+	// Post editors may preview the Sales components (rendered as themselves, as on any page).
+	$is_component = '' !== $tag && function_exists( 'gend_society_scx_schema' ) && isset( gend_society_scx_schema()[ $tag ] );
+	if ( ! current_user_can( 'edit_theme_options' ) && ! ( $is_component && ! $page && current_user_can( 'edit_posts' ) ) ) {
 		return;
 	}
-	add_filter( 'show_admin_bar', '__return_false' );
-	$html = do_shortcode( '[' . $tag . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+	// The studio's Customise card previews unsaved settings on the plain component.
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+	if ( ! empty( $_GET['gs_scx_off'] ) ) {
+		$GLOBALS['gend_society_scx_off'] = true;
+	}
+	if ( $page && 'page' === $page->post_type && 'publish' === $page->post_status ) {
+		$GLOBALS['post'] = $page; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- the page's shortcodes read the current post.
+		setup_postdata( $page );
+		add_filter( 'show_admin_bar', '__return_false' );
+		$html = apply_filters( 'the_content', $page->post_content ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core filter.
+	} elseif ( '' !== $tag && shortcode_exists( $tag ) ) {
+		add_filter( 'show_admin_bar', '__return_false' );
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only preview for site editors.
+		$sc_id = isset( $_GET['gs_studio_sc_id'] ) ? sanitize_key( wp_unslash( $_GET['gs_studio_sc_id'] ) ) : '';
+		if ( $is_component && isset( $_GET['gs_scx_block'] ) && function_exists( 'gend_society_sb_render' ) ) {
+			// A Sales block's own settings (?gs_scx_block=JSON), as the block renders them.
+			$custom = json_decode( wp_unslash( $_GET['gs_scx_block'] ), true ); // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- sanitised in gend_society_scx_sanitize().
+			$custom = is_array( $custom ) ? $custom : array();
+			if ( isset( $_GET['gs_dash_section'] ) && function_exists( 'gend_society_sb_dash_section' ) ) {
+				// One part of the Affiliate Dashboard (Affiliate Dashboard Section block).
+				$html = gend_society_sb_dash_section( sanitize_key( wp_unslash( $_GET['gs_dash_section'] ) ), empty( $_GET['gs_dash_noheader'] ), $custom, false );
+			} else {
+				$html = gend_society_sb_render( $tag, $custom, false );
+			}
+		} else {
+			$html = do_shortcode( '[' . $tag . ( '' !== $sc_id ? ' id="' . $sc_id . '"' : '' ) . ']' ); // Rendered before wp_head so the styles it enqueues print in <head>.
+		}
+	} else {
+		return;
+	}
 	?><!DOCTYPE html>
 <html <?php language_attributes(); ?>>
 <head>
@@ -888,6 +1027,7 @@ function gend_society_studio_shortcode_preview() {
 <body <?php body_class( 'gs-studio-preview' ); ?>>
 <div class="gs-sc-preview"><?php echo $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- shortcode output. ?></div>
 	<?php wp_footer(); ?>
+<script>(function(){var s=function(){if(parent!==window){parent.postMessage({gsPreviewHeight:document.documentElement.scrollHeight},'*');}};addEventListener('load',s);if(window.ResizeObserver){new ResizeObserver(s).observe(document.body);}})();</script>
 </body>
 </html>
 	<?php
@@ -953,6 +1093,7 @@ function gend_society_studio_specimen_page() {
 	$css = 'assets/design-studio-guide.css';
 	$js  = 'assets/design-studio-guide.js';
 	wp_enqueue_style( 'gs-studio-guide', GEND_SOCIETY_URL . $css, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $css ) );
+	wp_enqueue_style( 'gs-brand-kit-demo', GEND_SOCIETY_URL . 'assets/brand-kit-demo.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/brand-kit-demo.css' ) );
 	wp_enqueue_script( 'gs-studio-guide', GEND_SOCIETY_URL . $js, array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
 
 	$name    = get_bloginfo( 'name' );
@@ -1043,13 +1184,18 @@ function gend_society_studio_specimen_page() {
 
 	<nav class="gsg-index">
 		<?php
-		$chapters = array(
+		// Written chapters (inc/brand-kit.php) sit between the components and the closing spread.
+		$kit_chapters = function_exists( 'gend_society_bk_guide_chapters' ) ? gend_society_bk_guide_chapters() : array();
+		$chapters     = array(
 			'logo'       => __( 'Logo', 'gend-society' ),
 			'colour'     => __( 'Colour', 'gend-society' ),
 			'type'       => __( 'Typography', 'gend-society' ),
 			'components' => __( 'Components', 'gend-society' ),
-			'in-use'     => __( 'In use', 'gend-society' ),
 		);
+		foreach ( $kit_chapters as $kid => $kc ) {
+			$chapters[ $kid ] = $kc[0];
+		}
+		$chapters['in-use'] = __( 'In use', 'gend-society' );
 		$n = 0;
 		foreach ( $chapters as $id => $label ) :
 			++$n;
@@ -1150,9 +1296,28 @@ function gend_society_studio_specimen_page() {
 		</div>
 	</section>
 
+	<?php
+	$kn = 4;
+	foreach ( $kit_chapters as $kid => $kc ) :
+		++$kn;
+		?>
+	<section class="gsg-chapter" id="gsg-<?php echo esc_attr( $kid ); ?>">
+		<header class="gsg-chapter-head">
+			<span class="gsg-num"><?php echo esc_html( sprintf( '%02d', $kn ) ); ?></span>
+			<div class="gsg-chapter-title"><?php echo esc_html( $kc[0] ); ?></div>
+			<div class="gsg-chapter-lede"><?php echo esc_html( $kc[1] ); ?></div>
+		</header>
+		<?php if ( '' !== $kc[2] ) : ?>
+			<div class="gsg-bk"><?php echo $kc[2]; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped in gend_society_bk_guide_chapters(). ?></div>
+		<?php else : ?>
+			<div class="gsg-bk-empty"><?php esc_html_e( 'Not written yet. Fill this chapter in from the Design Studio’s Branding screens.', 'gend-society' ); ?></div>
+		<?php endif; ?>
+	</section>
+	<?php endforeach; ?>
+
 	<section class="gsg-chapter" id="gsg-in-use">
 		<header class="gsg-chapter-head">
-			<span class="gsg-num">05</span>
+			<span class="gsg-num"><?php echo esc_html( sprintf( '%02d', $kn + 1 ) ); ?></span>
 			<div class="gsg-chapter-title"><?php esc_html_e( 'In use', 'gend-society' ); ?></div>
 			<div class="gsg-chapter-lede"><?php esc_html_e( 'Everything together, as visitors will meet it.', 'gend-society' ); ?></div>
 		</header>

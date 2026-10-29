@@ -561,3 +561,60 @@ body.gs-studio-page #wpbody-content { padding-bottom: 0 !important; float: none;
 .gs-st-sb-width, .gs-st-sb-sticky { display: inline-flex; align-items: center; gap: 8px; font-size: 13px; color: #c6cfdf; }
 .gs-st-sb-width input[type=range] { width: 140px; accent-color: var(--st-accent); }
 .gs-st-sb-sticky input { accent-color: var(--st-accent); }
+
+/* ── Category templates (Blog Archives, Product Categories & Attributes) ── */
+.gs-st-tt-group { margin: 0 0 34px; }
+.gs-st-tt-sub { margin: 22px 0 10px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--st-muted); }
+.gs-st-tt-list { display: flex; flex-direction: column; gap: 8px; }
+.gs-st-tt-item { border: 1px solid var(--st-border); border-radius: var(--st-radius); background: var(--st-card); transition: border-color .2s; scroll-margin-top: 16px; }
+.gs-st-tt-item.is-open { border-color: rgba(151, 228, 110, .45); }
+.gs-st-tt-row { display: flex; align-items: center; gap: 12px; padding: 10px 14px; }
+.gs-st-tt-row.is-all { padding: 14px; }
+.gs-st-tt-row.is-all .gs-st-tpl-thumb { width: 92px; height: 64px; padding: 8px; gap: 4px; margin: 0; flex: none; }
+.gs-st-tt-name { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+.gs-st-tt-name strong { font-size: 14px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-st-tt-row.is-all .gs-st-tt-name strong { font-size: 16px; }
+.gs-st-tt-name small { color: var(--st-muted); font-size: 12px; }
+.gs-studio .gs-st-tt-row select.gs-st-input { width: 260px; max-width: 40%; height: 34px; }
+.gs-st-tt-row .gs-st-btn { flex: none; }
+.gs-st-tt-drawer { display: grid; grid-template-rows: 0fr; transition: grid-template-rows .45s var(--st-ease); }
+.gs-st-tt-item.is-open .gs-st-tt-drawer { grid-template-rows: 1fr; }
+.gs-st-tt-drawer-in { min-height: 0; overflow: hidden; display: flex; flex-direction: column; }
+.gs-st-tt-item.is-open .gs-st-tt-drawer-in { border-top: 1px solid var(--st-border); }
+.gs-st-tt-drawer-head { display: flex; align-items: center; gap: 8px; padding: 8px 10px 8px 14px; font-size: 13px; color: var(--st-muted); }
+.gs-st-tt-drawer-head span:not(.dashicons) { flex: 1; }
+.gs-st-tt-drawer-in .gs-st-editor { flex: none; height: min(80vh, 860px); border-radius: 0 0 var(--st-radius) var(--st-radius); overflow: hidden; }
+@media (max-width: 782px) {
+	.gs-st-tt-row { flex-wrap: wrap; }
+	.gs-st-tt-name { flex-basis: 100%; }
+	.gs-studio .gs-st-tt-row select.gs-st-input { flex: 1; max-width: none; width: auto; }
+	.gs-st-tt-row.is-all .gs-st-tpl-thumb { display: none; }
+}
+/* Product Templates: where each template is used. */
+.gs-st-pt-chips { display: flex; flex-wrap: wrap; gap: 4px; margin-top: 2px; }
+.gs-st-pt-chip { display: inline-flex; align-items: center; height: 20px; padding: 0 8px; border-radius: 99px; font-size: 11px; font-weight: 600; border: 1px solid var(--st-border); color: var(--st-text); }
+.gs-st-pt-chip.is-types { color: var(--st-accent); border-color: rgba(151, 228, 110, .35); }
+.gs-st-pt-chip.is-cats { color: var(--st-blue); border-color: rgba(110, 193, 228, .35); }
+.gs-st-pt-chip.is-attrs { color: #d68cf0; border-color: rgba(214, 140, 240, .35); }
+.gs-st-pt-form { padding: 6px 14px 16px; display: flex; flex-direction: column; gap: 14px; }
+.gs-st-pt-form > p { margin: 0; font-size: 13px; }
+.gs-st-pt-set { margin: 0; padding: 0; border: 0; min-width: 0; }
+.gs-st-pt-set legend { padding: 0; margin-bottom: 8px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--st-muted); }
+.gs-st-pt-opts { display: flex; flex-wrap: wrap; gap: 6px; max-height: 220px; overflow: auto; }
+.gs-st-pt-opt { display: inline-flex; align-items: center; gap: 6px; padding: 5px 10px; border: 1px solid var(--st-border); border-radius: 99px; font-size: 13px; cursor: pointer; }
+.gs-st-pt-opt:has(input:checked) { border-color: rgba(151, 228, 110, .5); background: rgba(151, 228, 110, .08); }
+.gs-st-pt-opt input { accent-color: var(--st-accent); margin: 0; }
+.gs-st-pt-opt small { color: var(--st-muted); font-size: 11px; }
+/* Customise a shortcode component. */
+.gs-st-scx { display: flex; flex-direction: column; gap: 10px; }
+.gs-st-scx > p { margin: 0; font-size: 13px; }
+.gs-st-scx-h { margin: 8px 0 0; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: var(--st-muted); }
+.gs-st-scx-colors { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 8px; }
+.gs-st-scx-color { display: flex; align-items: center; gap: 10px; padding: 6px 8px; border: 1px solid var(--st-border); border-radius: 10px; cursor: pointer; }
+.gs-st-scx-color.is-set { border-color: rgba(151, 228, 110, .45); }
+.gs-st-scx-color input[type=color] { width: 30px; height: 30px; padding: 0; border: 0; border-radius: 8px; background: none; cursor: pointer; flex: none; }
+.gs-st-scx-color span { flex: 1; min-width: 0; display: flex; flex-direction: column; font-size: 13px; }
+.gs-st-scx-color small { color: var(--st-muted); font-size: 11px; font-family: ui-monospace, Menlo, Consolas, monospace; }
+.gs-st-scx-color .gs-st-icon-btn[hidden] { display: none; }
+.gs-st-scx-texts { display: flex; flex-direction: column; gap: 8px; max-height: 360px; overflow: auto; padding-right: 4px; }
+.gs-st-scx-texts .gs-st-field > span { font-size: 12px; color: var(--st-muted); }

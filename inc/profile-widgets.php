@@ -209,11 +209,21 @@ function gend_society_pw_sidebar_widgets( $widgets ) {
 	if ( ! $state['open'] || ! function_exists( 'gend_society_ds_layout' ) || ( function_exists( 'gend_society_pv_view' ) && 'original' === gend_society_pv_view() ) ) {
 		return $widgets;
 	}
-	if ( ! gend_society_ds_layout( 'profile-sidebar' ) ) {
+	if ( ! gend_society_pw_sidebar_post() ) {
 		return $widgets;
 	}
 	gend_society_pw_sidebar_state( 'replace' );
 	return array();
+}
+
+/**
+ * The Profile sidebar layout to show (a page can pick another sidebar).
+ *
+ * @return WP_Post|null
+ */
+function gend_society_pw_sidebar_post() {
+	/** This filter is documented in inc/social-pages.php (gend_society_sp_chosen_sidebar). */
+	return apply_filters( 'gend_society_sp_sidebar_layout', gend_society_ds_layout( 'profile-sidebar' ), 'profiles' );
 }
 
 add_action( 'youzify_after_right_sidebar_widgets', 'gend_society_pw_sidebar_layout', 0 );
@@ -222,7 +232,7 @@ add_action( 'youzify_after_right_sidebar_widgets', 'gend_society_pw_sidebar_layo
  */
 function gend_society_pw_sidebar_layout() {
 	$state = gend_society_pw_sidebar_state( 'close' );
-	$tpl   = $state['replace'] ? gend_society_ds_layout( 'profile-sidebar' ) : null;
+	$tpl   = $state['replace'] ? gend_society_pw_sidebar_post() : null;
 	if ( $tpl ) {
 		echo '<div class="gdc-bp-layout gdc-bp-layout--profile-sidebar">' . do_blocks( $tpl->post_content ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered blocks of an admin-authored layout.
 	}

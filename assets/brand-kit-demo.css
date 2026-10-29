@@ -1,0 +1,113 @@
+/* GenD Society - Brand kit style samples (inc/brand-kit.php).
+   One small scene (card, field, two buttons) drawn in each style family, used by
+   the Brand Guidelines page and the studio's App Styling picker. Modifier classes
+   on .gsg-bk-demo: is-<family>, c-<corners>, d-<depth>, b-<buttons>, f-<forms>, k-<cards>. */
+
+.gsg-bk-demo {
+	--bk-accent: var(--wp--preset--color--accent-1, var(--wp--preset--color--primary, #6a5cff));
+	--bk-accent-2: var(--wp--preset--color--accent-2, #ff6fae);
+	--bk-r: 14px;
+	--bk-ink: #15151c;
+	--bk-mute: rgba(21, 21, 28, .62);
+	--bk-surface: #ffffff;
+	--bk-stage: #eceaf3;
+	--bk-shadow: 0 6px 18px rgba(20, 20, 40, .12);
+	position: relative;
+	overflow: hidden;
+	border-radius: 18px;
+	font-family: inherit;
+}
+.gsg-bk-demo *, .gsg-bk-demo *::before, .gsg-bk-demo *::after { box-sizing: border-box; }
+.gsg-bk-demo-stage { position: relative; display: grid; place-items: center; min-height: 260px; padding: 32px; background: var(--bk-stage); }
+.gsg-bk-card { position: relative; width: min(100%, 320px); padding: 22px; border-radius: var(--bk-r); background: var(--bk-surface); color: var(--bk-ink); box-shadow: var(--bk-shadow); }
+.gsg-bk-card-k { font-size: 10px; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--bk-accent); }
+.gsg-bk-card-t { margin: 6px 0 4px; font-size: 19px; font-weight: 700; line-height: 1.2; }
+.gsg-bk-card-p { font-size: 13px; color: var(--bk-mute); }
+.gsg-bk-field { display: block; margin: 16px 0; }
+.gsg-bk-field span { display: block; margin-bottom: 6px; font-size: 11px; font-weight: 600; color: var(--bk-mute); }
+.gsg-bk-field i { display: block; padding: 10px 12px; border: 1px solid rgba(21, 21, 28, .18); border-radius: calc(var(--bk-r) * .6); background: #fff; font-style: normal; font-size: 13px; color: rgba(21, 21, 28, .45); }
+.gsg-bk-btns { display: flex; gap: 8px; flex-wrap: wrap; }
+.gsg-bk-btn { display: inline-flex; align-items: center; padding: 10px 16px; border: 2px solid var(--bk-accent); border-radius: calc(var(--bk-r) * .6); background: var(--bk-accent); color: #fff; font-size: 13px; font-weight: 700; }
+.gsg-bk-btn.is-2 { background: transparent; color: var(--bk-accent); }
+
+/* Corners */
+.gsg-bk-demo.c-sharp { --bk-r: 0px; }
+.gsg-bk-demo.c-soft { --bk-r: 8px; }
+.gsg-bk-demo.c-rounded { --bk-r: 16px; }
+.gsg-bk-demo.c-pill { --bk-r: 26px; }
+.gsg-bk-demo.c-pill .gsg-bk-btn, .gsg-bk-demo.c-pill .gsg-bk-field i { border-radius: 999px; }
+
+/* Depth */
+.gsg-bk-demo.d-flat { --bk-shadow: none; }
+.gsg-bk-demo.d-subtle { --bk-shadow: 0 4px 14px rgba(20, 20, 40, .10); }
+.gsg-bk-demo.d-layered { --bk-shadow: 0 2px 4px rgba(20, 20, 40, .08), 0 12px 28px rgba(20, 20, 40, .14); }
+.gsg-bk-demo.d-floating { --bk-shadow: 0 30px 60px -12px rgba(20, 20, 40, .35); }
+
+/* Cards */
+.gsg-bk-demo.k-bordered .gsg-bk-card { border: 1px solid rgba(21, 21, 28, .14); }
+.gsg-bk-demo.k-flat .gsg-bk-card { background: color-mix(in srgb, var(--bk-accent) 10%, #fff); box-shadow: none; }
+
+/* Buttons */
+.gsg-bk-demo.b-outline .gsg-bk-btn { background: transparent; color: var(--bk-accent); }
+.gsg-bk-demo.b-outline .gsg-bk-btn.is-2 { border-color: transparent; }
+.gsg-bk-demo.b-gradient .gsg-bk-btn:not(.is-2) { border-color: transparent; background: linear-gradient(135deg, var(--bk-accent), var(--bk-accent-2)) border-box; }
+.gsg-bk-demo.b-soft .gsg-bk-btn:not(.is-2) { border-color: transparent; background: color-mix(in srgb, var(--bk-accent) 16%, #fff); color: var(--bk-accent); }
+.gsg-bk-demo.b-glass .gsg-bk-btn { border: 1px solid rgba(255, 255, 255, .6); background: rgba(255, 255, 255, .28); color: var(--bk-ink); backdrop-filter: blur(8px); }
+
+/* Form fields */
+.gsg-bk-demo.f-filled .gsg-bk-field i { border-color: transparent; background: rgba(21, 21, 28, .07); }
+.gsg-bk-demo.f-underline .gsg-bk-field i { border-width: 0 0 2px; border-radius: 0; background: transparent; }
+.gsg-bk-demo.f-glass .gsg-bk-field i { border-color: rgba(255, 255, 255, .55); background: rgba(255, 255, 255, .3); backdrop-filter: blur(8px); }
+
+/* ── Style families ─────────────────────────────────────────────────── */
+.gsg-bk-demo.is-minimal { --bk-stage: #fafafa; }
+.gsg-bk-demo.is-minimal .gsg-bk-card { box-shadow: none; border: 1px solid rgba(21, 21, 28, .1); }
+
+.gsg-bk-demo.is-glassmorphism { --bk-stage: radial-gradient(circle at 20% 20%, var(--bk-accent), transparent 55%), radial-gradient(circle at 85% 80%, var(--bk-accent-2), transparent 50%), #1b1640; --bk-ink: #fff; --bk-mute: rgba(255, 255, 255, .75); }
+.gsg-bk-demo.is-glassmorphism .gsg-bk-card { background: rgba(255, 255, 255, .14); border: 1px solid rgba(255, 255, 255, .35); backdrop-filter: blur(18px) saturate(1.4); -webkit-backdrop-filter: blur(18px) saturate(1.4); box-shadow: 0 20px 50px rgba(0, 0, 0, .3); }
+.gsg-bk-demo.is-glassmorphism .gsg-bk-card-k { color: #fff; opacity: .8; }
+.gsg-bk-demo.is-glassmorphism .gsg-bk-field span { color: rgba(255, 255, 255, .75); }
+.gsg-bk-demo.is-glassmorphism .gsg-bk-field i { background: rgba(255, 255, 255, .12); border-color: rgba(255, 255, 255, .35); color: rgba(255, 255, 255, .7); }
+.gsg-bk-demo.is-glassmorphism .gsg-bk-btn.is-2 { color: #fff; border-color: rgba(255, 255, 255, .5); }
+
+.gsg-bk-demo.is-claymorphism { --bk-stage: color-mix(in srgb, var(--bk-accent) 22%, #f6efe9); --bk-r: 26px; }
+.gsg-bk-demo.is-claymorphism .gsg-bk-card { background: #fffaf6; box-shadow: 14px 16px 32px rgba(120, 80, 60, .22), inset -6px -8px 14px rgba(120, 80, 60, .1), inset 6px 8px 14px rgba(255, 255, 255, .9); }
+.gsg-bk-demo.is-claymorphism .gsg-bk-btn { border: 0; border-radius: 18px; box-shadow: 6px 8px 16px color-mix(in srgb, var(--bk-accent) 45%, transparent), inset -3px -4px 8px rgba(0, 0, 0, .16), inset 3px 4px 8px rgba(255, 255, 255, .45); }
+.gsg-bk-demo.is-claymorphism .gsg-bk-btn.is-2 { background: #fffaf6; box-shadow: 6px 8px 16px rgba(120, 80, 60, .18), inset -3px -4px 8px rgba(120, 80, 60, .1), inset 3px 4px 8px #fff; }
+.gsg-bk-demo.is-claymorphism .gsg-bk-field i { border: 0; border-radius: 16px; background: #f3ebe4; box-shadow: inset 4px 4px 8px rgba(120, 80, 60, .14), inset -4px -4px 8px #fff; }
+
+.gsg-bk-demo.is-neumorphism { --bk-stage: #e6e9ef; --bk-surface: #e6e9ef; }
+.gsg-bk-demo.is-neumorphism .gsg-bk-card { box-shadow: 12px 12px 24px #c5c9d1, -12px -12px 24px #ffffff; }
+.gsg-bk-demo.is-neumorphism .gsg-bk-field i { border: 0; background: #e6e9ef; box-shadow: inset 4px 4px 8px #c5c9d1, inset -4px -4px 8px #fff; }
+.gsg-bk-demo.is-neumorphism .gsg-bk-btn { border: 0; background: #e6e9ef; color: var(--bk-accent); box-shadow: 5px 5px 10px #c5c9d1, -5px -5px 10px #fff; }
+
+.gsg-bk-demo.is-material { --bk-stage: #f1f3f6; --bk-r: 12px; }
+.gsg-bk-demo.is-material .gsg-bk-card { box-shadow: 0 1px 3px rgba(0, 0, 0, .12), 0 8px 24px rgba(0, 0, 0, .12); }
+.gsg-bk-demo.is-material .gsg-bk-btn { text-transform: uppercase; letter-spacing: .06em; font-size: 12px; box-shadow: 0 3px 6px rgba(0, 0, 0, .18); }
+.gsg-bk-demo.is-material .gsg-bk-btn.is-2 { box-shadow: none; }
+.gsg-bk-demo.is-material .gsg-bk-field i { border-width: 0 0 2px; border-radius: 4px 4px 0 0; background: rgba(0, 0, 0, .05); }
+
+.gsg-bk-demo.is-brutalism { --bk-stage: #ffe45c; --bk-r: 4px; }
+.gsg-bk-demo.is-brutalism .gsg-bk-card { border: 3px solid #111; box-shadow: 8px 8px 0 #111; }
+.gsg-bk-demo.is-brutalism .gsg-bk-card-t { font-size: 22px; text-transform: uppercase; letter-spacing: -.02em; }
+.gsg-bk-demo.is-brutalism .gsg-bk-field i { border: 3px solid #111; }
+.gsg-bk-demo.is-brutalism .gsg-bk-btn { border: 3px solid #111; color: #111; background: var(--bk-accent-2); box-shadow: 4px 4px 0 #111; }
+.gsg-bk-demo.is-brutalism .gsg-bk-btn.is-2 { background: #fff; }
+
+.gsg-bk-demo.is-skeuomorphic { --bk-stage: linear-gradient(180deg, #d9d2c5, #b9ae9b); }
+.gsg-bk-demo.is-skeuomorphic .gsg-bk-card { background: linear-gradient(180deg, #fdfbf6, #ece5d6); border: 1px solid #a99f8b; box-shadow: 0 1px 0 #fff inset, 0 12px 24px rgba(60, 40, 10, .3); }
+.gsg-bk-demo.is-skeuomorphic .gsg-bk-btn { border: 1px solid color-mix(in srgb, var(--bk-accent) 70%, #000); background: linear-gradient(180deg, color-mix(in srgb, var(--bk-accent) 75%, #fff), var(--bk-accent)); box-shadow: 0 1px 0 rgba(255, 255, 255, .5) inset, 0 2px 4px rgba(0, 0, 0, .3); text-shadow: 0 -1px 0 rgba(0, 0, 0, .3); }
+.gsg-bk-demo.is-skeuomorphic .gsg-bk-btn.is-2 { background: linear-gradient(180deg, #fff, #e8e1d2); color: #4a3f2c; text-shadow: none; border-color: #a99f8b; }
+.gsg-bk-demo.is-skeuomorphic .gsg-bk-field i { background: #fff; box-shadow: inset 0 2px 3px rgba(0, 0, 0, .15); border-color: #a99f8b; }
+
+.gsg-bk-demo.is-flat .gsg-bk-card { box-shadow: none; }
+.gsg-bk-demo.is-flat .gsg-bk-field i { border-color: transparent; background: #f0eff5; }
+
+/* Family choice wins over the cards modifier for the families that define the card. */
+.gsg-bk-demo.k-glass:not(.is-glassmorphism) .gsg-bk-card { background: rgba(255, 255, 255, .55); border: 1px solid rgba(255, 255, 255, .8); backdrop-filter: blur(12px); }
+.gsg-bk-demo.k-clay:not(.is-claymorphism) .gsg-bk-card { box-shadow: 10px 12px 24px rgba(20, 20, 40, .16), inset -5px -6px 12px rgba(20, 20, 40, .06), inset 5px 6px 12px #fff; }
+.gsg-bk-demo.k-elevated:not(.is-neumorphism):not(.is-brutalism) .gsg-bk-card { box-shadow: 0 2px 6px rgba(20, 20, 40, .08), 0 18px 40px rgba(20, 20, 40, .16); }
+
+@media (prefers-reduced-motion: reduce) {
+	.gsg-bk-demo * { transition: none !important; }
+}

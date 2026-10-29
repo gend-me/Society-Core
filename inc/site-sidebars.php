@@ -8,8 +8,9 @@
  * block template part (gs-sidebar-<area>) edited like the header and footer,
  * created with starter blocks the first time it is opened.
  *
- * The theme's templates stay as they are: the sidebar is added around the
- * template's <main> group when the page renders.
+ * The theme's templates stay as they are: when a page renders, the block
+ * template about to be used (the theme's or a saved one) gets everything
+ * between its header and footer parts in a main column, with the sidebar beside it.
  *
  * @package gend-society
  */
@@ -110,37 +111,87 @@ function gend_society_sb_for_request( $area ) {
 	return $s;
 }
 
-add_filter( 'render_block_core/group', 'gend_society_sb_wrap_main', 20, 2 );
 /**
- * Adds the area's sidebar beside the template's <main> group.
+ * Whether a top-level template block is the site header or footer part.
  *
- * @param string $html  Rendered group.
  * @param array  $block Parsed block.
+ * @param string $kind  'header' or 'footer'.
+ * @return bool
+ */
+function gend_society_sb_is_frame_part( $block, $kind ) {
+	if ( empty( $block['blockName'] ) || 'core/template-part' !== $block['blockName'] ) {
+		return false;
+	}
+	$a = isset( $block['attrs'] ) ? $block['attrs'] : array();
+	return ( isset( $a['tagName'] ) && $kind === $a['tagName'] ) || ( isset( $a['area'] ) && $kind === $a['area'] ) || ( isset( $a['slug'] ) && false !== strpos( (string) $a['slug'], $kind ) );
+}
+
+/**
+ * Adds the area's sidebar to a block template: everything between the
+ * header and footer parts goes in the main column, the sidebar part beside it.
+ *
+ * @param string $content Block template content.
+ * @param string $area    Area slug.
+ * @param array  $s       Sidebar settings.
+ * @return string Content ('' when the template has nothing between its header and footer).
+ */
+function gend_society_sb_wrap_template( $content, $area, $s ) {
+	$blocks = parse_blocks( $content );
+	$n      = count( $blocks );
+	$start  = 0;
+	$end    = $n;
+	// Leading header part(s) (and whitespace between blocks) stay above the columns.
+	while ( $start < $n && ( empty( $blocks[ $start ]['blockName'] ) ? '' === trim( $blocks[ $start ]['innerHTML'] ) : gend_society_sb_is_frame_part( $blocks[ $start ], 'header' ) ) ) {
+		++$start;
+	}
+	// Trailing footer part(s) stay below.
+	while ( $end > $start && ( empty( $blocks[ $end - 1 ]['blockName'] ) ? '' === trim( $blocks[ $end - 1 ]['innerHTML'] ) : gend_society_sb_is_frame_part( $blocks[ $end - 1 ], 'footer' ) ) ) {
+		--$end;
+	}
+	if ( $end <= $start ) {
+		return '';
+	}
+	$aside = '<aside class="gs-site-sidebar' . ( $s['sticky'] ? ' is-sticky' : '' ) . '" aria-label="' . esc_attr__( 'Sidebar', 'gend-society' ) . '">'
+		. '<!-- wp:template-part ' . wp_json_encode( array( 'slug' => gend_society_sb_part_slug( $area ), 'tagName' => 'div', 'className' => 'gs-site-sidebar__inner' ) ) . ' /-->'
+		. '</aside>';
+	$main  = '<div class="gs-has-sidebar__main">' . serialize_blocks( array_slice( $blocks, $start, $end - $start ) ) . '</div>';
+	return serialize_blocks( array_slice( $blocks, 0, $start ) )
+		. '<div class="gs-has-sidebar is-' . esc_attr( $s['position'] ) . ' gs-sidebar-area-' . esc_attr( $area ) . '" style="--gs-sidebar-w:' . (int) $s['width'] . 'px">'
+		. ( 'left' === $s['position'] ? $aside . $main : $main . $aside )
+		. '</div>'
+		. serialize_blocks( array_slice( $blocks, $end ) );
+}
+
+add_filter( 'template_include', 'gend_society_sb_apply', 1000 );
+/**
+ * Adds the sidebar to the block template about to render (saved or theme
+ * template alike), when the page's area has one turned on.
+ *
+ * @param string $template Template file.
  * @return string
  */
-function gend_society_sb_wrap_main( $html, $block ) {
-	static $done = false;
-	if ( $done || is_admin() || wp_doing_ajax() || ( defined( 'REST_REQUEST' ) && REST_REQUEST ) || empty( $block['attrs']['tagName'] ) || 'main' !== $block['attrs']['tagName'] ) {
-		return $html;
+function gend_society_sb_apply( $template ) {
+	global $_wp_current_template_content;
+	if ( empty( $_wp_current_template_content ) || is_admin() || is_embed() ) {
+		return $template;
 	}
 	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- embeds and previews never get a sidebar.
-	if ( isset( $_GET['gs_studio_embed'] ) || isset( $_GET['gdc_tab_only'] ) || isset( $_GET['gs_embed'] ) ) {
-		return $html;
+	if ( isset( $_GET['gs_studio_embed'] ) || isset( $_GET['gdc_tab_only'] ) || isset( $_GET['gs_embed'] ) || isset( $_GET['gs_studio_view'] ) ) {
+		return $template;
 	}
 	$area = gend_society_sb_current_area();
 	if ( '' === $area ) {
-		return $html;
+		return $template;
 	}
 	$s = gend_society_sb_for_request( $area );
 	if ( 'none' === $s['position'] ) {
-		return $html;
+		return $template;
 	}
-	$done    = true; // Only the page's own <main>, never a nested one.
-	$sidebar = do_blocks( '<!-- wp:template-part ' . wp_json_encode( array( 'slug' => gend_society_sb_part_slug( $area ), 'tagName' => 'div', 'className' => 'gs-site-sidebar__inner' ) ) . ' /-->' );
-	$aside   = '<aside class="gs-site-sidebar' . ( $s['sticky'] ? ' is-sticky' : '' ) . '" aria-label="' . esc_attr__( 'Sidebar', 'gend-society' ) . '">' . $sidebar . '</aside>';
-	return '<div class="gs-has-sidebar is-' . esc_attr( $s['position'] ) . ' gs-sidebar-area-' . esc_attr( $area ) . '" style="--gs-sidebar-w:' . (int) $s['width'] . 'px">'
-		. ( 'left' === $s['position'] ? $aside . '<div class="gs-has-sidebar__main">' . $html . '</div>' : '<div class="gs-has-sidebar__main">' . $html . '</div>' . $aside )
-		. '</div>';
+	$wrapped = gend_society_sb_wrap_template( $_wp_current_template_content, $area, $s );
+	if ( '' !== $wrapped ) {
+		$_wp_current_template_content = $wrapped; // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited, WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedVariableFound -- core global: the block template about to render, with the sidebar added.
+	}
+	return $template;
 }
 
 add_action( 'wp_enqueue_scripts', 'gend_society_sb_styles' );
@@ -158,6 +209,16 @@ function gend_society_sb_styles() {
 		. '.gs-has-sidebar__main>main{margin-inline:0}'
 		. '.gs-site-sidebar{min-width:0;margin-top:var(--wp--preset--spacing--60,32px);display:flex;flex-direction:column;gap:20px}'
 		. '.gs-site-sidebar.is-sticky{position:sticky;top:calc(var(--gs-header-h,0px) + 24px)}'
+		// Readable on any site background; block settings (zero-specificity :where) still win.
+		. ':where(.gs-site-sidebar){color:#e8edf5;font-size:15px;line-height:1.5}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-group.has-border-color){background:var(--gs-sidebar-surface,rgba(13,13,26,.94));box-shadow:0 12px 32px rgba(0,0,0,.28)}'
+		. ':where(.gs-site-sidebar) :where(h1,h2,h3,h4,h5,h6){margin:0 0 12px;font-size:12px;font-weight:700;letter-spacing:.12em;text-transform:uppercase;color:#fff}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-latest-posts,.wp-block-categories,.wp-block-page-list){list-style:none;margin:0;padding:0;display:grid;gap:12px}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-latest-posts a,.wp-block-categories a){color:inherit;text-decoration:none;font-size:15px;line-height:1.4}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-latest-posts a,.wp-block-categories a):hover{color:var(--gs-accent,#97e46e)}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-latest-posts__post-date){display:block;margin-top:2px;font-size:12px;opacity:.6}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-search__input){min-width:0;padding:10px 16px;border:1px solid rgba(255,255,255,.14);border-radius:999px;background:rgba(255,255,255,.06);color:#fff}'
+		. ':where(.gs-site-sidebar) :where(.wp-block-search__inside-wrapper){gap:8px}'
 		. '@media (max-width:900px){.gs-has-sidebar,.gs-has-sidebar.is-left{grid-template-columns:minmax(0,1fr)}.gs-has-sidebar.is-left>.gs-site-sidebar{order:2}.gs-site-sidebar.is-sticky{position:static}}'
 	);
 }
