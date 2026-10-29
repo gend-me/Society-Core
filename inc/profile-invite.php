@@ -240,12 +240,12 @@ function gend_society_invite_render_panel( $share = array() ) {
     // icon) in the youzify_social_networks option. "Connecting" an account =
     // filling it in on the Youzify profile social-networks settings screen.
     $social_networks = array();
-    if ( function_exists( 'youzify_option' ) ) {
-        $nets = youzify_option( 'youzify_social_networks' );
+    if ( function_exists( 'gend_sn_option' ) ) {
+        $nets = gend_sn_option( 'youzify_social_networks' );
         if ( is_array( $nets ) ) {
             foreach ( $nets as $net_key => $net ) {
-                $net_url = function_exists( 'youzify_get_user_meta' )
-                    ? youzify_get_user_meta( $net_key, $user_id )
+                $net_url = function_exists( 'gend_sn_user_meta' )
+                    ? gend_sn_user_meta( $net_key, $user_id )
                     : get_user_meta( $user_id, $net_key, true );
                 $social_networks[ $net_key ] = array(
                     'name' => isset( $net['name'] ) ? (string) $net['name'] : ucfirst( $net_key ),
@@ -255,8 +255,8 @@ function gend_society_invite_render_panel( $share = array() ) {
             }
         }
     }
-    $social_settings_url = function_exists( 'youzify_get_profile_settings_url' )
-        ? youzify_get_profile_settings_url( 'social-networks' )
+    $social_settings_url = function_exists( 'gend_sn_profile_settings_url' )
+        ? gend_sn_profile_settings_url( 'social-networks' )
         : '';
 
     // ── Social tab, current connector: the member's Content Campaigns channels (the same accounts as the

@@ -488,11 +488,11 @@ function gend_society_ds_block_group_about() {
  * @return string
  */
 function gend_society_ds_block_original_sidebar() {
-	if ( ! function_exists( 'youzify_get_groups_sidebar' ) || ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) {
+	if ( ! function_exists( 'gend_sn_groups_sidebar' ) || ! function_exists( 'bp_is_group' ) || ! bp_is_group() ) {
 		return '<div class="gdc-ps-placeholder"><strong>' . esc_html__( 'Current group sidebar', 'gend-society' ) . '</strong><span>' . esc_html__( 'Youzify’s group sidebar widgets, as they are today.', 'gend-society' ) . '</span></div>';
 	}
 	ob_start();
-	youzify_get_groups_sidebar();
+	gend_sn_groups_sidebar();
 	return (string) ob_get_clean();
 }
 

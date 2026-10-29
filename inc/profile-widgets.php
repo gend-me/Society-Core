@@ -22,20 +22,7 @@ if ( ! defined( 'ABSPATH' ) ) {
  * @return array
  */
 function gend_society_pw_list() {
-	if ( ! function_exists( 'youzify_profile_widgets' ) || ! function_exists( 'youzify_get_profile_widget_args' ) ) {
-		return array();
-	}
-	$list = array();
-	foreach ( array_keys( (array) youzify_profile_widgets() ) as $name ) {
-		$args          = youzify_get_profile_widget_args( $name );
-		$list[ $name ] = ! empty( $args['name'] ) ? ucfirst( wp_strip_all_tags( (string) $args['name'] ) ) : $name;
-	}
-	$custom = function_exists( 'youzify_option' ) ? youzify_option( 'youzify_custom_widgets' ) : array();
-	foreach ( is_array( $custom ) ? $custom : array() as $name => $w ) {
-		/* translators: %s: custom widget name */
-		$list[ $name ] = sprintf( __( 'Custom: %s', 'gend-society' ), isset( $w['name'] ) ? wp_strip_all_tags( (string) $w['name'] ) : $name );
-	}
-	return $list;
+	return function_exists( 'gend_sn_profile_widget_list' ) ? gend_sn_profile_widget_list() : array();
 }
 
 add_action( 'init', 'gend_society_pw_register', 22 );
@@ -98,6 +85,9 @@ function gend_society_pw_editor_data() {
  * @return object|null
  */
 function gend_society_pw_object( $name ) {
+	if ( function_exists( 'gend_sn_profile_widget_object' ) ) {
+		return gend_sn_profile_widget_object( $name );
+	}
 	$defaults = function_exists( 'youzify_profile_widgets' ) ? (array) youzify_profile_widgets() : array();
 	if ( isset( $defaults[ $name ]['class'] ) ) {
 		$class = $defaults[ $name ]['class'];
@@ -130,7 +120,7 @@ function gend_society_pw_render( $attrs ) {
 	$empty   = static function ( $why ) use ( $label ) {
 		return '<div class="gdc-ps-placeholder"><strong>' . esc_html( $label ) . '</strong><span>' . esc_html( $why ) . '</span></div>';
 	};
-	if ( ! isset( $list[ $name ] ) || ! function_exists( 'youzify_widgets' ) ) {
+	if ( ! isset( $list[ $name ] ) || ! function_exists( 'gend_sn_render_profile_widget' ) ) {
 		return $preview ? $empty( __( 'This widget isn’t available.', 'gend-society' ) ) : '';
 	}
 	if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) {
@@ -140,7 +130,7 @@ function gend_society_pw_render( $attrs ) {
 	if ( ! $object ) {
 		return '';
 	}
-	$args = youzify_get_profile_widget_args( $name );
+	$args = gend_sn_profile_widget_args( $name );
 	if ( ! is_array( $args ) || empty( $args['id'] ) ) {
 		$args = array(
 			'id'   => $name,
@@ -151,9 +141,7 @@ function gend_society_pw_render( $attrs ) {
 	if ( isset( $attrs['title'] ) && in_array( $attrs['title'], array( 'on', 'off' ), true ) ) {
 		$args['display_title'] = $attrs['title'];
 	}
-	ob_start();
-	youzify_widgets()->youzify_widget_core( $name, $object, $args );
-	$html = (string) ob_get_clean();
+	$html = gend_sn_render_profile_widget( $name, $args );
 	if ( '' === trim( $html ) ) {
 		return $preview ? $empty( __( 'Empty for this member: they haven’t filled it in yet (it’s hidden on their profile).', 'gend-society' ) ) : '';
 	}
@@ -167,7 +155,7 @@ function gend_society_pw_render( $attrs ) {
  */
 function gend_society_pw_default_sidebar() {
 	$fallback = array_fill_keys( array( 'login', 'user_balance', 'user_badges', 'gamipress_user_balance', 'gamipress_user_badges', 'about_me', 'wall_media', 'social_networks', 'friends', 'flickr', 'groups', 'recent_posts', 'user_tags', 'email', 'address', 'website', 'phone' ), 'visible' );
-	$widgets  = function_exists( 'youzify_option' ) ? youzify_option( 'youzify_profile_sidebar_widgets', $fallback ) : $fallback;
+	$widgets  = function_exists( 'gend_sn_option' ) ? gend_sn_option( 'youzify_profile_sidebar_widgets', $fallback ) : $fallback;
 	$out      = '';
 	foreach ( is_array( $widgets ) ? $widgets : array() as $name => $visibility ) {
 		if ( 'visible' === $visibility ) {
@@ -249,10 +237,10 @@ add_filter( 'gend_society_ps_default_tab_content', 'gend_society_pw_default_over
  * @return string
  */
 function gend_society_pw_default_overview( $content, $slug ) {
-	if ( 'overview' !== $slug || ! function_exists( 'youzify_option' ) ) {
+	if ( 'overview' !== $slug || ! function_exists( 'gend_sn_option' ) ) {
 		return $content;
 	}
-	$widgets = apply_filters( 'youzify_profile_main_widgets', youzify_option( 'youzify_profile_main_widgets', array_fill_keys( array( 'slideshow', 'project', 'skills', 'portfolio', 'quote', 'instagram', 'services', 'post', 'link', 'video', 'reviews' ), 'visible' ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- the Overview's own filter, so the layout starts with what it shows.
+	$widgets = apply_filters( 'youzify_profile_main_widgets', gend_sn_option( 'youzify_profile_main_widgets', array_fill_keys( array( 'slideshow', 'project', 'skills', 'portfolio', 'quote', 'instagram', 'services', 'post', 'link', 'video', 'reviews' ), 'visible' ) ) ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- the Overview's own filter, so the layout starts with what it shows.
 	$out     = '';
 	foreach ( is_array( $widgets ) ? $widgets : array() as $name => $visibility ) {
 		if ( 'visible' === $visibility ) {

@@ -955,8 +955,8 @@ function gend_society_profile_group_gas( $group_id, $group_url ) {
 // block of inc/profile-styling.php so both always list the same tabs).
 function gend_society_profile_header_nav_items( $user_id ) {
     // ── Nav ───────────────────────────────────────────────────────────────────
-    $nav_items         = function_exists( 'youzify_get_profile_primary_nav' )
-                          ? (array) youzify_get_profile_primary_nav() : [];
+    $nav_items         = function_exists( 'gend_sn_profile_primary_nav' )
+                          ? (array) gend_sn_profile_primary_nav() : [];
 
     // Apply requested society stylings modifications to the nav array
     foreach ( $nav_items as $index => $item ) {
@@ -1270,13 +1270,13 @@ function gend_society_render_profile_header() {
         : '';
 
     // Fallback to Youzify's configured default cover image
-    if ( ! $cover_url && function_exists( 'youzify_option' ) ) {
-        $cover_url = youzify_option( 'youzify_default_profiles_cover', '' );
+    if ( ! $cover_url && function_exists( 'gend_sn_option' ) ) {
+        $cover_url = gend_sn_option( 'youzify_default_profiles_cover', '' );
     }
 
     // Final fallback: Youzify's built-in pattern cover (always exists)
-    if ( ! $cover_url && function_exists( 'youzify_get_default_profile_cover' ) ) {
-        $cover_url = youzify_get_default_profile_cover();
+    if ( ! $cover_url && function_exists( 'gend_sn_default_profile_cover' ) ) {
+        $cover_url = gend_sn_default_profile_cover();
     }
 
     ?>
