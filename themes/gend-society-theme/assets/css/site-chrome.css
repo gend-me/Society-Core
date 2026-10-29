@@ -1,0 +1,322 @@
+/**
+ * GenD Society theme — site header + footer template parts.
+ *
+ * Moved out of the template parts themselves (they carried their own <style>
+ * blocks) so the parts are plain markup an editor or AI agent can change
+ * without losing the styling, and so the styling follows the site's style
+ * guide: every colour, font and font size here is a theme.json preset
+ * (Appearance › Editor › Styles), never a literal brand value. Changing the
+ * style guide restyles the header and footer everywhere.
+ *
+ * Fonts are inherited from the style guide (body + heading element styles);
+ * only layout values (widths, gaps, radii, timings) are literal.
+ */
+
+:root {
+	/* Legacy aliases used by older page content; they follow the style guide now. */
+	--brand-magenta: var(--wp--preset--color--brand-primary);
+	--brand-red: var(--wp--preset--color--brand-action);
+	--brand-blue: var(--wp--preset--color--brand-secondary);
+	--brand-green: var(--wp--preset--color--brand-success);
+	--brand-gold: var(--wp--preset--color--brand-gold);
+	--brand-electric: var(--wp--preset--color--brand-highlight);
+	--glass-bg: color-mix(in srgb, var(--wp--preset--color--brand-surface) 45%, transparent);
+	--glass-border: color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 12%, transparent);
+}
+
+/* =========================================================================
+   HEADER (parts: header — #main-3d-header)
+   ========================================================================= */
+
+.header-anchor-wrap {
+	position: fixed !important;
+	top: 0;
+	left: 0;
+	width: 100%;
+	z-index: 99999;
+	background: var(--glass-bg);
+	backdrop-filter: blur(40px) saturate(180%);
+	-webkit-backdrop-filter: blur(40px) saturate(180%);
+	border-bottom: 1px solid var(--glass-border);
+	padding: 8px 30px;
+	display: flex;
+	align-items: center;
+	box-sizing: border-box;
+	perspective: 1500px;
+	gap: 12px;
+	animation: gsHeaderSlideDown 0.8s cubic-bezier(0.2, 1, 0.3, 1) forwards;
+}
+
+@keyframes gsHeaderSlideDown {
+	0% { transform: translateY(-100%); opacity: 0; }
+	100% { transform: translateY(0); opacity: 1; }
+}
+
+@keyframes gsItemFadeBlurIn {
+	0% { transform: translateY(-10px) scale(0.95); filter: blur(10px); opacity: 0; }
+	100% { transform: translateY(0) scale(1); filter: blur(0); opacity: 1; }
+}
+
+.logo-container {
+	order: 3;
+	flex-shrink: 0;
+	opacity: 0;
+	animation: gsItemFadeBlurIn 0.8s ease-out forwards 1.2s;
+	display: flex;
+	align-items: center;
+}
+.logo-container img {
+	height: 30px;
+	filter: drop-shadow(0 0 12px color-mix(in srgb, var(--wp--preset--color--brand-secondary) 50%, transparent));
+	display: block;
+}
+
+.nav-central {
+	order: 1;
+	display: flex;
+	gap: 8px;
+	align-items: center;
+	flex: 1;
+	justify-content: center;
+	transform-style: preserve-3d;
+}
+
+.nav-pill {
+	position: relative;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	text-decoration: none;
+	color: var(--wp--preset--color--brand-on-surface);
+	font-weight: 800;
+	font-size: clamp(0.65rem, 0.8vw, 0.75rem);
+	width: 160px;
+	height: 38px;
+	border-radius: 10px;
+	overflow: hidden;
+	border: 1px solid var(--glass-border);
+	opacity: 0;
+	transform-style: preserve-3d;
+	animation: gsItemFadeBlurIn 0.8s cubic-bezier(0.34, 1.56, 0.64, 1) forwards;
+}
+.nav-pill:nth-child(1) { animation-delay: 0.4s; }
+.nav-pill:nth-child(2) { animation-delay: 0.55s; }
+.nav-pill:nth-child(3) { animation-delay: 0.7s; }
+
+.pill-bg {
+	position: absolute;
+	inset: 0;
+	width: 100%;
+	height: 100%;
+	object-fit: cover;
+	z-index: 1;
+	filter: brightness(0.4) saturate(1.2);
+	transition: 0.5s ease;
+}
+.pill-content {
+	position: relative;
+	z-index: 2;
+	width: 100%;
+	height: 100%;
+	display: flex;
+	align-items: center;
+	justify-content: center;
+	background: color-mix(in srgb, var(--wp--preset--color--brand-surface-deep) 25%, transparent);
+	backdrop-filter: blur(4px);
+	text-transform: uppercase;
+	letter-spacing: 1px;
+	white-space: nowrap;
+}
+
+.nav-actions-right {
+	order: 2;
+	display: flex;
+	align-items: center;
+	gap: 8px;
+	flex-shrink: 0;
+	margin-right: 20px;
+}
+/* An injected WooCommerce cart must not push the row down. */
+.nav-actions-right > * {
+	margin-top: 0 !important;
+	margin-bottom: 0 !important;
+}
+
+.btn-header-action {
+	display: none;
+	opacity: 0;
+	animation: gsItemFadeBlurIn 0.6s ease-out forwards;
+	align-items: center;
+	justify-content: center;
+	gap: 5px;
+	padding: 6px 14px;
+	border-radius: 8px;
+	text-decoration: none;
+	font-weight: 800;
+	text-transform: uppercase;
+	font-size: clamp(0.58rem, 0.68vw, 0.68rem);
+	letter-spacing: 0.5px;
+	transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+	white-space: nowrap;
+}
+.btn-pilot {
+	animation-delay: 0.85s;
+	background: var(--wp--preset--color--brand-action);
+	color: var(--wp--preset--color--brand-on-surface) !important;
+	border: 1px solid var(--wp--preset--color--brand-action);
+	order: 99; /* always the last item on the right */
+}
+
+.logged-out-spacer { display: none; }
+body:not(.logged-in) .logged-out-spacer { display: block; order: 0; flex: 1; }
+body:not(.logged-in) .nav-central { flex: 2; }
+body:not(.logged-in) .logo-container { flex: 1; }
+body:not(.logged-in) .btn-header-action { display: flex !important; }
+/* Members get the GenD Society app chrome instead of this marketing header. */
+body.logged-in .header-anchor-wrap { display: none !important; }
+
+@media (max-width: 900px) {
+	.nav-central { display: none !important; }
+	.header-anchor-wrap { padding: 8px 15px; gap: 12px; align-items: center; }
+	body:not(.logged-in) .logged-out-spacer { order: 1; flex: 1; }
+	body:not(.logged-in) .logo-container { order: 2; flex: 0 0 auto; margin-right: 0; display: flex; align-items: center; }
+	.nav-actions-right { order: 3; margin-right: 0; display: flex; align-items: center; }
+}
+
+/* =========================================================================
+   FOOTER (parts: footer — footer.site-footer)
+   ========================================================================= */
+
+.site-footer {
+	position: relative;
+	z-index: 10;
+	border-top: 1px solid color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 8%, transparent);
+	background: radial-gradient(100% 100% at 50% 0%, color-mix(in srgb, var(--wp--preset--color--brand-surface) 40%, transparent) 0%, var(--wp--preset--color--brand-surface-deep) 100%);
+	padding: 100px 20px 40px 20px;
+	width: 100%;
+	box-sizing: border-box;
+	color: var(--wp--preset--color--brand-on-surface);
+}
+
+.footer-container {
+	width: 100% !important;
+	box-sizing: border-box !important;
+	max-width: 1400px !important;
+	margin: 0 auto !important;
+	display: grid !important;
+	grid-template-columns: 2fr 1fr 1fr 1fr !important;
+	gap: 60px !important;
+	align-items: start !important;
+}
+
+.footer-brand { display: block !important; }
+.footer-brand h2 {
+	font-size: var(--wp--preset--font-size--xx-large) !important;
+	margin: 0 0 20px 0 !important;
+	color: var(--wp--preset--color--brand-on-surface) !important;
+	line-height: 1.2 !important;
+}
+.footer-brand h2 a { color: inherit !important; text-decoration: none !important; }
+.footer-brand p {
+	color: var(--wp--preset--color--brand-on-surface-muted) !important;
+	font-size: var(--wp--preset--font-size--medium) !important;
+	line-height: 1.7 !important;
+	max-width: 350px !important;
+	margin-bottom: 30px !important;
+}
+
+.footer-col { display: block !important; }
+.footer-col h4 {
+	color: var(--wp--preset--color--brand-on-surface) !important;
+	font-family: var(--wp--preset--font-family--fira-code, monospace) !important;
+	letter-spacing: 2px !important;
+	text-transform: uppercase !important;
+	font-size: var(--wp--preset--font-size--small) !important;
+	margin: 0 0 30px 0 !important;
+	display: block !important;
+}
+
+.footer-links { list-style: none !important; padding: 0 !important; margin: 0 !important; display: block !important; }
+.footer-links li { margin-bottom: 15px !important; display: block !important; text-align: left !important; }
+.footer-links li::before { display: none !important; content: none !important; }
+.footer-links a {
+	color: var(--wp--preset--color--brand-on-surface-muted) !important;
+	text-decoration: none !important;
+	font-size: var(--wp--preset--font-size--small) !important;
+	transition: 0.3s cubic-bezier(0.16, 1, 0.3, 1) !important;
+	display: inline-block !important;
+}
+.footer-links a:hover {
+	color: var(--wp--preset--color--brand-on-surface) !important;
+	transform: translateX(5px) !important;
+	text-shadow: 0 0 15px color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 30%, transparent) !important;
+}
+
+/* Social icons: the core Social Icons block (wp:social-links) inside .footer-socials. */
+.site-footer .footer-socials {
+	display: flex !important;
+	gap: 15px !important;
+	flex-wrap: wrap !important;
+	list-style: none !important;
+	padding: 0 !important;
+	margin: 0 !important;
+}
+.site-footer .footer-socials .wp-social-link {
+	width: 40px !important;
+	height: 40px !important;
+	border-radius: 50% !important;
+	background: color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 3%, transparent) !important;
+	border: 1px solid color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 8%, transparent) !important;
+	color: var(--wp--preset--color--brand-on-surface) !important;
+	transition: 0.3s ease !important;
+	margin: 0 !important;
+}
+.site-footer .footer-socials .wp-social-link a {
+	width: 100% !important;
+	height: 100% !important;
+	display: flex !important;
+	align-items: center !important;
+	justify-content: center !important;
+	padding: 0 !important;
+	color: inherit !important;
+}
+.site-footer .footer-socials .wp-social-link svg { width: 18px !important; height: 18px !important; fill: currentColor !important; }
+.site-footer .footer-socials .wp-social-link:hover {
+	background: color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 10%, transparent) !important;
+	border-color: color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 20%, transparent) !important;
+	transform: translateY(-3px) !important;
+}
+
+.footer-bottom {
+	width: 100% !important;
+	max-width: 1400px !important;
+	margin: 80px auto 0 auto !important;
+	padding-top: 30px !important;
+	border-top: 1px solid color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 5%, transparent) !important;
+	display: flex !important;
+	justify-content: space-between !important;
+	align-items: center !important;
+	color: color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 40%, transparent) !important;
+	font-size: var(--wp--preset--font-size--small) !important;
+}
+.footer-bottom-links { display: flex !important; gap: 20px !important; }
+.footer-bottom-links a {
+	color: color-mix(in srgb, var(--wp--preset--color--brand-on-surface) 40%, transparent) !important;
+	text-decoration: none !important;
+	transition: 0.3s !important;
+}
+.footer-bottom-links a:hover { color: var(--wp--preset--color--brand-on-surface) !important; }
+
+@media (max-width: 1100px) {
+	.footer-container { grid-template-columns: 1fr 1fr !important; gap: 50px !important; }
+	.footer-brand { grid-column: span 2 !important; }
+}
+@media (max-width: 768px) {
+	.footer-container { grid-template-columns: 1fr !important; gap: 40px !important; }
+	.footer-brand { grid-column: span 1 !important; }
+	.footer-bottom { flex-direction: column !important; gap: 20px !important; text-align: center !important; }
+}
+
+@media (prefers-reduced-motion: reduce) {
+	.header-anchor-wrap, .logo-container, .nav-pill, .btn-header-action { animation: none; opacity: 1; }
+}
