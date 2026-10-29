@@ -49,7 +49,7 @@ if ( ! function_exists( 'gend_society_theme_editor_style' ) ) :
 	 * @return void
 	 */
 	function gend_society_theme_editor_style() {
-		add_editor_style( 'assets/css/editor-style.css' );
+		add_editor_style( array( 'assets/css/editor-style.css', 'assets/css/site-chrome.css' ) );
 	}
 endif;
 add_action( 'after_setup_theme', 'gend_society_theme_editor_style' );
@@ -76,6 +76,25 @@ if ( ! function_exists( 'gend_society_theme_enqueue_styles' ) ) :
 			'gend-society-theme-style',
 			'path',
 			get_parent_theme_file_path( $src )
+		);
+
+		// Header + footer template part styling and the header's tilt effect. They
+		// live here, not inside the parts, so the parts stay plain markup and the
+		// styling follows the style guide (theme.json presets).
+		$chrome_css = 'assets/css/site-chrome.css';
+		wp_enqueue_style(
+			'gend-society-theme-site-chrome',
+			get_parent_theme_file_uri( $chrome_css ),
+			array(),
+			(string) filemtime( get_parent_theme_file_path( $chrome_css ) )
+		);
+		$chrome_js = 'assets/js/site-chrome.js';
+		wp_enqueue_script(
+			'gend-society-theme-site-chrome',
+			get_parent_theme_file_uri( $chrome_js ),
+			array(),
+			(string) filemtime( get_parent_theme_file_path( $chrome_js ) ),
+			array( 'in_footer' => true, 'strategy' => 'defer' )
 		);
 	}
 endif;

@@ -47,6 +47,56 @@
 					"color": "color-mix(in srgb, currentColor 20%, transparent)",
 					"name": "Accent 6",
 					"slug": "accent-6"
+				},
+				{
+					"color": "#b608c9",
+					"name": "Brand Primary",
+					"slug": "brand-primary"
+				},
+				{
+					"color": "#6ec1e4",
+					"name": "Brand Secondary",
+					"slug": "brand-secondary"
+				},
+				{
+					"color": "#e100ff",
+					"name": "Brand Highlight",
+					"slug": "brand-highlight"
+				},
+				{
+					"color": "#cc0000",
+					"name": "Brand Action",
+					"slug": "brand-action"
+				},
+				{
+					"color": "#00ff88",
+					"name": "Brand Success",
+					"slug": "brand-success"
+				},
+				{
+					"color": "#ffcc00",
+					"name": "Brand Gold",
+					"slug": "brand-gold"
+				},
+				{
+					"color": "#0b0e14",
+					"name": "Brand Surface",
+					"slug": "brand-surface"
+				},
+				{
+					"color": "#05070a",
+					"name": "Brand Surface Deep",
+					"slug": "brand-surface-deep"
+				},
+				{
+					"color": "#ffffff",
+					"name": "Brand On Surface",
+					"slug": "brand-on-surface"
+				},
+				{
+					"color": "#8b949e",
+					"name": "Brand On Surface Muted",
+					"slug": "brand-on-surface-muted"
 				}
 			]
 		},
