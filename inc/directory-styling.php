@@ -387,7 +387,13 @@ add_action( 'youzify_group_sidebar', 'gend_society_ds_group_sidebar', 0 );
  * A published Group sidebar layout replaces Youzify's group sidebar widgets.
  */
 function gend_society_ds_group_sidebar() {
-	$tpl = gend_society_ds_layout( 'group-sidebar' );
+	/**
+	 * Filters the group sidebar layout (Social Pages: the sidebar a page picked).
+	 *
+	 * @param WP_Post|null $tpl   Layout.
+	 * @param string       $scope groups.
+	 */
+	$tpl = apply_filters( 'gend_society_sp_sidebar_layout', gend_society_ds_layout( 'group-sidebar' ), 'groups' );
 	if ( ! $tpl ) {
 		return;
 	}
@@ -710,7 +716,8 @@ add_action( 'enqueue_block_assets', 'gend_society_ds_editor_styles' );
  */
 function gend_society_ds_styles() {
 	$slug    = gend_society_ds_current_slug();
-	$sidebar = function_exists( 'bp_is_group' ) && bp_is_group() && gend_society_ds_layout( 'group-sidebar' );
+	$sidebar = function_exists( 'bp_is_group' ) && bp_is_group() && apply_filters( 'gend_society_sp_sidebar_layout', gend_society_ds_layout( 'group-sidebar' ), 'groups' );
+	$sidebar = $sidebar || ( function_exists( 'bp_is_user' ) && bp_is_user() && function_exists( 'gend_society_sp_current' ) && gend_society_sp_current() && in_array( gend_society_sp_current()['layout'], array( 'left', 'right' ), true ) );
 	if ( ! $sidebar && ( '' === $slug || ! gend_society_ds_layout( $slug ) ) ) {
 		return; // Only pages that use a published layout need these styles.
 	}

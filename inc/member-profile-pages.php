@@ -1055,7 +1055,7 @@ function gend_society_add_invest_profile_tab() {
         return;
     }
     bp_core_new_nav_item( [
-        'name'                    => __( 'Contracts', 'gend-society' ),
+        'name'                    => __( 'Commissions', 'gend-society' ),
         'slug'                    => 'invest',
         'screen_function'         => 'gend_society_invest_profile_screen',
         'position'                => 33,
@@ -1728,29 +1728,9 @@ function gend_society_invest_profile_screen_content() {
         <?php // "Web Apps You Manage", Currency Hold and Completed Contracts were removed from this screen (2026-10-15). ?>
         <?php // autocomplete="off": browsers otherwise restore the last-picked tab on reload instead of Commissions. ?>
         <input type="radio" name="gci-tab" id="gci-tab-commissions" class="gci-radio" autocomplete="off" checked>
-        <input type="radio" name="gci-tab" id="gci-tab-growth"    class="gci-radio" autocomplete="off">
-        <input type="radio" name="gci-tab" id="gci-tab-projects"  class="gci-radio" autocomplete="off">
-        <input type="radio" name="gci-tab" id="gci-tab-fund"      class="gci-radio" autocomplete="off">
-        <div class="gci-tabs" role="tablist">
-            <label for="gci-tab-commissions" class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="9" cy="9" r="5.5"/><path d="M15.5 9.6A5.5 5.5 0 1 1 9.6 15.5"/><path d="M9 6.8v4.4M7.4 8.2h2.4a1 1 0 0 1 0 2H8.2a1 1 0 0 0 0 2h2.4"/></svg></span><?php esc_html_e( 'Commissions', 'gend-society' ); ?></label>
-            <label for="gci-tab-growth"    class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 17l6-6 4 4 8-8"/><path d="M15 7h6v6"/></svg></span><?php esc_html_e( 'Growth Investments', 'gend-society' ); ?></label>
-            <label for="gci-tab-projects"  class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 2 3 7v10l9 5 9-5V7z"/><path d="M3 7l9 5 9-5"/><path d="M12 12v10"/></svg></span><?php esc_html_e( 'Project Investments', 'gend-society' ); ?></label>
-            <label for="gci-tab-fund"      class="gci-tab"><span class="gci-tab-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v9h9"/><path d="M20.5 15.5A9 9 0 1 1 8.5 3.7"/></svg></span><?php esc_html_e( 'Network Profit Share', 'gend-society' ); ?></label>
-        </div>
+        <?php // The Growth Investments / Project Investments / Network Profit Share tabs and the tab strip were removed (2026-10-28): this screen is the Commissions content only. ?>
         <div class="gci-panel gci-panel--commissions" role="tabpanel">
             <?php echo shortcode_exists( 'affiliate_sales_dashboard' ) ? do_shortcode( '[affiliate_sales_dashboard]' ) : ''; // Sales Team commission dashboard ?>
-        </div>
-        <div class="gci-panel gci-panel--growth" role="tabpanel"><?php
-            // Owner: pick an app you admin → its Marketing → Advertising page (inc/profile-growth-apps.php). Visitors: the growth marketplace.
-            if ( function_exists( 'gend_society_growth_apps_panel' ) && gend_society_growth_apps_can_view( (int) bp_displayed_user_id() ) ) {
-                echo gend_society_growth_apps_panel( (int) bp_displayed_user_id() ); // phpcs:ignore
-            } else {
-                echo gend_society_render_marketing_fund_pool_summary( (int) bp_displayed_user_id() ) . gend_society_render_growth_market(); // phpcs:ignore
-            }
-        ?></div>
-        <div class="gci-panel gci-panel--projects" role="tabpanel"><?php echo gend_society_render_project_market(); // phpcs:ignore ?></div>
-        <div class="gci-panel gci-panel--fund" role="tabpanel">
-            <?php echo do_shortcode( '[gend_wallet]' ); ?>
         </div>
     </div>
     <?php
@@ -2258,6 +2238,34 @@ function gend_society_invest_footer_assets() {
         }
         if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', initReveal);
         else initReveal();
+    }());
+    /* Full width: collapse the Youzify 72%/28% grid and drop the sidebar column. The wallet panel that used to do this
+       on this screen (reward-programs [gend_wallet] unwrap script) was removed with the other top tabs (2026-10-28). */
+    (function () {
+        var screen = document.querySelector('.gend-contracts-tabbed');
+        if (!screen) return;
+        function forceWidth() {
+            var node = screen.parentElement, depth = 0;
+            while (node && node !== document.body && depth < 30) {
+                node.style.setProperty('max-width', 'none', 'important');
+                node.style.setProperty('width', '100%', 'important');
+                if (/youzify-(right|left)-sidebar-layout/.test(node.className)) {
+                    node.style.setProperty('display', 'block', 'important');
+                    node.style.setProperty('grid-template-columns', '1fr', 'important');
+                    node.style.setProperty('gap', '0', 'important');
+                }
+                Array.prototype.forEach.call(node.children, function (c) {
+                    if (c === screen || (c.contains && c.contains(screen))) return;
+                    if (c.classList && (c.classList.contains('youzify-sidebar-column') || c.classList.contains('youzify-profile-sidebar') || c.classList.contains('yz-sidebar-column') || c.classList.contains('youzify-widgets-area') || c.id === 'secondary')) {
+                        c.style.setProperty('display', 'none', 'important');
+                    }
+                });
+                node = node.parentElement; depth++;
+            }
+        }
+        forceWidth();
+        setTimeout(forceWidth, 300);
+        window.addEventListener('load', forceWidth);
     }());
     </script>
     <?php

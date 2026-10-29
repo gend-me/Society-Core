@@ -258,6 +258,10 @@ function gend_society_studio_product_type_hierarchy( $templates ) {
 	if ( ! wp_is_block_theme() || ! function_exists( 'wc_get_product' ) || ! is_singular( 'product' ) ) {
 		return $templates;
 	}
+	// Once Product Templates has been saved, its assignments decide (inc/product-templates.php).
+	if ( defined( 'GEND_SOCIETY_PT_OPTION' ) && false !== get_option( GEND_SOCIETY_PT_OPTION, false ) ) {
+		return $templates;
+	}
 	$product = wc_get_product( get_queried_object_id() );
 	if ( ! $product ) {
 		return $templates;
@@ -310,4 +314,66 @@ function gend_society_studio_page_hierarchy( $templates ) {
 		break;
 	}
 	return $templates;
+}
+
+/**
+ * Where each dashboard template's content comes from, for the editor preview:
+ * the newest published page with its shortcode, else the shortcode alone.
+ *
+ * @return array slug => [ url, label ].
+ */
+function gend_society_studio_template_previews() {
+	global $wpdb;
+	$out = array();
+	foreach ( gend_society_studio_template_defs() as $slug => $def ) {
+		if ( empty( $def['shortcode'] ) || ! call_user_func( $def['when'] ) ) {
+			continue;
+		}
+		// phpcs:ignore WordPress.DB.DirectDatabaseQuery.DirectQuery,WordPress.DB.DirectDatabaseQuery.NoCaching -- editor-only lookup of a page that uses the shortcode.
+		$id = (int) $wpdb->get_var( $wpdb->prepare( "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'page' AND post_status = 'publish' AND post_content LIKE %s ORDER BY post_modified DESC LIMIT 1", '%' . $wpdb->esc_like( '[' . $def['shortcode'] ) . '%' ) );
+		$out[ $slug ] = $id
+			? array(
+				'url'   => add_query_arg( 'gs_studio_page_preview', $id, home_url( '/' ) ),
+				/* translators: %s: page title. */
+				'label' => sprintf( __( 'Live preview: %s', 'gend-society' ), get_the_title( $id ) ),
+			)
+			: array(
+				'url'   => add_query_arg( 'gs_studio_shortcode', $def['shortcode'], home_url( '/' ) ),
+				/* translators: %s: shortcode. */
+				'label' => sprintf( __( 'Live preview: [%s]', 'gend-society' ), $def['shortcode'] ),
+			);
+		// A team dashboard needs an id: show the first one.
+		if ( ! $id && 'psoo_dashboard' === $def['shortcode'] && function_exists( 'psoo_dash_get_all' ) ) {
+			$all  = psoo_dash_get_all();
+			$dash = reset( $all );
+			if ( $dash ) {
+				$out[ $slug ]['url'] = add_query_arg( 'gs_studio_sc_id', $dash['id'], $out[ $slug ]['url'] );
+				/* translators: %s: dashboard name. */
+				$out[ $slug ]['label'] = sprintf( __( 'Live preview: %s dashboard', 'gend-society' ), $dash['title'] );
+			}
+		}
+	}
+	return $out;
+}
+
+add_action( 'enqueue_block_editor_assets', 'gend_society_studio_template_preview_script' );
+/**
+ * In the template editor, a dashboard template's Content block shows the
+ * page it renders (the dashboard) instead of an empty placeholder.
+ */
+function gend_society_studio_template_preview_script() {
+	if ( ! is_admin() || ! current_user_can( 'edit_theme_options' ) || ! wp_is_block_theme() ) {
+		return;
+	}
+	$screen = function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	if ( ! $screen || 'site-editor' !== $screen->id ) {
+		return;
+	}
+	$previews = gend_society_studio_template_previews();
+	if ( ! $previews ) {
+		return;
+	}
+	$js = 'assets/template-content-preview.js';
+	wp_enqueue_script( 'gend-society-template-preview', GEND_SOCIETY_URL . $js, array( 'wp-hooks', 'wp-element', 'wp-data', 'wp-compose', 'wp-block-editor' ), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . $js ), true );
+	wp_add_inline_script( 'gend-society-template-preview', 'window.gsTemplatePreviews=' . wp_json_encode( $previews ) . ';', 'before' );
 }

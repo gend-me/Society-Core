@@ -31,19 +31,10 @@ Core WordPress is never locked: every standard WordPress screen and feature keep
 When an administrator clicks **Connect** on the GenD page, the site is paired with a gend.me business group. After connecting you can:
 
 * see your gend.me plan and which features it includes;
-<!-- @build-strip-begin wporg -->
 * give gend.me support time-limited access when you ask for help;
-<!-- @build-strip-end wporg -->
-<!-- @build-only-begin wporg -->
-* optionally send the site's email through the gend.me mail service, and optionally share the site's active plugin list (both off until you turn them on);
-<!-- @build-only-end wporg -->
 * coming soon: a paid move of the site into a gend.me container. This is still in progress and not available yet. A move will never happen automatically.
 
 **Nothing is sent to gend.me until you click Connect.** Activating the plugin makes no outside requests. See "External services" below for exactly what is sent and when.
-<!-- @build-only-begin wporg -->
-
-**No remote administration.** gend.me never logs in to your site, never creates or changes users on it and never changes its settings or content. After you connect, every request is made by your site: it fetches information from gend.me (such as your plan, its features and your backups status) and opens gend.me pages when you click.
-<!-- @build-only-end wporg -->
 
 = Your public site =
 
@@ -97,16 +88,6 @@ Deleting the plugin from the Plugins screen removes its own settings, cached dat
 = How do I disconnect? =
 
 Open the Connect popup from the Integration Hub card on the GenD dashboard and click Disconnect. Disconnecting stops all communication with gend.me.
-<!-- @build-only-begin wporg -->
-
-= Can gend.me log in to my site or change it? =
-
-No. This version of the plugin has no support access, no remote login and no way for gend.me to create users or change settings. The only request gend.me makes to your site is a signed challenge while a Connect that an administrator started is waiting: the site answers it only for that pending request (with a one-time request ID that expires) and the endpoint is rate limited. At all other times it refuses.
-
-= Is my email or my plugin list sent to gend.me? =
-
-Only if you turn it on. After connecting, the Connected card in the Connect popup has two boxes, both off by default: "Send this site's email through the gend.me mail service" and "Share this site's active plugin list with gend.me". Turning a box off stops that at once, and disconnecting turns both off.
-<!-- @build-only-end wporg -->
 
 == Screenshots ==
 
@@ -133,21 +114,10 @@ This plugin connects to outside services only after a site administrator chooses
    * **Backups** (`.../install/<install ID>/backups-status`): whether backups are available for this site on gend.me and the link to choose a backup plan, for the Backups panel on the dashboard. The answer is kept for as long as gend.me says (at least a minute).
    * **Popups to gend.me pages:** buttons such as Choose a plan, Change plan, Choose a server plan, Pay and Choose backups open the matching page on gend.me in a popup window or new tab (you sign in to gend.me there). The popups send no data themselves: the address is a page on gend.me and holds no token. Payment details are entered on gend.me, never on your site. When a plan checkout finishes, the gend.me window sends your admin page a short message (plan changed, with the install ID), and the page fetches the plan again.
    * membership panel actions that you start from the GenD screens;
-<!-- @build-strip-begin wporg -->
    * a list of the site's active plugins, sent when a plugin is activated or deactivated and once a day;
    * mail relay through gend.me, only if an administrator chooses gend.me mail.
-<!-- @build-strip-end wporg -->
-<!-- @build-only-begin wporg -->
-   * **Only if you turn it on (off by default):** a list of the site's active plugins (`.../install/<install ID>/features-state`), sent when a plugin is activated or deactivated and once a day. Turn on "Share this site's active plugin list with gend.me" on the Connected card.
-   * **Only if you turn it on (off by default):** mail relay. WordPress email from the site (recipients, subject, message and attachments) is sent to gend.me (`/wp-json/gend-mail/v1/relay`) for delivery and counted against your gend.me Emails plan, and once a day the site reports how much inbox data it stores (`/wp-json/gend-mail/v1/storage`). Turn on "Send this site's email through the gend.me mail service" on the Connected card. When it is off, WordPress sends mail as usual.
-<!-- @build-only-end wporg -->
 3. **After connecting: images.** The GenD admin screens load some images that are hosted on gend.me. Your browser requests them from gend.me, which sends your IP address and browser details as with any web request.
-<!-- @build-strip-begin wporg -->
 4. **Support access (only after connecting).** gend.me can send the site a signed, time-limited admin-access grant when you ask for support. The site checks the signature with gend.me's public key before accepting it.
-<!-- @build-strip-end wporg -->
-<!-- @build-only-begin wporg -->
-4. **No remote administration.** gend.me cannot log in to the site, create or change users, or change settings or content. The only request gend.me makes to the site is the signed connect challenge (`/wp-json/gs/v1/connect/challenge`) while a Connect started by an administrator is waiting; the site answers only that pending request and refuses at all other times.
-<!-- @build-only-end wporg -->
 5. **Download links (opened only when you click them).** The GenD page links to the GenD Society theme download, https://gend.me/grow/downloads/gend-society-theme/, and to the full GenD Society build, https://gend.me/grow/downloads/digital-society-plugin/ (on a connected site, the same page on your paired gend.me). These are plain links: the plugin does not request these pages and adds no site data to them. Your browser opens the page in a new tab, and gend.me receives your IP address and browser details as with any web request. The downloads are free store products on gend.me, so getting a file means completing a free ($0) checkout there.
 
 gend.me [Terms of Service](https://gend.me/terms-of-service/) and [Privacy Policy](https://gend.me/privacy-policy/).
@@ -178,10 +148,6 @@ Disconnecting the site from gend.me stops all of the above.
 
 = 1.6.1 =
 * Fixes a fatal error on single-site installs in the admin menu.
-<!-- @build-only-begin wporg -->
-* Removed from this version: support access (gend.me no longer has any way to sign in to a site) and the raw database query tool.
-* Mail relay through gend.me and the active-plugin list are now off until you turn them on in the Connected card.
-<!-- @build-only-end wporg -->
 
 = 1.6.0 =
 * The GenD dashboard is now on by default. "Switch back to standard WordPress" returns you to the normal WordPress admin at any time.

@@ -86,10 +86,52 @@ return array(
 			'note'  => 'Design Studio: replaces the Site Editor landing screen; live style preview endpoint + style-guide page.',
 		),
 		array(
+			'file'  => 'inc/brand-kit.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Brand kit: Voice and Tone, App Styling and Cast Members for the Design Studio and the Brand Guidelines page; adds the brand brief to AI chats on this site (aipa_system_context) and serves it at /brand-kit/brief.',
+		),
+		array(
+			'file'  => 'inc/html-visual-edit.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Custom HTML blocks in every block editor: shown as the page looks in a live frame (their scripts run), text edited by clicking it, images replaced from the media library; Edit HTML shows the code.',
+		),
+		array(
+			'file'  => 'inc/taxonomy-templates.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Category templates: the block template each blog category, product category and product attribute uses (Design Studio Blog Archives / Product Categories & Attributes); the choice goes first in the template hierarchy.',
+		),
+		array(
+			'file'  => 'inc/product-templates.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Product templates: the block template product pages use by product type, category or attribute (Design Studio Product Templates); goes in the single product template hierarchy.',
+		),
+		array(
+			'file'  => 'inc/shortcode-customizer.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Shortcode customiser: per-site colours, hidden sections, wording and CSS for plugin components that are shortcodes (Sales Team), applied on do_shortcode_tag; edited in the Design Studio.',
+		),
+		array(
+			'file'  => 'inc/sales-blocks.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Sales blocks: each Sales Team component as a block (live preview; its own colours, sections, wording and CSS on top of the site-wide Customise settings). Needs inc/shortcode-customizer.php.',
+		),
+		array(
+			'file'  => 'inc/page-heading.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Page basics: a visually hidden H1 with the page title when a page renders without one; the bare permalink base (e.g. /society/) goes to the blog page.',
+		),
+		array(
 			'file'  => 'inc/site-sidebars.php',
 			'tier'  => 'core',
 			'needs' => array(),
-			'note'  => 'Site sidebars: optional left/right sidebar per area (pages, blog, shop, social), block template parts, added around the template <main>.',
+			'note'  => 'Site sidebars: optional left/right sidebar per area (pages, blog, shop, social), block template parts; the rendering block template gets a main column between its header and footer parts.',
 		),
 		array(
 			'file'  => 'inc/design-studio-templates.php',
@@ -260,6 +302,12 @@ return array(
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
 			'note'  => 'Profile Styling: block-built profile headers, tab layouts and menu (after member-profile-header: takes over its header hook).',
+		),
+		array(
+			'file'  => 'inc/social-pages.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Social Pages: per-tab pages by audience (visitors, roles, member/group types, plan features) and per-page layout + sidebar for groups and profiles; API for the studio Group / Profile Pages builder.',
 		),
 		array(
 			'file'  => 'inc/profile-widgets.php',

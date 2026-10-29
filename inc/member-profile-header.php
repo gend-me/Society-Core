@@ -423,6 +423,10 @@ function gend_society_topup_autocomplete( $status, $order_id, $order ) {
 // the active/hover color treatments and stagger animation from the parent.
 if ( ! function_exists( 'gend_society_get_profile_nav_icon' ) ) {
 function gend_society_get_profile_nav_icon( $slug ) {
+    // A chosen icon (Design Studio › Profile Pages) replaces the built-in one.
+    $custom = (string) apply_filters( 'gend_society_profile_nav_icon', '', (string) $slug );
+    if ( '' !== $custom ) return $custom;
+
     $key = strtolower( (string) $slug );
 
     // Aliases — collapse common variants to one canonical icon.
@@ -1013,7 +1017,7 @@ function gend_society_profile_header_nav_items( $user_id ) {
     // Guarantees placement regardless of where Youzify orders the registered tab.
     if ( bp_is_my_profile() ) {
         $invest_obj = (object) [
-            'name' => 'Contracts',
+            'name' => 'Commissions',
             'slug' => 'invest',
             'link' => trailingslashit( bp_displayed_user_domain() ) . 'invest/',
         ];

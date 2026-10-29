@@ -1,0 +1,102 @@
+/* GenD Society - Design Studio › Branding › Voice & Tone, App Styling, Cast Members (assets/brand-kit.js). */
+
+.gs-studio .gs-bk-host { display: contents; }
+.gs-studio .gs-bk { gap: 18px; }
+.gs-studio .gs-bk-group { padding: 16px; border: 1px solid var(--st-border); border-radius: var(--st-radius); background: var(--st-card); display: flex; flex-direction: column; gap: 12px; animation: gs-st-rise .35s var(--st-ease) both; }
+.gs-studio .gs-bk-group-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 10px; }
+.gs-studio .gs-bk-group-head h2 { margin: 0 0 2px; font-size: 14px; letter-spacing: .01em; color: var(--st-text); }
+.gs-studio .gs-bk-group-head p { margin: 0; font-size: 12.5px; line-height: 1.45; }
+.gs-studio .gs-bk-hint { display: block; margin-top: -2px; font-size: 11.5px; line-height: 1.4; color: var(--st-muted); font-weight: 400; }
+.gs-studio .gs-bk-2col { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 10px; }
+.gs-studio .gs-bk textarea.gs-st-input { resize: vertical; min-height: 54px; line-height: 1.45; }
+
+/* Repeating rows (traits, examples) */
+.gs-studio .gs-bk-rows { display: flex; flex-direction: column; gap: 10px; }
+.gs-studio .gs-bk-row { position: relative; display: flex; gap: 10px; padding: 12px; border: 1px solid var(--st-border); border-radius: 12px; background: rgba(0, 0, 0, .18); }
+.gs-studio .gs-bk-row-n { flex: none; font: 600 11px/1 ui-monospace, Menlo, monospace; color: var(--st-blue); padding-top: 12px; }
+.gs-studio .gs-bk-row-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 8px; }
+.gs-studio .gs-bk-x { flex: none; align-self: flex-start; display: grid; place-items: center; width: 28px; height: 28px; padding: 0; border: 0; border-radius: 8px; background: transparent; color: var(--st-muted); cursor: pointer; }
+.gs-studio .gs-bk-x:hover { color: var(--st-danger); background: rgba(255, 107, 107, .1); }
+.gs-studio .gs-bk-do small, .gs-studio .gs-bk-dont small { display: block; margin-bottom: 4px; font-size: 11px; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.gs-studio .gs-bk-do small { color: var(--st-accent); }
+.gs-studio .gs-bk-dont small { color: var(--st-danger); }
+
+/* Tone sliders */
+.gs-studio .gs-bk-sliders { display: flex; flex-direction: column; gap: 12px; }
+.gs-studio .gs-bk-slider { display: grid; grid-template-columns: 86px minmax(0, 1fr) 86px; align-items: center; gap: 10px; font-size: 11.5px; color: var(--st-muted); }
+.gs-studio .gs-bk-slider span:last-child { text-align: right; }
+.gs-studio .gs-bk-slider input[type="range"] { width: 100%; accent-color: var(--st-accent); }
+
+/* Chips */
+.gs-studio .gs-bk-chips { display: flex; flex-wrap: wrap; gap: 6px; padding: 6px; min-height: 42px; border: 1px solid var(--st-border); border-radius: 10px; background: rgba(0, 0, 0, .25); cursor: text; }
+.gs-studio .gs-bk-chip { display: inline-flex; align-items: center; gap: 4px; padding: 4px 4px 4px 10px; border-radius: 999px; font-size: 12.5px; color: var(--st-text); background: rgba(110, 193, 228, .14); border: 1px solid rgba(110, 193, 228, .3); }
+.gs-studio .gs-bk-chips.is-use .gs-bk-chip { background: rgba(151, 228, 110, .12); border-color: rgba(151, 228, 110, .35); }
+.gs-studio .gs-bk-chips.is-avoid .gs-bk-chip { background: rgba(255, 255, 255, .05); border-color: var(--st-border-hi); text-decoration: line-through; color: var(--st-muted); }
+.gs-studio .gs-bk-chips.is-never .gs-bk-chip { background: rgba(255, 107, 107, .12); border-color: rgba(255, 107, 107, .4); }
+.gs-studio .gs-bk-chip button { display: grid; place-items: center; width: 18px; height: 18px; padding: 0; border: 0; border-radius: 50%; background: rgba(255, 255, 255, .08); color: inherit; font-size: 13px; line-height: 1; cursor: pointer; text-decoration: none; }
+.gs-studio .gs-bk-chip button:hover { background: rgba(255, 107, 107, .3); }
+.gs-studio .gs-bk-chip-input { flex: 1; min-width: 120px; border: 0 !important; background: transparent !important; box-shadow: none !important; color: var(--st-text) !important; font-size: 13px; padding: 4px 6px !important; outline: none; }
+
+/* Segmented choices */
+.gs-studio .gs-bk-seg { display: flex; flex-wrap: wrap; gap: 6px; }
+.gs-studio .gs-bk-seg-opt { padding: 6px 11px; border: 1px solid var(--st-border); border-radius: 999px; background: rgba(255, 255, 255, .03); color: var(--st-text); font-size: 12px; cursor: pointer; transition: border-color .2s, background .2s, color .2s; }
+.gs-studio .gs-bk-seg-opt:hover { border-color: var(--st-border-hi); }
+.gs-studio .gs-bk-seg-opt.is-on { border-color: var(--st-accent); background: rgba(151, 228, 110, .12); color: var(--st-accent); }
+.gs-studio .gs-bk-trait-row { display: flex; flex-direction: column; gap: 6px; }
+.gs-studio .gs-bk-trait-label { font-size: 12px; font-weight: 600; color: var(--st-muted); }
+
+/* Style families */
+.gs-studio .gs-bk-families { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 10px; }
+.gs-studio .gs-bk-family { display: flex; flex-direction: column; gap: 4px; padding: 8px 8px 10px; border: 1px solid var(--st-border); border-radius: 14px; background: rgba(0, 0, 0, .2); color: var(--st-text); text-align: left; cursor: pointer; transition: border-color .2s, transform .2s var(--st-ease), box-shadow .2s; }
+.gs-studio .gs-bk-family:hover { transform: translateY(-2px); border-color: var(--st-border-hi); }
+.gs-studio .gs-bk-family.is-on { border-color: var(--st-accent); box-shadow: 0 0 0 3px rgba(151, 228, 110, .18); }
+.gs-studio .gs-bk-family strong { margin-top: 4px; font-size: 13px; }
+.gs-studio .gs-bk-family small { font-size: 11px; line-height: 1.35; color: var(--st-muted); }
+.gs-studio .gs-bk-family-demo { height: 112px; overflow: hidden; border-radius: 10px; pointer-events: none; }
+.gs-studio .gs-bk-family-demo .gsg-bk-demo { width: 250%; transform: scale(.4); transform-origin: 0 0; border-radius: 0; }
+.gs-studio .gs-bk-family-demo .gsg-bk-demo-stage { min-height: 280px; padding: 20px; }
+.gs-studio .gs-bk-family-custom { display: grid; place-items: center; height: 112px; border-radius: 10px; border: 1px dashed var(--st-border-hi); color: var(--st-muted); }
+.gs-studio .gs-bk-family-custom .dashicons { font-size: 28px; width: 28px; height: 28px; }
+.gs-studio .gs-bk-bigdemo .gsg-bk-demo-stage { min-height: 280px; padding: 24px; }
+
+/* Cast */
+.gs-studio .gs-bk-adders { display: flex; flex-wrap: wrap; gap: 6px; }
+.gs-studio .gs-bk-cast { display: flex; flex-direction: column; gap: 8px; }
+.gs-studio .gs-bk-cast-item { border: 1px solid var(--st-border); border-radius: 12px; background: rgba(0, 0, 0, .18); transition: border-color .2s; }
+.gs-studio .gs-bk-cast-item.is-open { border-color: rgba(151, 228, 110, .4); }
+.gs-studio .gs-bk-cast-head { display: flex; align-items: center; gap: 10px; width: 100%; padding: 10px; border: 0; background: transparent; color: var(--st-text); text-align: left; cursor: pointer; }
+.gs-studio .gs-bk-face { flex: none; display: grid; place-items: center; width: 40px; height: 40px; border-radius: 50%; font-weight: 700; color: var(--st-blue); background: var(--gs-img, rgba(110, 193, 228, .12)) center / cover no-repeat !important; border: 1px solid var(--st-border); }
+.gs-studio .gs-bk-cast-name { flex: 1; min-width: 0; display: flex; flex-direction: column; }
+.gs-studio .gs-bk-cast-name small { font-size: 11.5px; color: var(--st-muted); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.gs-studio .gs-bk-editor { display: flex; flex-direction: column; gap: 12px; padding: 4px 12px 14px; animation: gs-st-rise .25s var(--st-ease) both; }
+.gs-studio .gs-bk-editor-top { display: flex; gap: 12px; align-items: flex-start; }
+.gs-studio .gs-bk-editor-top > .gs-st-stack { flex: 1; min-width: 0; }
+.gs-studio .gs-bk-portrait { flex: none; display: grid; place-items: center; width: 92px; height: 92px; padding: 0; border-radius: 16px; border: 1px dashed var(--st-border-hi); color: var(--st-muted); cursor: pointer; background: var(--gs-img, rgba(255, 255, 255, .03)) center / cover no-repeat !important; }
+.gs-studio .gs-bk-portrait.has-img { border-style: solid; }
+.gs-studio .gs-bk-portrait:hover { border-color: var(--st-accent); }
+.gs-studio .gs-bk-check { display: flex; gap: 10px; align-items: flex-start; cursor: pointer; }
+.gs-studio .gs-bk-check input { margin-top: 3px; accent-color: var(--st-accent); }
+.gs-studio .gs-bk-check strong { display: block; font-size: 13px; }
+.gs-studio .gs-bk-check small { display: block; font-size: 11.5px; color: var(--st-muted); }
+.gs-studio .gs-bk-editor-foot { display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap; padding-top: 8px; border-top: 1px solid var(--st-border); }
+.gs-studio .gs-bk-danger:hover { color: var(--st-danger); border-color: rgba(255, 107, 107, .5); }
+.gs-studio .gs-bk-empty { margin: 0; padding: 14px; text-align: center; }
+
+/* AI brief and save bar */
+.gs-studio .gs-bk-brief { max-height: 260px; overflow: auto; margin: 0; padding: 12px; border: 1px solid var(--st-border); border-radius: 10px; background: rgba(0, 0, 0, .35); color: var(--st-text); font: 11.5px/1.55 ui-monospace, Menlo, Consolas, monospace; white-space: pre-wrap; }
+.gs-studio .gs-bk-savebar { position: sticky; bottom: -60px; z-index: 3; display: flex; align-items: center; gap: 12px; margin: 0 -24px -60px; padding: 14px 24px 18px; background: linear-gradient(180deg, rgba(11, 14, 20, 0), rgba(11, 14, 20, .96) 30%); }
+.gs-studio .gs-bk-status { font-size: 12px; }
+
+/* An admin skin forces white text inputs; keep the studio's dark fields. */
+body.gs-studio-page .gs-studio .gs-bk input[type="text"].gs-st-input,
+body.gs-studio-page .gs-studio .gs-bk textarea.gs-st-input,
+body.gs-studio-page .gs-studio .gs-bk select.gs-st-input { background: rgba(0, 0, 0, .25) !important; color: var(--st-text) !important; border-color: var(--st-border) !important; }
+body.gs-studio-page .gs-studio .gs-bk input[type="text"].gs-st-input:focus,
+body.gs-studio-page .gs-studio .gs-bk textarea.gs-st-input:focus { border-color: var(--st-accent) !important; box-shadow: 0 0 0 2px rgba(151, 228, 110, .18) !important; }
+
+@media (prefers-reduced-motion: reduce) {
+	.gs-studio .gs-bk-group, .gs-studio .gs-bk-editor, .gs-studio .gs-bk-family { animation: none !important; transition: none !important; }
+}
+/* Placeholders are examples, not saved text: keep them clearly dim. */
+body.gs-studio-page .gs-studio .gs-bk .gs-st-input::placeholder,
+body.gs-studio-page .gs-studio .gs-bk .gs-bk-chip-input::placeholder { color: rgba(139, 152, 176, .5) !important; font-style: italic; opacity: 1; }
