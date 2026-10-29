@@ -1,0 +1,667 @@
+/**
+ * Records-Editor — Phase 73-02 of v10.0.
+ *
+ * Namespaced modal styling for the DNS records-editor. Mirrors Phase 72
+ * domains-wizard.css glass-card conventions (rgba surface + subtle border +
+ * radius 12-14 + CSS var text colors). No new keyframe declarations — the sole
+ * visual animation is a plain CSS opacity/transform transition on modal reveal.
+ *
+ * Namespaced under .gs-records-editor to prevent bleed into other Hosting
+ * sub-panels (Dashboard / Domains / Logs / Tables / Containers / Backups).
+ *
+ * @package gend-society
+ * @since   v10.0 / Phase 73-02
+ */
+
+/* ── Root modal + backdrop ──────────────────────────────────────── */
+.gs-records-editor {
+    position: fixed;
+    inset: 0;
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 20px;
+    box-sizing: border-box;
+}
+.gs-records-editor[hidden] { display: none !important; }
+
+.gs-records-editor__backdrop {
+    position: absolute;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.72);
+    backdrop-filter: blur(8px);
+    -webkit-backdrop-filter: blur(8px);
+    cursor: pointer;
+}
+
+.gs-records-editor__panel {
+    position: relative;
+    background: rgba(11, 14, 20, 0.96);
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 14px;
+    box-shadow: 0 30px 90px -20px rgba(0, 0, 0, 0.75);
+    width: min(900px, 96vw);
+    max-height: 90vh;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    color: #f8fafc;
+    transition: opacity 180ms ease, transform 180ms ease;
+}
+
+/* ── Header ─────────────────────────────────────────────────────── */
+.gs-records-editor__header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 12px;
+    padding: 16px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.06);
+}
+.gs-records-editor__title {
+    margin: 0;
+    font-size: 1.05rem;
+    font-weight: 700;
+    letter-spacing: 0.02em;
+    color: #f8fafc;
+    flex: 1;
+}
+.gs-records-editor__undo {
+    background: rgba(78, 170, 255, 0.15);
+    border: 1px solid rgba(78, 170, 255, 0.35);
+    color: #93c5fd;
+    padding: 6px 12px;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease;
+    white-space: nowrap;
+}
+.gs-records-editor__undo:hover { background: rgba(78, 170, 255, 0.25); border-color: rgba(78, 170, 255, 0.55); }
+.gs-records-editor__undo[hidden] { display: none; }
+.gs-records-editor__close {
+    background: transparent;
+    border: 0;
+    color: var(--gs-muted, #94a3b8);
+    font-size: 1.5rem;
+    line-height: 1;
+    cursor: pointer;
+    padding: 0 6px;
+}
+.gs-records-editor__close:hover { color: #f8fafc; }
+
+/* ── Toolbar ────────────────────────────────────────────────────── */
+.gs-records-editor__toolbar {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 12px 20px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    background: rgba(255, 255, 255, 0.015);
+}
+.gs-records-editor__status {
+    color: var(--gs-muted, #94a3b8);
+    font-size: 0.82rem;
+    flex: 1;
+}
+
+/* ── Buttons ────────────────────────────────────────────────────── */
+.gs-records-editor__btn {
+    background: rgba(255, 255, 255, 0.06);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    padding: 7px 14px;
+    border-radius: 8px;
+    font-size: 0.82rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 140ms ease, border-color 140ms ease;
+    white-space: nowrap;
+}
+.gs-records-editor__btn:hover { background: rgba(255, 255, 255, 0.11); border-color: rgba(255, 255, 255, 0.22); }
+.gs-records-editor__btn.is-primary {
+    background: linear-gradient(135deg, rgba(78, 170, 255, 0.85), rgba(78, 170, 255, 0.65));
+    border-color: rgba(78, 170, 255, 0.9);
+    color: #061024;
+}
+.gs-records-editor__btn.is-primary:hover { background: linear-gradient(135deg, rgba(78, 170, 255, 1), rgba(78, 170, 255, 0.8)); }
+.gs-records-editor__btn.is-danger {
+    background: rgba(252, 165, 165, 0.12);
+    border-color: rgba(252, 165, 165, 0.4);
+    color: #fca5a5;
+}
+.gs-records-editor__btn.is-danger:hover { background: rgba(252, 165, 165, 0.22); }
+.gs-records-editor__btn.is-warning {
+    background: rgba(252, 211, 77, 0.18);
+    border-color: rgba(252, 211, 77, 0.45);
+    color: #fcd34d;
+}
+.gs-records-editor__btn.is-warning:hover { background: rgba(252, 211, 77, 0.3); }
+
+/* ── Body (scrollable) ──────────────────────────────────────────── */
+.gs-records-editor__body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 16px 20px 20px;
+}
+
+.gs-records-editor__loading,
+.gs-records-editor__empty {
+    text-align: center;
+    color: var(--gs-muted, #94a3b8);
+    font-style: italic;
+    padding: 40px 16px;
+    background: rgba(255, 255, 255, 0.02);
+    border: 1px dashed rgba(255, 255, 255, 0.06);
+    border-radius: 10px;
+}
+
+/* ── Records table ──────────────────────────────────────────────── */
+.gs-records-editor__table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+}
+.gs-records-editor__table thead th {
+    text-align: left;
+    padding: 10px 12px;
+    color: var(--gs-muted, #94a3b8);
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    font-size: 0.72rem;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    background: rgba(255, 255, 255, 0.015);
+    position: sticky;
+    top: 0;
+}
+.gs-records-editor__table tbody td {
+    padding: 10px 12px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    vertical-align: middle;
+}
+.gs-records-editor__table tbody tr:hover td {
+    background: rgba(78, 170, 255, 0.05);
+}
+.gs-records-editor__table code {
+    font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+    font-size: 0.8rem;
+    background: rgba(255, 255, 255, 0.04);
+    padding: 2px 6px;
+    border-radius: 4px;
+    color: #a5b4fc;
+    word-break: break-all;
+}
+.gs-records-editor__table input[type="checkbox"] {
+    accent-color: #4eaaff;
+    cursor: pointer;
+}
+.gs-records-editor__table input[type="checkbox"]:disabled {
+    cursor: not-allowed;
+    opacity: 0.5;
+}
+
+/* ── Form (Add / Edit) ─────────────────────────────────────────── */
+.gs-records-editor__form {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+.gs-records-editor__field {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.gs-records-editor__field[hidden] { display: none; }
+.gs-records-editor__field label {
+    color: var(--gs-muted, #94a3b8);
+    font-size: 0.78rem;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+}
+.gs-records-editor__field input[type="text"],
+.gs-records-editor__field input[type="number"],
+.gs-records-editor__field select {
+    background: rgba(0, 0, 0, 0.35);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #f8fafc;
+    padding: 8px 12px;
+    border-radius: 8px;
+    font-size: 0.9rem;
+    font-family: inherit;
+}
+.gs-records-editor__field input[type="text"]:focus,
+.gs-records-editor__field input[type="number"]:focus,
+.gs-records-editor__field select:focus {
+    outline: none;
+    border-color: rgba(78, 170, 255, 0.7);
+    box-shadow: 0 0 0 3px rgba(78, 170, 255, 0.15);
+}
+.gs-records-editor__field select:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+}
+.gs-records-editor__hint {
+    color: var(--gs-muted, #94a3b8);
+    font-size: 0.72rem;
+    font-style: italic;
+    text-transform: none;
+    letter-spacing: 0;
+}
+.gs-records-editor__form-actions {
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+    padding-top: 4px;
+}
+.gs-records-editor__form-error {
+    color: #fca5a5;
+    font-size: 0.82rem;
+    padding: 8px 12px;
+    background: rgba(252, 165, 165, 0.08);
+    border: 1px solid rgba(252, 165, 165, 0.28);
+    border-radius: 8px;
+}
+.gs-records-editor__form-error[hidden] { display: none; }
+
+/* ── Destructive-edit warning banner (modal-within-modal) ──────── */
+.gs-records-editor__warning {
+    background: linear-gradient(135deg, rgba(252, 211, 77, 0.16), rgba(252, 165, 165, 0.12));
+    border: 1px solid rgba(252, 211, 77, 0.45);
+    border-radius: 12px;
+    padding: 18px 20px;
+    color: #fcd34d;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+}
+.gs-records-editor__warning strong {
+    font-size: 0.95rem;
+    color: #fef3c7;
+}
+.gs-records-editor__warning p {
+    margin: 0;
+    color: #fde68a;
+    font-size: 0.85rem;
+    line-height: 1.5;
+}
+
+/* ── Inline error toast (auto-hide via JS setTimeout) ──────────── */
+.gs-records-editor__error {
+    padding: 12px 20px;
+    background: rgba(252, 165, 165, 0.14);
+    border-top: 1px solid rgba(252, 165, 165, 0.35);
+    color: #fca5a5;
+    font-size: 0.82rem;
+    text-align: center;
+}
+.gs-records-editor__error[hidden] { display: none; }
+
+/* ── Reduced motion support ────────────────────────────────────── */
+@media (prefers-reduced-motion: reduce) {
+    .gs-records-editor__panel,
+    .gs-records-editor__btn,
+    .gs-records-editor__undo {
+        transition: none !important;
+    }
+}
+
+/* ── Narrow viewports ──────────────────────────────────────────── */
+@media (max-width: 640px) {
+    .gs-records-editor {
+        padding: 0;
+    }
+    .gs-records-editor__panel {
+        width: 100vw;
+        max-height: 100vh;
+        border-radius: 0;
+        border: 0;
+    }
+    .gs-records-editor__table {
+        font-size: 0.78rem;
+    }
+    .gs-records-editor__table thead th:nth-child(4),
+    .gs-records-editor__table tbody td:nth-child(4) {
+        display: none;
+    }
+}
+
+/* ── Phase 74-02 additions — SSL badge + Point-at-App + advanced-options ──
+   No new keyframe declarations; no jQuery; no third-party deps.
+   6 SSL-badge visual states mirror the 74-01 consolidated overall classifier
+   (provisioning / active / mismatched / active_ipv4_only / stale_aaaa / unknown).
+   MAKE-OR-BREAK invariant: active_ipv4_only is yellow-green (NOT green)
+   so operators never mistake IPv4-only for full "active" dual-stack. */
+
+.gs-records-editor__point-at-app {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 6px 12px;
+    margin-left: 8px;
+    border-radius: 6px;
+    border: 1px solid rgba(78, 170, 255, 0.4);
+    background: linear-gradient(135deg, #4eaaff 0%, #3a8ce6 100%);
+    color: #fff;
+    font-weight: 600;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.15s, box-shadow 0.15s;
+}
+.gs-records-editor__point-at-app:hover {
+    box-shadow: 0 0 12px rgba(78, 170, 255, 0.5);
+}
+.gs-records-editor__point-at-app[disabled] {
+    opacity: 0.5;
+    cursor: not-allowed;
+}
+
+.gs-records-editor__ssl-badge {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 4px 10px;
+    margin-left: 8px;
+    border-radius: 999px;
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    background: rgba(0, 0, 0, 0.25);
+    font-size: 0.75rem;
+    color: #e2e8f0;
+    cursor: default;
+    transition: background 0.15s;
+}
+.gs-records-editor__ssl-badge-dot {
+    display: inline-block;
+    width: 8px;
+    height: 8px;
+    border-radius: 50%;
+    background: #94a3b8;
+    box-shadow: 0 0 4px rgba(148, 163, 184, 0.5);
+}
+.gs-records-editor__ssl-badge-label {
+    line-height: 1;
+}
+.gs-records-editor__ssl-badge[data-state="provisioning"] .gs-records-editor__ssl-badge-dot {
+    background: #94a3b8;
+    box-shadow: 0 0 4px rgba(148, 163, 184, 0.5);
+}
+.gs-records-editor__ssl-badge[data-state="active"] .gs-records-editor__ssl-badge-dot {
+    background: #4ade80;
+    box-shadow: 0 0 6px rgba(74, 222, 128, 0.6);
+}
+.gs-records-editor__ssl-badge[data-state="active_ipv4_only"] .gs-records-editor__ssl-badge-dot {
+    background: #a3e635;
+    box-shadow: 0 0 4px rgba(163, 230, 53, 0.5);
+}
+.gs-records-editor__ssl-badge[data-state="stale_aaaa"] .gs-records-editor__ssl-badge-dot {
+    background: #fcd34d;
+    box-shadow: 0 0 4px rgba(252, 211, 77, 0.5);
+}
+.gs-records-editor__ssl-badge[data-state="mismatched"] .gs-records-editor__ssl-badge-dot {
+    background: #fb923c;
+    box-shadow: 0 0 4px rgba(251, 146, 60, 0.6);
+}
+.gs-records-editor__ssl-badge[data-state="unknown"] .gs-records-editor__ssl-badge-dot {
+    background: transparent;
+    border: 1px solid #94a3b8;
+    box-shadow: none;
+}
+
+.gs-records-editor__advanced {
+    margin: 12px 16px 0;
+    padding: 8px 12px;
+    border-top: 1px solid rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    font-size: 0.85rem;
+}
+.gs-records-editor__advanced > summary {
+    cursor: pointer;
+    user-select: none;
+    font-weight: 600;
+    color: #94a3b8;
+    padding: 4px 0;
+    outline: none;
+}
+.gs-records-editor__advanced[open] > summary {
+    color: #e2e8f0;
+}
+.gs-records-editor__advanced-body {
+    padding: 8px 0 4px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+}
+.gs-records-editor__ssl-mode-select {
+    padding: 6px 10px;
+    border-radius: 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.15);
+    color: #fff;
+    max-width: 260px;
+}
+
+/* Ship-it-anyway modal-within-modal — reuses Phase 73 destructive-warning slot. */
+.gs-records-editor__warning--ssl {
+    border-left: 4px solid #fcd34d;
+    padding: 16px;
+    margin: 12px;
+    background: rgba(252, 211, 77, 0.06);
+    border-radius: 8px;
+}
+.gs-records-editor__warning--ssl .gs-records-editor__warning-title {
+    margin: 0 0 8px;
+    font-size: 1rem;
+    color: #fef3c7;
+}
+.gs-records-editor__warning--ssl .gs-records-editor__warning-body {
+    margin: 0 0 12px;
+    color: #e2e8f0;
+    line-height: 1.4;
+}
+.gs-records-editor__warning--ssl .gs-records-editor__warning-actions {
+    display: flex;
+    gap: 8px;
+}
+.gs-records-editor__btn.is-warning {
+    background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+    color: #fff;
+    border: 1px solid rgba(245, 158, 11, 0.5);
+}
+.gs-records-editor__btn.is-warning:hover {
+    box-shadow: 0 0 12px rgba(245, 158, 11, 0.6);
+}
+
+/* ═══════════════════════════════════════════════════════════════════════════
+ * Phase 75-02 — Email preset picker + managed-record lock icon + rollback banner
+ * No new keyframe declarations — plain CSS transitions only.
+ * All selectors namespaced under .gs-records-editor per Phase 73-02 baseline.
+ * ═══════════════════════════════════════════════════════════════════════════ */
+
+.gs-records-editor__preset-picker {
+    position: absolute;
+    top: 60px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: min(760px, 92vw);
+    max-height: calc(100vh - 120px);
+    overflow-y: auto;
+    background: rgba(18, 23, 34, 0.98);
+    color: #e6edf7;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 24px 60px rgba(0, 0, 0, 0.5);
+    z-index: 10;
+}
+
+.gs-records-editor__preset-picker[hidden] {
+    display: none;
+}
+
+.gs-records-editor__preset-picker-inner h3 {
+    margin: 0 0 12px;
+    font-size: 18px;
+    color: #f1f5f9;
+}
+
+.gs-records-editor__preset-picker-inner h4 {
+    margin: 18px 0 8px;
+    font-size: 14px;
+    color: #cbd5e1;
+    text-transform: uppercase;
+    letter-spacing: 0.4px;
+}
+
+.gs-records-editor__preset-picker-inner label {
+    display: block;
+    margin: 12px 0 4px;
+    font-weight: 500;
+    color: #e2e8f0;
+    font-size: 13px;
+}
+
+.gs-records-editor__preset-picker-inner input[type="text"],
+.gs-records-editor__preset-picker-inner textarea,
+.gs-records-editor__preset-picker-inner select {
+    width: 100%;
+    padding: 8px 10px;
+    background: rgba(255, 255, 255, 0.04);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    border-radius: 6px;
+    color: inherit;
+    font-family: inherit;
+    box-sizing: border-box;
+    transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.gs-records-editor__preset-picker-inner input[type="text"]:focus,
+.gs-records-editor__preset-picker-inner textarea:focus,
+.gs-records-editor__preset-picker-inner select:focus {
+    border-color: rgba(96, 165, 250, 0.6);
+    background: rgba(255, 255, 255, 0.06);
+    outline: none;
+}
+
+.gs-records-editor__preset-picker-inner textarea {
+    min-height: 60px;
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    font-size: 12px;
+    resize: vertical;
+}
+
+.gs-records-editor__preset-picker-inner input[type="checkbox"] {
+    width: auto;
+    margin-right: 6px;
+    vertical-align: middle;
+}
+
+.gs-records-editor__preset-picker-inner .gs-records-editor__hint {
+    display: block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: rgba(203, 213, 225, 0.7);
+    font-weight: 400;
+    line-height: 1.4;
+}
+
+.gs-records-editor__preset-preview {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 8px;
+    font-size: 12px;
+}
+
+.gs-records-editor__preset-preview thead th {
+    text-align: left;
+    padding: 8px 6px;
+    background: rgba(255, 255, 255, 0.04);
+    border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+    color: #cbd5e1;
+    font-weight: 600;
+}
+
+.gs-records-editor__preset-preview tbody td {
+    padding: 6px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Consolas, monospace;
+    word-break: break-all;
+    color: #e2e8f0;
+}
+
+.gs-records-editor__preset-actions {
+    margin-top: 20px;
+    display: flex;
+    gap: 8px;
+    justify-content: flex-end;
+}
+
+/* Managed lock icon inline in records list (Open Q4 — icon adjacent to type badge). */
+.gs-records-editor__managed-lock {
+    display: inline-block;
+    margin-right: 4px;
+    font-size: 12px;
+    line-height: 1;
+    cursor: help;
+    color: #fcd34d;
+    filter: drop-shadow(0 0 3px rgba(252, 211, 77, 0.4));
+}
+
+/* Rollback alert banner — amber→rose gradient (Phase 73 destructive-warning precedent). */
+.gs-records-editor__warning.is-rollback {
+    border-left: 4px solid #fb7185;
+    background: linear-gradient(90deg, rgba(252, 211, 77, 0.10) 0%, rgba(251, 113, 133, 0.10) 100%);
+    padding: 16px 20px;
+    border-radius: 8px;
+    color: #fee2e2;
+}
+
+.gs-records-editor__warning.is-rollback h3 {
+    color: #fecaca;
+    margin: 0 0 8px;
+}
+
+/* Managed-record delete confirmation — yellow warning per Ship-it-anyway pattern. */
+.gs-records-editor__warning.is-managed-delete {
+    border-left: 4px solid #fcd34d;
+    background: linear-gradient(90deg, rgba(252, 211, 77, 0.12) 0%, rgba(255, 179, 71, 0.12) 100%);
+    padding: 16px 20px;
+    border-radius: 8px;
+    color: #fef3c7;
+}
+
+.gs-records-editor__warning.is-managed-delete h3 {
+    color: #fef9c3;
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+/* SPF conflict — Phase 74 Ship-it-anyway destructive-warning style borrowed. */
+.gs-records-editor__warning.is-spf-conflict {
+    border-left: 4px solid #f59e0b;
+    background: linear-gradient(90deg, rgba(245, 158, 11, 0.12) 0%, rgba(217, 119, 6, 0.12) 100%);
+    padding: 16px 20px;
+    border-radius: 8px;
+    color: #fef3c7;
+}
+
+.gs-records-editor__warning.is-spf-conflict h3 {
+    color: #fef9c3;
+    margin: 0 0 8px;
+    font-size: 16px;
+}
+
+/* Narrow-viewport: preset picker becomes full-width overlay on mobile. */
+@media (max-width: 640px) {
+    .gs-records-editor__preset-picker {
+        width: 100vw;
+        left: 0;
+        transform: none;
+        top: 0;
+        max-height: 100vh;
+        border-radius: 0;
+    }
+}
+
