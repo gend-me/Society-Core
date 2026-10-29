@@ -552,6 +552,12 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     }
     update_user_meta( $user->ID, 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
 
+    // ── Link this site account to the gend.me user who just signed in ──
+    // (user-site-credentials.php: lets the desktop chat edit this site as them).
+    if ( function_exists( 'gend_society_record_hub_link' ) ) {
+        gend_society_record_hub_link( $user->ID, $info );
+    }
+
     // ── Log in ─────────────────────────────────────────────────────────
     wp_set_current_user( $user->ID, $user->user_login );
     wp_set_auth_cookie( $user->ID, true );
