@@ -334,7 +334,7 @@ function gend_society_inject_profile_page_embed() {
     // The Youzify Media gallery only renders on the real /media/ route, so we
     // surface it inside the Media panel via an iframe with ?gdc_tab_only=1
     // (chrome-stripped by gdc_tab_only_strip_chrome() further down this file).
-    $media_slug = function_exists( 'youzify_profile_media_slug' ) ? youzify_profile_media_slug() : 'media';
+    $media_slug = function_exists( 'gend_sn_profile_media_slug' ) ? gend_sn_profile_media_slug() : 'media';
     $media_url  = add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . $media_slug ) );
     ?>
     <div class="gs-overview-wrap">

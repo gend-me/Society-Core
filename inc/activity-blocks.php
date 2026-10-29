@@ -134,7 +134,7 @@ function gend_society_ab_placeholder( $title ) {
  * @return string
  */
 function gend_society_ab_wrap( $html ) {
-	$class = function_exists( 'youzify_get_activity_page_class' ) ? youzify_get_activity_page_class() : '';
+	$class = function_exists( 'gend_sn_activity_page_class' ) ? gend_sn_activity_page_class() : '';
 	return '<div id="youzify"><div id="youzify-bp" class="youzify youzify-page noLightbox gdc-activity-wall ' . esc_attr( $class ) . '"><div class="youzify-content"><main class="youzify-page-main-content">' . $html . '</main></div></div></div>';
 }
 

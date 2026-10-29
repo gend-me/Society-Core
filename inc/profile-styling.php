@@ -330,7 +330,7 @@ function gend_society_ps_nav_items() {
 	if ( function_exists( 'gend_society_profile_header_nav_items' ) ) {
 		return gend_society_profile_header_nav_items( $uid ); // Same tabs as the GenD header (menu settings included).
 	}
-	$items = function_exists( 'youzify_get_profile_primary_nav' ) ? (array) youzify_get_profile_primary_nav() : array();
+	$items = function_exists( 'gend_sn_profile_primary_nav' ) ? (array) gend_sn_profile_primary_nav() : array();
 	return (array) apply_filters( 'gend_society_profile_nav_items', $items, $uid );
 }
 
@@ -498,8 +498,8 @@ function gend_society_ps_block_classic() {
 function gend_society_ps_block_cover( $attrs, $content ) {
 	$uid = gend_society_ps_block_user();
 	$url = function_exists( 'bp_attachments_get_attachment' ) ? bp_attachments_get_attachment( 'url', array( 'object_dir' => 'members', 'item_id' => $uid ) ) : '';
-	if ( ! $url && function_exists( 'youzify_option' ) ) {
-		$url = youzify_option( 'youzify_default_profiles_cover', '' );
+	if ( ! $url && function_exists( 'gend_sn_option' ) ) {
+		$url = gend_sn_option( 'youzify_default_profiles_cover', '' );
 	}
 	$style = sprintf(
 		'min-height:%dpx;background-image:linear-gradient(rgba(0,0,0,%s),rgba(0,0,0,%s))%s;background-size:cover;background-position:center;display:flex;flex-direction:column;justify-content:flex-end;',
