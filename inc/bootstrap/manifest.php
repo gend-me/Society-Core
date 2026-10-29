@@ -667,6 +667,12 @@ return array(
 			'note'  => 'Container-side agent provisioning rail.',
 		),
 		array(
+			'file'  => 'inc/user-site-credentials.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Feature-scoped desktop chat editing: links a site account to its gend.me user at "Sign in with gend.me" and mints a site-pinned Application Password for that person (signed by gend.me). Must load after agent-provision.php (uses its signature verifier).',
+		),
+		array(
 			'file'  => 'inc/agent-chat.php',
 			'tier'  => 'container',
 			'needs' => array(),
