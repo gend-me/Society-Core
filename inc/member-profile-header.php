@@ -119,7 +119,10 @@ function gend_society_handle_wallet_topup_purchase() {
         if ( (int) get_post_meta( $pkg, '_aipa_token_package_amount', true ) <= 0 || 'publish' !== get_post_status( $pkg ) ) {
             wp_safe_redirect( $back ); exit;
         }
-        WC()->cart->add_to_cart( $pkg );
+        // qty: a custom dollar amount bought as N units of a pack (the desktop app's Top Up
+        // "Custom amount" uses the smallest pack); leo credits tokens per unit x quantity.
+        // Capped so a typo can't build a huge order.
+        WC()->cart->add_to_cart( $pkg, min( 100000, max( 1, $qty ) ) );
 
     } elseif ( 'ai' === $kind ) {
         if ( ! class_exists( 'AIPA_Commerce' ) ) { wp_safe_redirect( $back ); exit; }
