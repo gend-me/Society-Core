@@ -360,10 +360,10 @@ $S['no-options'] = function () {
 	$S = gs111_scenario();
 	gs111_assert( 'done' === ( $S['delta_r']['status'] ?? '' ), 'noopt-done', 'delta job finished' );
 	gs111_assert( false === strpos( $S['sql'], 'wp_options' ) && false === strpos( $S['sql'], 'gs111_opt' ) && false === strpos( $S['sql'], 'changed after the base' ), 'noopt-sql', 'no wp_options statement and the option changed after the base is not exported' );
-	gs111_assert( ! preg_match( '/`wp_(users|usermeta|options)`/', $S['sql'] ), 'noopt-no-users', 'no wp_users / wp_usermeta / wp_options (users arrive in 111-07)' );
+	gs111_assert( ! preg_match( '/`wp_options`/', $S['sql'] ), 'noopt-no-options-table', 'no wp_options statement (new users arrive in the 111-07 users part)' );
 	gs111_assert( ! in_array( 'wp_options', (array) ( $S['dmanifest']['tables'] ?? array() ), true ), 'noopt-manifest', 'manifest tables[] has no wp_options' );
-	gs111_assert( empty( $S['delta_end']['tables'] ) && empty( $S['delta_end']['parts']['users'] ), 'noopt-no-table-dump', 'the delta job has no table list and no users parts' );
-	gs111_assert( 0 === strpos( $S['sql'], "SET NAMES utf8mb4;" ), 'noopt-header', 'parts start with the usual SET header (no CREATE/DROP)' );
+	gs111_assert( empty( $S['delta_end']['tables'] ), 'noopt-no-table-dump', 'the delta job has no full-export table list' );
+	gs111_assert( 0 !== strpos( $S['sql'], 'SET ' ) && ! preg_match( '/^SET /m', $S['sql'] ), 'noopt-header', 'delta parts carry statements only: no SET header (the importer scan accepts none), no CREATE/DROP (111-07)' );
 };
 
 $S['manifest-shape'] = function () {
@@ -375,7 +375,7 @@ $S['manifest-shape'] = function () {
 	gs111_assert( ( $m['anchor']['taken_at_gmt'] ?? '' ) === $S['T'] && 300 === ( $m['anchor']['overlap_s'] ?? 0 ) && 2 === count( (array) ( $m['anchor'] ?? array() ) ), 'shape-anchor', 'anchor {taken_at_gmt = base start, overlap_s 300}' );
 	$tables = (array) ( $m['tables'] ?? array() );
 	sort( $tables );
-	gs111_assert( $tables === array( 'wp_commentmeta', 'wp_comments', 'wp_postmeta', 'wp_posts', 'wp_term_relationships' ), 'shape-tables', 'tables[] lists the five whitelisted tables', wp_json_encode( $tables ) );
+	gs111_assert( ! array_diff( array( 'wp_commentmeta', 'wp_comments', 'wp_postmeta', 'wp_posts', 'wp_term_relationships' ), $tables ) && ! array_diff( $tables, array( 'wp_commentmeta', 'wp_comments', 'wp_postmeta', 'wp_posts', 'wp_term_relationships', 'wp_terms', 'wp_term_taxonomy', 'wp_termmeta', 'wp_users', 'wp_usermeta', 'wp_wc_orders', 'wp_wc_orders_meta', 'wp_wc_order_addresses', 'wp_wc_order_operational_data', 'wp_wc_order_items', 'wp_wc_order_itemmeta' ) ), 'shape-tables', 'tables[] lists the five plan-05 tables plus only whitelisted 111-07 ones', wp_json_encode( $tables ) );
 	$c = (array) ( $m['counts'] ?? array() );
 	gs111_assert( isset( $c['posts'], $c['postmeta'], $c['term_relationships'], $c['comments'], $c['commentmeta'] ) && $c['posts'] >= 2 && $c['comments'] >= 2 && $c['postmeta'] >= 1, 'shape-counts', 'counts{} per table', wp_json_encode( $c ) );
 	gs111_assert( isset( $m['watermark']['taken_at_gmt'] ) && isset( $m['parts']['db'][0]['sha256'] ), 'shape-parts', 'own watermark and db parts with sha256 present' );
