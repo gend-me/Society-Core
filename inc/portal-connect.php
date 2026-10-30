@@ -424,6 +424,18 @@ if (!function_exists('gend_society_portal_connect_standalone_redirect')) {
 	}
 }
 
+if (!function_exists('gend_society_portal_connect_moved_refuse')) {
+	/**
+	 * 111-12 (MIG-11): after Live the origin must not disconnect: Disconnect cancels the membership and would lapse the
+	 * container's plan. The nonce was already checked by the caller; this ends the request with the existing failure path.
+	 */
+	function gend_society_portal_connect_moved_refuse() {
+		if (function_exists('gend_society_origin_moved') && gend_society_origin_moved()['moved']) {
+			gend_society_portal_connect_standalone_redirect('error', __('This site has moved; disconnecting would cancel the new site\'s plan.', 'gend-society'));
+		}
+	}
+}
+
 if (!function_exists('gend_society_portal_connect_handle_standalone')) {
 	/**
 	 * admin-post gend_society_portal_connect_submit on a standalone install.
@@ -437,6 +449,7 @@ if (!function_exists('gend_society_portal_connect_handle_standalone')) {
 				return;
 			case 'disconnect_local':
 				check_admin_referer('gend_society_disconnect_local', 'gend_society_disconnect_local_nonce');
+				gend_society_portal_connect_moved_refuse();
 				gend_society_portal_connect_forget_local();
 				gend_society_portal_connect_standalone_redirect('success', __('Disconnected on this site only. gend.me still holds this site\'s record, and its token stays valid there until you reconnect (which replaces it) or a gend.me admin removes it.', 'gend-society'));
 				return;
@@ -592,6 +605,7 @@ if (!function_exists('gend_society_portal_connect_standalone_disconnect')) {
 	 */
 	function gend_society_portal_connect_standalone_disconnect() {
 		check_admin_referer('gs_portal_connect_disconnect', 'gs_portal_connect_nonce');
+		gend_society_portal_connect_moved_refuse();
 
 		if ('' === (string) get_option('gend_society_install_token', '') || '' === (string) get_option('gend_society_install_id', '')) {
 			gend_society_portal_connect_forget_local();
@@ -949,7 +963,8 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 		$owner_id     = gend_society_portal_connect_owner_id();
 		$owner        = $owner_id > 0 ? get_userdata($owner_id) : false;
 		$health       = get_option('gend_society_connection_health', array());
-		$unauthorized = is_array($health) && isset($health['status']) && 'unauthorized' === $health['status'];
+		$moved        = function_exists('gend_society_origin_moved') ? gend_society_origin_moved() : array('moved' => false, 'to' => '');
+		$unauthorized = is_array($health) && isset($health['status']) && 'unauthorized' === $health['status'] && empty($moved['moved']); // 111-12: no Reconnect once the site has moved
 		$can_owner    = gend_society_portal_connect_can_manage_owner(get_current_user_id());
 		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- display only.
 		$disconnect_failed = !empty($_GET['gs_disconnect_failed']);
@@ -1035,6 +1050,10 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 				</form>
 			<?php endif; ?>
 <?php /* @build-only-end wporg */ ?>
+<?php if (!empty($moved['moved'])) : /* 111-12: Disconnect and Reconnect are hidden after Live (Disconnect would cancel the new site's plan). */ ?>
+				<h3><?php esc_html_e('This site has moved', 'gend-society'); ?></h3>
+				<p data-gs-moved-connect="1"><?php esc_html_e('Your site now runs on', 'gend-society'); ?> <a href="<?php echo esc_url($moved['to']); ?>" target="_blank" rel="noopener noreferrer"><?php echo esc_html($moved['to']); ?></a>. <?php esc_html_e('Disconnecting is turned off here: it would cancel the new site\'s plan.', 'gend-society'); ?></p>
+<?php else : ?>
 			<h3><?php esc_html_e('Disconnect', 'gend-society'); ?></h3>
 			<?php $billing = function_exists('gend_society_plan_disconnect_billing') ? gend_society_plan_disconnect_billing() : null; ?>
 			<?php if ($billing) : ?>
@@ -1072,6 +1091,7 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 					</form>
 				</div>
 			<?php endif; ?>
+<?php endif; /* moved */ ?>
 
 			<?php if ($can_owner) : ?>
 				<?php $candidates = gend_society_portal_connect_owner_candidates(); ?>

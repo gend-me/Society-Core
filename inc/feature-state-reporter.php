@@ -48,6 +48,34 @@ function gend_society_feature_state_collect_active_plugins() {
 }
 
 /**
+ * The address this report is sent for (111-12, MIG-11): the hub refuses a report for a site that has moved unless it
+ * comes from the new site. On the ORIGIN it is home_url(). In a CONTAINER (a Host-keyed home_url() answers whichever
+ * host the request came in on) it is the stable canonical host written by the importer (option
+ * gend_society_canonical_host), falling back to the host of the raw stored home option.
+ *
+ * @return string An http(s) URL, or '' when none can be determined.
+ */
+function gend_society_feature_state_site_url() {
+    $container = function_exists('gend_society_runtime_mode') && 'container' === gend_society_runtime_mode();
+    if (!apply_filters('gend_society_feature_state_is_container', $container)) { // the filter lets tests force it
+        return home_url();
+    }
+    $host = strtolower(trim((string) get_option('gend_society_canonical_host', '')));
+    if ('' !== $host && preg_match('/^[a-z0-9]([a-z0-9.-]{0,251}[a-z0-9])?$/', $host)) {
+        return 'https://' . $host;
+    }
+    // The raw stored value: the Host-keyed pre_option filter (111-06) is bypassed on purpose.
+    if (defined('WP_HOME') && is_string(WP_HOME) && '' !== WP_HOME) {
+        $raw = WP_HOME;
+    } else {
+        global $wpdb;
+        $raw = (string) $wpdb->get_var($wpdb->prepare("SELECT option_value FROM {$wpdb->options} WHERE option_name = %s LIMIT 1", 'home')); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+    }
+    $parts = wp_parse_url($raw);
+    return is_array($parts) && !empty($parts['host']) ? 'https://' . strtolower((string) $parts['host']) : '';
+}
+
+/**
  * Push the current active-plugin list to the hub. Best-effort: failures
  * are logged via error_log but never surfaced — the reporter is a
  * background optimisation, not a critical path.
@@ -64,6 +92,10 @@ function gend_society_feature_state_report_now() {
     if ((string) get_option('gend_society_install_token', '') === '') {
         return false;
     }
+    // 111-12 (MIG-11): after Live the origin must not overwrite the container's list (the hub also refuses it).
+    if (function_exists('gend_society_origin_moved') && gend_society_origin_moved()['moved']) {
+        return false;
+    }
     // @build-only-begin wporg
     // wordpress.org build: the plugin list is sent only after the owner opts in.
     if (function_exists('gend_society_data_sharing_allowed') && !gend_society_data_sharing_allowed('plugin_list')) {
@@ -75,6 +107,10 @@ function gend_society_feature_state_report_now() {
         'plugins'     => gend_society_feature_state_collect_active_plugins(),
         'reported_at' => time(),
     );
+    $site_url = gend_society_feature_state_site_url();
+    if ('' !== $site_url) {
+        $body['site_url'] = $site_url;
+    }
     $resp = gend_society_remote_membership_call('features-state', $body, 'POST');
     if (is_wp_error($resp)) {
         if (function_exists('error_log')) {

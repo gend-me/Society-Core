@@ -3,7 +3,7 @@
  *
  * After the page has fully loaded, and only when the server says a check is
  * due (localized `due`), ask admin-ajax `gend_society_connection_health`.
- * On "unauthorized" the returned Reconnect notice is inserted after the first
+ * On "unauthorized" (or, 111-12, when the site has moved) the returned notice is inserted after the first
  * `.wrap h1` (or at the top of #wpbody-content) unless one is already shown.
  * Dismissing the notice tells the server which check was dismissed.
  * No timers, no polling: one request at most per admin page load.
@@ -75,7 +75,7 @@
 			return;
 		}
 		post('gend_society_connection_health', {}).then(function (r) {
-			if (r && r.status === 'unauthorized' && r.notice_html && cfg.inject) {
+			if (r && (r.status === 'unauthorized' || r.moved) && r.notice_html && cfg.inject) {
 				insertNotice(r.notice_html);
 			}
 		}).catch(function () {});

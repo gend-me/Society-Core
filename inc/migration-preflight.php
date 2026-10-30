@@ -744,6 +744,14 @@ if ( ! function_exists( 'gend_society_migration_view' ) ) {
 			$v['can_cancel'] = false;
 			$v['can_start']  = false;
 		}
+		if ( function_exists( 'gend_society_origin_moved' ) && gend_society_origin_moved()['moved'] ) {
+			// 111-12: the stored hub block says Live although a stale /membership cache still shows an armed state: no
+			// header progress, no Start / Retry / Cancel controls.
+			$v['live']       = true;
+			$v['can_start']  = false;
+			$v['can_retry']  = false;
+			$v['can_cancel'] = false;
+		}
 		return $v;
 	}
 }
@@ -1226,6 +1234,9 @@ if ( ! function_exists( 'gend_society_migration_cta_mode' ) ) {
 	 * @param array $payload /membership payload.
 	 */
 	function gend_society_migration_cta_mode( array $payload ): string {
+		if ( function_exists( 'gend_society_origin_moved' ) && gend_society_origin_moved()['moved'] ) {
+			return ''; // 111-12: the stored hub block says Live; a stale membership cache must not offer Start again
+		}
 		$v = gend_society_migration_view( $payload );
 		if ( $v['live'] || $v['index'] >= 5 ) {
 			return '';
