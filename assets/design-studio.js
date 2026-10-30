@@ -1023,6 +1023,11 @@
 				return originList( get( v, 'settings.color.palette' ) ).length;
 			} )
 		);
+		// The site's own saved palette first, so trying a scheme can be undone with one click.
+		var saved = S.gsSaved ? JSON.parse( S.gsSaved ) : null;
+		if ( originList( get( saved, 'settings.color.palette' ) ).length ) {
+			schemes.unshift( { title: __( 'Your saved palette', 'gend-society' ), settings: { color: { palette: get( saved, 'settings.color.palette' ) } }, styles: saved.styles || {} } );
+		}
 		// Full style variations and colour-only ones often share a palette: show each palette once.
 		var seenKeys = {};
 		schemes = schemes.filter( function ( v ) {
@@ -1521,6 +1526,7 @@
 		{ id: 'p', label: __( 'Paragraph', 'gend-society' ), base: 'styles', sample: __( 'Comfortable reading for every paragraph on your site.', 'gend-society' ) },
 		{ id: 'a', label: __( 'Link', 'gend-society' ), base: 'styles.elements.link', sample: __( 'A link that stands out', 'gend-society' ) },
 		{ id: 'button', label: __( 'Buttons', 'gend-society' ), base: 'styles.elements.button', sample: __( 'Get started', 'gend-society' ) },
+		{ id: 'code', label: __( 'Labels & code', 'gend-society' ), base: 'styles.blocks.core/code', sample: __( 'SYSTEM // ACTIVE', 'gend-society' ) },
 	];
 	var WEIGHT_NAMES = { 100: __( 'Thin', 'gend-society' ), 200: __( 'Extra light', 'gend-society' ), 300: __( 'Light', 'gend-society' ), 400: __( 'Regular', 'gend-society' ), 500: __( 'Medium', 'gend-society' ), 600: __( 'Semi bold', 'gend-society' ), 700: __( 'Bold', 'gend-society' ), 800: __( 'Extra bold', 'gend-society' ), 900: __( 'Black', 'gend-society' ) };
 
@@ -1580,13 +1586,22 @@
 		var s = fam.font_family_settings;
 		var faces = s.fontFace || [];
 		var familyId;
+		var have = [];
+		var faceKey = function ( f ) {
+			return String( f.fontWeight ) + '|' + ( f.fontStyle || 'normal' );
+		};
 		return api( { path: '/wp/v2/font-families?slug=' + encodeURIComponent( s.slug ) + '&_embed=true' } ).then( function ( found ) {
 			if ( found && found.length ) {
 				familyId = found[ 0 ].id;
-				var installed = ( found[ 0 ]._embedded && found[ 0 ]._embedded.font_faces ) || [];
-				return installed.length ? installed.map( function ( f ) {
+				// Installed before (perhaps only some styles): add the styles it is missing.
+				have = ( ( found[ 0 ]._embedded && found[ 0 ]._embedded.font_faces ) || [] ).map( function ( f ) {
 					return f.font_face_settings;
-				} ) : null;
+				} );
+				var keys = have.map( faceKey );
+				faces = faces.filter( function ( f ) {
+					return keys.indexOf( faceKey( f ) ) === -1;
+				} );
+				return faces.length ? null : have;
 			}
 			var fd = new window.FormData();
 			fd.append( 'font_family_settings', JSON.stringify( { name: s.name, slug: s.slug, fontFamily: s.fontFamily, preview: s.preview } ) );
@@ -1598,7 +1613,7 @@
 			if ( existing ) {
 				return existing;
 			}
-			var out = [];
+			var out = have.slice();
 			// One style at a time: download the file from Google, upload it to this site.
 			return faces.reduce( function ( chain, face, i ) {
 				return chain.then( function () {
@@ -1615,7 +1630,7 @@
 						return api( { path: '/wp/v2/font-families/' + familyId + '/font-faces', method: 'POST', body: fd } );
 					} ).then( function ( r ) {
 						out.push( r.font_face_settings );
-						onProgress( out.length, faces.length );
+						onProgress( out.length - have.length, faces.length );
 					} );
 				} );
 			}, Promise.resolve() ).then( function () {
@@ -1681,11 +1696,15 @@
 			var q = search.value.trim().toLowerCase();
 			var have = {};
 			fontFamilies().forEach( function ( f ) {
-				have[ f.slug ] = 1;
+				have[ f.slug ] = ( f.fontFace || [] ).length || 1;
 			} );
+			// Installed families stay listed while they miss styles (picking one adds them).
+			var partial = function ( st ) {
+				return have[ st.slug ] && have[ st.slug ] < ( st.fontFace || [] ).length;
+			};
 			var list = S.google.font_families.filter( function ( f ) {
 				var st = f.font_family_settings;
-				return ! have[ st.slug ] && ( ! q || st.name.toLowerCase().indexOf( q ) !== -1 ) && ( ! cat || ( f.categories || [] ).indexOf( cat ) !== -1 );
+				return ( ! have[ st.slug ] || partial( st ) ) && ( ! q || st.name.toLowerCase().indexOf( q ) !== -1 ) && ( ! cat || ( f.categories || [] ).indexOf( cat ) !== -1 );
 			} );
 			google.textContent = '';
 			list.slice( 0, limit ).forEach( function ( f ) {
@@ -1707,7 +1726,7 @@
 						overlay.classList.remove( 'is-busy' );
 						status.textContent = errMsg( e );
 					} );
-				} }, st.preview ? h( 'img', { class: 'gs-st-font-preview', src: st.preview, alt: st.name, loading: 'lazy' } ) : h( 'span', { class: 'gs-st-font-name' }, st.name ), h( 'small', null, sprintf( __( '%d styles', 'gend-society' ), ( st.fontFace || [] ).length ) ) ) );
+				} }, st.preview ? h( 'img', { class: 'gs-st-font-preview', src: st.preview, alt: st.name, loading: 'lazy' } ) : h( 'span', { class: 'gs-st-font-name' }, st.name ), h( 'small', null, partial( st ) ? sprintf( __( '%1$d of %2$d styles · add the rest', 'gend-society' ), have[ st.slug ], ( st.fontFace || [] ).length ) : sprintf( __( '%d styles', 'gend-society' ), ( st.fontFace || [] ).length ) ) ) );
 			} );
 			if ( list.length > limit ) {
 				google.appendChild( h( 'button', { type: 'button', class: 'gs-st-btn is-ghost', onclick: function () {

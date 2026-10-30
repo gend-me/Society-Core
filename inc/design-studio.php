@@ -1066,6 +1066,10 @@ function gend_society_studio_rest_preview_css( WP_REST_Request $request ) {
 	$css     = $tree->get_stylesheet( array( 'variables' ), $origins )
 		. $tree->get_stylesheet( array( 'presets' ), $origins )
 		. $tree->get_stylesheet( array( 'styles' ), $origins );
+	if ( function_exists( 'gend_society_bt_role_css' ) ) {
+		$raw  = $tree->get_raw_data();
+		$css .= gend_society_bt_role_css( isset( $raw['styles'] ) ? $raw['styles'] : array() );
+	}
 
 	// The CSS goes into a <style> element in a same-origin preview frame; never let it close that element.
 	$css = str_ireplace( '</style', '', $css );
@@ -1253,7 +1257,7 @@ function gend_society_studio_specimen_page() {
 		<header class="gsg-chapter-head">
 			<span class="gsg-num">03</span>
 			<div class="gsg-chapter-title"><?php esc_html_e( 'Typography', 'gend-society' ); ?></div>
-			<div class="gsg-chapter-lede"><?php esc_html_e( 'Two voices: one to announce, one to explain. The scale below is the system every page is set in.', 'gend-society' ); ?></div>
+			<div class="gsg-chapter-lede"><?php esc_html_e( 'One voice to announce, one to explain, and the details that act and label. The scale below is the system every page is set in.', 'gend-society' ); ?></div>
 		</header>
 		<div class="gsg-faces" id="gsg-faces">
 			<div class="gsg-face">
@@ -1267,6 +1271,18 @@ function gend_society_studio_specimen_page() {
 				<div class="gsg-canvas gsg-face-glyph"><p data-gsg-font="body">Aa</p></div>
 				<div class="gsg-face-name" data-gsg-name="body">—</div>
 				<div class="gsg-canvas gsg-face-set"><p>ABCDEFGHIJKLM NOPQRSTUVWXYZ abcdefghijklm nopqrstuvwxyz 0123456789 &amp;!?</p></div>
+			</div>
+			<div class="gsg-face">
+				<div class="gsg-face-role"><?php esc_html_e( 'Buttons', 'gend-society' ); ?></div>
+				<div class="gsg-canvas gsg-face-glyph"><p data-gsg-font="button" style="font-family:var(--gs-font-button)">Aa</p></div>
+				<div class="gsg-face-name" data-gsg-name="button">—</div>
+				<div class="gsg-canvas gsg-face-set"><p style="font-family:var(--gs-font-button)">ABCDEFGHIJKLM NOPQRSTUVWXYZ 0123456789</p></div>
+			</div>
+			<div class="gsg-face">
+				<div class="gsg-face-role"><?php esc_html_e( 'Labels & code', 'gend-society' ); ?></div>
+				<div class="gsg-canvas gsg-face-glyph"><p data-gsg-font="mono" style="font-family:var(--gs-font-mono)">Aa</p></div>
+				<div class="gsg-face-name" data-gsg-name="mono">—</div>
+				<div class="gsg-canvas gsg-face-set"><p style="font-family:var(--gs-font-mono)">ABCDEFGHIJKLM NOPQRSTUVWXYZ 0123456789 // {}</p></div>
 			</div>
 		</div>
 		<div class="gsg-scale">
