@@ -207,10 +207,12 @@ add_action( 'wp_enqueue_scripts', 'gend_society_yz_preload_libraries', 100 );
  * the synchronous copy jQuery would fetch.
  */
 function gend_society_yz_preload_libraries() {
-	if ( is_admin() || ! wp_script_is( 'youzify', 'enqueued' ) || ! defined( 'YOUZIFY_ASSETS' ) ) {
+	if ( is_admin() || ! wp_script_is( 'youzify', 'enqueued' ) || ! function_exists( 'gend_sn_script_url' ) ) {
 		return;
 	}
-	$ver  = defined( 'YOUZIFY_VERSION' ) ? YOUZIFY_VERSION : GEND_SOCIETY_VERSION;
+	$ver = function_exists( 'gend_sn_version' ) ? gend_sn_version() : GEND_SOCIETY_VERSION;
+	// Youzify's stylesheet (which styled these dropdowns) no longer loads; the script still builds them.
+	wp_enqueue_style( 'gend-society-nice-select', GEND_SOCIETY_URL . 'assets/nice-select.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/nice-select.css' ) );
 	$libs = array(
 		'nice-select' => array( 'jquery' ),
 		'autosize'    => array( 'jquery' ),
@@ -223,7 +225,7 @@ function gend_society_yz_preload_libraries() {
 	$names = array();
 	foreach ( $libs as $name => $deps ) {
 		$handle = 'gend-society-yz-' . $name;
-		wp_enqueue_script( $handle, YOUZIFY_ASSETS . 'js/youzify-' . $name . '.min.js', $deps, $ver, true );
+		wp_enqueue_script( $handle, gend_sn_script_url( $name ), $deps, $ver, true );
 		$names[] = $name;
 		// Youzify's script runs after the libraries it calls straight away.
 		if ( 'live-notifications' !== $name ) {
