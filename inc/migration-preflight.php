@@ -759,9 +759,9 @@ if ( ! function_exists( 'gend_society_migration_view_shows' ) ) {
 }
 
 if ( ! function_exists( 'gend_society_migration_view_polls' ) ) {
-	/** Repaint every 15 s while armed, scheduled or running; stop when Live or failed. */
+	/** Repaint every 15 s while armed, scheduled or running; stop when Live, failed or in Preview (111-10: nothing moves on its own in Preview). */
 	function gend_society_migration_view_polls( array $v ): bool {
-		return gend_society_migration_view_shows( $v ) && 'failed' !== $v['state'];
+		return gend_society_migration_view_shows( $v ) && ! in_array( $v['state'], array( 'failed', 'preview' ), true );
 	}
 }
 

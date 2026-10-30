@@ -194,3 +194,52 @@ function gend_society_render_hosting_domains_panel( $payload = array() ) {
     }
 }
 endif;
+
+if ( ! function_exists( 'gend_society_migration_go_live_ajax' ) ) {
+    /**
+     * Phase 111-10 (MIG-10, P1): "Make live now" in the Domains panel. admin-ajax gend_society_migration_go_live:
+     * manage_options + the panel nonce (gs_membership_action). The hub is the authority: it refuses (409) anything but
+     * a Preview install; this handler also refuses locally when the fresh payload does not show Preview, so a stale
+     * button never posts. Calls POST /install/{id}/migration/go-live through the token proxy (the token never reaches
+     * the browser) and refetches the payload so the reload paints Live.
+     */
+    function gend_society_migration_go_live_ajax(): void {
+        if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
+        }
+        check_ajax_referer( 'gs_membership_action', 'nonce' );
+        if ( ! function_exists( 'gend_society_remote_membership_call' ) ) {
+            wp_send_json_error( array( 'message' => __( 'Not available.', 'gend-society' ) ), 404 );
+        }
+        if ( function_exists( 'gend_society_remote_membership_invalidate' ) ) {
+            gend_society_remote_membership_invalidate();
+        }
+        $payload = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+        $mig     = is_array( $payload ) && is_array( $payload['migration'] ?? null ) ? $payload['migration'] : array();
+        if ( empty( $mig['preview'] ) || ! empty( $mig['live'] ) ) {
+            wp_send_json_error( array( 'message' => __( 'Your site is not in Preview, so there is nothing to switch.', 'gend-society' ), 'code' => 'not_preview' ), 409 );
+        }
+        $r = gend_society_remote_membership_call( 'migration/go-live', array(), 'POST' );
+        if ( is_wp_error( $r ) ) {
+            $d = $r->get_error_data();
+            wp_send_json_error(
+                array(
+                    'message' => $r->get_error_message(),
+                    'code'    => $r->get_error_code(),
+                ),
+                is_array( $d ) && isset( $d['status'] ) ? (int) $d['status'] : 400
+            );
+        }
+        gend_society_remote_membership_invalidate();
+        if ( function_exists( 'gend_society_remote_membership_get_cached' ) ) {
+            gend_society_remote_membership_get_cached(); // Refetch now so the reload paints Live (and the container learns it).
+        }
+        wp_send_json_success(
+            array(
+                'ok'    => true,
+                'state' => (string) ( $r['state'] ?? 'complete' ),
+            )
+        );
+    }
+}
+add_action( 'wp_ajax_gend_society_migration_go_live', 'gend_society_migration_go_live_ajax' );

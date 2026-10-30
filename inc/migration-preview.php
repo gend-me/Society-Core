@@ -9,7 +9,7 @@
  *   - The marker: the container's own option gend_society_container_preview (value = the time it was set). It is set
  *     the first time an admin-side membership fetch shows migration.preview (the importer image has no hook into this
  *     plugin, so this is the container's first chance to learn it). A non-migrated container never has it.
- *   - noindex (send_headers X-Robots-Tag + wp_robots) is sent when the cached payload says the request host is the
+ *   - noindex (X-Robots-Tag through wp_headers + wp_robots) is sent when the cached payload says the request host is the
  *     preview_url host and migration.live is false, or, with no cached migration block, only while the marker is set.
  *     There is NO host-pattern fallback (a *.gend.me host alone never makes a page noindex).
  *   - Clearing: the marker goes when Live is learned, either from the verified-domains record the 5-minute WP-Cron sync
@@ -70,15 +70,22 @@ if ( ! function_exists( 'gend_society_preview_noindex_active' ) ) {
 	}
 }
 
-if ( ! function_exists( 'gend_society_preview_send_headers' ) ) {
-	function gend_society_preview_send_headers(): void {
-		if ( is_admin() || ! gend_society_preview_noindex_active() ) {
-			return;
+if ( ! function_exists( 'gend_society_preview_headers' ) ) {
+	/**
+	 * wp_headers (the headers WP::send_headers() emits for a front-end request): X-Robots-Tag noindex, nofollow.
+	 *
+	 * @param array $headers Headers about to be sent.
+	 * @return array
+	 */
+	function gend_society_preview_headers( $headers ) {
+		if ( ! is_array( $headers ) || is_admin() || ! gend_society_preview_noindex_active() ) {
+			return $headers;
 		}
-		header( 'X-Robots-Tag: noindex, nofollow', true );
+		$headers['X-Robots-Tag'] = 'noindex, nofollow';
+		return $headers;
 	}
 }
-add_action( 'send_headers', 'gend_society_preview_send_headers' );
+add_filter( 'wp_headers', 'gend_society_preview_headers', 99 );
 
 if ( ! function_exists( 'gend_society_preview_wp_robots' ) ) {
 	/**
