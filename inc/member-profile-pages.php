@@ -3805,14 +3805,17 @@ function gend_society_activity_hubs_subnav() {
     $nav->edit_nav( array( 'name' => __( 'Integration Hubs', 'gend-society' ), 'position' => 5 ), $slug, bp_get_activity_slug() );
 }
 
-// Inside the iframed feed, links that stay on this member's activity keep ?gdc_tab_only=1 (so the filters don't load
+// Inside the iframed feed / settings popup, links that stay in that section keep ?gdc_tab_only=1 (so the filters don't load
 // the whole profile again inside the frame); every other link opens in the main window.
 add_action( 'wp_footer', 'gend_society_tab_only_keep_links', 99 );
 function gend_society_tab_only_keep_links() {
     if ( empty( $_GET['gdc_tab_only'] ) || ! function_exists( 'bp_is_user' ) || ! bp_is_user() ) return;
     $base = function_exists( 'bp_displayed_user_url' ) ? bp_displayed_user_url() : ( function_exists( 'bp_displayed_user_domain' ) ? bp_displayed_user_domain() : '' );
     if ( ! $base ) return;
-    $path = wp_parse_url( trailingslashit( $base ) . bp_get_activity_slug() . '/', PHP_URL_PATH );
+    // Stay inside the frame for links within the section it shows (the activity feed, or the settings popup's tabs).
+    $component = function_exists( 'bp_current_component' ) ? (string) bp_current_component() : '';
+    $section   = ( $component && ! empty( buddypress()->{$component}->slug ) ) ? buddypress()->{$component}->slug : bp_get_activity_slug();
+    $path      = wp_parse_url( trailingslashit( $base ) . $section . '/', PHP_URL_PATH );
     ?>
     <script id="gdc-tab-only-links">
     (function () {
@@ -3850,6 +3853,9 @@ function gend_society_tab_only_lighten() {
     if ( empty( $_GET['gdc_tab_only'] ) ) return;
     // Heavy per-request renders (each does its own queries).
     remove_action( 'youzify_profile_before_header', 'gend_society_render_profile_header', 1 );
+    // Profile Styling (inc/profile-styling.php) swaps the header hook for its own renderer; drop that too, or the
+    // full header (and its PJAX nav script, which hijacks the feed filters) renders inside the iframe.
+    remove_action( 'youzify_profile_before_header', 'gend_society_ps_render_header', 1 );
     remove_action( 'bp_before_member_home_content', 'gend_society_inject_profile_page_embed', 1 );
     remove_action( 'wp_footer', 'gend_society_render_wallet_source', 5 );
     remove_action( 'wp_footer', 'gend_society_render_frontend_bar', 5 );

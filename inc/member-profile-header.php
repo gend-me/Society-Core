@@ -2787,6 +2787,7 @@ function gend_society_render_profile_header() {
                 if (i >= list.length) { done(); return; }
                 var item = list[i++];
                 var s = document.createElement('script');
+                if (item.type) s.type = item.type;
                 if (item.src) {
                     s.src = item.src;
                     s.onload = next;
@@ -2795,11 +2796,13 @@ function gend_society_render_profile_header() {
                     return;
                 }
                 s.textContent = item.text;
-                if (item.node && item.node.parentNode) {
-                    item.node.parentNode.replaceChild(s, item.node);
-                } else {
-                    document.head.appendChild(s);
-                }
+                try {   // one broken inline script must not stop the rest of the page's scripts
+                    if (item.node && item.node.parentNode) {
+                        item.node.parentNode.replaceChild(s, item.node);
+                    } else {
+                        document.head.appendChild(s);
+                    }
+                } catch (err) { if (window.console) console.warn('[gdc-nav-pjax] script failed', err); }
                 next();
             })();
         }
@@ -2852,15 +2855,18 @@ function gend_society_render_profile_header() {
                 var inContent = fresh.contains(s);
                 var target = null;
                 if (inContent) { target = importedScripts[contentIdx] || null; contentIdx++; }
+                // Data blocks (JSON, ld+json, importmap, templates) are not code: the swapped DOM already carries them.
+                var type = (s.getAttribute('type') || '').toLowerCase().trim();
+                if (type && type !== 'module' && !/(java|ecma)script/.test(type)) return;
                 if (s.src) {
                     if (seenSrc[s.src]) return;
                     seenSrc[s.src] = 1;
-                    list.push({ src: s.src });
+                    list.push({ src: s.src, type: type === 'module' ? 'module' : '' });
                     return;
                 }
                 var text = s.textContent || '';
                 if (!text) return;
-                list.push({ text: text, node: target });
+                list.push({ text: text, node: target, type: type === 'module' ? 'module' : '' });
             });
 
             document.title = doc.title || document.title;
