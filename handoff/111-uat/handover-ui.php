@@ -596,6 +596,10 @@ $S['cron-park-unpark'] = function () {
 	gs111ho_assert( false === $res && false === wp_next_scheduled( 'gs111ho_other_hook' ), 'cp-guard', 'a plugin cannot schedule a new event while parked (pre_schedule_event guard)' );
 	$res = wp_schedule_event( time() + 60, 'hourly', 'gs111ho_other_hook' );
 	gs111ho_assert( false === $res && array( 'version' => 2 ) === get_option( 'cron' ), 'cp-guard-recurring', 'nor a recurring one; the cron option stays parked' );
+	// A request that raced the park writes an event back into the cron option: the next request empties it again, the backup is untouched.
+	update_option( 'cron', array( time() + 600 => array( 'gs111ho_other_hook' => array( md5( 'x' ) => array( 'schedule' => false, 'args' => array() ) ) ), 'version' => 2 ) );
+	gend_society_origin_cron_reconcile();
+	gs111ho_assert( array( 'version' => 2 ) === get_option( 'cron' ) && get_option( 'gend_society_origin_cron_backup' ) === $orig, 'cp-heal', 'an event written back into the cron option after the park is removed on the next request; the backup is still the original' );
 	// Idempotent: a second park never overwrites the backup with the parked value.
 	gs111ho_assert( false === gend_society_origin_park_cron(), 'cp-idempotent', 'parking again does nothing' );
 	gs111ho_assert( get_option( 'gend_society_origin_cron_backup' ) === $orig, 'cp-backup-kept', 'and the backup is still the ORIGINAL schedule' );

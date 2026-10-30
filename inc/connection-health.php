@@ -388,6 +388,16 @@ if ( ! function_exists( 'gend_society_origin_cron_reconcile' ) ) {
 	function gend_society_origin_cron_reconcile(): void {
 		if ( false === get_option( 'gend_society_origin_moved', false ) && false !== get_option( 'gend_society_origin_cron_backup', false ) ) {
 			gend_society_origin_unpark_cron();
+			return;
+		}
+		// Parked: a request that loaded its options before the marker was written (a spawned wp-cron.php, an AJAX poll) can
+		// write events back into the cron option after the park (found by the 111-13 run: core's own housekeeping event came
+		// back). The next request puts the empty schedule back; the saved original in the backup is never touched.
+		if ( false !== get_option( 'gend_society_origin_moved', false ) && false !== get_option( 'gend_society_origin_cron_backup', false ) ) {
+			$cron = get_option( 'cron', array() );
+			if ( is_array( $cron ) && count( $cron ) > 1 ) {
+				update_option( 'cron', array( 'version' => 2 ) );
+			}
 		}
 	}
 }
