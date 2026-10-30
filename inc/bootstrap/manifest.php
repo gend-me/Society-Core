@@ -92,6 +92,12 @@ return array(
 			'note'  => 'Brand kit: Voice and Tone, App Styling and Cast Members for the Design Studio and the Brand Guidelines page; adds the brand brief to AI chats on this site (aipa_system_context) and serves it at /brand-kit/brief.',
 		),
 		array(
+			'file'  => 'inc/brand-tokens.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Brand font roles: --gs-font-heading/body/button/mono from Global Styles (Design Studio Font Types), on the front end, in block editors and in the studio preview, so hand-written page CSS follows the site fonts.',
+		),
+		array(
 			'file'  => 'inc/html-visual-edit.php',
 			'tier'  => 'core',
 			'needs' => array(),
