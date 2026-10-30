@@ -680,6 +680,12 @@ return array(
 			'note'  => '"Sign in with gend.me" on every site except gend.me itself; container tier since 106: hub + containers only; never standalone, never in the wordpress.org zip.',
 		),
 		array(
+			'file'  => 'inc/migration-preview.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Preview marker + noindex for a migrated container while it is in Preview (Phase 111-10). Options only on the front end; never in the wordpress.org zip.',
+		),
+		array(
 			'file'  => 'inc/container-host-urls.php',
 			'tier'  => 'container',
 			'needs' => array(),

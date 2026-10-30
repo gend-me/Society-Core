@@ -27,6 +27,8 @@ inc/support-access.php
 inc/migration-preflight.php
 inc/migration-export.php
 inc/migration-serve.php
+# Preview marker + noindex for a migrated container (Phase 111-10); container tier, listed here as belt and braces.
+inc/migration-preview.php
 # Chat-flow wireframe seed data (read only by the container-tier wireframe store)
 chatflows/
 
