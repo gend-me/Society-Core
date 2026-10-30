@@ -971,6 +971,11 @@ if ( ! function_exists( 'gend_society_migration_do' ) ) {
 		gend_society_migration_receive( (array) $answer );
 		if ( function_exists( 'gend_society_remote_membership_invalidate' ) ) {
 			gend_society_remote_membership_invalidate();
+			// Refetch now, inside this request, so the dashboard reload that follows paints the new state; left to the
+			// reload, a slow refetch falls back to the stale cached copy and the header lags until the next poll.
+			if ( function_exists( 'gend_society_remote_membership_get_cached' ) ) {
+				gend_society_remote_membership_get_cached();
+			}
 		}
 		gend_society_migration_poll_schedule();
 		return array( 'state' => (string) ( $answer['state'] ?? '' ) );
