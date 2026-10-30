@@ -1657,6 +1657,10 @@ if ( ! function_exists( 'gend_society_migration_report_progress' ) ) {
 		if ( $ready && ! empty( $job['ready_reported_at'] ) ) {
 			return 'skipped';
 		}
+		$delta = 'delta' === (string) ( $job['mode'] ?? 'full' );
+		if ( $delta && ! $ready ) {
+			return 'skipped'; // 111-11: the hub has no delta progress route; only the ready report (migration/delta/ready) goes out
+		}
 		$rep = (array) ( $job['report'] ?? array() );
 		if ( ! $force && (int) ( $rep['at'] ?? 0 ) > time() - 30 ) {
 			return 'throttled';
@@ -1691,11 +1695,12 @@ if ( ! function_exists( 'gend_society_migration_report_progress' ) ) {
 			'phase' => (string) $job['phase'],
 		);
 		// A short timeout: the report runs at the end of a tick that already used its budget (30 s hosts).
-		$short = static function ( $args, $url ) {
-			return false !== strpos( (string) $url, '/migration/progress' ) ? array_merge( $args, array( 'timeout' => 5 ) ) : $args;
+		$route = $delta ? 'migration/delta/ready' : 'migration/progress'; // 111-11: the catch-up reports through the delta route
+		$short = static function ( $args, $url ) use ( $route ) {
+			return false !== strpos( (string) $url, '/' . $route ) ? array_merge( $args, array( 'timeout' => 5 ) ) : $args;
 		};
 		add_filter( 'http_request_args', $short, 99, 2 );
-		$r = gend_society_remote_membership_call( 'migration/progress', $body, 'POST' );
+		$r = gend_society_remote_membership_call( $route, $body, 'POST' );
 		remove_filter( 'http_request_args', $short, 99 );
 		if ( is_wp_error( $r ) ) {
 			$code = (int) ( is_array( $r->get_error_data() ) ? ( $r->get_error_data()['status'] ?? 0 ) : 0 );

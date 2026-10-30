@@ -182,7 +182,16 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
         $out .= '<p>' . esc_html__( 'Your domain still points at your original site.', 'gend-society' ) . ' '
             . esc_html__( 'You can edit the preview, but the catch-up before you go live overwrites changes made to the same posts.', 'gend-society' ) . ' '
             . esc_html__( 'Nothing is switched until you add your domain or press Make live.', 'gend-society' ) . '</p>';
-        $out .= '<button type="button" class="gs-mship-action-btn is-secondary" data-gs-delta="1" disabled>' . esc_html__( 'Catch up changes', 'gend-society' ) . '</button>';
+        // 111-11 (MIG-13, P3): the catch-up control exists only on the ORIGIN (a connected standalone install exports there).
+        // Disabled until gend.me says a delta is available; the freeze warning is the click's confirm (gs-dashboard-standalone.js).
+        if ( function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired() ) {
+            $delta = isset( $migration['delta'] ) && is_array( $migration['delta'] ) ? $migration['delta'] : array();
+            $avail = ! empty( $delta['available'] );
+            $dst   = isset( $delta['state'] ) && is_string( $delta['state'] ) ? preg_replace( '/[^a-z]/', '', strtolower( $delta['state'] ) ) : 'idle';
+            $busy  = in_array( $dst, array( 'queued', 'exporting', 'applying' ), true );
+            $out  .= '<button type="button" class="gs-mship-action-btn is-secondary" data-gs-delta="1"' . ( $avail && ! $busy ? '' : ' disabled' ) . '>' . esc_html__( 'Catch up changes', 'gend-society' ) . '</button>';
+            $out  .= '<p class="gs-mship-mig__note" data-gs-delta-msg="1" data-gs-delta-state="' . esc_attr( '' !== $dst ? $dst : 'idle' ) . '" role="status"></p>';
+        }
         $out .= '</div>';
         return $out;
     }
@@ -859,7 +868,7 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_local_payload' ) ) {
             'status_label'   => '',
             'billing'        => array( 'amount' => 0, 'currency' => '', 'unit' => '', 'label' => '' ),
             'dates'          => array( 'created' => '', 'activated' => '', 'expires' => '', 'renews' => '' ),
-            'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array(), 'preview' => false, 'preview_url' => '', 'migrated_to' => '', 'migrated_at' => 0, 'domain_cutover' => false ),
+            'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array(), 'preview' => false, 'preview_url' => '', 'migrated_to' => '', 'migrated_at' => 0, 'domain_cutover' => false, 'delta' => array( 'available' => false, 'state' => 'idle' ) ),
             'dashboard_plan' => null,
             'hosting_plan'   => null,
             'customer'       => null,
@@ -3629,6 +3638,7 @@ function gend_society_membership_payload_from_local( $membership ) {
             'migrated_to'    => '',
             'migrated_at'    => 0,
             'domain_cutover' => false,
+            'delta'          => array( 'available' => false, 'state' => 'idle' ),
         ),
         'dashboard_plan' => $serialize_plan( $dash_plan ),
         'hosting_plan'   => $serialize_plan( $host_plan ),
@@ -3705,7 +3715,7 @@ function gend_society_membership_payload_group_only() {
         'status_label'   => '',
         'billing'        => array( 'amount' => 0, 'currency' => '', 'unit' => '', 'label' => '' ),
         'dates'          => array( 'created' => '', 'activated' => '', 'expires' => '', 'renews' => '' ),
-        'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array(), 'preview' => false, 'preview_url' => '', 'migrated_to' => '', 'migrated_at' => 0, 'domain_cutover' => false ),
+        'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array(), 'preview' => false, 'preview_url' => '', 'migrated_to' => '', 'migrated_at' => 0, 'domain_cutover' => false, 'delta' => array( 'available' => false, 'state' => 'idle' ) ),
         'dashboard_plan' => null,
         'hosting_plan'   => null,
         'customer'       => null,

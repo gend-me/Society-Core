@@ -236,6 +236,7 @@ function gend_society_dashboard_enqueue_standalone()
             'migPickTime' => __('Pick a date and time.', 'gend-society'),
             'migWorking'  => __('Working...', 'gend-society'),
             'migFailed'   => __('Something went wrong. Please try again.', 'gend-society'),
+            'deltaFreeze' => __('Avoid editing your original site while the catch-up runs; edits made after it starts are not copied. Deleted items are not copied either, and edits you made in the preview to the same posts are overwritten. Start the catch-up?', 'gend-society'),
         ),
     ));
 }

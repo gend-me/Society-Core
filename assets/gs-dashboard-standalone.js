@@ -344,6 +344,104 @@
 		migTick();
 	}
 
+	/*
+	 * 111-11 (MIG-13): the Catch up changes button in the Preview note. The click asks for the freeze warning, starts
+	 * the catch-up through this site's own admin-ajax (gend_society_migration_delta) and then repaints one status
+	 * line every 15 s (gend_society_migration_delta_state) until it is done or failed. While this site still prepares
+	 * the export the open tab drives the exporter too (gend_society_migration_tick), as for the full migration.
+	 */
+	var deltaPoll = null;
+	var deltaTicking = false;
+
+	function deltaBtn() {
+		return document.querySelector('[data-gs-delta]');
+	}
+
+	function deltaSay(msg) {
+		var m = document.querySelector('[data-gs-delta-msg]');
+		if (m) {
+			m.textContent = msg || '';
+		}
+	}
+
+	function deltaStopPoll() {
+		if (deltaPoll) {
+			window.clearInterval(deltaPoll);
+			deltaPoll = null;
+		}
+	}
+
+	function deltaTick() {
+		if (deltaTicking) {
+			return;
+		}
+		deltaTicking = true;
+		migPost('gend_society_migration_tick', {}, function (j) {
+			deltaTicking = false;
+			var st = j && j.success && j.data ? j.data.status : '';
+			if (st === 'running') {
+				window.setTimeout(deltaTick, 1000);
+			} else if (st === 'locked') {
+				window.setTimeout(deltaTick, 5000);
+			}
+		});
+	}
+
+	function deltaRefresh() {
+		migPost('gend_society_migration_delta_state', {}, function (j) {
+			if (!j || !j.success || !j.data) {
+				return;
+			}
+			var d = j.data;
+			deltaSay(d.line || '');
+			var b = deltaBtn();
+			if (b) {
+				b.disabled = !!d.poll;
+			}
+			if (d.poll) {
+				if (!deltaPoll) {
+					deltaPoll = window.setInterval(deltaRefresh, 15000);
+				}
+				if (d.tick) {
+					deltaTick();
+				}
+			} else {
+				deltaStopPoll();
+			}
+		});
+	}
+
+	document.addEventListener('click', function (ev) {
+		var btn = closest(ev.target, '[data-gs-delta]');
+		if (!btn) {
+			return;
+		}
+		ev.preventDefault();
+		if (btn.disabled) {
+			return;
+		}
+		if (!window.confirm(i18n.deltaFreeze || 'Avoid editing your original site while the catch-up runs; edits made after it starts are not copied.')) {
+			return;
+		}
+		btn.disabled = true;
+		deltaSay(i18n.migWorking || 'Working...');
+		migPost('gend_society_migration_delta', {}, function (j) {
+			if (j && j.success) {
+				deltaRefresh();
+				return;
+			}
+			btn.disabled = false;
+			deltaSay((j && j.data && j.data.message) || i18n.migFailed || 'Something went wrong. Please try again.');
+		});
+	});
+
+	function deltaStart() {
+		var m = document.querySelector('[data-gs-delta-msg]');
+		if (m && m.getAttribute('data-gs-delta-state') && m.getAttribute('data-gs-delta-state') !== 'idle') {
+			deltaRefresh(); // a fresh page load restores the line
+		}
+	}
+
 	// Only the paired hub, only this install, only this message type.
 	window.addEventListener('message', function (ev) {
 		if (!cfg.hubOrigin || ev.origin !== cfg.hubOrigin) {
@@ -362,6 +460,7 @@
 	});
 
 	window.addEventListener('pagehide', stopPoll);
+	window.addEventListener('pagehide', deltaStopPoll);
 
 	function qr() {
 		var $ = window.jQuery;
@@ -386,8 +485,10 @@
 	if (document.readyState === 'loading') {
 		document.addEventListener('DOMContentLoaded', qr);
 		document.addEventListener('DOMContentLoaded', migStart);
+		document.addEventListener('DOMContentLoaded', deltaStart);
 	} else {
 		qr();
 		migStart();
+		deltaStart();
 	}
 })();
