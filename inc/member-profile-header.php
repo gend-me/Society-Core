@@ -795,44 +795,64 @@ function gend_society_gas_unpaid_orders( $user_id ) {
 add_action( 'wp_ajax_gend_society_gas_pay_now', 'gend_society_gas_pay_now' );
 function gend_society_gas_pay_now() {
     check_ajax_referer( 'gend_society_gas_pay' );
-    $uid      = get_current_user_id();
     $group_id = isset( $_POST['group_id'] ) ? absint( $_POST['group_id'] ) : 0;
+    $r        = gend_society_gas_pay_now_core( get_current_user_id(), $group_id, 'the member profile' );
+    if ( is_wp_error( $r ) ) {
+        $data = $r->get_error_data();
+        wp_send_json_error( array( 'message' => $r->get_error_message() ), is_array( $data ) && isset( $data['status'] ) ? (int) $data['status'] : 400 );
+    }
+    wp_send_json_success( $r );
+}
+
+/**
+ * Pay Now, shared by the profile header (AJAX) and the desktop app's Gas Station
+ * (REST gdc-gas/v1/me/membership/{id}/pay-now). Returns { pay_url, amount, order_id }
+ * or a WP_Error with an HTTP status in its data.
+ *
+ * @param int    $uid      The paying user (must be the group's admin).
+ * @param int    $group_id The group whose compute gas is paid.
+ * @param string $source   Where the payment was started, for the order note.
+ * @return array|WP_Error
+ */
+function gend_society_gas_pay_now_core( $uid, $group_id, $source = 'the member profile' ) {
+    $uid      = (int) $uid;
+    $group_id = (int) $group_id;
     if ( ! $uid || ! $group_id || ! function_exists( 'groups_is_user_admin' ) || ! groups_is_user_admin( $uid, $group_id ) ) {
-        wp_send_json_error( array( 'message' => 'Only a group admin can pay this group\'s compute gas.' ), 403 );
+        return new WP_Error( 'gas_pay_forbidden', 'Only a group admin can pay this group\'s compute gas.', array( 'status' => 403 ) );
     }
     $ns = '\\WP_Ultimo\\Integrations\\';
     foreach ( array( 'gdc_gas_usage_create_order', 'gdc_gas_usage_mark_rows', 'gdc_gas_usage_install_schema', 'gdc_gas_usage_log_reserve', 'gdc_gas_usage_sum' ) as $fn ) {
         if ( ! function_exists( $ns . $fn ) ) {
-            wp_send_json_error( array( 'message' => 'Compute Gas billing is not available right now.' ), 503 );
+            return new WP_Error( 'gas_pay_unavailable', 'Compute Gas billing is not available right now.', array( 'status' => 503 ) );
         }
     }
 
     global $wpdb;
     $lock = 'gs_gas_pay_' . $uid;
     if ( '1' !== (string) $wpdb->get_var( $wpdb->prepare( 'SELECT GET_LOCK(%s, 10)', $lock ) ) ) {
-        wp_send_json_error( array( 'message' => 'Another payment is being prepared. Try again in a moment.' ), 409 );
+        return new WP_Error( 'gas_pay_busy', 'Another payment is being prepared. Try again in a moment.', array( 'status' => 409 ) );
     }
     try {
         // An unpaid usage order already exists: pay that one first.
         $unpaid = gend_society_gas_unpaid_orders( $uid );
         if ( $unpaid ) {
             $o = $unpaid[0];
-            wp_send_json_success( array( 'pay_url' => $o->get_checkout_payment_url(), 'amount' => wc_format_decimal( $o->get_total(), 2 ), 'order_id' => $o->get_id() ) );
+            return array( 'pay_url' => $o->get_checkout_payment_url(), 'amount' => wc_format_decimal( $o->get_total(), 2 ), 'order_id' => $o->get_id() );
         }
 
         if ( ! \WP_Ultimo\Integrations\gdc_gas_usage_install_schema() ) {
-            wp_send_json_error( array( 'message' => 'Compute Gas billing is not ready yet.' ), 503 );
+            return new WP_Error( 'gas_pay_unavailable', 'Compute Gas billing is not ready yet.', array( 'status' => 503 ) );
         }
         $rows = gend_society_gas_billable_rows( $group_id );
         $ids  = array_map( 'intval', wp_list_pluck( $rows, 'id' ) );
         if ( ! $ids ) {
-            wp_send_json_error( array( 'message' => 'There is no compute gas to pay.' ), 400 );
+            return new WP_Error( 'gas_pay_nothing', 'There is no compute gas to pay.', array( 'status' => 400 ) );
         }
         $total  = \WP_Ultimo\Integrations\gdc_gas_usage_sum( $ids );
         $peg    = function_exists( $ns . 'gdc_gas_to_cad_peg' ) ? (float) \WP_Ultimo\Integrations\gdc_gas_to_cad_peg() : 1.0;
         $amount = round( (float) $total * $peg, 2 );
         if ( $amount < 0.01 ) {
-            wp_send_json_error( array( 'message' => 'The balance is under 0.01; it rolls into next month.' ), 400 );
+            return new WP_Error( 'gas_pay_small', 'The balance is under 0.01; it rolls into next month.', array( 'status' => 400 ) );
         }
         $breakdown = array();
         foreach ( $rows as $r ) {
@@ -847,28 +867,28 @@ function gend_society_gas_pay_now() {
             'ledger_ids' => $ids,
             'total_gas'  => $total,
             'amount'     => $amount,
-            'detail'     => 'Pay Now from the member profile (group ' . $group_id . ')',
+            'detail'     => 'Pay Now from ' . $source . ' (group ' . $group_id . ')',
         );
         if ( ! \WP_Ultimo\Integrations\gdc_gas_usage_log_reserve( $key, $period, $uid, $entry, 'creating' ) ) {
-            wp_send_json_error( array( 'message' => 'Could not prepare the payment. Try again.' ), 500 );
+            return new WP_Error( 'gas_pay_failed', 'Could not prepare the payment. Try again.', array( 'status' => 500 ) );
         }
         $order = \WP_Ultimo\Integrations\gdc_gas_usage_create_order( $uid, $period, $key, $entry, $breakdown );
         if ( is_wp_error( $order ) || ! $order ) {
             $msg = is_wp_error( $order ) ? $order->get_error_message() : 'order not created';
             \WP_Ultimo\Integrations\gdc_gas_usage_log_update( $key, array( 'outcome' => 'error', 'detail' => $msg ) );
-            wp_send_json_error( array( 'message' => 'Could not create the payment order.' ), 500 );
+            return new WP_Error( 'gas_pay_failed', 'Could not create the payment order.', array( 'status' => 500 ) );
         }
         $oid = (int) $order->get_id();
         \WP_Ultimo\Integrations\gdc_gas_usage_log_update( $key, array( 'order_id' => $oid, 'outcome' => 'ordered', 'charge' => 'pay-now' ) );
         $marked = \WP_Ultimo\Integrations\gdc_gas_usage_mark_rows( $ids, $key, $oid );
         $order->update_meta_data( '_gdc_gas_usage_collected', gmdate( 'Y-m-d H:i:s' ) ); // paid by the member now: no invoice email / auto-charge
         $order->update_meta_data( '_gdc_gas_usage_group_id', $group_id );
-        $order->add_order_note( sprintf( 'Billed on demand from the member profile Pay Now button (group %d); %d of %d ledger rows marked.', $group_id, $marked, count( $ids ) ) );
+        $order->add_order_note( sprintf( 'Billed on demand from the Pay Now button in %s (group %d); %d of %d ledger rows marked.', $source, $group_id, $marked, count( $ids ) ) );
         $order->save();
         if ( function_exists( $ns . 'gdc_gas_usage_track_unpaid' ) ) {
             \WP_Ultimo\Integrations\gdc_gas_usage_track_unpaid( $order );
         }
-        wp_send_json_success( array( 'pay_url' => $order->get_checkout_payment_url(), 'amount' => wc_format_decimal( $order->get_total(), 2 ), 'order_id' => $oid ) );
+        return array( 'pay_url' => $order->get_checkout_payment_url(), 'amount' => wc_format_decimal( $order->get_total(), 2 ), 'order_id' => $oid );
     } finally {
         $wpdb->get_var( $wpdb->prepare( 'SELECT RELEASE_LOCK(%s)', $lock ) );
     }
