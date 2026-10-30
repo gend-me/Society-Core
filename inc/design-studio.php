@@ -40,6 +40,22 @@ function gend_society_studio_is_embed() {
 	return is_admin() && 'iframe' === $dest;
 }
 
+add_filter( 'block_editor_settings_all', 'gend_society_studio_embed_editor_styles', 20 );
+/**
+ * Editors inside the studio: no title field above the content (the studio's
+ * drawer already names what is being edited), so the content starts at the top.
+ *
+ * @param array $settings Editor settings.
+ * @return array
+ */
+function gend_society_studio_embed_editor_styles( $settings ) {
+	if ( gend_society_studio_is_embed() ) {
+		$settings['styles']   = isset( $settings['styles'] ) && is_array( $settings['styles'] ) ? $settings['styles'] : array();
+		$settings['styles'][] = array( 'css' => '.editor-visual-editor__post-title-wrapper{display:none!important}' );
+	}
+	return $settings;
+}
+
 /**
  * Is a plugin active (single site or network)? Uses the menu helper when it is loaded.
  *

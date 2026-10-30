@@ -98,6 +98,12 @@ return array(
 			'note'  => 'Brand font roles: --gs-font-heading/body/button/mono from Global Styles (Design Studio Font Types), on the front end, in block editors and in the studio preview, so hand-written page CSS follows the site fonts.',
 		),
 		array(
+			'file'  => 'inc/app-wording.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'App wording: live app sections (group content endpoint panels) keep a shown-text => new-text list (block attribute gsTexts, Wording panel) applied to their text nodes and placeholders when they render.',
+		),
+		array(
 			'file'  => 'inc/html-visual-edit.php',
 			'tier'  => 'core',
 			'needs' => array(),

@@ -98,7 +98,8 @@ function gend_society_pv_render() {
 		$slug = isset( $_GET['slug'] ) ? sanitize_key( wp_unslash( $_GET['slug'] ) ) : '';
 		$part = function () use ( $slug ) {
 			echo '<div id="youzify"><div class="youzify youzify-page"><div class="youzify-content"><div class="gs-pv-pad">';
-			echo gdc_gs_render_endpoint_panel_block( array( 'slug' => $slug ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered group tab content.
+			$html = gdc_gs_render_endpoint_panel_block( array( 'slug' => $slug ) );
+			echo function_exists( 'gend_society_aw_apply' ) ? gend_society_aw_apply( $html, gend_society_aw_preview_texts() ) : $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered group tab content.
 			echo '</div></div></div></div>';
 		};
 	} elseif ( 'group-header' === $view && function_exists( 'bp_is_group' ) && bp_is_group() && function_exists( 'gdc_gs_render_group_header_shell' ) ) {
@@ -107,10 +108,10 @@ function gend_society_pv_render() {
 			gdc_gs_render_group_header_shell( (int) bp_get_current_group_id() );
 			echo '</div></div></div>';
 		};
-	} elseif ( 'group-sidebar' === $view && function_exists( 'bp_is_group' ) && bp_is_group() && function_exists( 'youzify_get_groups_sidebar' ) ) {
+	} elseif ( 'group-sidebar' === $view && function_exists( 'bp_is_group' ) && bp_is_group() && function_exists( 'gend_sn_groups_sidebar' ) ) {
 		$part = function () {
 			echo '<div id="youzify"><div class="youzify youzify-page"><div class="youzify-content"><div class="youzify-sidebar-column youzify-group-sidebar youzify-sidebar"><div class="youzify-column-content">';
-			youzify_get_groups_sidebar();
+			gend_sn_groups_sidebar();
 			echo '</div></div></div></div></div>';
 		};
 	}

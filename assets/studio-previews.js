@@ -79,9 +79,92 @@
 			return { label: __( 'Current group sidebar', 'gend-society' ) + ( cfg.groupName ? ': ' + cfg.groupName : '' ), src: withQuery( cfg.groupUrl, 'gs_studio_view=group-sidebar' ) };
 		},
 		'gdc-blocks/endpoint-panel': function ( attrs ) {
-			return { label: __( 'Group content', 'gend-society' ) + ': ' + ( attrs.slug || '' ) + ( cfg.groupName ? ' · ' + cfg.groupName : '' ), src: attrs.slug ? withQuery( cfg.groupUrl, 'gs_studio_view=group-endpoint&slug=' + encodeURIComponent( attrs.slug ) ) : '' };
+			var texts = attrs.gsTexts && Object.keys( attrs.gsTexts ).length ? '&gs_texts=' + encodeURIComponent( JSON.stringify( attrs.gsTexts ) ) : '';
+			return { label: __( 'Group content', 'gend-society' ) + ': ' + ( attrs.slug || '' ) + ( cfg.groupName ? ' · ' + cfg.groupName : '' ), src: attrs.slug ? withQuery( cfg.groupUrl, 'gs_studio_view=group-endpoint&slug=' + encodeURIComponent( attrs.slug ) + texts ) : '', wording: true };
 		},
 	};
+
+	// App sections can't become HTML (the app renders them): their words are renamed instead (inc/app-wording.php).
+	var WORDING_BLOCKS = [ 'gdc-blocks/endpoint-panel' ];
+	wp.hooks.addFilter( 'blocks.registerBlockType', 'gend-society/app-wording', function ( settings, name ) {
+		if ( WORDING_BLOCKS.indexOf( name ) !== -1 ) {
+			settings.attributes = Object.assign( {}, settings.attributes, { gsTexts: { type: 'object', default: {} } } );
+		}
+		return settings;
+	} );
+	var wordCache = {};
+	// The words the app shows: tabs, buttons, headings, labels, field hints (not its data).
+	function appWords( src ) {
+		if ( ! wordCache[ src ] ) {
+			wordCache[ src ] = window.fetch( src, { credentials: 'same-origin' } ).then( function ( r ) {
+				return r.text();
+			} ).then( function ( html ) {
+				var doc = new window.DOMParser().parseFromString( html, 'text/html' );
+				var root = doc.querySelector( '.gs-pv-pad' ) || doc.body;
+				var seen = {};
+				var out = [];
+				var add = function ( t ) {
+					t = ( t || '' ).replace( /\s+/g, ' ' ).trim();
+					if ( t.length > 1 && t.length <= 80 && /[a-z]/i.test( t ) && ! seen[ t ] ) {
+						seen[ t ] = 1;
+						out.push( t );
+					}
+				};
+				var walker = doc.createTreeWalker( root, window.NodeFilter.SHOW_TEXT );
+				var node;
+				while ( ( node = walker.nextNode() ) ) {
+					var p = node.parentElement;
+					if ( p && ! p.closest( 'script,style,textarea' ) && p.closest( 'button,a,h1,h2,h3,h4,h5,h6,label,th,option,summary,legend,[role="tab"]' ) ) {
+						add( node.nodeValue );
+					}
+				}
+				Array.prototype.forEach.call( root.querySelectorAll( '[placeholder]' ), function ( f ) {
+					add( f.getAttribute( 'placeholder' ) );
+				} );
+				return out;
+			} );
+		}
+		return wordCache[ src ];
+	}
+	function Wording( props ) {
+		var st = wp.element.useState( null );
+		var src = props.src;
+		wp.element.useEffect( function () {
+			if ( src ) {
+				appWords( src ).then( st[ 1 ], function () {
+					st[ 1 ]( [] );
+				} );
+			}
+		}, [ src ] );
+		var C = wp.components;
+		var cur = props.attributes.gsTexts || {};
+		var body;
+		if ( ! src ) {
+			body = el( 'p', null, __( 'Choose the group content first.', 'gend-society' ) );
+		} else if ( ! st[ 0 ] ) {
+			body = el( C.Spinner );
+		} else if ( ! st[ 0 ].length ) {
+			body = el( 'p', null, __( 'No words to rename.', 'gend-society' ) );
+		} else {
+			body = st[ 0 ].map( function ( t ) {
+				return el( C.TextControl, { key: t, label: t, value: cur[ t ] || '', placeholder: t, __nextHasNoMarginBottom: true, __next40pxDefaultSize: true, onChange: function ( v ) {
+					var next = Object.assign( {}, cur );
+					if ( v.trim() ) {
+						next[ t ] = v;
+					} else {
+						delete next[ t ];
+					}
+					props.setAttributes( { gsTexts: next } );
+				} } );
+			} );
+		}
+		return el( wp.blockEditor.InspectorControls, null,
+			el( C.PanelBody, { title: __( 'Wording', 'gend-society' ), initialOpen: true },
+				el( 'p', null, __( 'This section is a live app, so it is edited by renaming the words it shows: tabs, buttons, headings and field hints. The app keeps working.', 'gend-society' ) ),
+				body
+			)
+		);
+	}
 
 	wp.hooks.addFilter( 'editor.BlockEdit', 'gend-society/studio-previews', wp.compose.createHigherOrderComponent( function ( BlockEdit ) {
 		return function ( props ) {
@@ -90,7 +173,13 @@
 				return el( BlockEdit, props );
 			}
 			var p = make( props.attributes || {} );
-			return el( LiveFrame, { src: p.src, label: p.label, empty: p.empty } );
+			var frame = el( LiveFrame, { src: p.src, label: p.label, empty: p.empty } );
+			if ( ! p.wording ) {
+				return frame;
+			}
+			// Words come from the app as shipped (no gs_texts), so renamed ones can be found again.
+			var bare = make( Object.assign( {}, props.attributes, { gsTexts: {} } ) ).src;
+			return el( wp.element.Fragment, null, frame, props.isSelected ? el( Wording, { src: bare, attributes: props.attributes, setAttributes: props.setAttributes } ) : null );
 		};
 	}, 'withGsLivePreview' ) );
 
@@ -198,7 +287,8 @@
 	// that run code stay live (data-gs-live-part / data-gs-live-block).
 	var LIVE_PREFIX = /^(gdc-blocks|gend-society)\//;
 	function convertible( block ) {
-		return LIVE_PREFIX.test( block.name ) && ! ( block.innerBlocks && block.innerBlocks.length );
+		// App sections would only become an empty live placeholder: they get the Wording panel instead.
+		return LIVE_PREFIX.test( block.name ) && WORDING_BLOCKS.indexOf( block.name ) === -1 && ! ( block.innerBlocks && block.innerBlocks.length );
 	}
 	function collect( blocks, out ) {
 		( blocks || [] ).forEach( function ( b ) {
