@@ -4,7 +4,7 @@
  *
  *   wp eval-file host-urls.php <section>[,<section>...]     (C:/tmp/livepull/phase111/tools/sc-uat-111.sh bed host-urls <sections>)
  *
- * Sections: host-keyed-home unknown-host-untouched stored-option-unchanged wporg-excluded no-frontend-network
+ * Sections: host-keyed-home unknown-host-untouched stored-option-unchanged wporg-excluded no-frontend-network asset-src
  *
  * The bed runs standalone; the filter is forced on with gend_society_host_urls_enabled (test hook), and every section sets
  * HTTP_HOST by hand. Every outbound request is caught by a pre_http_request spy (nothing leaves the bed). Each section puts
@@ -251,6 +251,44 @@ $S['no-frontend-network'] = function () {
 	$res = gend_society_host_urls_sync();
 	remove_filter( 'pre_http_request', $fail, 1 );
 	gs111hu_assert( false === $res && array( 'synced-gs111.example.test' ) === gend_society_host_urls_state()['domains'], 'nf-fail-keeps', 'a failed fetch keeps the stored record' );
+};
+
+// Found by the 111-13 end-to-end run: assets whose URL a plugin built from a constant at load time (GEND_SOCIETY_URL) kept
+// the stored address on a customer host.
+$S['asset-src'] = function () {
+	gs111hu_setup( array( 'shop-gs111.example.test' ), 'shop-gs111.example.test', 'https://tmp-host.gend.test' );
+	global $wpdb;
+	$old_site = $wpdb->get_var( "SELECT option_value FROM {$wpdb->options} WHERE option_name='siteurl'" );
+	$wpdb->update( $wpdb->options, array( 'option_value' => 'https://tmp-host.gend.test' ), array( 'option_name' => 'siteurl' ) );
+	wp_cache_delete( 'alloptions', 'options' );
+	gs111hu_on_cleanup(
+		function () use ( $old_site ) {
+			global $wpdb;
+			$wpdb->update( $wpdb->options, array( 'option_value' => $old_site ), array( 'option_name' => 'siteurl' ) );
+			wp_cache_delete( 'alloptions', 'options' );
+		}
+	);
+	$stored = 'https://tmp-host.gend.test/wp-content/plugins/gend-society/assets/site-header-footer.css?ver=1';
+	foreach ( array( 'style_loader_src', 'script_loader_src' ) as $hook ) {
+		gs111hu_assert( 'https://shop-gs111.example.test/wp-content/plugins/gend-society/assets/site-header-footer.css?ver=1' === apply_filters( $hook, $stored, 'gs111-handle' ), 'as-rewritten-' . $hook, $hook . ': an asset on the stored address follows the verified request host', (string) apply_filters( $hook, $stored, 'gs111-handle' ) );
+	}
+	gs111hu_assert( 'https://cdn.example.test/lib.js' === apply_filters( 'script_loader_src', 'https://cdn.example.test/lib.js', 'gs111-handle' ), 'as-other-host', 'an asset on another host is untouched' );
+	gs111hu_assert( '/relative.css' === apply_filters( 'style_loader_src', '/relative.css', 'gs111-handle' ), 'as-relative', 'a relative source is untouched' );
+	gs111hu_assert( false === apply_filters( 'style_loader_src', false, 'gs111-handle' ), 'as-false', 'a non-string source is returned as it came' );
+	$_SERVER['HTTP_HOST'] = 'tmp-host.gend.test';
+	gs111hu_assert( $stored === apply_filters( 'style_loader_src', $stored, 'gs111-handle' ), 'as-temp-host', 'on the temporary host itself nothing is rewritten' );
+	$_SERVER['HTTP_HOST'] = 'unknown-gs111.example.test';
+	gs111hu_assert( $stored === apply_filters( 'style_loader_src', $stored, 'gs111-handle' ), 'as-unknown-host', 'an unknown request host is not host-keyed: nothing is rewritten' );
+	$_SERVER['HTTP_HOST'] = 'shop-gs111.example.test';
+	remove_all_filters( 'gend_society_host_urls_enabled' );
+	add_filter( 'gend_society_host_urls_enabled', '__return_false' );
+	gs111hu_assert( $stored === apply_filters( 'style_loader_src', $stored, 'gs111-handle' ), 'as-mode-off', 'outside container mode nothing is rewritten' );
+	gs111hu_on_cleanup(
+		function () {
+			remove_filter( 'gend_society_host_urls_enabled', '__return_false' );
+		}
+	);
+	gs111hu_assert( 0 === count( $GLOBALS['gs111hu']['http'] ), 'as-no-network', 'no outbound request' );
 };
 
 $gs111hu_want = array();

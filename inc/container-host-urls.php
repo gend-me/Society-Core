@@ -141,6 +141,43 @@ if ( ! function_exists( 'gend_society_host_urls_filter' ) ) {
 add_filter( 'pre_option_home', 'gend_society_host_urls_filter', 20, 3 );
 add_filter( 'pre_option_siteurl', 'gend_society_host_urls_filter', 20, 3 );
 
+if ( ! function_exists( 'gend_society_host_urls_rewrite_src' ) ) {
+	/**
+	 * style_loader_src / script_loader_src. A URL a plugin built from a constant at load time (GEND_SOCIETY_URL is
+	 * plugin_dir_url() evaluated before this module's option filters exist) still carries the STORED address, so on a
+	 * verified customer host a few of the plugin's own stylesheets would load from the temporary host. On such a request
+	 * a source that starts with the stored address follows the request host like every other link. Anything else (other
+	 * hosts, other options, an unknown request host) is returned as it came. The stored value is read from the autoloaded
+	 * options array, which the pre_option filters do not touch; no network call, nothing is written.
+	 *
+	 * @param mixed $src Asset URL.
+	 * @return mixed
+	 */
+	function gend_society_host_urls_rewrite_src( $src ) {
+		if ( ! is_string( $src ) || '' === $src ) {
+			return $src;
+		}
+		$host = gend_society_host_urls_request_host();
+		if ( '' === $host || ! gend_society_host_urls_enabled() ) {
+			return $src;
+		}
+		$state = gend_society_host_urls_state();
+		if ( ! in_array( $host, $state['domains'], true ) ) {
+			return $src;
+		}
+		$all    = wp_load_alloptions();
+		$stored = isset( $all['siteurl'] ) && is_string( $all['siteurl'] ) ? rtrim( $all['siteurl'], '/' ) : '';
+		$parts  = '' !== $stored ? wp_parse_url( $stored ) : null;
+		if ( ! is_array( $parts ) || empty( $parts['host'] ) || strtolower( (string) $parts['host'] ) === $host || 0 !== strpos( $src, $stored . '/' ) ) {
+			return $src;
+		}
+		$path = isset( $parts['path'] ) ? rtrim( (string) $parts['path'], '/' ) : '';
+		return 'https://' . $host . $path . substr( $src, strlen( $stored ) );
+	}
+}
+add_filter( 'style_loader_src', 'gend_society_host_urls_rewrite_src', 20 );
+add_filter( 'script_loader_src', 'gend_society_host_urls_rewrite_src', 20 );
+
 if ( ! function_exists( 'gend_society_host_urls_sync' ) ) {
 	/**
 	 * Fetch the verified domains from the hub and store them. NEVER called from a front-end request: only WP-Cron and
