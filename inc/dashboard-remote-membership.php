@@ -170,7 +170,10 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
         if ( '' !== $url && ! preg_match( '#^https?://#i', $url ) ) {
             $url = '';
         }
-        $out  = '<div class="gs-mship-preview-note" data-gs-preview-note="1" role="note">';
+        // The few style lines ride with the note (Preview + admin only), so the panel's own stylesheet - and every
+        // free / Live panel - stays byte-identical.
+        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}</style>';
+        $out .= '<div class="gs-mship-preview-note" data-gs-preview-note="1" role="note">';
         if ( '' !== $url ) {
             $out .= '<p>' . esc_html__( 'Your new site is ready to preview:', 'gend-society' ) . ' <a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a></p>';
         } else {
@@ -1832,11 +1835,6 @@ function gend_society_render_membership_panel( $payload = null ) {
         .gs-mship-toast.is-visible { opacity: 1; transform: translateY(0); }
         .gs-mship-toast.is-success { border-color: rgba(0,180,80,0.4); }
         .gs-mship-toast.is-error { border-color: rgba(255,80,80,0.4); }
-        .gs-mship-status-badge--preview { background: rgba(78,170,255,0.15); border-color: rgba(78,170,255,0.4); color: #8cc8ff; }
-        .gs-mship-preview-note { margin: 0 0 12px; padding: 12px 14px; border: 1px solid rgba(78,170,255,0.3); border-radius: 12px; background: rgba(78,170,255,0.06); font-size: 0.85rem; line-height: 1.5; }
-        .gs-mship-preview-note p { margin: 0 0 6px; }
-        .gs-mship-preview-note a { color: #8cc8ff; word-break: break-all; }
-        .gs-mship-preview-note .gs-mship-action-btn { margin-top: 6px; }
     </style>
 
     <div class="gs-mship-card" id="gs-mship-root" data-app-title="<?php echo esc_attr( $app_title ); ?>">
@@ -1851,7 +1849,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                 <?php if ( ! empty( $migration['live'] ) ) : ?>
                     <span class="gs-mship-status-badge">● <?php esc_html_e( 'Container Live', 'gend-society' ); ?></span>
                 <?php elseif ( ! empty( $migration['preview'] ) ) : /* Phase 111-10 (P1): Verify is Preview; Live only at cutover. */ ?>
-                    <span class="gs-mship-status-badge gs-mship-status-badge--preview">● <?php esc_html_e( 'Preview', 'gend-society' ); ?></span>
+                    <span class="gs-mship-status-badge gs-mship-status-badge--preview" style="background:rgba(78,170,255,0.15); border-color:rgba(78,170,255,0.4); color:#8cc8ff;">● <?php esc_html_e( 'Preview', 'gend-society' ); ?></span>
                 <?php elseif ( $status_label !== '' ) : ?>
                     <span class="gs-mship-status-badge" style="background:rgba(255,180,0,0.15); border-color:rgba(255,180,0,0.4); color:#ffd166;"><?php echo esc_html( $status_label ); ?></span>
                 <?php endif; ?>
