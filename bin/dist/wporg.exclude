@@ -44,3 +44,6 @@ package*.json
 composer.*
 phpcs.xml*
 *.md
+# Host-keyed home / siteurl for a migrated container (Phase 111): container runtime only, polls the hub for the
+# customer's verified domains. Not part of the wordpress.org build.
+inc/container-host-urls.php
