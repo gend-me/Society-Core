@@ -66,6 +66,19 @@ if ( ! function_exists( 'gend_society_preview_noindex_active' ) ) {
 				return true;
 			}
 		}
+		// Phase 111-13: a container that was only just imported has had no admin membership fetch yet (that is what sets
+		// the marker) and its cache is the origin's old one, so the preview host would be indexable until an admin
+		// opens the dashboard. The importer records the container's temporary host in gend_society_canonical_host at the
+		// end of the first import (a non-migrated container never has it): until the verified-domains record says Live,
+		// that host is noindex too. Options only, no network call.
+		if ( ! $marker ) {
+			$canon = get_option( 'gend_society_canonical_host', '' );
+			$have  = isset( $_SERVER['HTTP_HOST'] ) && is_string( $_SERVER['HTTP_HOST'] ) ? preg_replace( '/:\d{1,5}$/', '', strtolower( trim( wp_unslash( $_SERVER['HTTP_HOST'] ) ) ) ) : ''; // phpcs:ignore WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- compared, never output.
+			if ( is_string( $canon ) && '' !== $canon && '' !== $have && strtolower( preg_replace( '/:\d{1,5}$/', '', trim( $canon ) ) ) === $have ) {
+				$rec = function_exists( 'gend_society_host_urls_state' ) ? gend_society_host_urls_state() : array( 'live' => false );
+				return empty( $rec['live'] );
+			}
+		}
 		return $marker;
 	}
 }

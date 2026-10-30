@@ -48,6 +48,7 @@ const GS111PV_OPTIONS    = array(
 	'gend_society_container_preview',
 	'gend_society_container_imported',
 	'gend_society_verified_domains',
+	'gend_society_canonical_host',
 );
 
 function gs111pv_assert( $c, $id, $t = '', $d = '' ) {
@@ -618,6 +619,29 @@ $S['noindex'] = function () {
 	do_action( 'gend_society_remote_membership_fetched', gs111pv_payload( 'hub-site' ) );
 	gs111pv_assert( ! get_option( 'gend_society_container_preview', false ), 'ni-never-migrated', 'a payload with neither preview nor live-after-preview leaves a non-migrated container without a marker' );
 	set_current_screen( 'front' );
+
+	// Phase 111-13: a freshly imported container (the importer wrote gend_society_canonical_host, no admin has opened the
+	// dashboard yet, the cache is the origin's old one with no preview block) is noindex on its temporary host.
+	delete_option( 'gend_society_container_preview' );
+	delete_option( 'gend_society_verified_domains' );
+	$GLOBALS['gs111pv']['http'] = array(); // the earlier sections of this test made sync requests on purpose
+	update_option( 'gend_society_remote_membership_cache', gs111pv_payload( 'preview', array( 'preview' => false, 'preview_url' => '', 'state' => 'preparing', 'stage' => 'export', 'index' => 2 ) ), false );
+	update_option( 'gend_society_remote_membership_cache_expires', time() - 3600, false );
+	update_option( 'gend_society_canonical_host', 'abc-gs111.gend.test', false );
+	$d = $decide( 'abc-gs111.gend.test:8920' );
+	gs111pv_assert( $d['active'] && 'noindex, nofollow' === $d['header'] && $d['robots'], 'ni-imported-canonical', 'just-imported container (importer canonical host, stale origin cache, no marker): its temporary host is noindex', wp_json_encode( $d ) );
+	$d = $decide( 'shop-gs111.example.test' );
+	gs111pv_assert( ! $d['active'] && '' === $d['header'], 'ni-imported-other-host', 'a different host on the same imported container stays indexable' );
+	delete_option( 'gend_society_canonical_host' );
+	$d = $decide( 'abc-gs111.gend.test' );
+	gs111pv_assert( ! $d['active'], 'ni-no-canonical-option', 'without the importer option (non-migrated container) nothing changes' );
+	update_option( 'gend_society_canonical_host', 'abc-gs111.gend.test', false );
+	update_option( 'gend_society_verified_domains', array( 'domains' => array( 'shop-gs111.example.test' ), 'live' => true, 'canonical_host' => 'abc-gs111.gend.test', 'synced_at' => time() ), true );
+	$d = $decide( 'abc-gs111.gend.test' );
+	gs111pv_assert( ! $d['active'] && '' === $d['header'], 'ni-imported-live', 'after the verified-domains record says Live the temporary host is no longer noindex', wp_json_encode( $d ) );
+	delete_option( 'gend_society_verified_domains' );
+	delete_option( 'gend_society_canonical_host' );
+	gs111pv_assert( 0 === count( $GLOBALS['gs111pv']['http'] ), 'ni-imported-no-network', 'the decision still made zero outbound requests' );
 
 	// Disabled outside the container runtime.
 	remove_filter( 'gend_society_preview_enabled', $on );
