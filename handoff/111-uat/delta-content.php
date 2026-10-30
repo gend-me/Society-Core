@@ -750,7 +750,7 @@ $S['empty-delta'] = function () {
 	$allow = '__return_true';
 	$cap   = null;
 	$http  = function ( $pre, $args, $url ) use ( &$cap ) {
-		if ( false !== strpos( (string) $url, '/migration/progress' ) ) {
+		if ( false !== strpos( (string) $url, '/migration/delta/ready' ) ) { // 111-11: a delta job reports its ready URLs through the delta route
 			$cap = json_decode( (string) ( $args['body'] ?? '' ), true );
 			return array(
 				'headers'  => array(),
