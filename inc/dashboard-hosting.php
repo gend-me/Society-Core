@@ -650,7 +650,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                     <div class="gs-hosting__stat-label"><?php esc_html_e( 'Container Plan', 'gend-society' ); ?></div>
                     <div style="color:#fff; font-size:1rem; font-weight:600; margin-top:4px;">
 <?php if ( $gs_sa ) : ?>
-                            <span class="gs-dash-sa-muted"><?php esc_html_e( 'After migration', 'gend-society' ); ?></span>
+                            <span class="gs-dash-sa-muted"><?php echo esc_html( gend_society_after_migration_label() ); ?></span>
 <?php else : ?>
                         <?php if ( $gs_container_any ) : ?>
                             <?php echo esc_html( $gs_container_label ); ?>
@@ -1114,7 +1114,7 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
         if ( $gs_bk_sa && empty( $gs_bk_sa_view['hosted'] ) ) {
             $gs_bk_hero['sub']           = (string) ( $gs_bk_sa_view['text'] ?? '' );
             unset( $gs_bk_hero['pct'], $gs_bk_hero['warn'] ); // no gend.me quota to measure against yet
-            $gs_bk_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+            $gs_bk_hero['stats'][1]['v'] = gend_society_after_migration_label();
         }
         gend_society_hosting_render_analytics_hero( $gs_bk_hero );
         ?>
@@ -1252,6 +1252,14 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
  *                       User Access moved to the Feature Suite tab (see
  *                       dashboard-remote-membership.php) - no longer rendered here.
  */
+if ( ! function_exists( 'gend_society_after_migration_label' ) ) {
+    /** The placeholder a not-yet-moved install shows where gend.me hosting will report; "Moved" once its site is Live elsewhere. */
+    function gend_society_after_migration_label(): string {
+        $moved = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+        return ! empty( $moved['moved'] ) ? __( 'Moved', 'gend-society' ) : __( 'After migration', 'gend-society' );
+    }
+}
+
 if ( ! function_exists( 'gend_society_dialog_assets' ) ) {
     /**
      * Styled confirm / alert for the hosting console (replaces the browser's native popups). Printed once per page.
@@ -1978,7 +1986,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 // Phase 109-29: a standalone install has no gend.me database quota (no container): no ring, no cap.
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_tables_hero['pct'], $gs_tables_hero['warn'] );
-                    $gs_tables_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+                    $gs_tables_hero['stats'][1]['v'] = gend_society_after_migration_label();
                 }
                 gend_society_hosting_render_analytics_hero( $gs_tables_hero );
                 ?>
@@ -2525,7 +2533,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 // Phase 109-29: no gend.me codebase quota on a standalone install (no container): no ring, no cap.
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_codebase_hero['pct'], $gs_codebase_hero['warn'] );
-                    $gs_codebase_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+                    $gs_codebase_hero['stats'][1]['v'] = gend_society_after_migration_label();
                 }
                 gend_society_hosting_render_analytics_hero( $gs_codebase_hero );
                 ?>

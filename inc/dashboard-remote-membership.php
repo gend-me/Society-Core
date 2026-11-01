@@ -370,6 +370,15 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
             $v['text']   = __( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' );
             $v['choose_url'] = gend_society_dashboard_standalone_url( $p['choose_url'] ?? '' );
         }
+        // The site now lives on gend.me hosting (Live): this original copy keeps no backups of its own to promise, so say where they are.
+        $moved = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+        if ( ! empty( $moved['moved'] ) ) {
+            $v['hosted']     = false;
+            $v['backup_now'] = false;
+            $v['badge']      = __( 'Moved', 'gend-society' );
+            $v['text']       = __( 'Backups now run on your new site on gend.me hosting. Open your new site to manage them.', 'gend-society' );
+            $v['learn_url']  = (string) $moved['to'];
+        }
         return $v;
     }
 }
@@ -526,6 +535,13 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
                 $v['badge']     = __( 'After migration', 'gend-society' );
                 $v['text']      = __( 'Email hosting runs on gend.me hosting. Your site keeps sending mail its own way until you move it.', 'gend-society' );
                 $v['learn_url'] = (string) ( $env['learn_url'] ?? '' );
+                $moved           = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+                if ( ! empty( $moved['moved'] ) ) {
+                    // Live elsewhere: mail now goes out from the new site, so this copy no longer "keeps sending mail its own way".
+                    $v['badge']     = __( 'Moved', 'gend-society' );
+                    $v['text']      = __( 'Email hosting now runs on your new site on gend.me hosting. Open your new site to manage it.', 'gend-society' );
+                    $v['learn_url'] = (string) $moved['to'];
+                }
             }
             $v['manage_url'] = '';
             return $v;
