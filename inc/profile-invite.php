@@ -1192,7 +1192,7 @@ function gend_society_invite_render_panel( $share = array() ) {
             reader.readAsText( file );
         });
 
-        tplSaveBtn.addEventListener('click', function () {
+        if ( tplSaveBtn ) tplSaveBtn.addEventListener('click', function () {
             setStatus( 'Saving template…' );
             fetch( REST_ROOT + '/template', {
                 method: 'POST',
@@ -1205,7 +1205,7 @@ function gend_society_invite_render_panel( $share = array() ) {
             }).catch(function(){ setStatus( 'Network error.', 'error' ); });
         });
 
-        tplResetBtn.addEventListener('click', function () {
+        if ( tplResetBtn ) tplResetBtn.addEventListener('click', function () {
             setStatus( 'Resetting…' );
             fetch( REST_ROOT + '/template?reset=1', {
                 method: 'POST',
