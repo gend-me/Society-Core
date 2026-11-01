@@ -37,7 +37,7 @@ function gend_society_aw_clean( $texts ) {
 		$from = trim( sanitize_text_field( (string) $from ) );
 		$to   = sanitize_text_field( (string) $to );
 		if ( '' !== $from && '' !== trim( $to ) && $from !== $to ) {
-			$out[ $from ] = mb_substr( $to, 0, 200 );
+			$out[ $from ] = mb_substr( $to, 0, 1000 );
 		}
 	}
 	return $out;

@@ -105,16 +105,17 @@
 				var out = [];
 				var add = function ( t ) {
 					t = ( t || '' ).replace( /\s+/g, ' ' ).trim();
-					if ( t.length > 1 && t.length <= 80 && /[a-z]/i.test( t ) && ! seen[ t ] ) {
+					if ( t.length > 1 && t.length <= 400 && /[a-z]/i.test( t ) && ! seen[ t ] && out.length < 200 ) {
 						seen[ t ] = 1;
 						out.push( t );
 					}
 				};
+				// Every text the section shows, top to bottom (headers first).
 				var walker = doc.createTreeWalker( root, window.NodeFilter.SHOW_TEXT );
 				var node;
 				while ( ( node = walker.nextNode() ) ) {
 					var p = node.parentElement;
-					if ( p && ! p.closest( 'script,style,textarea' ) && p.closest( 'button,a,h1,h2,h3,h4,h5,h6,label,th,option,summary,legend,[role="tab"]' ) ) {
+					if ( p && ! p.closest( 'script,style,textarea,noscript,svg,template' ) ) {
 						add( node.nodeValue );
 					}
 				}
@@ -129,6 +130,13 @@
 	function Wording( props ) {
 		var st = wp.element.useState( null );
 		var src = props.src;
+		// Selecting the section shows its Wording panel (the sidebar may be on the page tab or closed).
+		wp.element.useEffect( function () {
+			var ep = wp.data.dispatch( 'core/edit-post' );
+			if ( ep && ep.openGeneralSidebar ) {
+				ep.openGeneralSidebar( 'edit-post/block' );
+			}
+		}, [] );
 		wp.element.useEffect( function () {
 			if ( src ) {
 				appWords( src ).then( st[ 1 ], function () {
@@ -147,7 +155,8 @@
 			body = el( 'p', null, __( 'No words to rename.', 'gend-society' ) );
 		} else {
 			body = st[ 0 ].map( function ( t ) {
-				return el( C.TextControl, { key: t, label: t, value: cur[ t ] || '', placeholder: t, __nextHasNoMarginBottom: true, __next40pxDefaultSize: true, onChange: function ( v ) {
+				var long = t.length > 60;
+				return el( long ? C.TextareaControl : C.TextControl, { key: t, label: long ? t.slice( 0, 60 ) + '…' : t, value: cur[ t ] || '', placeholder: t, rows: long ? 3 : undefined, __nextHasNoMarginBottom: true, __next40pxDefaultSize: long ? undefined : true, onChange: function ( v ) {
 					var next = Object.assign( {}, cur );
 					if ( v.trim() ) {
 						next[ t ] = v;
@@ -160,7 +169,7 @@
 		}
 		return el( wp.blockEditor.InspectorControls, null,
 			el( C.PanelBody, { title: __( 'Wording', 'gend-society' ), initialOpen: true },
-				el( 'p', null, __( 'This section is a live app, so it is edited by renaming the words it shows: tabs, buttons, headings and field hints. The app keeps working.', 'gend-society' ) ),
+				el( 'p', null, __( 'This section is a live app, so it is edited by changing the text it shows: headings, descriptions, tabs, buttons and field hints, top to bottom. Leave a box empty to keep the original. The app keeps working.', 'gend-society' ) ),
 				body
 			)
 		);

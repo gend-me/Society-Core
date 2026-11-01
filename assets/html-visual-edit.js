@@ -27,6 +27,25 @@
 		tpl.innerHTML = html;
 		return tpl;
 	}
+	// HTML pasted as a whole document (<!doctype>, <html>, <head>, <body>): the
+	// parser drops those wrapper tags, so they become placeholder comments while
+	// editing (comments stay where they are) and are put back on every write.
+	var SHELL_TAG = /<!doctype[^>]*>|<\/?(?:html|head|body)\b[^>]*>/gi;
+	function shellOut( html ) {
+		var tags = [];
+		var out = html.split( /(<script\b[\s\S]*?<\/script\s*>|<style\b[\s\S]*?<\/style\s*>)/i ).map( function ( part, i ) {
+			return i % 2 ? part : part.replace( SHELL_TAG, function ( t ) {
+				tags.push( t );
+				return '<!--gs-shell:' + ( tags.length - 1 ) + '-->';
+			} );
+		} ).join( '' );
+		return { html: out, tags: tags };
+	}
+	function shellIn( html, tags ) {
+		return tags.length ? html.replace( /<!--gs-shell:(\d+)-->/g, function ( m, i ) {
+			return tags[ +i ] !== undefined ? tags[ +i ] : '';
+		} ) : html;
+	}
 	// The browser must read the HTML back exactly as written (same elements in
 	// the same order), or writing it back could move things around.
 	function roundTrips( html, tpl ) {
@@ -748,8 +767,9 @@
 		var reload = wp.element.useState( 0 );
 		// The block's HTML with edit marks, and whether it can be written back safely.
 		var marked = wp.element.useMemo( function () {
-			var tpl = parse( content );
-			var safe = roundTrips( content, tpl );
+			var sh = shellOut( content );
+			var tpl = parse( sh.html );
+			var safe = roundTrips( sh.html, tpl );
 			var count = safe ? annotate( tpl ) : 0;
 			return { html: count ? tpl.innerHTML : content, safe: safe, count: count };
 		}, [ content ] );
@@ -792,14 +812,15 @@
 
 		// Write one change back into the block's HTML.
 		var commit = function ( id, apply ) {
-			var tpl = parse( latest.current );
+			var sh = shellOut( latest.current );
+			var tpl = parse( sh.html );
 			annotate( tpl );
 			var src = tpl.content.querySelector( '[data-gs-e="' + id + '"]' );
 			if ( ! src ) {
 				return;
 			}
 			apply( src );
-			var next = unmark( tpl );
+			var next = shellIn( unmark( tpl ), sh.tags );
 			if ( next !== latest.current ) {
 				own.current = next;
 				props.onChange( next );

@@ -20,6 +20,7 @@ function gend_society_enqueue_live_view_assets()
         GEND_SOCIETY_URL . 'assets/gs-live-view.js',
         [
             'wp-plugins',
+            'wp-api-fetch',
             'wp-edit-post',
             'wp-element',
             'wp-data',
@@ -43,6 +44,35 @@ function gend_society_enqueue_live_view_assets()
         'siteUrl' => get_site_url(),
         'restUrl' => esc_url_raw(rest_url()),
         'nonce' => wp_create_nonce('wp_rest')
+    ]);
+}
+
+add_action('rest_api_init', 'gend_society_live_view_rest');
+
+/**
+ * Frontend tab: renders the editor's current blocks (unsaved included) for the
+ * post being edited. Blocks and shortcodes only: no theme, header or footer.
+ */
+function gend_society_live_view_rest()
+{
+    register_rest_route('gend-society/v1', '/live-view/render', [
+        'methods'             => 'POST',
+        'permission_callback' => function (WP_REST_Request $req) {
+            $id = (int) $req->get_param('id');
+            return $id > 0 && current_user_can('edit_post', $id);
+        },
+        'args'                => [
+            'id'      => ['type' => 'integer', 'required' => true],
+            'content' => ['type' => 'string', 'required' => true],
+        ],
+        'callback'            => function (WP_REST_Request $req) {
+            global $post;
+            $post = get_post((int) $req->get_param('id')); // phpcs:ignore WordPress.WP.GlobalVariablesOverride.Prohibited -- blocks read the current post.
+            setup_postdata($post);
+            $html = do_shortcode(do_blocks((string) $req->get_param('content')));
+            wp_reset_postdata();
+            return rest_ensure_response(['html' => $html]);
+        },
     ]);
 }
 
