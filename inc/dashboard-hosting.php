@@ -813,6 +813,64 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
     }
 }
 
+if ( ! function_exists( 'gend_society_domains_cutover_state' ) ) {
+    /**
+     * Phase 111-10 (MIG-10, N-B3): how the Domains panel behaves for this payload.
+     *
+     * armed   = an externally migrated install in Preview, or Live after one (this container was imported, or the
+     *           connected original site learned migrated_to). Hub-created sites and plain standalone installs are not
+     *           armed: their Domains copy and buttons are unchanged.
+     * preview = the install is in Preview (Make live now is offered).
+     * cutover = the hub's customer-domain switch (migration.domain_cutover) is on; while off, no action is offered.
+     *
+     * @param array $payload The /membership payload.
+     * @return array{armed:bool,preview:bool,live:bool,cutover:bool}
+     */
+    function gend_society_domains_cutover_state( array $payload ): array {
+        $m       = isset( $payload['migration'] ) && is_array( $payload['migration'] ) ? $payload['migration'] : array();
+        $preview = ! empty( $m['preview'] ) && empty( $m['live'] );
+        $live    = ! empty( $m['live'] );
+        $armed   = $preview;
+        if ( ! $armed && $live ) {
+            $imported = (bool) get_option( 'gend_society_container_imported', false );
+            $origin   = function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() && ! empty( $m['migrated_to'] );
+            $armed    = $imported || $origin;
+        }
+        return array(
+            'armed'   => (bool) $armed,
+            'preview' => (bool) $preview,
+            'live'    => (bool) $live,
+            'cutover' => ! empty( $m['domain_cutover'] ),
+        );
+    }
+}
+
+if ( ! function_exists( 'gend_society_domain_stage_view' ) ) {
+    /**
+     * Phase 111-10: the certificate stage of one domain row (hub domains[].stage) as customer wording.
+     *
+     * @param string $stage checking-dns | checking-ssl-cert | done | done-without-ssl | failed | ''.
+     * @return array{stage:string,text:string,class:string}
+     */
+    function gend_society_domain_stage_view( string $stage ): array {
+        $stage = strtolower( trim( $stage ) );
+        switch ( $stage ) {
+            case 'checking-dns':
+                return array( 'stage' => $stage, 'text' => __( 'Waiting for your DNS records', 'gend-society' ), 'class' => 'is-warn' );
+            case 'checking-ssl-cert':
+                return array( 'stage' => $stage, 'text' => __( 'Issuing the certificate (1-2 minutes)', 'gend-society' ), 'class' => 'is-warn' );
+            case 'done':
+                return array( 'stage' => $stage, 'text' => __( 'Secure (certificate issued)', 'gend-society' ), 'class' => 'is-ok' );
+            case 'done-without-ssl':
+                return array( 'stage' => $stage, 'text' => __( 'Working, but the certificate was not issued yet. Press Retry certificate.', 'gend-society' ), 'class' => 'is-warn' );
+            case 'failed':
+                return array( 'stage' => $stage, 'text' => __( 'Failed: check the records and press Verify', 'gend-society' ), 'class' => 'is-err' );
+            default:
+                return array( 'stage' => $stage, 'text' => '' === $stage ? __( 'Pending', 'gend-society' ) : $stage, 'class' => 'is-warn' );
+        }
+    }
+}
+
 if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
     /**
      * Real domain mapping — Add / Verify / Remove a custom domain pointed at
@@ -839,21 +897,81 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
      */
     function gend_society_render_hosting_domains_panel( $payload ) {
         $gs_domains = isset( $payload['domains'] ) && is_array( $payload['domains'] ) ? $payload['domains'] : array();
+        // Phase 111-10 (MIG-10, N-B3): an armed (externally migrated) install in Preview or Live follows the cutover rules.
+        // The template keeps the pre-111 markup byte for byte when the install is not armed (PHP control lines sit at column 0).
+        $gs_cut     = function_exists( 'gend_society_domains_cutover_state' ) ? gend_society_domains_cutover_state( is_array( $payload ) ? $payload : array() ) : array( 'armed' => false, 'preview' => false, 'cutover' => false );
+        $gs_armed   = ! empty( $gs_cut['armed'] );
+        $gs_open    = ! $gs_armed || ! empty( $gs_cut['cutover'] ); // add / verify / remove controls shown.
+        $gs_has_dns = false;
+        foreach ( $gs_domains as $gs_d0 ) {
+            if ( is_array( $gs_d0 ) && ! empty( $gs_d0['dns'] ) && is_array( $gs_d0['dns'] ) ) {
+                $gs_has_dns = true;
+            }
+        }
         ?>
         <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Domains', 'gend-society' ); ?></h4>
         <p class="gs-hosting__section-sub"><?php esc_html_e( 'Custom domains pointed at this install. Verification triggers a fresh DNS read on the hub.', 'gend-society' ); ?></p>
 
-        <div class="gs-hosting__card">
+        <div class="gs-hosting__card"<?php echo $gs_armed ? ' data-gs-domains-armed="1"' : ''; ?>>
             <div class="gs-hosting__card-header">
                 <div>
-                    <h5 class="gs-hosting__card-title"><?php esc_html_e( 'Add a domain', 'gend-society' ); ?></h5>
-                    <p class="gs-hosting__card-desc"><?php esc_html_e( 'Point an A record at the hub IP first, then enter the hostname here to register and verify.', 'gend-society' ); ?></p>
+                    <h5 class="gs-hosting__card-title"><?php echo $gs_armed && $gs_open ? esc_html__( 'Add domain', 'gend-society' ) : esc_html__( 'Add a domain', 'gend-society' ); ?></h5>
+                    <?php if ( ! $gs_armed ) : ?><p class="gs-hosting__card-desc"><?php echo $gs_has_dns ? esc_html__( 'Add the DNS records shown for each domain, then enter the hostname here to register and verify.', 'gend-society' ) : esc_html__( 'Point an A record at the hub IP first, then enter the hostname here to register and verify.', 'gend-society' ); ?></p>
+<?php elseif ( ! $gs_open ) : ?><p class="gs-hosting__card-desc" data-gs-domains-off="1"><?php esc_html_e( 'Adding and verifying your domain is not available yet. Do not change your DNS until this panel shows the Add domain button.', 'gend-society' ); ?></p>
+<?php else : ?><p class="gs-hosting__card-desc"><?php esc_html_e( 'Enter your domain, then switch its DNS to the records shown below. Your original site keeps serving until that switch.', 'gend-society' ); ?></p>
+<?php endif; ?>
                 </div>
             </div>
+<?php if ( $gs_open ) : ?>
             <form data-gs-mship="add-domain" style="display: flex; gap: 10px; flex-wrap: wrap; margin-top: 4px;">
                 <input type="text" name="domain" class="gs-hosting__search" placeholder="example.com" autocomplete="off" required style="flex: 1 1 240px; max-width: 360px;">
-                <button type="submit" class="gs-hosting__btn"><?php esc_html_e( 'Add', 'gend-society' ); ?></button>
+                <button type="submit" class="gs-hosting__btn"><?php echo $gs_armed ? esc_html__( 'Add domain', 'gend-society' ) : esc_html__( 'Add', 'gend-society' ); ?></button>
             </form>
+<?php endif; ?>
+<?php if ( $gs_armed ) : ?>
+            <div class="gs-hosting__card-desc" data-gs-domains-dns="1" style="margin-top: 12px;">
+                <strong><?php echo $gs_open ? esc_html__( 'DNS records for your domain', 'gend-society' ) : esc_html__( 'What you will need later', 'gend-society' ); ?></strong>
+                <ul style="margin: 6px 0 0 18px; list-style: disc;">
+                    <li><?php esc_html_e( 'An A record for your domain pointing at the app address (this panel shows the exact address once adding opens).', 'gend-society' ); ?></li>
+                    <li><?php esc_html_e( 'A TXT record named _gend-verify.your-domain with a token (this panel shows the token once adding opens).', 'gend-society' ); ?></li>
+                    <li><?php esc_html_e( 'TTL 300 seconds (5 minutes). Lower the TTL of your current A record to 300 a few hours before you switch, so the change reaches visitors quickly.', 'gend-society' ); ?></li>
+                    <li><?php esc_html_e( 'Verification passes after the A record is switched to the app address. A certificate is issued 1-2 minutes after that.', 'gend-society' ); ?></li>
+                    <li><?php esc_html_e( 'Keep your MX records and your email TXT records (SPF, DKIM, DMARC) as they are: only the A record of the website moves.', 'gend-society' ); ?></li>
+                    <li><?php esc_html_e( 'If your DNS has CAA records, allow letsencrypt.org.', 'gend-society' ); ?></li>
+<?php if ( $gs_open ) : ?>
+                    <li data-gs-domains-wait="1"><?php esc_html_e( 'A newly verified domain can take up to 5 minutes to start working on your new site.', 'gend-society' ); ?></li>
+<?php endif; ?>
+                </ul>
+            </div>
+<?php endif; ?>
+<?php if ( $gs_armed && $gs_open && ! empty( $gs_cut['preview'] ) ) : ?>
+            <div style="margin-top: 14px;" data-gs-make-live-wrap="1">
+                <button type="button" class="gs-hosting__btn" data-gs-make-live="1" data-confirm="<?php echo esc_attr__( 'This tells gend.me your site now lives at the app; switch your DNS first or at the same time.', 'gend-society' ); ?>"><?php esc_html_e( 'Make live now', 'gend-society' ); ?></button>
+                <span class="gs-hosting__card-desc" style="margin-left: 8px;"><?php esc_html_e( 'Optional: your site also goes live by itself when your first domain is verified.', 'gend-society' ); ?></span>
+            </div>
+            <script>
+            (function () {
+                var b = document.querySelector('[data-gs-make-live="1"]');
+                if (!b) return;
+                b.addEventListener('click', function () {
+                    if (!window.confirm(b.getAttribute('data-confirm') || '')) return;
+                    var fd = new FormData();
+                    fd.append('action', 'gend_society_migration_go_live');
+                    fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>);
+                    var label = b.textContent;
+                    b.disabled = true;
+                    b.textContent = '...';
+                    fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>, { method: 'POST', body: fd, credentials: 'same-origin' })
+                        .then(function (r) { return r.json(); })
+                        .then(function (j) {
+                            var m = j ? (j.data ? j.data.message : '') : ''; if (!j || !j.success) { throw new Error(m || 'Request failed'); } /* no double ampersand in inline scripts: content filters rewrite it */
+                            window.location.reload();
+                        })
+                        .catch(function (e) { b.disabled = false; b.textContent = label; window.alert(e.message); });
+                });
+            })();
+            </script>
+<?php endif; ?>
         </div>
 
         <div class="gs-hosting__card" style="margin-top: 16px;">
@@ -866,12 +984,15 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
                         <tr>
                             <th><?php esc_html_e( 'Domain', 'gend-society' ); ?></th>
                             <th><?php esc_html_e( 'Status', 'gend-society' ); ?></th>
+<?php if ( $gs_armed ) : ?>
+                            <th><?php esc_html_e( 'SSL', 'gend-society' ); ?></th>
+<?php endif; ?>
                             <th style="width: 1%;"><?php esc_html_e( 'Action', 'gend-society' ); ?></th>
                         </tr>
                     </thead>
                     <tbody>
                         <?php foreach ( $gs_domains as $gs_d ) :
-                            $gs_hostname = (string) ( is_array( $gs_d ) ? ( $gs_d['domain'] ?? '' ) : $gs_d );
+                            $gs_hostname = (string) ( is_array( $gs_d ) ? ( $gs_d['domain'] ?? ( $gs_d['host'] ?? '' ) ) : $gs_d );
                             if ( $gs_hostname === '' ) {
                                 continue;
                             }
@@ -879,13 +1000,29 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
                             $gs_klass  = in_array( $gs_status, array( 'ok', 'verified', 'active', 'live' ), true )
                                 ? 'is-ok'
                                 : ( in_array( $gs_status, array( 'fail', 'error', 'invalid' ), true ) ? 'is-err' : 'is-warn' );
+                            $gs_stage  = gend_society_domain_stage_view( is_array( $gs_d ) ? (string) ( $gs_d['stage'] ?? '' ) : '' );
+                            $gs_dns    = is_array( $gs_d ) && ! empty( $gs_d['dns'] ) && is_array( $gs_d['dns'] ) ? $gs_d['dns'] : array();
                         ?>
                             <tr data-domain="<?php echo esc_attr( $gs_hostname ); ?>">
-                                <td><code style="background: rgba(78,170,255,0.1); color:#a5b4fc; padding: 2px 6px; border-radius: 4px;"><?php echo esc_html( $gs_hostname ); ?></code></td>
+                                <td><code style="background: rgba(78,170,255,0.1); color:#a5b4fc; padding: 2px 6px; border-radius: 4px;"><?php echo esc_html( $gs_hostname ); ?></code><?php if ( $gs_dns ) : ?><details data-gs-domain-dns="1" style="margin-top: 6px;"><summary><?php esc_html_e( 'DNS records', 'gend-society' ); ?></summary><ul style="margin: 6px 0 0 18px; list-style: disc;"><?php
+                                    foreach ( array( 'a_record', 'txt_record' ) as $gs_rk ) {
+                                        $gs_r = isset( $gs_dns[ $gs_rk ] ) && is_array( $gs_dns[ $gs_rk ] ) ? $gs_dns[ $gs_rk ] : array();
+                                        if ( ! $gs_r ) {
+                                            continue;
+                                        }
+                                        /* translators: 1: record type, 2: record name, 3: record value, 4: TTL in seconds. */
+                                        echo '<li>' . esc_html( sprintf( __( '%1$s record: %2$s -> %3$s (TTL %4$s)', 'gend-society' ), (string) ( $gs_r['type'] ?? '' ), (string) ( $gs_r['host'] ?? '' ), (string) ( $gs_r['value'] ?? '' ), (string) ( $gs_r['ttl'] ?? 300 ) ) ) . '</li>';
+                                    }
+                                ?></ul></details><?php endif; ?></td>
                                 <td><span class="gs-hosting__pill <?php echo esc_attr( $gs_klass ); ?>"><?php echo esc_html( $gs_status ?: 'pending' ); ?></span></td>
+<?php if ( $gs_armed ) : ?>
+                                <td data-gs-domain-stage="<?php echo esc_attr( $gs_stage['stage'] ); ?>"><span class="gs-hosting__pill <?php echo esc_attr( $gs_stage['class'] ); ?>"><?php echo esc_html( $gs_stage['text'] ); ?></span></td>
+<?php endif; ?>
                                 <td style="text-align: right; white-space: nowrap;">
-                                    <button type="button" class="gs-hosting__btn" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="background: rgba(255,255,255,0.08); padding: 4px 10px; font-size: 0.72rem;"><?php esc_html_e( 'Verify', 'gend-society' ); ?></button>
+<?php if ( $gs_open ) : ?>
+                                    <button type="button" class="gs-hosting__btn" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="background: rgba(255,255,255,0.08); padding: 4px 10px; font-size: 0.72rem;"><?php echo ( $gs_armed && 'done-without-ssl' === $gs_stage['stage'] ) ? esc_html__( 'Retry certificate', 'gend-society' ) : esc_html__( 'Verify', 'gend-society' ); ?></button>
                                     <button type="button" class="gs-hosting__btn is-danger" data-gs-mship="remove-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="padding: 4px 10px; font-size: 0.72rem;"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
+<?php endif; ?>
                                 </td>
                             </tr>
                         <?php endforeach; ?>

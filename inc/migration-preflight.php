@@ -744,6 +744,14 @@ if ( ! function_exists( 'gend_society_migration_view' ) ) {
 			$v['can_cancel'] = false;
 			$v['can_start']  = false;
 		}
+		if ( function_exists( 'gend_society_origin_moved' ) && gend_society_origin_moved()['moved'] ) {
+			// 111-12: the stored hub block says Live although a stale /membership cache still shows an armed state: no
+			// header progress, no Start / Retry / Cancel controls.
+			$v['live']       = true;
+			$v['can_start']  = false;
+			$v['can_retry']  = false;
+			$v['can_cancel'] = false;
+		}
 		return $v;
 	}
 }
@@ -759,9 +767,9 @@ if ( ! function_exists( 'gend_society_migration_view_shows' ) ) {
 }
 
 if ( ! function_exists( 'gend_society_migration_view_polls' ) ) {
-	/** Repaint every 15 s while armed, scheduled or running; stop when Live or failed. */
+	/** Repaint every 15 s while armed, scheduled or running; stop when Live, failed or in Preview (111-10: nothing moves on its own in Preview). */
 	function gend_society_migration_view_polls( array $v ): bool {
-		return gend_society_migration_view_shows( $v ) && 'failed' !== $v['state'];
+		return gend_society_migration_view_shows( $v ) && ! in_array( $v['state'], array( 'failed', 'preview' ), true );
 	}
 }
 
@@ -794,6 +802,9 @@ if ( ! function_exists( 'gend_society_migration_receive' ) ) {
 					'export_secret' => $secret,
 					'received_at'   => time(),
 				);
+				if ( 'delta' === (string) ( $answer['mode'] ?? '' ) ) {
+					$job['mode'] = 'delta'; // 111-11: the catch-up job; the exporter reads it at init
+				}
 				if ( is_array( $cur ) && ( $cur['job_id'] ?? '' ) !== $job_id ) {
 					// A new job (Retry) replaces the old one: its staging is wiped first.
 					do_action( 'gend_society_migration_cleanup', $cur );
@@ -962,6 +973,10 @@ if ( ! function_exists( 'gend_society_migration_do' ) ) {
 				return gend_society_migration_poll_once( true );
 			case 'report_if_stale':
 				return gend_society_migration_report_if_stale();
+			case 'delta':
+				return gend_society_migration_delta_start();
+			case 'delta_state':
+				return gend_society_migration_delta_state();
 			default:
 				return new WP_Error( 'gend_society_migration_verb', __( 'Unknown action.', 'gend-society' ) );
 		}
@@ -1053,6 +1068,163 @@ if ( ! function_exists( 'gend_society_migration_poll_cron' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_migration_delta_allowed' ) ) {
+	/**
+	 * 111-11 (MIG-13, P3): a catch-up runs only from the ORIGIN (a connected standalone install) while the hub says
+	 * Preview. The cached payload decides; the hub refuses again on its side.
+	 *
+	 * @return true|WP_Error
+	 */
+	function gend_society_migration_delta_allowed() {
+		$payload = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+		$m       = is_array( $payload ) && is_array( $payload['migration'] ?? null ) ? $payload['migration'] : array();
+		$origin  = function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired();
+		if ( ! $origin || empty( $m['preview'] ) || ! empty( $m['live'] ) ) {
+			return new WP_Error( 'not_preview', __( 'Catching up is only available while your new site is in Preview.', 'gend-society' ), array( 'status' => 409 ) );
+		}
+		return true;
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_start' ) ) {
+	/**
+	 * Start a catch-up: hub POST migration/delta/start (job id only), then GET migration/delta/state for the export
+	 * secret (the hub re-sends it until the first ready report, so an interrupted receipt can be repeated). The job is
+	 * stored in the existing job option with mode 'delta' and gend_society_migration_job_received starts the exporter.
+	 * The secret is kept only in that option and never logged or returned.
+	 *
+	 * @return array|WP_Error
+	 */
+	function gend_society_migration_delta_start() {
+		$ok = gend_society_migration_delta_allowed();
+		if ( is_wp_error( $ok ) ) {
+			return $ok;
+		}
+		$start = gend_society_remote_membership_call( 'migration/delta/start', array(), 'POST' );
+		if ( is_wp_error( $start ) ) {
+			return $start;
+		}
+		$job_id = is_array( $start ) ? (string) ( $start['job_id'] ?? '' ) : '';
+		if ( ! preg_match( '/^[0-9a-f-]{36}$/', $job_id ) ) {
+			return new WP_Error( 'gend_society_migration_delta_job', __( 'gend.me did not start the catch-up. Please try again.', 'gend-society' ), array( 'status' => 502 ) );
+		}
+		$state = gend_society_remote_membership_call( 'migration/delta/state', array(), 'GET' );
+		if ( is_wp_error( $state ) ) {
+			return $state;
+		}
+		$secret = is_array( $state ) && (string) ( $state['job_id'] ?? '' ) === $job_id ? (string) ( $state['export_secret'] ?? '' ) : '';
+		if ( ! preg_match( '/^[0-9a-f]{64}$/', $secret ) ) {
+			return new WP_Error( 'gend_society_migration_delta_secret', __( 'gend.me did not hand over the catch-up. Please try again in a minute.', 'gend-society' ), array( 'status' => 502 ) );
+		}
+		gend_society_migration_receive(
+			array(
+				'job_id'        => $job_id,
+				'export_secret' => $secret,
+				'mode'          => 'delta',
+			)
+		);
+		unset( $secret );
+		return array( 'state' => 'queued' );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_line' ) ) {
+	/**
+	 * The one status line shown in the Preview note.
+	 *
+	 * @param array $s Hub delta state (state, counts, empty, error, last_at) plus optional local_error.
+	 */
+	function gend_society_migration_delta_line( array $s ): string {
+		$state = (string) ( $s['state'] ?? 'idle' );
+		if ( ! empty( $s['local_error'] ) ) {
+			/* translators: %s: error. */
+			return sprintf( __( 'Catch-up failed: %s', 'gend-society' ), (string) $s['local_error'] );
+		}
+		switch ( $state ) {
+			case 'queued':
+			case 'exporting':
+				return __( 'Catch-up: exporting your changes...', 'gend-society' );
+			case 'applying':
+				return __( 'Catch-up: applying to your preview...', 'gend-society' );
+			case 'done':
+				$at = (int) ( $s['last_at'] ?? 0 );
+				$tm = $at > 0 ? wp_date( get_option( 'date_format' ) . ' ' . get_option( 'time_format' ), $at ) : '';
+				if ( ! empty( $s['empty'] ) ) {
+					/* translators: %s: local date and time. */
+					return sprintf( __( 'Done: nothing new to copy (%s).', 'gend-society' ), $tm );
+				}
+				$items = 0;
+				$files = 0;
+				foreach ( (array) ( $s['counts'] ?? array() ) as $k => $n ) {
+					if ( 'uploads_new' === $k || 'uploads_renamed' === $k ) {
+						$files += (int) $n;
+					} elseif ( 'conflicts' !== $k && 'uploads_same' !== $k ) {
+						$items += (int) $n;
+					}
+				}
+				/* translators: 1: number of items, 2: number of files, 3: local date and time. */
+				return sprintf( __( 'Done: %1$d items and %2$d files copied at %3$s', 'gend-society' ), $items, $files, $tm );
+			case 'failed':
+				$e = (string) ( $s['error'] ?? '' );
+				if ( '' === $e ) {
+					return __( 'Catch-up failed. Please try again.', 'gend-society' );
+				}
+				/* translators: %s: error. */
+				return sprintf( __( 'Catch-up failed: %s', 'gend-society' ), $e );
+		}
+		return '';
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_state' ) ) {
+	/**
+	 * Poll the catch-up: hub GET migration/delta/state (the export secret is never passed on to the browser). While the
+	 * hub still waits for the ready report (queued) the secret it re-sends repairs a missing local receipt and a ready
+	 * export that has not reached gend.me reports again. A local export that failed shows its own message.
+	 *
+	 * @return array|WP_Error { state, line, poll, tick, counts, empty }
+	 */
+	function gend_society_migration_delta_state() {
+		$s = gend_society_remote_membership_call( 'migration/delta/state', array(), 'GET' );
+		if ( is_wp_error( $s ) ) {
+			return $s;
+		}
+		$s = is_array( $s ) ? $s : array();
+		if ( 'queued' === (string) ( $s['state'] ?? '' ) ) {
+			$cur = get_option( GEND_SOCIETY_MIGRATION_JOB_OPTION, null );
+			if ( ! is_array( $cur ) || ( $cur['job_id'] ?? '' ) !== ( $s['job_id'] ?? '' ) ) {
+				gend_society_migration_receive(
+					array(
+						'job_id'        => (string) ( $s['job_id'] ?? '' ),
+						'export_secret' => (string) ( $s['export_secret'] ?? '' ),
+						'mode'          => 'delta',
+					)
+				);
+			}
+			if ( function_exists( 'gend_society_migration_report_pending' ) ) {
+				gend_society_migration_report_pending();
+			}
+		}
+		unset( $s['export_secret'] );
+		$job = get_option( GEND_SOCIETY_MIGRATION_JOB_OPTION, null );
+		if ( is_array( $job ) && 'delta' === ( $job['mode'] ?? '' ) && ( $job['job_id'] ?? '' ) === ( $s['job_id'] ?? '' ) && 'failed' === ( $job['phase'] ?? '' ) ) {
+			$s['local_error'] = (string) ( $job['error'] ?? '' );
+			if ( '' === $s['local_error'] ) {
+				$s['local_error'] = __( 'Your site could not prepare the changes.', 'gend-society' );
+			}
+		}
+		$state = (string) ( $s['state'] ?? 'idle' );
+		return array(
+			'state'  => $state,
+			'line'   => gend_society_migration_delta_line( $s ),
+			'poll'   => in_array( $state, array( 'queued', 'exporting', 'applying' ), true ) && empty( $s['local_error'] ),
+			'tick'   => function_exists( 'gend_society_migration_export_active' ) && gend_society_migration_export_active(),
+			'counts' => (array) ( $s['counts'] ?? array() ),
+			'empty'  => ! empty( $s['empty'] ),
+		);
+	}
+}
+
 if ( ! function_exists( 'gend_society_migration_cta_mode' ) ) {
 	/**
 	 * What the standalone Storage card Start Migration CTA does (M7): 'wizard' before payment (the container wizard
@@ -1062,6 +1234,9 @@ if ( ! function_exists( 'gend_society_migration_cta_mode' ) ) {
 	 * @param array $payload /membership payload.
 	 */
 	function gend_society_migration_cta_mode( array $payload ): string {
+		if ( function_exists( 'gend_society_origin_moved' ) && gend_society_origin_moved()['moved'] ) {
+			return ''; // 111-12: the stored hub block says Live; a stale membership cache must not offer Start again
+		}
 		$v = gend_society_migration_view( $payload );
 		if ( $v['live'] || $v['index'] >= 5 ) {
 			return '';
@@ -1297,7 +1472,7 @@ if ( ! function_exists( 'gend_society_migration_queue_report' ) ) {
 	}
 }
 
-foreach ( array( 'start', 'cancel', 'retry', 'state', 'report_if_stale' ) as $gend_society_mig_verb ) {
+foreach ( array( 'start', 'cancel', 'retry', 'state', 'report_if_stale', 'delta', 'delta_state' ) as $gend_society_mig_verb ) {
 	add_action(
 		'wp_ajax_gend_society_migration_' . $gend_society_mig_verb,
 		static function () use ( $gend_society_mig_verb ) {

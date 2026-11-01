@@ -680,6 +680,18 @@ return array(
 			'note'  => '"Sign in with gend.me" on every site except gend.me itself; container tier since 106: hub + containers only; never standalone, never in the wordpress.org zip.',
 		),
 		array(
+			'file'  => 'inc/migration-preview.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Preview marker + noindex for a migrated container while it is in Preview (Phase 111-10). Options only on the front end; never in the wordpress.org zip.',
+		),
+		array(
+			'file'  => 'inc/container-host-urls.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Host-keyed home/siteurl for a migrated container: answers on the verified custom domain as well as the temporary host (Phase 111-06). Durable-option read on the front end, cron + admin sync only; never in the wordpress.org zip.',
+		),
+		array(
 			'file'  => 'inc/portal-connect.php',
 			'tier'  => 'customer',
 			'needs' => array(),

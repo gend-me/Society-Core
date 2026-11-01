@@ -35,7 +35,9 @@
  *            batches and ticks with an in-entry cursor. No end-of-archive blocks except one final 1024-zero member at
  *            the end of the last part, so the parts concatenated in order are ONE .tar.gz (an entry may span parts).
  *  Manifest  manifest.json format 2 (site facts, part sizes + sha256, totals, the content-freeze watermark read at
- *            content-phase start, excluded[], alt_base); then the job phase is ready.
+ *            job start with taken_at_gmt (111-05), excluded[], alt_base); then the job phase is ready.
+ *  Delta     (111-05) job mode 'delta': the db phase writes INSERT IGNORE / DELETE-by-parent SQL for posts, postmeta,
+ *            term_relationships, comments, commentmeta changed since the base export's start (manifest mode, anchor).
  *
  * @package gend-society
  */
@@ -80,6 +82,13 @@ if ( ! defined( 'GEND_SOCIETY_MIGRATION_INDEX_STEP' ) ) {
 }
 if ( ! defined( 'GEND_SOCIETY_MIGRATION_LIST_MAX' ) ) {
 	define( 'GEND_SOCIETY_MIGRATION_LIST_MAX', 1000 );
+}
+
+if ( ! defined( 'GEND_SOCIETY_MIGRATION_BASE_OPTION' ) ) {
+	define( 'GEND_SOCIETY_MIGRATION_BASE_OPTION', 'gend_society_migration_base' ); // 111-05: {job_id, watermark, at} of the last full export (no secrets)
+}
+if ( ! defined( 'GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S' ) ) {
+	define( 'GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S', 300 );
 }
 
 if ( ! function_exists( 'gend_society_migration_export_job' ) ) {
@@ -277,12 +286,21 @@ if ( ! function_exists( 'gend_society_migration_export_init' ) ) {
 		}
 		global $wpdb;
 		$staging = gend_society_migration_staging_dir();
+		$mode    = 'delta' === ( $stored['mode'] ?? 'full' ) ? 'delta' : 'full'; // the job receipt says delta (111-11); default full
+		$base    = 'delta' === $mode ? get_option( GEND_SOCIETY_MIGRATION_BASE_OPTION, array() ) : array();
+		$nobase  = 'delta' === $mode && ( ! is_array( $base ) || empty( $base['job_id'] ) || empty( $base['watermark']['taken_at_gmt'] ) );
 		$stored  = array_merge(
 			$stored,
 			array(
-				'phase'        => '' === $staging ? 'failed' : 'db',
+				'mode'         => $mode,
+				'base'         => 'delta' === $mode && ! $nobase ? array(
+					'job_id'    => (string) $base['job_id'],
+					'watermark' => (array) $base['watermark'],
+				) : null,
+				'watermark'    => '' === $staging ? array() : gend_society_migration_watermark(), // 111-05: the anchor is read at job START, before the db phase
+				'phase'        => '' === $staging || $nobase ? 'failed' : 'db',
 				'prefix'       => (string) $wpdb->base_prefix,
-				'tables'       => '' === $staging ? array() : gend_society_migration_export_tables(),
+				'tables'       => '' === $staging || 'delta' === $mode ? array() : gend_society_migration_export_tables(),
 				'ti'           => 0,
 				'parts'        => array(
 					'db'      => array(),
@@ -304,7 +322,7 @@ if ( ! function_exists( 'gend_society_migration_export_init' ) ) {
 				'started_at'   => time(),
 				'last_tick_at' => 0,
 				'ticks'        => 0,
-				'error'        => '' === $staging ? __( 'This site has no writable place for the export. Free up space or ask your host.', 'gend-society' ) : null,
+				'error'        => '' === $staging ? __( 'This site has no writable place for the export. Free up space or ask your host.', 'gend-society' ) : ( $nobase ? __( 'There is no earlier full export to catch up from.', 'gend-society' ) : null ),
 			)
 		);
 		gend_society_migration_export_save( $stored );
@@ -390,7 +408,7 @@ if ( ! function_exists( 'gend_society_migration_part_append' ) ) {
 	function gend_society_migration_part_append( array &$job, string $kind, string $sql ): bool {
 		$cur  = gend_society_migration_part_open( $job, $kind );
 		$path = $job['staging'] . '/' . $cur['file'];
-		if ( 0 === (int) $cur['members'] ) {
+		if ( 0 === (int) $cur['members'] && 'delta' !== (string) ( $job['mode'] ?? 'full' ) ) { // 111-07: the importer's delta scan accepts no SET line, so delta parts are statements only
 			$sql = "SET NAMES utf8mb4;\nSET FOREIGN_KEY_CHECKS=0;\nSET SQL_MODE='NO_AUTO_VALUE_ON_ZERO';\n" . $sql;
 		}
 		$gz = gzopen( $path, 'ab6' );
@@ -592,31 +610,418 @@ if ( ! function_exists( 'gend_society_migration_export_step' ) ) {
 	}
 }
 
+/* ---- delta DB phase (111-05) ----------------------------------------------------------------------------- */
+
+if ( ! function_exists( 'gend_society_migration_delta_stmt' ) ) {
+	/**
+	 * One single-line INSERT IGNORE for one row (never REPLACE INTO), destination table wp_<name>. Newlines inside
+	 * values are escaped by the value helper, so the statement is one line.
+	 *
+	 * @param string $dst     Destination table (wp_ prefix).
+	 * @param array  $row     Row (column => value).
+	 * @param string $comment Trailing comment(s) the importer reads (chk / id / parent), or ''.
+	 */
+	function gend_society_migration_delta_stmt( string $dst, array $row, string $comment = '' ): string {
+		return 'INSERT IGNORE INTO `' . $dst . '` (`' . implode( '`, `', array_keys( $row ) ) . '`) VALUES (' . implode( ', ', array_map( 'gend_society_migration_sql_value', array_values( $row ) ) ) . ');' . ( '' !== $comment ? ' ' . $comment : '' ) . "\n";
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_children' ) ) {
+	/**
+	 * `DELETE FROM wp_<kt> WHERE <col> IN (ids);` then one INSERT IGNORE per child row of those parents (child tables
+	 * are replaced by delete-by-parent; each row carries a trailing parent:<id> comment so the importer can skip a conflicting parent).
+	 *
+	 * @param string $prefix Source table prefix.
+	 * @param string $kt     Child table name without prefix.
+	 * @param string $col    Owner column.
+	 * @param array  $ids    Owner ids.
+	 * @param array  $opt    delete (bool, default true: the importer allows DELETE on some child tables only), drop (columns left out of
+	 *                       the INSERT so the container assigns them), skip_meta (meta_key values not exported), rename_meta (bool).
+	 * @return array{0:string,1:int,2:array} SQL, the child row count and the rows.
+	 */
+	function gend_society_migration_delta_children( string $prefix, string $kt, string $col, array $ids, array $opt = array() ): array {
+		global $wpdb;
+		if ( ! $ids ) {
+			return array( '', 0, array() );
+		}
+		$in   = implode( ',', array_map( 'intval', $ids ) );
+		$sql  = ! isset( $opt['delete'] ) || $opt['delete'] ? 'DELETE FROM `wp_' . $kt . '` WHERE `' . $col . '` IN (' . $in . ");\n" : '';
+		$rows = (array) $wpdb->get_results( "SELECT * FROM `{$prefix}{$kt}` WHERE `{$col}` IN ({$in})", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- ids are cast to int above, names are fixed.
+		$n    = 0;
+		foreach ( $rows as $r ) {
+			if ( isset( $opt['skip_meta'], $r['meta_key'] ) && in_array( (string) $r['meta_key'], (array) $opt['skip_meta'], true ) ) {
+				continue;
+			}
+			$parent = (int) $r[ $col ];
+			if ( ! empty( $opt['rename_meta'] ) && isset( $r['meta_key'] ) ) {
+				$r['meta_key'] = gend_society_migration_rename_key( (string) $r['meta_key'], $prefix ); // phpcs:ignore WordPress.DB.SlowDBQuery
+			}
+			foreach ( (array) ( $opt['drop'] ?? array() ) as $d ) {
+				unset( $r[ $d ] );
+			}
+			$sql .= gend_society_migration_delta_stmt( 'wp_' . $kt, $r, '/* parent:' . $parent . ' */' );
+			++$n;
+		}
+		return array( $sql, $n, $rows );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_hash' ) ) {
+	/** md5 of the named columns joined with '|' (NULL = ''), the same formula as the importer's MD5(CONCAT_WS('|', IFNULL(col,''), ...)). */
+	function gend_society_migration_delta_hash( array $row, array $cols ): string {
+		$p = array();
+		foreach ( $cols as $c ) {
+			$p[] = isset( $row[ $c ] ) ? (string) $row[ $c ] : '';
+		}
+		return md5( implode( '|', $p ) );
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_tag' ) ) {
+	/** The chk and id trailing comments for a parent row; $kind = users | orders | terms (formulas fixed by the 111-04 importer). */
+	function gend_society_migration_delta_tag( string $kind, array $row ): string {
+		$f = array(
+			'users'  => array( array( 'user_login', 'user_registered' ), array( 'user_pass', 'user_email', 'user_nicename', 'display_name', 'user_status', 'user_url' ) ),
+			'orders' => array( array( 'type', 'date_created_gmt', 'billing_email' ), array( 'status', 'total_amount', 'date_updated_gmt', 'transaction_id' ) ),
+			'terms'  => array( array( 'slug' ), array( 'name', 'slug', 'term_group' ) ),
+		)[ $kind ];
+		return '/* chk:' . gend_society_migration_delta_hash( $row, $f[1] ) . ' */ /* id:' . gend_society_migration_delta_hash( $row, $f[0] ) . ' */';
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_db_step' ) ) {
+	/**
+	 * One unit of the delta db phase (resumable: an ID cursor per stage, one batch of parent rows plus their child
+	 * rows per call). Stage 0 = posts (+ postmeta + term_relationships), stage 1 = comments (+ commentmeta),
+	 * stage 2 = terms (+ term_taxonomy + termmeta, 111-07).
+	 * The anchor is ALWAYS the base (full) export's job-start time minus the overlap; posts_modified_gmt is never queried.
+	 *
+	 * Parent rows: `INSERT IGNORE ...; chk:<md5 of content fields> id:<md5 of identity fields>` on one line (the importer
+	 * decides insert / skip / overwrite-same-origin / conflict, 111-04). No DROP / CREATE / ALTER / TRUNCATE / REPLACE
+	 * and no wp_options.
+	 *
+	 * @return string 'more' | 'phase' | 'error'.
+	 */
+	function gend_society_migration_delta_db_step( array &$job ): string {
+		global $wpdb;
+		$prefix = (string) $job['prefix'];
+		$base   = (array) ( $job['base']['watermark'] ?? array() );
+		$taken  = (string) ( $base['taken_at_gmt'] ?? '' );
+		$ts     = strtotime( $taken . ' UTC' );
+		if ( '' === $taken || false === $ts ) {
+			$job['error'] = 'The earlier full export has no start time';
+			return 'error';
+		}
+		$from = gmdate( 'Y-m-d H:i:s', $ts - GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S );
+		if ( ! isset( $job['delta'] ) || ! is_array( $job['delta'] ) ) {
+			$job['delta'] = array(
+				'stage'  => 0,
+				'cursor' => 0,
+				'counts' => array(
+					'posts'              => 0,
+					'postmeta'           => 0,
+					'term_relationships' => 0,
+					'comments'           => 0,
+					'commentmeta'        => 0,
+				),
+			);
+		}
+		$d     = $job['delta'];
+		$limit = 50;
+		$out   = '';
+		$ids   = array();
+
+		if ( 0 === (int) $d['stage'] ) {
+			$where = $wpdb->prepare( "WHERE ID > %d AND (post_modified_gmt >= %s OR ID > %d) AND post_type <> 'revision' AND post_status <> 'auto-draft'", (int) $d['cursor'], $from, (int) ( $base['max_post_id'] ?? 0 ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+			$rows  = $wpdb->get_results( "SELECT * FROM `{$prefix}posts` {$where} ORDER BY ID LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- prepared above.
+			if ( '' !== (string) $wpdb->last_error ) {
+				$job['error'] = 'Reading posts failed: ' . $wpdb->last_error;
+				return 'error';
+			}
+			if ( ! $rows ) {
+				$d['stage']   = 1;
+				$d['cursor']  = 0;
+				$job['delta'] = $d;
+				return 'more';
+			}
+			foreach ( $rows as $r ) {
+				$chk  = md5( $r['post_title'] . '|' . $r['post_content'] . '|' . $r['post_modified_gmt'] . '|' . $r['post_status'] );
+				$idh  = md5( $r['post_name'] . '|' . $r['post_date_gmt'] . '|' . $r['post_type'] . '|' . $r['guid'] );
+				$out .= gend_society_migration_delta_stmt( 'wp_posts', $r, '/* chk:' . $chk . ' */ /* id:' . $idh . ' */' );
+				$ids[] = (int) $r['ID'];
+			}
+			$d['counts']['posts'] += count( $rows );
+			foreach ( array( 'postmeta' => 'post_id', 'term_relationships' => 'object_id' ) as $kt => $col ) {
+				list( $sql, $n ) = gend_society_migration_delta_children( $prefix, $kt, $col, $ids );
+				$out            .= $sql;
+				$d['counts'][ $kt ] += $n;
+			}
+			$d['cursor'] = (int) end( $ids );
+		} elseif ( 1 === (int) $d['stage'] ) {
+			$where = $wpdb->prepare( 'WHERE comment_ID > %d AND (comment_date_gmt >= %s OR comment_ID > %d)', (int) $d['cursor'], $from, (int) ( $base['max_comment_id'] ?? 0 ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+			$rows  = $wpdb->get_results( "SELECT * FROM `{$prefix}comments` {$where} ORDER BY comment_ID LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- prepared above.
+			if ( '' !== (string) $wpdb->last_error ) {
+				$job['error'] = 'Reading comments failed: ' . $wpdb->last_error;
+				return 'error';
+			}
+			if ( ! $rows ) {
+				$d['stage']   = 2; // 111-07: the terms the changed posts use (or that are new)
+				$d['cursor']  = 0;
+				$job['delta'] = $d;
+				return 'more';
+			}
+			foreach ( $rows as $r ) {
+				$chk  = md5( $r['comment_content'] . '|' . $r['comment_approved'] . '|' . $r['comment_type'] );
+				$idh  = md5( $r['comment_post_ID'] . '|' . $r['comment_author'] . '|' . $r['comment_author_email'] . '|' . $r['comment_date_gmt'] );
+				$out .= gend_society_migration_delta_stmt( 'wp_comments', $r, '/* chk:' . $chk . ' */ /* id:' . $idh . ' */' );
+				$ids[] = (int) $r['comment_ID'];
+			}
+			$d['counts']['comments'] += count( $rows );
+			list( $sql, $n )          = gend_society_migration_delta_children( $prefix, 'commentmeta', 'comment_id', $ids );
+			$out                     .= $sql;
+			$d['counts']['commentmeta'] += $n;
+			$d['cursor']              = (int) end( $ids );
+		} else {
+			// 111-07: wp_terms / wp_term_taxonomy / wp_termmeta rows, INSERT IGNORE only (insert-if-absent, the importer's terms parent
+			// rule): terms above the base max term id, plus every term a changed post is related to (an already imported term is
+			// "same identity, unchanged" there). Relationships alone would point at a term the container does not have.
+			$pw    = $wpdb->prepare( "(p.post_modified_gmt >= %s OR p.ID > %d) AND p.post_type <> 'revision' AND p.post_status <> 'auto-draft'", $from, (int) ( $base['max_post_id'] ?? 0 ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+			$newt  = isset( $base['max_term_id'] ) ? $wpdb->prepare( 't.term_id > %d OR ', (int) $base['max_term_id'] ) : ''; // an older base without max_term_id: referenced terms only
+			$where = $wpdb->prepare( 'WHERE t.term_id > %d', (int) $d['cursor'] ) . " AND ({$newt}t.term_id IN (SELECT tt.term_id FROM `{$prefix}term_taxonomy` tt JOIN `{$prefix}term_relationships` tr ON tr.term_taxonomy_id = tt.term_taxonomy_id JOIN `{$prefix}posts` p ON p.ID = tr.object_id WHERE {$pw}))"; // phpcs:ignore WordPress.DB.PreparedSQL
+			$rows  = $wpdb->get_results( "SELECT t.* FROM `{$prefix}terms` t {$where} ORDER BY t.term_id LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- prepared above.
+			if ( '' !== (string) $wpdb->last_error ) {
+				$job['error'] = 'Reading terms failed: ' . $wpdb->last_error;
+				return 'error';
+			}
+			if ( ! $rows ) {
+				if ( empty( $job['parts']['db'] ) && ! ( is_array( $job['cur'] ) && 'db' === $job['cur']['kind'] ) ) {
+					gend_society_migration_part_append( $job, 'db', '' ); // an empty catch-up still has one valid part
+				}
+				gend_society_migration_part_close( $job );
+				$job['delta'] = $d;
+				return 'phase';
+			}
+			foreach ( $rows as $r ) {
+				$out  .= gend_society_migration_delta_stmt( 'wp_terms', $r, gend_society_migration_delta_tag( 'terms', $r ) );
+				$ids[] = (int) $r['term_id'];
+			}
+			$d['counts']['terms'] = (int) ( $d['counts']['terms'] ?? 0 ) + count( $rows );
+			foreach ( array( 'term_taxonomy', 'termmeta' ) as $kt ) { // no DELETE: the importer allows INSERT IGNORE only on these
+				list( $sql, $n )    = gend_society_migration_delta_children( $prefix, $kt, 'term_id', $ids, array( 'delete' => false ) );
+				$out               .= $sql;
+				$d['counts'][ $kt ] = (int) ( $d['counts'][ $kt ] ?? 0 ) + $n;
+			}
+			$d['cursor'] = (int) end( $ids );
+		}
+		if ( '' !== $out && ! gend_society_migration_part_append( $job, 'db', $out ) ) {
+			$job['error'] = 'Writing the export failed (disk full?)';
+			return 'error';
+		}
+		$job['delta']           = $d;
+		$job['totals']['rows'] += count( $rows );
+		return 'more';
+	}
+}
+
+/* ---- delta users and WooCommerce orders (111-07) ---------------------------------------------------------- */
+
+if ( ! function_exists( 'gend_society_migration_delta_table_exists' ) ) {
+	/** Does the table with this exact name exist? */
+	function gend_society_migration_delta_table_exists( string $name ): bool {
+		global $wpdb;
+		return $name === (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $name ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_users_step' ) ) {
+	/**
+	 * One unit of the delta users phase: NEW users only (never a password hash of an existing user), as INSERT IGNORE INTO
+	 * wp_users with the chk / id comments plus their usermeta (session_tokens never leave the origin; umeta_id is left to the
+	 * container so ids cannot collide with a Preview user's meta). Stage 0 = users, stage 1 = HPOS orders
+	 * (gend_society_migration_delta_orders_step), then the phase ends. New = ID above the base max_user_id (an older base
+	 * without it: user_registered at or after the anchor).
+	 *
+	 * @return string 'more' | 'phase' | 'error'.
+	 */
+	function gend_society_migration_delta_users_step( array &$job ): string {
+		global $wpdb;
+		$prefix = (string) $job['prefix'];
+		$base   = (array) ( $job['base']['watermark'] ?? array() );
+		$ts     = strtotime( (string) ( $base['taken_at_gmt'] ?? '' ) . ' UTC' );
+		if ( false === $ts ) {
+			$job['error'] = 'The earlier full export has no start time';
+			return 'error';
+		}
+		$from = gmdate( 'Y-m-d H:i:s', $ts - GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S );
+		if ( ! isset( $job['delta'] ) || ! is_array( $job['delta'] ) ) {
+			$job['delta'] = array(
+				'stage'  => 3,
+				'cursor' => 0,
+				'counts' => array(),
+			);
+		}
+		if ( ! isset( $job['delta_u'] ) || ! is_array( $job['delta_u'] ) ) {
+			$job['delta_u']                     = array(
+				'stage'  => 0,
+				'cursor' => 0,
+			);
+			$job['delta']['counts']['users']    = 0;
+			$job['delta']['counts']['usermeta'] = 0;
+		}
+		$u = $job['delta_u'];
+		if ( 1 === (int) $u['stage'] ) {
+			return gend_society_migration_delta_orders_step( $job );
+		}
+		$limit = 50;
+		if ( isset( $base['max_user_id'] ) ) {
+			$where = $wpdb->prepare( 'WHERE ID > %d AND ID > %d', (int) $u['cursor'], (int) $base['max_user_id'] ); // phpcs:ignore WordPress.DB.PreparedSQL
+		} else {
+			$where = $wpdb->prepare( 'WHERE ID > %d AND user_registered >= %s', (int) $u['cursor'], $from ); // phpcs:ignore WordPress.DB.PreparedSQL
+		}
+		$rows = $wpdb->get_results( "SELECT * FROM `{$prefix}users` {$where} ORDER BY ID LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- prepared above.
+		if ( '' !== (string) $wpdb->last_error ) {
+			$job['error'] = 'Reading users failed: ' . $wpdb->last_error;
+			return 'error';
+		}
+		if ( ! $rows ) {
+			$job['delta_u'] = array(
+				'stage'  => 1,
+				'cursor' => 0,
+			);
+			return 'more';
+		}
+		$out = '';
+		$ids = array();
+		foreach ( $rows as $r ) {
+			$out  .= gend_society_migration_delta_stmt( 'wp_users', $r, gend_society_migration_delta_tag( 'users', $r ) );
+			$ids[] = (int) $r['ID'];
+		}
+		list( $sql, $n ) = gend_society_migration_delta_children(
+			$prefix,
+			'usermeta',
+			'user_id',
+			$ids,
+			array(
+				'skip_meta'   => array( 'session_tokens' ),
+				'drop'        => array( 'umeta_id' ),
+				'rename_meta' => true,
+			)
+		);
+		$out .= $sql;
+		if ( ! gend_society_migration_part_append( $job, 'users', $out ) ) {
+			$job['error'] = 'Writing the export failed (disk full?)';
+			return 'error';
+		}
+		$job['delta']['counts']['users']    += count( $rows );
+		$job['delta']['counts']['usermeta'] += $n;
+		$job['delta_u']['cursor']            = (int) end( $ids );
+		$job['totals']['users_rows']        += count( $rows );
+		return 'more';
+	}
+}
+
+if ( ! function_exists( 'gend_society_migration_delta_orders_step' ) ) {
+	/**
+	 * Delta WooCommerce HPOS orders (skipped silently without the wc_orders table): rows with date_updated_gmt at or after
+	 * anchor - 300 s or an id above the base max_order_id, plus wc_orders_meta, wc_order_addresses, wc_order_operational_data,
+	 * wc_order_items and wc_order_itemmeta (replaced by delete-by-parent where the importer allows it). Legacy shop_order posts
+	 * travel with wp_posts.
+	 *
+	 * @return string 'more' | 'phase' | 'error'.
+	 */
+	function gend_society_migration_delta_orders_step( array &$job ): string {
+		global $wpdb;
+		$prefix = (string) $job['prefix'];
+		$base   = (array) ( $job['base']['watermark'] ?? array() );
+		if ( ! isset( $job['delta_u']['hpos'] ) ) {
+			$job['delta_u']['hpos'] = gend_society_migration_delta_table_exists( $prefix . 'wc_orders' );
+			if ( $job['delta_u']['hpos'] ) {
+				foreach ( array( 'wc_orders', 'wc_orders_meta', 'wc_order_addresses', 'wc_order_operational_data', 'wc_order_items', 'wc_order_itemmeta' ) as $k ) {
+					$job['delta']['counts'][ $k ] = 0;
+				}
+			}
+		}
+		$u     = $job['delta_u'];
+		$from  = gmdate( 'Y-m-d H:i:s', (int) strtotime( (string) ( $base['taken_at_gmt'] ?? '' ) . ' UTC' ) - GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S );
+		$limit = 50;
+		$rows  = array();
+		if ( $u['hpos'] ) {
+			$where = $wpdb->prepare( "WHERE id > %d AND (date_updated_gmt >= %s OR id > %d) AND status <> 'auto-draft'", (int) $u['cursor'], $from, (int) ( $base['max_order_id'] ?? 0 ) ); // phpcs:ignore WordPress.DB.PreparedSQL
+			$rows  = $wpdb->get_results( "SELECT * FROM `{$prefix}wc_orders` {$where} ORDER BY id LIMIT {$limit}", ARRAY_A ); // phpcs:ignore WordPress.DB, PluginCheck.Security.DirectDB.UnescapedDBParameter -- prepared above.
+			if ( '' !== (string) $wpdb->last_error ) {
+				$job['error'] = 'Reading orders failed: ' . $wpdb->last_error;
+				return 'error';
+			}
+		}
+		if ( ! $rows ) {
+			gend_society_migration_part_close( $job );
+			return 'phase';
+		}
+		$out = '';
+		$ids = array();
+		foreach ( $rows as $r ) {
+			$out  .= gend_society_migration_delta_stmt( 'wp_wc_orders', $r, gend_society_migration_delta_tag( 'orders', $r ) );
+			$ids[] = (int) $r['id'];
+		}
+		$job['delta']['counts']['wc_orders'] += count( $rows );
+		$items = array();
+		foreach ( array( 'wc_orders_meta', 'wc_order_addresses', 'wc_order_operational_data', 'wc_order_items' ) as $kt ) {
+			if ( ! gend_society_migration_delta_table_exists( $prefix . $kt ) ) {
+				continue;
+			}
+			list( $sql, $n, $crow ) = gend_society_migration_delta_children( $prefix, $kt, 'order_id', $ids );
+			$out                   .= $sql;
+			$job['delta']['counts'][ $kt ] += $n;
+			if ( 'wc_order_items' === $kt ) {
+				foreach ( $crow as $c ) {
+					$items[] = (int) $c['order_item_id'];
+				}
+			}
+		}
+		if ( $items && gend_society_migration_delta_table_exists( $prefix . 'wc_order_itemmeta' ) ) {
+			list( $sql, $n ) = gend_society_migration_delta_children( $prefix, 'wc_order_itemmeta', 'order_item_id', $items );
+			$out            .= $sql;
+			$job['delta']['counts']['wc_order_itemmeta'] += $n;
+		}
+		if ( ! gend_society_migration_part_append( $job, 'db', $out ) ) {
+			$job['error'] = 'Writing the export failed (disk full?)';
+			return 'error';
+		}
+		$job['delta_u']['cursor'] = (int) end( $ids );
+		$job['totals']['rows']   += count( $rows );
+		return 'more';
+	}
+}
+
 /* ---- content phase (110-14) ------------------------------------------------------------------------------ */
 
 if ( ! function_exists( 'gend_society_migration_watermark' ) ) {
 	/**
 	 * The content-freeze watermark (Phase 111's delta anchor), read from the live database.
 	 *
-	 * @return array{max_post_id:int,max_comment_id:int,max_order_id:int,posts_modified_gmt:string}
+	 * @return array{taken_at_gmt:string,max_post_id:int,max_comment_id:int,max_order_id:int,posts_modified_gmt:string}
 	 */
 	function gend_society_migration_watermark(): array {
 		global $wpdb;
+		$taken = gmdate( 'Y-m-d H:i:s' ); // 111-05: first thing, before any read, so a row changed after this instant is always in a delta
 		$hpos  = (string) $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $wpdb->esc_like( $wpdb->prefix . 'wc_orders' ) ) ); // phpcs:ignore WordPress.DB.DirectDatabaseQuery
 		$order = '' !== $hpos
 			? (int) $wpdb->get_var( "SELECT COALESCE(MAX(id), 0) FROM {$wpdb->prefix}wc_orders" ) // phpcs:ignore WordPress.DB
 			: (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts} WHERE post_type IN ('shop_order', 'shop_order_placehold')" ); // phpcs:ignore WordPress.DB
 		return array(
+			'taken_at_gmt'       => $taken,
 			'max_post_id'        => (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->posts}" ), // phpcs:ignore WordPress.DB
 			'max_comment_id'     => (int) $wpdb->get_var( "SELECT COALESCE(MAX(comment_ID), 0) FROM {$wpdb->comments}" ), // phpcs:ignore WordPress.DB
 			'max_order_id'       => $order,
+			'max_user_id'        => (int) $wpdb->get_var( "SELECT COALESCE(MAX(ID), 0) FROM {$wpdb->users}" ), // phpcs:ignore WordPress.DB -- 111-07: a delta exports users above this ID only.
+			'max_term_id'        => (int) $wpdb->get_var( "SELECT COALESCE(MAX(term_id), 0) FROM {$wpdb->terms}" ), // phpcs:ignore WordPress.DB -- 111-07: brand-new terms of a delta.
 			'posts_modified_gmt' => (string) $wpdb->get_var( "SELECT COALESCE(MAX(post_modified_gmt), '') FROM {$wpdb->posts}" ), // phpcs:ignore WordPress.DB
 		);
 	}
 }
 
 if ( ! function_exists( 'gend_society_migration_content_init' ) ) {
-	/** Start the content phase: the index part, the cursors and the watermark (read now, at content-phase start). */
+	/** Start the content phase: the index part and the cursors (the watermark is read at job start since 111-05). */
 	function gend_society_migration_content_init( array &$job ): void {
 		$job['content']   = array(
 			'index'   => array(
@@ -634,7 +1039,23 @@ if ( ! function_exists( 'gend_society_migration_content_init' ) ) {
 			'changed' => array(),
 		);
 		$job['excluded']  = array();
-		$job['watermark'] = gend_society_migration_watermark();
+		if ( empty( $job['watermark'] ) ) { // jobs started before 111-05 have none yet
+			$job['watermark'] = gend_society_migration_watermark();
+		}
+		if ( 'delta' === (string) ( $job['mode'] ?? 'full' ) ) { // 111-07: wp-content/uploads only, files modified since the base anchor - 300 s
+			$root = rtrim( wp_normalize_path( WP_CONTENT_DIR ), '/' );
+			$up   = wp_upload_dir( null, false );
+			$base = rtrim( wp_normalize_path( (string) ( $up['basedir'] ?? '' ) ), '/' );
+			$rel  = 0 === strpos( $base . '/', $root . '/' ) && $base !== $root ? substr( $base, strlen( $root ) + 1 ) : '';
+			$ok   = 'uploads' === $rel || 0 === strpos( $rel, 'uploads/' );
+			$ts   = strtotime( (string) ( $job['base']['watermark']['taken_at_gmt'] ?? '' ) . ' UTC' );
+
+			$job['content']['delta_cutoff']  = (int) $ts - GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S;
+			$job['content']['index']['stack'] = $ok ? array( $rel ) : array();
+			if ( ! $ok ) {
+				gend_society_migration_content_note( $job, 'excluded', $rel, 'uploads_outside_wp_content_uploads' );
+			}
+		}
 	}
 }
 
@@ -697,6 +1118,7 @@ if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
 		$root  = rtrim( wp_normalize_path( WP_CONTENT_DIR ), '/' );
 		$real  = rtrim( wp_normalize_path( (string) realpath( $root ) ), '/' );
 		$ex    = gend_society_migration_excludes();
+		$delta = 'delta' === (string) ( $job['mode'] ?? 'full' );
 		$max   = max( 1, (int) apply_filters( 'gend_society_migration_index_step_entries', GEND_SOCIETY_MIGRATION_INDEX_STEP ) );
 		$buf   = '';
 		$lines = 0;
@@ -725,6 +1147,10 @@ if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
 				++$seen;
 				$r = '' === $rel ? $entries[ $i ] : $rel . '/' . $entries[ $i ];
 				$a = $root . '/' . $r;
+				if ( $delta && is_link( $a ) ) { // the importer refuses links in a delta
+					gend_society_migration_content_note( $job, 'excluded', $r, 'symlink' );
+					continue;
+				}
 				if ( is_link( $a ) ) {
 					$t = realpath( $a );
 					$t = false === $t ? '' : wp_normalize_path( $t );
@@ -750,7 +1176,10 @@ if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
 						continue;
 					}
 					$ix['stack'][] = $r;
-					$buf          .= gend_society_migration_index_line(
+					if ( $delta ) {
+						continue; // files only: tar creates the folders it needs
+					}
+					$buf .= gend_society_migration_index_line(
 						array(
 							'p' => $r,
 							't' => 'd',
@@ -764,6 +1193,9 @@ if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
 					continue; // sockets, fifos
 				}
 				$why = gend_society_migration_excluded( $r, false );
+				if ( '' === $why && $delta && (int) @filemtime( $a ) < (int) $job['content']['delta_cutoff'] ) { // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+					continue; // untouched since the base export
+				}
 				if ( '' === $why ) {
 					$size = (int) @filesize( $a ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 					$why  = $size > (int) $ex['max_file_bytes'] ? 'too_large' : ( is_readable( $a ) ? '' : 'unreadable' );
@@ -772,14 +1204,21 @@ if ( ! function_exists( 'gend_society_migration_index_step' ) ) {
 					gend_society_migration_content_note( $job, 'excluded', $r, $why );
 					continue;
 				}
-				$buf .= gend_society_migration_index_line(
-					array(
-						'p' => $r,
-						't' => 'f',
-						's' => $size,
-						'm' => (int) @filemtime( $a ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
-					)
+				$line = array(
+					'p' => $r,
+					't' => 'f',
+					's' => $size,
+					'm' => (int) @filemtime( $a ), // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
 				);
+				if ( $delta ) { // 111-07: the importer skips identical bytes and renames different ones by this checksum
+					$sha = (string) @hash_file( 'sha256', $a ); // phpcs:ignore WordPress.PHP.NoSilencedErrors.Discouraged
+					if ( '' === $sha ) {
+						gend_society_migration_content_note( $job, 'excluded', $r, 'unreadable' );
+						continue;
+					}
+					$line['sha256'] = $sha;
+				}
+				$buf .= gend_society_migration_index_line( $line );
 				++$lines;
 			}
 			if ( $out ) {
@@ -889,6 +1328,10 @@ if ( ! function_exists( 'gend_society_migration_content_step' ) ) {
 			return 'more';
 		}
 		if ( ! empty( $job['content']['final'] ) ) {
+			return 'phase';
+		}
+		if ( 'delta' === (string) ( $job['mode'] ?? 'full' ) && 0 === (int) $job['content']['index']['lines'] ) {
+			$job['content']['final'] = true; // 111-07: no changed upload: no content part at all
 			return 'phase';
 		}
 		$root = rtrim( wp_normalize_path( WP_CONTENT_DIR ), '/' );
@@ -1050,8 +1493,9 @@ if ( ! function_exists( 'gend_society_migration_manifest_step' ) ) {
 				);
 			}
 		}
-		$home = untrailingslashit( home_url() );
-		$m    = array(
+		$home  = untrailingslashit( home_url() );
+		$delta = 'delta' === (string) ( $job['mode'] ?? 'full' );
+		$m     = array(
 			'format'              => 2,
 			'source_kind'         => 'external',
 			'job_id'              => (string) $job['job_id'],
@@ -1079,6 +1523,44 @@ if ( ! function_exists( 'gend_society_migration_manifest_step' ) ) {
 			'changed'             => array_values( (array) ( $job['content']['changed'] ?? array() ) ),
 			'alt_base'            => $home . '/?rest_route=',
 		);
+		if ( $delta ) { // 111-05: what the importer needs to apply a catch-up (wp_options is never part of it)
+			$m['mode']                    = 'delta';
+			$m['base_job_id']             = (string) ( $job['base']['job_id'] ?? '' );
+			$m['anchor']                  = array(
+				'taken_at_gmt' => (string) ( $job['base']['watermark']['taken_at_gmt'] ?? '' ),
+				'overlap_s'    => GEND_SOCIETY_MIGRATION_DELTA_OVERLAP_S,
+			);
+			$m['base_posts_modified_gmt'] = (string) ( $job['base']['watermark']['posts_modified_gmt'] ?? '' ); // logged only, never a filter
+			$counts                       = (array) ( $job['delta']['counts'] ?? array() );
+			$m['tables']                  = array_values( array_map( function ( $t ) {
+				return 'wp_' . $t;
+			}, array_keys( $counts ) ) );
+			// 111-07: the changed uploads with their sha256 (the importer skips identical bytes and renames different ones).
+			$files = array();
+			$total = 0;
+			$ixf   = $job['staging'] . '/' . (string) ( $job['content']['index']['file'] ?? '' );
+			if ( ! empty( $job['content']['index']['file'] ) && is_file( $ixf ) ) {
+				$fh = fopen( $ixf, 'rb' ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fopen
+				while ( $fh && false !== ( $line = fgets( $fh ) ) ) { // phpcs:ignore WordPress.CodeAnalysis.AssignmentInCondition.FoundInWhileCondition
+					$e = json_decode( $line, true );
+					if ( ! is_array( $e ) || 'f' !== ( $e['t'] ?? '' ) ) {
+						continue;
+					}
+					++$total;
+					if ( count( $files ) < GEND_SOCIETY_MIGRATION_LIST_MAX ) {
+						$files[] = array_intersect_key( $e, array_flip( array( 'p', 'p64', 's', 'sha256' ) ) );
+					}
+				}
+				if ( $fh ) {
+					fclose( $fh ); // phpcs:ignore WordPress.WP.AlternativeFunctions.file_system_operations_fclose
+				}
+			}
+			$m['uploads']       = $files; // capped list; uploads_total is the real count
+			$m['uploads_total'] = $total;
+			$m['counts']        = $counts + array( 'uploads' => $total );
+			$m['empty']         = ! array_sum( array_map( 'intval', $counts ) ) && 0 === $total;
+			$job['empty']       = (bool) $m['empty'];
+		}
 		$json = wp_json_encode( $m, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_UNESCAPED_UNICODE );
 		$file = bin2hex( random_bytes( 8 ) ) . '.json';
 		$path = $job['staging'] . '/' . $file;
@@ -1091,6 +1573,17 @@ if ( ! function_exists( 'gend_society_migration_manifest_step' ) ) {
 			'size'   => strlen( $json ),
 			'sha256' => hash( 'sha256', $json ),
 		);
+		if ( ! $delta && ! empty( $job['watermark'] ) ) { // 111-05: the anchor a later delta starts from (no secrets)
+			update_option(
+				GEND_SOCIETY_MIGRATION_BASE_OPTION,
+				array(
+					'job_id'    => (string) $job['job_id'],
+					'watermark' => (array) $job['watermark'],
+					'at'        => time(),
+				),
+				false
+			);
+		}
 		return 'phase';
 	}
 }
@@ -1100,9 +1593,16 @@ if ( ! function_exists( 'gend_society_migration_export_dispatch' ) ) {
 	function gend_society_migration_export_dispatch( array &$job ): string {
 		switch ( (string) $job['phase'] ) {
 			case 'db':
-			case 'users':
+				if ( 'delta' === (string) ( $job['mode'] ?? 'full' ) ) {
+					return gend_society_migration_delta_db_step( $job );
+				}
 				return gend_society_migration_export_step( $job );
-			case 'content':
+			case 'users':
+				if ( 'delta' === (string) ( $job['mode'] ?? 'full' ) ) {
+					return gend_society_migration_delta_users_step( $job ); // 111-07: new users + HPOS orders
+				}
+				return gend_society_migration_export_step( $job );
+			case 'content': // delta: only uploads changed since the anchor (111-07)
 				return gend_society_migration_content_step( $job );
 			case 'manifest':
 				return gend_society_migration_manifest_step( $job );
@@ -1157,6 +1657,10 @@ if ( ! function_exists( 'gend_society_migration_report_progress' ) ) {
 		if ( $ready && ! empty( $job['ready_reported_at'] ) ) {
 			return 'skipped';
 		}
+		$delta = 'delta' === (string) ( $job['mode'] ?? 'full' );
+		if ( $delta && ! $ready ) {
+			return 'skipped'; // 111-11: the hub has no delta progress route; only the ready report (migration/delta/ready) goes out
+		}
 		$rep = (array) ( $job['report'] ?? array() );
 		if ( ! $force && (int) ( $rep['at'] ?? 0 ) > time() - 30 ) {
 			return 'throttled';
@@ -1178,6 +1682,7 @@ if ( ! function_exists( 'gend_society_migration_report_progress' ) ) {
 		);
 		if ( $ready ) {
 			$body['ready']    = true;
+			$body['empty']    = ! empty( $job['empty'] ); // 111-07: a delta with nothing changed (111-11 reads it)
 			$body['urls']     = gend_society_migration_ready_urls( false );
 			$body['alt_urls'] = gend_society_migration_ready_urls( true );
 			$body['alt_base'] = untrailingslashit( home_url() ) . '/?rest_route=';
@@ -1190,11 +1695,12 @@ if ( ! function_exists( 'gend_society_migration_report_progress' ) ) {
 			'phase' => (string) $job['phase'],
 		);
 		// A short timeout: the report runs at the end of a tick that already used its budget (30 s hosts).
-		$short = static function ( $args, $url ) {
-			return false !== strpos( (string) $url, '/migration/progress' ) ? array_merge( $args, array( 'timeout' => 5 ) ) : $args;
+		$route = $delta ? 'migration/delta/ready' : 'migration/progress'; // 111-11: the catch-up reports through the delta route
+		$short = static function ( $args, $url ) use ( $route ) {
+			return false !== strpos( (string) $url, '/' . $route ) ? array_merge( $args, array( 'timeout' => 5 ) ) : $args;
 		};
 		add_filter( 'http_request_args', $short, 99, 2 );
-		$r = gend_society_remote_membership_call( 'migration/progress', $body, 'POST' );
+		$r = gend_society_remote_membership_call( $route, $body, 'POST' );
 		remove_filter( 'http_request_args', $short, 99 );
 		if ( is_wp_error( $r ) ) {
 			$code = (int) ( is_array( $r->get_error_data() ) ? ( $r->get_error_data()['status'] ?? 0 ) : 0 );
@@ -1372,8 +1878,8 @@ if ( ! function_exists( 'gend_society_migration_export_tick' ) ) {
 				}
 				if ( 'phase' === $r ) {
 					$job['phase'] = $next[ $job['phase'] ] ?? 'ready';
-					if ( 'content' === $job['phase'] && ! isset( $job['content'] ) ) {
-						gend_society_migration_content_init( $job ); // the watermark is read at content-phase start
+					if ( 'content' === $job['phase'] && ! isset( $job['content'] ) && 'delta' !== (string) ( $job['mode'] ?? 'full' ) ) {
+						gend_society_migration_content_init( $job ); // the watermark was read at job start (111-05)
 					}
 					if ( 'ready' === $job['phase'] ) {
 						$job['ready_at'] = time();

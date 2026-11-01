@@ -147,9 +147,20 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         .gs-fc-status.inactive { background: rgba(20, 24, 34, 0.8); color: var(--gs-muted); border: 1px solid rgba(255,255,255,0.1); }
     </style>';
 
+    // 111-12 (MIG-15): after Live the origin's cards for what now runs on the new site read the hub's list (no local state).
+    $gs_fc_moved = function_exists('gend_society_origin_moved') ? gend_society_origin_moved() : array('moved' => false, 'to' => '');
+    $gs_fc_hub   = array();
+    if (!empty($gs_fc_moved['moved']) && function_exists('gend_society_origin_hub_features')) {
+        foreach (gend_society_origin_hub_features() as $gs_fc_f) {
+            $gs_fc_hub[$gs_fc_f['slug']] = true;
+        }
+    }
+
     echo '<div class="gs-feature-grid">';
 
     foreach ($features as $slug => $feature) {
+
+        $gs_fc_on_new = isset($gs_fc_hub[$slug]);
 
         // WP Ultimo has a special check since it is a mu-plugin or network managed usually
         if (isset($feature['is_ultimo']) && $feature['is_ultimo']) {
@@ -171,7 +182,9 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         echo '<div class="gs-fc">';
 
         // Status Badge overlay on image
-        if ($is_active) {
+        if ($gs_fc_on_new) {
+            echo '<div class="gs-fc-status active">' . esc_html__('Active on your new site', 'gend-society') . '</div>';
+        } elseif ($is_active) {
             echo '<div class="gs-fc-status active">' . esc_html__('Active', 'gend-society') . '</div>';
         } else {
             echo '<div class="gs-fc-status inactive">' . esc_html__('Inactive', 'gend-society') . '</div>';
@@ -186,7 +199,9 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         }
 
         // Update Button - overlaid bottom-right of the image/header section.
-        if ($has_update) {
+        if ($gs_fc_on_new) {
+            // 111-12: the plugin runs on the new site; no update control here.
+        } elseif ($has_update) {
             echo '<button class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update gs-ajax-action" data-action="update" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '" title="Install Update">';
             echo '<span class="dashicons dashicons-update"></span>';
             echo '<span class="gs-fc-badge">!</span>';
@@ -211,7 +226,9 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         echo '<div class="gs-fc-actions">';
 
         // Main Action Button (Manage or Activate)
-        if ($is_active) {
+        if ($gs_fc_on_new) {
+            echo '<a href="' . esc_url($gs_fc_moved['to']) . '" target="_blank" rel="noopener noreferrer" class="gs-btn gs-btn-secondary gs-fc-btn" data-gs-fc-new-site="1">' . esc_html__('Open on your new site', 'gend-society') . '</a>';
+        } elseif ($is_active) {
             echo '<a href="' . esc_url(admin_url('plugins.php')) . '" class="gs-btn gs-btn-secondary gs-fc-btn">' . esc_html__('Manage Plugin', 'gend-society') . '</a>';
         } else {
             echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';

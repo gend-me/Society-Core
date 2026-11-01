@@ -138,7 +138,12 @@ function gend_society_remote_membership_fetch() {
     if ( json_last_error() !== JSON_ERROR_NONE && preg_match( '/(\{.*\})/s', $clean, $m ) ) {
         $data = json_decode( $m[1], true );
     }
-    return is_array( $data ) ? $data : null;
+    if ( is_array( $data ) ) {
+        // Phase 111-10: a container learns Preview / Live from its own admin-side membership fetch (migration-preview.php).
+        do_action( 'gend_society_remote_membership_fetched', $data );
+        return $data;
+    }
+    return null;
 }
 
 function gend_society_remote_membership_invalidate() {
@@ -146,6 +151,51 @@ function gend_society_remote_membership_invalidate() {
 }
 add_action( 'wp_login', 'gend_society_remote_membership_invalidate' );
 add_action( 'gs_remote_membership_invalidate', 'gend_society_remote_membership_invalidate' );
+
+if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
+    /**
+     * Phase 111-10 (MIG-09, P1/P4/P6): the Preview note under the existing dashboard header. Shown only while the
+     * payload's migration block says preview, and only to a manage_options user (the preview URL is not for visitors).
+     * No new surface: it sits inside the same header the progress steps use. The "Catch up changes" button is wired by
+     * 111-11 (data-gs-delta); it renders disabled here.
+     *
+     * @param array $migration The payload's migration block.
+     * @return string Escaped HTML, '' when not in Preview or the viewer is not an admin.
+     */
+    function gend_society_migration_preview_note_html( array $migration ): string {
+        if ( empty( $migration['preview'] ) || ! empty( $migration['live'] ) || ! current_user_can( 'manage_options' ) ) {
+            return '';
+        }
+        $url = isset( $migration['preview_url'] ) && is_string( $migration['preview_url'] ) ? trim( $migration['preview_url'] ) : '';
+        if ( '' !== $url && ! preg_match( '#^https?://#i', $url ) ) {
+            $url = '';
+        }
+        // The few style lines ride with the note (Preview + admin only), so the panel's own stylesheet - and every
+        // free / Live panel - stays byte-identical.
+        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}</style>';
+        $out .= '<div class="gs-mship-preview-note" data-gs-preview-note="1" role="note">';
+        if ( '' !== $url ) {
+            $out .= '<p>' . esc_html__( 'Your new site is ready to preview:', 'gend-society' ) . ' <a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a></p>';
+        } else {
+            $out .= '<p>' . esc_html__( 'Your new site is ready to preview.', 'gend-society' ) . '</p>';
+        }
+        $out .= '<p>' . esc_html__( 'Your domain still points at your original site.', 'gend-society' ) . ' '
+            . esc_html__( 'You can edit the preview, but the catch-up before you go live overwrites changes made to the same posts.', 'gend-society' ) . ' '
+            . esc_html__( 'Nothing is switched until you add your domain or press Make live.', 'gend-society' ) . '</p>';
+        // 111-11 (MIG-13, P3): the catch-up control exists only on the ORIGIN (a connected standalone install exports there).
+        // Disabled until gend.me says a delta is available; the freeze warning is the click's confirm (gs-dashboard-standalone.js).
+        if ( function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired() ) {
+            $delta = isset( $migration['delta'] ) && is_array( $migration['delta'] ) ? $migration['delta'] : array();
+            $avail = ! empty( $delta['available'] );
+            $dst   = isset( $delta['state'] ) && is_string( $delta['state'] ) ? preg_replace( '/[^a-z]/', '', strtolower( $delta['state'] ) ) : 'idle';
+            $busy  = in_array( $dst, array( 'queued', 'exporting', 'applying' ), true );
+            $out  .= '<button type="button" class="gs-mship-action-btn is-secondary" data-gs-delta="1"' . ( $avail && ! $busy ? '' : ' disabled' ) . '>' . esc_html__( 'Catch up changes', 'gend-society' ) . '</button>';
+            $out  .= '<p class="gs-mship-mig__note" data-gs-delta-msg="1" data-gs-delta-state="' . esc_attr( '' !== $dst ? $dst : 'idle' ) . '" role="status"></p>';
+        }
+        $out .= '</div>';
+        return $out;
+    }
+}
 
 // ────────────────────────────────────────────────────────────────────────
 // Phase 109-29 (D28/D29/D32/D33): standalone data for the EXISTING panels
@@ -818,7 +868,7 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_local_payload' ) ) {
             'status_label'   => '',
             'billing'        => array( 'amount' => 0, 'currency' => '', 'unit' => '', 'label' => '' ),
             'dates'          => array( 'created' => '', 'activated' => '', 'expires' => '', 'renews' => '' ),
-            'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array() ),
+            'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array(), 'preview' => false, 'preview_url' => '', 'migrated_to' => '', 'migrated_at' => 0, 'domain_cutover' => false, 'delta' => array( 'available' => false, 'state' => 'idle' ) ),
             'dashboard_plan' => null,
             'hosting_plan'   => null,
             'customer'       => null,
@@ -1807,6 +1857,8 @@ function gend_society_render_membership_panel( $payload = null ) {
 <?php else : ?>
                 <?php if ( ! empty( $migration['live'] ) ) : ?>
                     <span class="gs-mship-status-badge">● <?php esc_html_e( 'Container Live', 'gend-society' ); ?></span>
+                <?php elseif ( ! empty( $migration['preview'] ) ) : /* Phase 111-10 (P1): Verify is Preview; Live only at cutover. */ ?>
+                    <span class="gs-mship-status-badge gs-mship-status-badge--preview" style="background:rgba(78,170,255,0.15); border-color:rgba(78,170,255,0.4); color:#8cc8ff;">● <?php esc_html_e( 'Preview', 'gend-society' ); ?></span>
                 <?php elseif ( $status_label !== '' ) : ?>
                     <span class="gs-mship-status-badge" style="background:rgba(255,180,0,0.15); border-color:rgba(255,180,0,0.4); color:#ffd166;"><?php echo esc_html( $status_label ); ?></span>
                 <?php endif; ?>
@@ -1845,6 +1897,7 @@ function gend_society_render_membership_panel( $payload = null ) {
         </div>
         <?php endif; ?>
 <?php if ( $gs_sa_mig ) : echo gend_society_migration_progress_html( $payload ); /* phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by the builder. */ endif; ?>
+<?php echo gend_society_migration_preview_note_html( $migration ); /* phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped by the builder; empty unless Preview + manage_options. */ ?>
 
         <!-- ── 2-card grid: Membership / Integration Hub. Feature Access moved to the top of the
              Feature Suite tab (see below) so it sits with the feature cards it controls. ── -->
@@ -3579,6 +3632,13 @@ function gend_society_membership_payload_from_local( $membership ) {
             'index' => 0,
             'live'  => false,
             'steps' => array( 'prepare', 'export', 'provision', 'verify', 'live' ),
+            // Phase 111-10: Preview keys so callers never hit a missing index.
+            'preview'        => false,
+            'preview_url'    => '',
+            'migrated_to'    => '',
+            'migrated_at'    => 0,
+            'domain_cutover' => false,
+            'delta'          => array( 'available' => false, 'state' => 'idle' ),
         ),
         'dashboard_plan' => $serialize_plan( $dash_plan ),
         'hosting_plan'   => $serialize_plan( $host_plan ),
@@ -3655,7 +3715,7 @@ function gend_society_membership_payload_group_only() {
         'status_label'   => '',
         'billing'        => array( 'amount' => 0, 'currency' => '', 'unit' => '', 'label' => '' ),
         'dates'          => array( 'created' => '', 'activated' => '', 'expires' => '', 'renews' => '' ),
-        'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array() ),
+        'migration'      => array( 'stage' => '', 'index' => 0, 'live' => false, 'steps' => array(), 'preview' => false, 'preview_url' => '', 'migrated_to' => '', 'migrated_at' => 0, 'domain_cutover' => false, 'delta' => array( 'available' => false, 'state' => 'idle' ) ),
         'dashboard_plan' => null,
         'hosting_plan'   => null,
         'customer'       => null,
