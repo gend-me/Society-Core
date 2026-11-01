@@ -899,6 +899,72 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
         if ( function_exists( 'gend_society_dialog_assets' ) ) {
             gend_society_dialog_assets();
         }
+        static $gs_dom_css = false;
+        if ( ! $gs_dom_css ) {
+            $gs_dom_css = true;
+            ?>
+<style>
+/* Domains panel: add form, DNS help, Make live and the registered-domain cards. */
+[data-gs-mship="add-domain"] { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; margin-top: 12px; }
+[data-gs-mship="add-domain"] input[name="domain"] { flex: 1 1 260px; max-width: 420px; min-height: 44px; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(148,163,184,.3); background: rgba(6,11,24,.8); color: #f1f5f9; font-size: .95rem; }
+[data-gs-mship="add-domain"] input[name="domain"]:focus { outline: none; border-color: rgba(78,170,255,.7); box-shadow: 0 0 0 3px rgba(78,170,255,.18); }
+[data-gs-mship="add-domain"] .gs-hosting__btn { min-height: 44px; padding: 0 22px; border-radius: 999px; }
+[data-gs-domains-dns] { margin-top: 16px !important; padding: 14px 18px; border-radius: 14px; border: 1px solid rgba(78,170,255,.2); background: rgba(78,170,255,.06); font-size: .88rem; line-height: 1.55; }
+[data-gs-domains-dns] > strong { display: block; margin-bottom: 4px; color: #e2e8f0; font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; }
+[data-gs-domains-dns] ul { margin: 6px 0 0 18px !important; }
+[data-gs-domains-dns] li { margin: 3px 0; color: #cbd5e1; }
+[data-gs-make-live-wrap] { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px !important; padding-top: 14px; border-top: 1px solid rgba(148,163,184,.14); }
+[data-gs-make-live-wrap] .gs-hosting__card-desc { margin-left: 0 !important; }
+.gs-dom-list { display: grid; gap: 14px; }
+.gs-dom { padding: 16px 18px; border-radius: 16px; border: 1px solid rgba(148,163,184,.18); background: linear-gradient(155deg, rgba(15,23,42,.7), rgba(8,14,28,.6)); }
+.gs-dom.is-done { border-color: rgba(34,197,94,.35); }
+.gs-dom__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gs-dom__id { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.gs-dom__name { padding: 4px 10px; border-radius: 8px; background: rgba(78,170,255,.12); color: #c7d2fe; font-size: .95rem; font-weight: 600; overflow-wrap: anywhere; }
+.gs-dom__actions { display: flex; gap: 8px; }
+.gs-dom__btn { border-radius: 999px; padding: 7px 18px; font-size: .8rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(148,163,184,.35); background: rgba(255,255,255,.06); color: #e2e8f0; }
+.gs-dom__btn:hover:not([disabled]), .gs-dom__btn:focus { border-color: rgba(78,170,255,.7); outline: none; }
+.gs-dom__btn[disabled] { opacity: .55; cursor: progress; }
+.gs-dom__btn.is-danger { border-color: rgba(244,63,94,.45); color: #fda4af; background: rgba(244,63,94,.08); }
+.gs-dom__records { margin-top: 14px; display: grid; gap: 10px; }
+.gs-dom__hint { margin: 0; font-size: .85rem; color: #94a3b8; }
+.gs-dom__rec { display: grid; grid-template-columns: auto minmax(0,1fr) minmax(0,1.4fr) auto auto; align-items: center; gap: 10px 14px; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(148,163,184,.14); background: rgba(8,15,27,.6); }
+.gs-dom__type { min-width: 38px; text-align: center; padding: 3px 8px; border-radius: 8px; background: #4eaaff; color: #04121f; font-weight: 800; font-size: .78rem; }
+.gs-dom__field { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; }
+.gs-dom__lbl { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: #64748b; }
+.gs-dom__field code { background: transparent; color: #e2e8f0; font-size: .84rem; overflow-wrap: anywhere; }
+.gs-dom__copy { border: 1px solid rgba(148,163,184,.3); background: transparent; color: #94a3b8; border-radius: 999px; padding: 2px 10px; font-size: .7rem; cursor: pointer; }
+.gs-dom__copy:hover, .gs-dom__copy:focus { color: #fff; border-color: rgba(78,170,255,.7); outline: none; }
+.gs-dom__ttl { font-size: .75rem; color: #64748b; white-space: nowrap; }
+.gs-dom__chk { min-width: 90px; font-size: .78rem; font-weight: 700; }
+.gs-dom__chk.is-ok { color: #86efac; }
+.gs-dom__chk.is-miss { color: #fca5a5; }
+.gs-dom__result { margin: 12px 0 0; padding: 0; font-size: .86rem; line-height: 1.5; color: #cbd5e1; }
+.gs-dom__result:empty { display: none; }
+.gs-dom__result.is-busy { color: #94a3b8; }
+.gs-dom__result.is-warn { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(245,158,11,.35); background: rgba(245,158,11,.08); color: #fde68a; }
+.gs-dom__result.is-ok { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color: #86efac; }
+.gs-dom__result.is-err { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(244,63,94,.4); background: rgba(244,63,94,.08); color: #fecaca; }
+@media (max-width: 820px) { .gs-dom__rec { grid-template-columns: 1fr; } .gs-dom__type { justify-self: start; } }
+</style>
+<script>
+(function () {
+    if (window.gsDomCopyBound) { return; }
+    window.gsDomCopyBound = true;
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('[data-gs-copy]') : null;
+        if (!b) { return; }
+        var text = b.getAttribute('data-gs-copy') || '';
+        var done = function () { var old = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = old; }, 1200); };
+        if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); return; }
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (err) {}
+        document.body.removeChild(ta);
+    });
+})();
+</script>
+            <?php
+        }
         $gs_domains = isset( $payload['domains'] ) && is_array( $payload['domains'] ) ? $payload['domains'] : array();
         // Phase 111-10 (MIG-10, N-B3): an armed (externally migrated) install in Preview or Live follows the cutover rules.
         // The template keeps the pre-111 markup byte for byte when the install is not armed (PHP control lines sit at column 0).
@@ -990,18 +1056,7 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
             <?php if ( empty( $gs_domains ) ) : ?>
                 <p style="color: var(--gs-muted, #94a3b8); font-style: italic; margin: 0;"><?php esc_html_e( 'No custom domains registered yet — this install is reachable via its hub-issued URL.', 'gend-society' ); ?></p>
             <?php else : ?>
-                <table class="gs-hosting__table">
-                    <thead>
-                        <tr>
-                            <th><?php esc_html_e( 'Domain', 'gend-society' ); ?></th>
-                            <th><?php esc_html_e( 'Status', 'gend-society' ); ?></th>
-<?php if ( $gs_armed ) : ?>
-                            <th><?php esc_html_e( 'SSL', 'gend-society' ); ?></th>
-<?php endif; ?>
-                            <th style="width: 1%;"><?php esc_html_e( 'Action', 'gend-society' ); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                <div class="gs-dom-list" data-gs-domain-list="1">
                         <?php foreach ( $gs_domains as $gs_d ) :
                             $gs_hostname = (string) ( is_array( $gs_d ) ? ( $gs_d['domain'] ?? ( $gs_d['host'] ?? '' ) ) : $gs_d );
                             if ( $gs_hostname === '' ) {
@@ -1013,32 +1068,52 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
                                 : ( in_array( $gs_status, array( 'fail', 'error', 'invalid' ), true ) ? 'is-err' : 'is-warn' );
                             $gs_stage  = gend_society_domain_stage_view( is_array( $gs_d ) ? (string) ( $gs_d['stage'] ?? '' ) : '' );
                             $gs_dns    = is_array( $gs_d ) && ! empty( $gs_d['dns'] ) && is_array( $gs_d['dns'] ) ? $gs_d['dns'] : array();
+                            $gs_done   = 'is-ok' === $gs_klass && ( ! $gs_armed || 'done' === $gs_stage['stage'] );
                         ?>
-                            <tr data-domain="<?php echo esc_attr( $gs_hostname ); ?>">
-                                <td><code style="background: rgba(78,170,255,0.1); color:#a5b4fc; padding: 2px 6px; border-radius: 4px;"><?php echo esc_html( $gs_hostname ); ?></code><?php if ( $gs_dns ) : ?><details data-gs-domain-dns="1" style="margin-top: 6px;"><summary><?php esc_html_e( 'DNS records', 'gend-society' ); ?></summary><ul style="margin: 6px 0 0 18px; list-style: disc;"><?php
-                                    foreach ( array( 'a_record', 'txt_record' ) as $gs_rk ) {
-                                        $gs_r = isset( $gs_dns[ $gs_rk ] ) && is_array( $gs_dns[ $gs_rk ] ) ? $gs_dns[ $gs_rk ] : array();
-                                        if ( ! $gs_r ) {
-                                            continue;
-                                        }
-                                        /* translators: 1: record type, 2: record name, 3: record value, 4: TTL in seconds. */
-                                        echo '<li>' . esc_html( sprintf( __( '%1$s record: %2$s -> %3$s (TTL %4$s)', 'gend-society' ), (string) ( $gs_r['type'] ?? '' ), (string) ( $gs_r['host'] ?? '' ), (string) ( $gs_r['value'] ?? '' ), (string) ( $gs_r['ttl'] ?? 300 ) ) ) . '</li>';
-                                    }
-                                ?></ul></details><?php endif; ?></td>
-                                <td><span class="gs-hosting__pill <?php echo esc_attr( $gs_klass ); ?>"><?php echo esc_html( $gs_status ?: 'pending' ); ?></span></td>
+                    <div class="gs-dom<?php echo $gs_done ? ' is-done' : ''; ?>" data-domain="<?php echo esc_attr( $gs_hostname ); ?>">
+                        <div class="gs-dom__head">
+                            <div class="gs-dom__id">
+                                <code class="gs-dom__name"><?php echo esc_html( $gs_hostname ); ?></code>
+                                <span class="gs-hosting__pill <?php echo esc_attr( $gs_klass ); ?>"><?php echo esc_html( $gs_status ?: 'pending' ); ?></span>
 <?php if ( $gs_armed ) : ?>
-                                <td data-gs-domain-stage="<?php echo esc_attr( $gs_stage['stage'] ); ?>"><span class="gs-hosting__pill <?php echo esc_attr( $gs_stage['class'] ); ?>"><?php echo esc_html( $gs_stage['text'] ); ?></span></td>
+                                <span data-gs-domain-stage="<?php echo esc_attr( $gs_stage['stage'] ); ?>" class="gs-hosting__pill <?php echo esc_attr( $gs_stage['class'] ); ?>"><?php echo esc_html( $gs_stage['text'] ); ?></span>
 <?php endif; ?>
-                                <td style="text-align: right; white-space: nowrap;">
+                            </div>
 <?php if ( $gs_open ) : ?>
-                                    <button type="button" class="gs-hosting__btn" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="background: rgba(255,255,255,0.08); padding: 4px 10px; font-size: 0.72rem;"><?php echo ( $gs_armed && 'done-without-ssl' === $gs_stage['stage'] ) ? esc_html__( 'Retry certificate', 'gend-society' ) : esc_html__( 'Verify', 'gend-society' ); ?></button>
-                                    <button type="button" class="gs-hosting__btn is-danger" data-gs-mship="remove-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="padding: 4px 10px; font-size: 0.72rem;"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
+                            <div class="gs-dom__actions">
+                                <button type="button" class="gs-dom__btn" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>"><?php echo ( $gs_armed && 'done-without-ssl' === $gs_stage['stage'] ) ? esc_html__( 'Retry certificate', 'gend-society' ) : esc_html__( 'Verify', 'gend-society' ); ?></button>
+                                <button type="button" class="gs-dom__btn is-danger" data-gs-mship="remove-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
+                            </div>
 <?php endif; ?>
-                                </td>
-                            </tr>
+                        </div>
+<?php if ( $gs_dns && ! $gs_done ) : ?>
+                        <div class="gs-dom__records" data-gs-domain-dns="1">
+                            <p class="gs-dom__hint"><?php esc_html_e( 'Add these records where your domain\'s DNS is managed, then press Verify.', 'gend-society' ); ?></p>
+<?php
+                            foreach ( array( 'a_record' => 'a', 'txt_record' => 'txt' ) as $gs_rk => $gs_ck ) {
+                                $gs_r = isset( $gs_dns[ $gs_rk ] ) && is_array( $gs_dns[ $gs_rk ] ) ? $gs_dns[ $gs_rk ] : array();
+                                if ( ! $gs_r ) {
+                                    continue;
+                                }
+                                $gs_rh = (string) ( $gs_r['host'] ?? '' );
+                                $gs_rv = (string) ( $gs_r['value'] ?? '' );
+                                ?>
+                            <div class="gs-dom__rec" data-gs-rec="<?php echo esc_attr( $gs_ck ); ?>">
+                                <span class="gs-dom__type"><?php echo esc_html( (string) ( $gs_r['type'] ?? '' ) ); ?></span>
+                                <div class="gs-dom__field"><span class="gs-dom__lbl"><?php esc_html_e( 'Name', 'gend-society' ); ?></span><code><?php echo esc_html( $gs_rh ); ?></code><button type="button" class="gs-dom__copy" data-gs-copy="<?php echo esc_attr( $gs_rh ); ?>"><?php esc_html_e( 'Copy', 'gend-society' ); ?></button></div>
+                                <div class="gs-dom__field"><span class="gs-dom__lbl"><?php esc_html_e( 'Value', 'gend-society' ); ?></span><code><?php echo esc_html( $gs_rv ); ?></code><button type="button" class="gs-dom__copy" data-gs-copy="<?php echo esc_attr( $gs_rv ); ?>"><?php esc_html_e( 'Copy', 'gend-society' ); ?></button></div>
+                                <span class="gs-dom__ttl"><?php echo esc_html( sprintf( /* translators: %s: TTL in seconds. */ __( 'TTL %s', 'gend-society' ), (string) ( $gs_r['ttl'] ?? 300 ) ) ); ?></span>
+                                <span class="gs-dom__chk" data-gs-chk="<?php echo esc_attr( $gs_ck ); ?>" aria-live="polite"></span>
+                            </div>
+<?php
+                            }
+?>
+                        </div>
+<?php endif; ?>
+                        <p class="gs-dom__result" data-gs-dom-result="1" role="status" aria-live="polite"></p>
+                    </div>
                         <?php endforeach; ?>
-                    </tbody>
-                </table>
+                </div>
             <?php endif; ?>
         </div>
         <?php

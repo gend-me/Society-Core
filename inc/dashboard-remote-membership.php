@@ -3238,6 +3238,15 @@ function gend_society_render_membership_panel( $payload = null ) {
             });
         });
 
+        // A reload after a domain change must land on the Domains tab again (the hosting console remembers it for one load).
+        function keepDomainsTabReload(ms) {
+            try {
+                var hr = document.querySelector('.gs-hosting');
+                if (hr) { sessionStorage.setItem('gsHostingResume:' + hr.id, 'domains'); }
+            } catch (e) {}
+            setTimeout(function () { location.reload(); }, ms || 800);
+        }
+
         // Add domain
         var addForm = root.querySelector('[data-gs-mship="add-domain"]');
         if (addForm) {
@@ -3247,7 +3256,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                 var domain = (input.value || '').trim().toLowerCase();
                 if (!domain) return;
                 ajaxAction('gend_society_membership_domain_add', { domain: domain }, addForm.querySelector('button'))
-                    .then(function () { toast('Domain added.', 'success'); setTimeout(function(){ location.reload(); }, 800); })
+                    .then(function () { toast('Domain added.', 'success'); keepDomainsTabReload(800); })
                     .catch(function (e) { toast(e.message, 'error'); });
             });
         }
@@ -3259,14 +3268,48 @@ function gend_society_render_membership_panel( $payload = null ) {
             var act = b.dataset.gsMship;
 
             if (act === 'verify-domain') {
+                var card = b.closest('.gs-dom');
+                var out = card ? card.querySelector('[data-gs-dom-result]') : null;
+                var say = function (cls, text) {
+                    if (out) { out.className = 'gs-dom__result ' + cls; out.textContent = text; } else { toast(text, cls === 'is-err' ? 'error' : 'success'); }
+                };
+                say('is-busy', 'Checking your DNS records…');
                 ajaxAction('gend_society_membership_domain_verify', { domain: b.dataset.domain }, b)
-                    .then(function (d) { toast('Verify: ' + (d.stage || 'ok'), 'success'); })
-                    .catch(function (e) { toast(e.message, 'error'); });
+                    .then(function (d) {
+                        var c = d.checks || {};
+                        ['a', 'txt'].forEach(function (k) {
+                            var el = card ? card.querySelector('[data-gs-chk="' + k + '"]') : null;
+                            if (!el) { return; }
+                            if (typeof c[k] === 'undefined') { el.textContent = ''; el.className = 'gs-dom__chk'; return; }
+                            el.className = 'gs-dom__chk ' + (c[k] ? 'is-ok' : 'is-miss');
+                            el.textContent = c[k] ? '\u2713 Found' : '\u2717 Not found yet';
+                        });
+                        var st = d.stage || '';
+                        if (st === 'checking-dns' || st === 'failed' || st === '') {
+                            var missing = [];
+                            if (c.a === false) { missing.push('the A record'); }
+                            if (c.txt === false) { missing.push('the TXT record'); }
+                            say('is-warn', (missing.length ? 'We could not see ' + missing.join(' and ') + ' yet. ' : 'Your DNS records were not detected yet. ') + 'DNS changes can take a few minutes to reach us. We re-check every 5 minutes, or press Verify again.');
+                            return;
+                        }
+                        if (st === 'checking-ssl-cert') { say('is-ok', 'DNS verified. Issuing the certificate (1-2 minutes).'); }
+                        else if (st === 'done') { say('is-ok', 'Your domain is verified and secure.'); }
+                        else if (st === 'done-without-ssl') { say('is-warn', 'Your domain works, but its certificate is not issued yet. Press Retry certificate in a minute.'); }
+                        else { say('is-ok', 'Verified. Updating this page...'); }
+                        keepDomainsTabReload(1600);
+                    })
+                    .catch(function (e) { say('is-err', (e && e.message) ? e.message : 'Could not verify this domain. Please try again.'); });
             } else if (act === 'remove-domain') {
-                if (!confirm('Remove ' + b.dataset.domain + '?')) return;
-                ajaxAction('gend_society_membership_domain_remove', { domain: b.dataset.domain }, b)
-                    .then(function () { var li = b.closest('li'); if (li) li.remove(); toast('Domain removed.', 'success'); })
-                    .catch(function (e) { toast(e.message, 'error'); });
+                var doRemove = function () {
+                    ajaxAction('gend_society_membership_domain_remove', { domain: b.dataset.domain }, b)
+                        .then(function () { var cd = b.closest('.gs-dom'); if (cd) { cd.remove(); } toast('Domain removed.', 'success'); keepDomainsTabReload(900); })
+                        .catch(function (e) { toast(e.message, 'error'); });
+                };
+                if (window.gsDialog) {
+                    window.gsDialog.confirm('Visitors will no longer reach your site at ' + b.dataset.domain + '. This does not delete your site.', { title: 'Remove ' + b.dataset.domain + '?', ok: 'Remove domain', danger: true }).then(function (yes) { if (yes) { doRemove(); } });
+                } else if (confirm('Remove ' + b.dataset.domain + '?')) {
+                    doRemove();
+                }
             } else if (act === 'backup-now') {
                 ajaxAction('gend_society_membership_backup_now', {}, b)
                     .then(function () { toast('Backup started. Reload in ~2 minutes.', 'success'); })
