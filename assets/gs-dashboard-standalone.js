@@ -278,7 +278,7 @@
 			var keep = open && !open.hidden;
 			var was = r.getAttribute('data-state');
 			var now = j.data.migration && j.data.migration.state ? j.data.migration.state : '';
-			if (!keep && now && was && now !== was && (now === 'failed' || now === 'complete')) {
+			if (!keep && now && was && now !== was && (now === 'failed' || now === 'complete' || now === 'preview')) {
 				reload(); // the status badge (friendly error) and the panels change with it
 				return;
 			}

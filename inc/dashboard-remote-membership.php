@@ -172,8 +172,9 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
         }
         // The few style lines ride with the note (Preview + admin only), so the panel's own stylesheet - and every
         // free / Live panel - stays byte-identical.
-        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}</style>';
+        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}.gs-mship-preview-note .gs-mship-action-btn[disabled]{cursor:not-allowed}.gs-mship-preview-note__ok{font-weight:700;color:#86efac}</style>';
         $out .= '<div class="gs-mship-preview-note" data-gs-preview-note="1" role="note">';
+        $out .= '<p class="gs-mship-preview-note__ok" data-gs-migration-done="1">' . esc_html__( '✓ Migration complete. Your site has been copied to gend.me hosting.', 'gend-society' ) . '</p>';
         if ( '' !== $url ) {
             $out .= '<p>' . esc_html__( 'Your new site is ready to preview:', 'gend-society' ) . ' <a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a></p>';
         } else {
@@ -190,6 +191,9 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
             $dst   = isset( $delta['state'] ) && is_string( $delta['state'] ) ? preg_replace( '/[^a-z]/', '', strtolower( $delta['state'] ) ) : 'idle';
             $busy  = in_array( $dst, array( 'queued', 'exporting', 'applying' ), true );
             $out  .= '<button type="button" class="gs-mship-action-btn is-secondary" data-gs-delta="1"' . ( $avail && ! $busy ? '' : ' disabled' ) . '>' . esc_html__( 'Catch up changes', 'gend-society' ) . '</button>';
+            if ( ! $avail && ! $busy ) {
+                $out .= '<p class="gs-mship-mig__note" data-gs-delta-off="1">' . esc_html__( 'Catching up late changes is not available yet. Avoid changing your original site until you go live.', 'gend-society' ) . '</p>';
+            }
             $out  .= '<p class="gs-mship-mig__note" data-gs-delta-msg="1" data-gs-delta-state="' . esc_attr( '' !== $dst ? $dst : 'idle' ) . '" role="status"></p>';
         }
         $out .= '</div>';
