@@ -172,17 +172,24 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
         }
         // The few style lines ride with the note (Preview + admin only), so the panel's own stylesheet - and every
         // free / Live panel - stays byte-identical.
-        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}.gs-mship-preview-note .gs-mship-action-btn[disabled]{cursor:not-allowed}.gs-mship-preview-note__ok{font-weight:700;color:#86efac}</style>';
+        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}.gs-mship-preview-note .gs-mship-action-btn[disabled]{cursor:not-allowed}.gs-mship-preview-note__ok{font-weight:700;color:#86efac}.gs-mship-next{margin:8px 0 10px;padding:0;list-style:none;counter-reset:gsnext;display:grid;gap:8px}.gs-mship-next li{counter-increment:gsnext;position:relative;padding:8px 12px 8px 42px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}.gs-mship-next li::before{content:counter(gsnext);position:absolute;left:11px;top:8px;width:22px;height:22px;border-radius:50%;background:#4eaaff;color:#04121f;font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center}.gs-mship-next li.is-now{border-color:rgba(78,170,255,.55);background:rgba(78,170,255,.1)}.gs-mship-next .gs-mship-action-btn{margin-top:8px}</style>';
         $out .= '<div class="gs-mship-preview-note" data-gs-preview-note="1" role="note">';
         $out .= '<p class="gs-mship-preview-note__ok" data-gs-migration-done="1">' . esc_html__( '✓ Migration complete. Your site has been copied to gend.me hosting.', 'gend-society' ) . '</p>';
+        $out .= '<p class="gs-mship-preview-note__title"><strong>' . esc_html__( 'Next steps to put your new site live', 'gend-society' ) . '</strong></p>';
+        $out .= '<ol class="gs-mship-next" data-gs-next-steps="1">';
+        $out .= '<li><strong>' . esc_html__( 'Check your new site.', 'gend-society' ) . '</strong> ';
         if ( '' !== $url ) {
-            $out .= '<p>' . esc_html__( 'Your new site is ready to preview:', 'gend-society' ) . ' <a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a></p>';
+            $out .= '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a>';
         } else {
-            $out .= '<p>' . esc_html__( 'Your new site is ready to preview.', 'gend-society' ) . '</p>';
+            $out .= esc_html__( 'Open it from the app address in the Domains tab.', 'gend-society' );
         }
-        $out .= '<p>' . esc_html__( 'Your domain still points at your original site.', 'gend-society' ) . ' '
-            . esc_html__( 'You can edit the preview, but the catch-up before you go live overwrites changes made to the same posts.', 'gend-society' ) . ' '
-            . esc_html__( 'Nothing is switched until you add your domain or press Make live.', 'gend-society' ) . '</p>';
+        $out .= '<br>' . esc_html__( 'You can edit it. The catch-up before you go live overwrites changes made to the same posts.', 'gend-society' ) . '</li>';
+        $out .= '<li class="is-now"><strong>' . esc_html__( 'Add your domain.', 'gend-society' ) . '</strong> '
+            . esc_html__( 'In the Domains tab, add your domain and update its DNS records (an A record and a TXT record). Your visitors keep seeing your original site until then.', 'gend-society' )
+            . '<br><button type="button" class="gs-mship-action-btn" data-gs-go-domains="1">' . esc_html__( 'Go to Domains', 'gend-society' ) . ' &darr;</button></li>';
+        $out .= '<li><strong>' . esc_html__( 'Go live.', 'gend-society' ) . '</strong> '
+            . esc_html__( 'Your site goes live by itself when your first domain is verified, or press Make live in the Domains tab.', 'gend-society' ) . '</li>';
+        $out .= '</ol>';
         // 111-11 (MIG-13, P3): the catch-up control exists only on the ORIGIN (a connected standalone install exports there).
         // Disabled until gend.me says a delta is available; the freeze warning is the click's confirm (gs-dashboard-standalone.js).
         if ( function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired() ) {

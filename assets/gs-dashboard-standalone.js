@@ -301,6 +301,21 @@
 	}
 
 	document.addEventListener('click', function (ev) {
+		var goDomains = closest(ev.target, '[data-gs-go-domains]');
+		if (goDomains) {
+			ev.preventDefault();
+			var nav = document.querySelector('.gs-hosting__nav[data-section="domains"]');
+			if (nav) {
+				nav.click();
+			}
+			var target = document.querySelector('.gs-hosting__panel[data-panel="domains"]') || document.querySelector('.gs-hosting');
+			if (target && target.scrollIntoView) {
+				window.setTimeout(function () {
+					target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}, 60);
+			}
+			return;
+		}
 		var btn = closest(ev.target, '[data-gs-mig-action]');
 		if (btn) {
 			ev.preventDefault();
