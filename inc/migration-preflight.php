@@ -692,6 +692,8 @@ if ( ! function_exists( 'gend_society_migration_texts' ) ) {
 			'ack'        => __( 'Tick "I understand" first.', 'gend-society' ),
 			'cancel'     => __( 'Cancel this migration? Your plans stay active and you can start again later.', 'gend-society' ),
 			'measuring'  => __( 'Your site is still being measured. Try again in a minute.', 'gend-society' ),
+			'ready'      => __( 'Payment received. Your migration has not started yet: click Start migration to begin.', 'gend-society' ),
+			'running'    => __( 'Your migration is running. You do not need to do anything; this page updates by itself.', 'gend-society' ),
 		);
 	}
 }
@@ -1358,6 +1360,11 @@ if ( ! function_exists( 'gend_society_migration_progress_html' ) ) {
 		}
 		if ( 'preparing' === $state && $v['waiting_for_site'] ) {
 			$out .= '<p class="gs-mship-mig__note" data-gs-mig-waiting="1">' . esc_html( $t['waiting'] ) . '</p>';
+		}
+		if ( 'scheduled' !== $state && $v['can_start'] ) {
+			$out .= '<p class="gs-mship-mig__note gs-mship-mig__note--action" data-gs-mig-ready="1">' . esc_html( $t['ready'] ) . '</p>';
+		} elseif ( in_array( $state, gend_society_migration_running_states(), true ) ) {
+			$out .= '<p class="gs-mship-mig__note" data-gs-mig-running="1">' . esc_html( $t['running'] ) . '</p>';
 		}
 		$btns = '';
 		if ( $v['can_start'] ) {

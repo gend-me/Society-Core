@@ -22,6 +22,7 @@
 .gs-mship-mig__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .gs-mship-mig__note { margin: 0; font-size: 0.82rem; line-height: 1.45; color: #fff; opacity: 0.85; text-align: center; }
 .gs-mship-mig__note:empty { display: none; }
+.gs-mship-mig__note--action { opacity: 1; font-weight: 700; font-size: 0.9rem; color: #fde68a; }
 .gs-mship-mig__start { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .gs-mship-mig__start[hidden] { display: none; }
 .gs-mship-mig__freeze { margin: 0; font-size: 0.85rem; line-height: 1.45; color: #fde68a; }
