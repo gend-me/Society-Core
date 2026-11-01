@@ -6,8 +6,10 @@
  * from the app on every request, so it can't become editable HTML. Instead
  * the block keeps a list of "shown text => your text" (attribute gsTexts),
  * edited in the block's Wording panel, and every text node or placeholder
- * whose whole text matches is swapped when the block renders. The app keeps
- * working; text the app adds later with JavaScript is not covered.
+ * whose whole text matches is swapped when the block renders. Click a text in
+ * the preview to type over it and style it (fonts, sizes, colours), so a value
+ * is safe inline HTML. The app keeps working; text the app adds later with
+ * JavaScript is not covered.
  *
  * @package gend-society
  */
@@ -26,6 +28,44 @@ function gend_society_aw_blocks() {
 }
 
 /**
+ * The inline HTML a wording value may hold (what the text toolbar makes).
+ *
+ * @return array
+ */
+function gend_society_aw_allowed() {
+	$style = array( 'style' => true );
+	return array(
+		'span'   => $style,
+		'strong' => $style,
+		'b'      => $style,
+		'em'     => $style,
+		'i'      => $style,
+		'u'      => $style,
+		's'      => $style,
+		'mark'   => $style,
+		'small'  => $style,
+		'sub'    => $style,
+		'sup'    => $style,
+		'br'     => array(),
+		'font'   => array( 'style' => true, 'face' => true, 'color' => true ),
+		'a'      => array(
+			'href'  => true,
+			'style' => true,
+		),
+	);
+}
+
+/**
+ * A shown text as a key: whitespace runs as one space, trimmed.
+ *
+ * @param string $text Text (HTML entities allowed).
+ * @return string
+ */
+function gend_society_aw_key( $text ) {
+	return trim( preg_replace( '/\s+/u', ' ', html_entity_decode( (string) $text, ENT_QUOTES | ENT_HTML5, 'UTF-8' ) ) );
+}
+
+/**
  * Cleans a wording map.
  *
  * @param mixed $texts Raw map.
@@ -34,10 +74,10 @@ function gend_society_aw_blocks() {
 function gend_society_aw_clean( $texts ) {
 	$out = array();
 	foreach ( is_array( $texts ) ? array_slice( $texts, 0, 200, true ) : array() as $from => $to ) {
-		$from = trim( sanitize_text_field( (string) $from ) );
-		$to   = sanitize_text_field( (string) $to );
-		if ( '' !== $from && '' !== trim( $to ) && $from !== $to ) {
-			$out[ $from ] = mb_substr( $to, 0, 1000 );
+		$from = gend_society_aw_key( sanitize_text_field( (string) $from ) );
+		$to   = trim( wp_kses( mb_substr( (string) $to, 0, 4000 ), gend_society_aw_allowed() ) );
+		if ( '' !== $from && '' !== trim( wp_strip_all_tags( $to ) ) && $from !== $to ) {
+			$out[ $from ] = $to;
 		}
 	}
 	return $out;
@@ -48,9 +88,10 @@ function gend_society_aw_clean( $texts ) {
  *
  * @param string $html  Markup.
  * @param array  $texts Shown text => new text.
+ * @param bool   $mark  Wrap swapped text in <span data-gs-aw="shown text"> (editor previews).
  * @return string
  */
-function gend_society_aw_apply( $html, $texts ) {
+function gend_society_aw_apply( $html, $texts, $mark = false ) {
 	$texts = gend_society_aw_clean( $texts );
 	if ( ! $texts || '' === $html ) {
 		return $html;
@@ -66,21 +107,22 @@ function gend_society_aw_apply( $html, $texts ) {
 		}
 		$part = preg_replace_callback(
 			'#>([^<]+)<#',
-			static function ( $m ) use ( $texts ) {
-				$text = trim( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
+			static function ( $m ) use ( $texts, $mark ) {
+				$text = gend_society_aw_key( $m[1] );
 				if ( '' === $text || ! isset( $texts[ $text ] ) ) {
 					return $m[0];
 				}
 				preg_match( '#^(\s*).*?(\s*)$#s', $m[1], $ws );
-				return '>' . $ws[1] . esc_html( $texts[ $text ] ) . $ws[2] . '<';
+				$to = $mark ? '<span data-gs-aw="' . esc_attr( $text ) . '">' . $texts[ $text ] . '</span>' : $texts[ $text ];
+				return '>' . $ws[1] . $to . $ws[2] . '<';
 			},
 			$part
 		);
 		$part = preg_replace_callback(
 			'#\splaceholder="([^"]*)"#',
 			static function ( $m ) use ( $texts ) {
-				$text = trim( html_entity_decode( $m[1], ENT_QUOTES | ENT_HTML5, 'UTF-8' ) );
-				return isset( $texts[ $text ] ) ? ' placeholder="' . esc_attr( $texts[ $text ] ) . '"' : $m[0];
+				$text = gend_society_aw_key( $m[1] );
+				return isset( $texts[ $text ] ) ? ' placeholder="' . esc_attr( wp_strip_all_tags( $texts[ $text ] ) ) . '"' : $m[0];
 			},
 			$part
 		);

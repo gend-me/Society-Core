@@ -99,7 +99,7 @@ function gend_society_pv_render() {
 		$part = function () use ( $slug ) {
 			echo '<div id="youzify"><div class="youzify youzify-page"><div class="youzify-content"><div class="gs-pv-pad">';
 			$html = gdc_gs_render_endpoint_panel_block( array( 'slug' => $slug ) );
-			echo function_exists( 'gend_society_aw_apply' ) ? gend_society_aw_apply( $html, gend_society_aw_preview_texts() ) : $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered group tab content.
+			echo function_exists( 'gend_society_aw_apply' ) ? gend_society_aw_apply( $html, gend_society_aw_preview_texts(), true ) : $html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered group tab content.
 			echo '</div></div></div></div>';
 		};
 	} elseif ( 'group-header' === $view && function_exists( 'bp_is_group' ) && bp_is_group() && function_exists( 'gdc_gs_render_group_header_shell' ) ) {
@@ -192,6 +192,24 @@ function gend_society_pv_render() {
 </html>
 	<?php
 	exit;
+}
+
+add_filter( 'wp_client_side_media_processing_enabled', 'gend_society_pv_no_isolation' );
+/**
+ * Live previews read their frames (height, click-to-edit text). WordPress 7.1
+ * isolates the block editor (Document-Isolation-Policy) for in-browser media
+ * processing, which makes same-site frames unreachable, so these template
+ * editors process uploads on the server instead (as core does for builders).
+ *
+ * @param bool $enabled Client-side media processing.
+ * @return bool
+ */
+function gend_society_pv_no_isolation( $enabled ) {
+	$screen = $enabled && function_exists( 'get_current_screen' ) ? get_current_screen() : null;
+	if ( $screen && in_array( $screen->post_type, gend_society_pv_post_types(), true ) ) {
+		return false;
+	}
+	return $enabled;
 }
 
 add_action( 'enqueue_block_editor_assets', 'gend_society_pv_editor_assets' );

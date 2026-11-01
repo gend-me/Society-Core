@@ -354,7 +354,9 @@
 	// The toolbar over the text being edited, built inside the frame. commitText(t, fn)
 	// writes a text's HTML back, and fn( element ) changes the element itself;
 	// shown() is the part of the frame on screen, { top, bottom } in the frame's own view.
-	function textToolbar( doc, on, commitText, shown ) {
+	// opts.whole: only changes inside the text (no alignment or links on the element itself).
+	function textToolbar( doc, on, commitText, shown, opts ) {
+		var inside = !! ( opts && opts.whole );
 		var P = presets();
 		var win = doc.defaultView;
 		var active = null;
@@ -404,6 +406,9 @@
 			btn( 'link', __( 'Link', 'gend-society' ) ), btn( 'unlink', __( 'Remove link', 'gend-society' ) ), sep(),
 			btn( 'left', __( 'Align left', 'gend-society' ) ), btn( 'center', __( 'Align centre', 'gend-society' ) ), btn( 'right', __( 'Align right', 'gend-society' ) ), sep(),
 			btn( 'clear', __( 'Clear formatting', 'gend-society' ) ) ].forEach( function ( n ) {
+			if ( inside && ( ( n.dataset.cmd && /^(link|unlink|left|center|right)$/.test( n.dataset.cmd ) ) || ( n.className === 'gs-tb-sep' && row.lastChild && row.lastChild.className === 'gs-tb-sep' ) ) ) {
+				return;
+			}
 			row.appendChild( n );
 		} );
 		bar.appendChild( row );
@@ -1193,6 +1198,9 @@
 				},
 			} ) );
 	}
+
+	// The text toolbar and its frame styles, for other in-place editors (studio-previews.js app wording).
+	window.gsHtmlVisualKit = { textToolbar: textToolbar, css: FRAME_CSS.slice( FRAME_CSS.indexOf( '[data-gs-k=text]' ) ) };
 
 	wp.hooks.addFilter( 'editor.BlockEdit', 'gend-society/html-visual-edit', wp.compose.createHigherOrderComponent( function ( BlockEdit ) {
 		return function ( props ) {

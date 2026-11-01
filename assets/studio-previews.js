@@ -34,8 +34,13 @@
 					}
 				} catch ( e ) {}
 			};
+			var stopEdit = null;
 			var onLoad = function () {
 				measure();
+				if ( stopEdit ) {
+					stopEdit();
+				}
+				stopEdit = props.editRef ? editWords( frame, props.editRef ) : null;
 				var n = 0;
 				clearInterval( timer );
 				timer = setInterval( function () {
@@ -49,6 +54,9 @@
 			return function () {
 				frame.removeEventListener( 'load', onLoad );
 				clearInterval( timer );
+				if ( stopEdit ) {
+					stopEdit();
+				}
 			};
 		}, [ props.src ] );
 		var blockProps = wp.blockEditor.useBlockProps();
@@ -56,7 +64,7 @@
 			return el( 'div', blockProps, el( 'div', { className: 'gs-pv-label' }, props.label, el( 'span', null, props.empty || __( 'Nothing to preview yet.', 'gend-society' ) ) ) );
 		}
 		return el( 'div', blockProps,
-			el( 'div', { className: 'gs-pv-label' }, props.label, el( 'span', null, __( 'Live preview', 'gend-society' ) ) ),
+			el( 'div', { className: 'gs-pv-label' }, props.label, el( 'span', null, props.editRef ? __( 'Live preview · click any text to edit it', 'gend-society' ) : __( 'Live preview', 'gend-society' ) ) ),
 			el( 'div', { className: 'gs-pv-wrap' },
 				el( 'iframe', { ref: ref, className: 'gs-pv-frame', src: props.src, title: props.label, style: { height: height + 'px' }, loading: 'lazy' } )
 			)
@@ -156,10 +164,10 @@
 		} else {
 			body = st[ 0 ].map( function ( t ) {
 				var long = t.length > 60;
-				return el( long ? C.TextareaControl : C.TextControl, { key: t, label: long ? t.slice( 0, 60 ) + '…' : t, value: cur[ t ] || '', placeholder: t, rows: long ? 3 : undefined, __nextHasNoMarginBottom: true, __next40pxDefaultSize: long ? undefined : true, onChange: function ( v ) {
+				return el( long ? C.TextareaControl : C.TextControl, { key: t, label: long ? t.slice( 0, 60 ) + '…' : t, value: cur[ t ] ? plainText( cur[ t ] ) : '', placeholder: t, rows: long ? 3 : undefined, __nextHasNoMarginBottom: true, __next40pxDefaultSize: long ? undefined : true, onChange: function ( v ) {
 					var next = Object.assign( {}, cur );
 					if ( v.trim() ) {
-						next[ t ] = v;
+						next[ t ] = escText( v );
 					} else {
 						delete next[ t ];
 					}
@@ -169,10 +177,242 @@
 		}
 		return el( wp.blockEditor.InspectorControls, null,
 			el( C.PanelBody, { title: __( 'Wording', 'gend-society' ), initialOpen: true },
-				el( 'p', null, __( 'This section is a live app, so it is edited by changing the text it shows: headings, descriptions, tabs, buttons and field hints, top to bottom. Leave a box empty to keep the original. The app keeps working.', 'gend-society' ) ),
+				el( 'p', null, __( 'This section is a live app. Click any text in the preview to type over it and change its font, size or colour, or rename it here: headings, descriptions, tabs, buttons and field hints, top to bottom. Leave a box empty to keep the original. The app keeps working.', 'gend-society' ) ),
 				body
 			)
 		);
+	}
+
+	function plainText( html ) {
+		return new window.DOMParser().parseFromString( '<body>' + html, 'text/html' ).body.textContent;
+	}
+	function escText( t ) {
+		return String( t ).replace( /&/g, '&amp;' ).replace( /</g, '&lt;' ).replace( />/g, '&gt;' );
+	}
+	var AW_INLINE = /^(A|B|STRONG|I|EM|U|S|SMALL|SPAN|BR|MARK|SUB|SUP|FONT)$/;
+	var AW_SKIP = 'script,style,textarea,noscript,svg,template,select,option,input,[contenteditable="false"]';
+	// Click a text in the app preview to type over it; the text toolbar styles it.
+	// Each text the section shows is wrapped in <span data-gs-aw="shown text"> in
+	// the preview only (renamed ones come wrapped from the server), and a change
+	// is written to gsTexts as "shown text" => inline HTML.
+	function editWords( frame, ctxRef ) {
+		var doc = frame.contentDocument;
+		if ( ! doc || ! doc.body ) {
+			return null;
+		}
+		var win = doc.defaultView;
+		var host = frame.ownerDocument.defaultView;
+		var kit = window.gsHtmlVisualKit;
+		var root = doc.querySelector( '.gs-pv-pad' ) || doc.body;
+		var cleanup = [];
+		var on = function ( type, fn, opts ) {
+			doc.addEventListener( type, fn, opts );
+			cleanup.push( function () {
+				doc.removeEventListener( type, fn, opts );
+			} );
+		};
+		var css = doc.createElement( 'style' );
+		css.textContent = ( kit ? kit.css : '' ) + '[data-gs-aw]{cursor:text;border-radius:3px;outline:1px dashed transparent;outline-offset:2px}[data-gs-aw]:hover{outline-color:rgba(151,228,110,.7)}[data-gs-aw]:focus{outline:2px solid #97e46e;outline-offset:2px}';
+		doc.head.appendChild( css );
+		var walker = doc.createTreeWalker( root, win.NodeFilter.SHOW_TEXT );
+		var found = [];
+		var node;
+		while ( ( node = walker.nextNode() ) ) {
+			var key = node.nodeValue.replace( /\s+/g, ' ' ).trim();
+			var p = node.parentElement;
+			if ( key.length > 1 && /[a-z]/i.test( key ) && p && ! p.closest( AW_SKIP ) && ! p.closest( '[data-gs-aw]' ) ) {
+				found.push( [ node, key ] );
+			}
+		}
+		found.forEach( function ( f ) {
+			var span = doc.createElement( 'span' );
+			span.setAttribute( 'data-gs-aw', f[ 1 ] );
+			f[ 0 ].parentNode.insertBefore( span, f[ 0 ] );
+			span.appendChild( f[ 0 ] );
+		} );
+		Array.prototype.forEach.call( root.querySelectorAll( '[data-gs-aw]' ), function ( t ) {
+			t.setAttribute( 'data-gs-k', 'text' );
+			t.setAttribute( 'contenteditable', 'true' );
+			t.setAttribute( 'spellcheck', 'true' );
+			t.dataset.gsBefore = t.innerHTML;
+		} );
+		// Only the text's inline styling is kept (what the toolbar makes).
+		var commit = function ( t ) {
+			var after = t.innerHTML;
+			if ( after === t.dataset.gsBefore ) {
+				return;
+			}
+			var key = t.getAttribute( 'data-gs-aw' );
+			var box = doc.createElement( 'div' );
+			box.innerHTML = after;
+			Array.prototype.slice.call( box.querySelectorAll( '*' ) ).reverse().forEach( function ( c ) {
+				if ( ! AW_INLINE.test( c.tagName ) ) {
+					c.replaceWith.apply( c, Array.prototype.slice.call( c.childNodes ) );
+					return;
+				}
+				Array.prototype.slice.call( c.attributes ).forEach( function ( a ) {
+					if ( ! /^(style|href|face|color)$/.test( a.name ) ) {
+						c.removeAttribute( a.name );
+					}
+				} );
+				// The browser writes colours as rgb(), which WordPress's CSS filter drops: hex instead.
+				if ( c.getAttribute( 'style' ) ) {
+					c.setAttribute( 'style', c.getAttribute( 'style' ).replace( /rgba?\(\s*(\d+)[,\s]+(\d+)[,\s]+(\d+)(?:[,\s/]+([\d.]+%?))?\s*\)/gi, function ( m, r, g, b, a ) {
+						var alpha = a === undefined ? 1 : ( /%$/.test( a ) ? parseFloat( a ) / 100 : parseFloat( a ) );
+						return '#' + [ r, g, b ].concat( alpha < 1 ? [ Math.round( alpha * 255 ) ] : [] ).map( function ( n ) {
+							return ( '0' + Math.min( 255, +n ).toString( 16 ) ).slice( -2 );
+						} ).join( '' );
+					} ) );
+				}
+			} );
+			var plain = box.textContent.replace( /\s+/g, ' ' ).trim();
+			if ( ! plain ) {
+				// Emptied: back to the app's own text.
+				t.textContent = key;
+			}
+			t.dataset.gsBefore = t.innerHTML;
+			var same = ! plain || ( plain === key && ! box.querySelector( '*' ) );
+			ctxRef.current.change( key, same ? '' : box.innerHTML.trim() );
+		};
+		// Clicks in the preview select the block and edit text; the app's own links and buttons wait.
+		on( 'pointerdown', function ( e ) {
+			var t = e.target.closest && e.target.closest( '[data-gs-aw]' );
+			if ( ! ctxRef.current.onSelect() || ! t ) {
+				return;
+			}
+			// Selecting the block focuses its first text: put the caret back where the click was.
+			var x = e.clientX;
+			var y = e.clientY;
+			[ 120, 360 ].forEach( function ( ms ) {
+				setTimeout( function () {
+					if ( doc.activeElement === t ) {
+						return;
+					}
+					t.focus( { preventScroll: true } );
+					var r = doc.caretRangeFromPoint ? doc.caretRangeFromPoint( x, y ) : null;
+					if ( r && t.contains( r.startContainer ) ) {
+						var sel = doc.getSelection();
+						sel.removeAllRanges();
+						sel.addRange( r );
+					}
+				}, ms );
+			} );
+		}, true );
+		on( 'click', function ( e ) {
+			var a = e.target.closest && e.target.closest( 'a[href]' );
+			if ( ( e.target.closest && e.target.closest( '[data-gs-aw]' ) ) || ( a && ! /^#/.test( a.getAttribute( 'href' ) ) ) ) {
+				e.preventDefault();
+				e.stopPropagation();
+			}
+		}, true );
+		on( 'submit', function ( e ) {
+			e.preventDefault();
+		}, true );
+		on( 'focusout', function ( e ) {
+			if ( e.target.hasAttribute && e.target.hasAttribute( 'data-gs-aw' ) ) {
+				commit( e.target );
+			}
+		} );
+		on( 'keydown', function ( e ) {
+			var t = e.target;
+			if ( ! t.isContentEditable ) {
+				return;
+			}
+			var key = ( e.key || '' ).toLowerCase();
+			if ( e.key === 'Enter' && ! e.shiftKey ) {
+				e.preventDefault();
+				t.blur();
+			} else if ( e.key === 'Escape' ) {
+				t.innerHTML = t.dataset.gsBefore;
+				t.blur();
+			} else if ( e.key === ' ' && t.closest( 'button' ) ) {
+				// A space typed in a button label is text, not a click.
+				e.preventDefault();
+				doc.execCommand( 'insertText', false, ' ' );
+			} else if ( ( e.ctrlKey || e.metaKey ) && /^[zys]$/.test( key ) && ( key === 's' || t.innerHTML === t.dataset.gsBefore ) ) {
+				// Undo / redo / save belong to the editor once the text has no typing of its own to undo.
+				e.preventDefault();
+				t.blur();
+				var ed = wp.data.dispatch( 'core/editor' );
+				if ( key === 's' ) {
+					ed.savePost();
+				} else if ( key === 'y' || e.shiftKey ) {
+					ed.redo();
+				} else {
+					ed.undo();
+				}
+			}
+		} );
+		on( 'paste', function ( e ) {
+			if ( e.target.isContentEditable && e.clipboardData ) {
+				e.preventDefault();
+				doc.execCommand( 'insertText', false, e.clipboardData.getData( 'text/plain' ) );
+			}
+		} );
+		if ( kit ) {
+			// The part of the frame on screen in the editor, in the frame's own view.
+			var onScreen = function () {
+				var r = frame.getBoundingClientRect();
+				return { top: Math.max( 0, -r.top ), bottom: Math.min( r.height, host.innerHeight - r.top ) };
+			};
+			var tb = kit.textToolbar( doc, on, commit, onScreen, { whole: true } );
+			host.addEventListener( 'scroll', tb.place, { passive: true } );
+			cleanup.push( function () {
+				host.removeEventListener( 'scroll', tb.place );
+				tb.destroy();
+			} );
+		}
+		return function () {
+			cleanup.forEach( function ( fn ) {
+				fn();
+			} );
+		};
+	}
+	// An app section: the live preview, edited in place, plus its Wording panel.
+	function AppSection( props ) {
+		var make = props.make;
+		var attrs = props.attributes || {};
+		var p = make( attrs );
+		// Words come from the app as shipped (no gs_texts), so renamed ones can be found again.
+		var bare = make( Object.assign( {}, attrs, { gsTexts: {} } ) ).src;
+		// An edit typed in the preview is already on screen: the frame keeps its page (no reload).
+		var own = wp.element.useRef( null );
+		var shown = wp.element.useState( p.src );
+		wp.element.useEffect( function () {
+			if ( own.current !== p.src ) {
+				own.current = null;
+				shown[ 1 ]( p.src );
+			}
+		}, [ p.src ] );
+		var latest = wp.element.useRef( attrs.gsTexts || {} );
+		latest.current = attrs.gsTexts || {};
+		var editRef = wp.element.useRef( null );
+		editRef.current = {
+			// True when this click selected the block.
+			onSelect: function () {
+				if ( wp.data.select( 'core/block-editor' ).isBlockSelected( props.clientId ) ) {
+					return false;
+				}
+				wp.data.dispatch( 'core/block-editor' ).selectBlock( props.clientId );
+				return true;
+			},
+			change: function ( key, value ) {
+				var next = Object.assign( {}, latest.current );
+				if ( value ) {
+					next[ key ] = value;
+				} else if ( next[ key ] !== undefined ) {
+					delete next[ key ];
+				} else {
+					return;
+				}
+				latest.current = next;
+				own.current = make( Object.assign( {}, props.attributes, { gsTexts: next } ) ).src;
+				props.setAttributes( { gsTexts: next } );
+			},
+		};
+		return el( wp.element.Fragment, null,
+			el( LiveFrame, { src: shown[ 0 ], label: p.label, empty: p.empty, editRef: p.src ? editRef : null } ),
+			props.isSelected ? el( Wording, { src: bare, attributes: attrs, setAttributes: props.setAttributes } ) : null );
 	}
 
 	wp.hooks.addFilter( 'editor.BlockEdit', 'gend-society/studio-previews', wp.compose.createHigherOrderComponent( function ( BlockEdit ) {
@@ -182,13 +422,10 @@
 				return el( BlockEdit, props );
 			}
 			var p = make( props.attributes || {} );
-			var frame = el( LiveFrame, { src: p.src, label: p.label, empty: p.empty } );
-			if ( ! p.wording ) {
-				return frame;
+			if ( p.wording ) {
+				return el( AppSection, Object.assign( {}, props, { make: make } ) );
 			}
-			// Words come from the app as shipped (no gs_texts), so renamed ones can be found again.
-			var bare = make( Object.assign( {}, props.attributes, { gsTexts: {} } ) ).src;
-			return el( wp.element.Fragment, null, frame, props.isSelected ? el( Wording, { src: bare, attributes: props.attributes, setAttributes: props.setAttributes } ) : null );
+			return el( LiveFrame, { src: p.src, label: p.label, empty: p.empty } );
 		};
 	}, 'withGsLivePreview' ) );
 
