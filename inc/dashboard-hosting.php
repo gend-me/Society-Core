@@ -964,7 +964,7 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
                     fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>, { method: 'POST', body: fd, credentials: 'same-origin' })
                         .then(function (r) { return r.json(); })
                         .then(function (j) {
-                            if (!j || !j.success) { throw new Error((j && j.data && j.data.message) || 'Request failed'); }
+                            var m = j ? (j.data ? j.data.message : '') : ''; if (!j || !j.success) { throw new Error(m || 'Request failed'); } /* no double ampersand in inline scripts: content filters rewrite it */
                             window.location.reload();
                         })
                         .catch(function (e) { b.disabled = false; b.textContent = label; window.alert(e.message); });
