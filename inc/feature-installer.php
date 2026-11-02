@@ -23,6 +23,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const GEND_SOCIETY_FEATURE_INSTALLS_OPTION = 'gend_society_feature_installs';
 
+// The dashboard plugins this installer puts here choose where their menu goes by probing GS_VERSION: defined, Sales Team and Project
+// Services sit under the Store menu, otherwise they register under a parent that does not exist and never show. A standalone install
+// does not load the compat layer that normally defines it, so it is defined here (guarded: a wp-config definition wins).
+if ( ! defined( 'GS_VERSION' ) ) {
+	define( 'GS_VERSION', GEND_SOCIETY_VERSION );
+}
+
 if ( ! function_exists( 'gend_society_feature_installer_enabled' ) ) {
 	/**
 	 * Is the installer allowed to run on this site? Full build, standalone, connected, not turned off.
