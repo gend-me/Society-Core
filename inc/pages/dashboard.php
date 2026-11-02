@@ -649,10 +649,22 @@ function gend_society_dashboard_get_membership()
 {
     if (function_exists('WP_Ultimo') && WP_Ultimo()->is_loaded()) {
         try {
-            return WP_Ultimo()->currents->get_membership();
+            $membership = WP_Ultimo()->currents->get_membership();
         } catch (Throwable $e) {
             return null;
         }
+        // A membership belongs to a site. WP Ultimo falls back to the signed-in user's membership where the site has
+        // none (gend.me's own site, a connected install's membership), so only hand back one that owns THIS site.
+        if ($membership && is_object($membership) && method_exists($membership, 'get_sites')) {
+            $blog_id = get_current_blog_id();
+            foreach ((array) $membership->get_sites() as $site) {
+                if (is_object($site) && method_exists($site, 'get_blog_id') && (int) $site->get_blog_id() === $blog_id) {
+                    return $membership;
+                }
+            }
+            return null;
+        }
+        return $membership;
     }
     return null;
 }

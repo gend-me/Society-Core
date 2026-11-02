@@ -375,6 +375,10 @@ if ( ! function_exists( 'gend_society_module_needs_met' ) ) {
 				case 'standalone':
 					$met = ( 'standalone' === $mode );
 					break;
+				case 'plan_ui':
+					// The plan UI (inc/plan-access.php): a paired standalone install, or the hub (launch sub-sites read it in-process).
+					$met = ( 'hub' === $mode ) || ( 'standalone' === $mode && '' !== (string) get_option( 'gend_society_install_token', '' ) );
+					break;
 				default:
 					$met = false;
 			}

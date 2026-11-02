@@ -183,8 +183,12 @@ if ( ! function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) ) {
     function gend_society_hosting_resource_upgrade_data_attrs( $type ) {
         // Phase 109-29: on a standalone install every gend.me action is a popup / new-tab link to gend.me
         // (D14), never this modal (iframe or proxy picker), so no data-gs-upgrade-open attributes there.
+        // A connected install picks its plan in the same picker the containers use (the plan list and the checkout come
+        // from gend.me through the install token). Backups open their own popup from the panel's Choose / Change plan.
         if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
-            return '';
+            return ( 'backups' !== $type && function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired() )
+                ? 'data-resource-type="' . esc_attr( $type ) . '"'
+                : '';
         }
         $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
         // Backups are two choices, not one list: a storage plan, then how
@@ -234,9 +238,11 @@ if ( ! function_exists( 'gend_society_hosting_plan_upgrade_data_attrs' ) ) {
      * @return string
      */
     function gend_society_hosting_plan_upgrade_data_attrs( $type, $plan_id ) {
-        // Phase 109-29: standalone uses popup links instead (see gend_society_hosting_resource_upgrade_data_attrs()).
+        // A connected install buys a specific plan through the proxy checkout (see gend_society_hosting_resource_upgrade_data_attrs()).
         if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
-            return '';
+            return ( function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired() )
+                ? 'data-plan-id="' . esc_attr( (int) $plan_id ) . '"'
+                : '';
         }
         $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
         if ( $same_origin ) {
@@ -650,7 +656,16 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                     <div class="gs-hosting__stat-label"><?php esc_html_e( 'Container Plan', 'gend-society' ); ?></div>
                     <div style="color:#fff; font-size:1rem; font-weight:600; margin-top:4px;">
 <?php if ( $gs_sa ) : ?>
-                            <span class="gs-dash-sa-muted"><?php echo esc_html( gend_society_after_migration_label() ); ?></span>
+                            <?php
+                            $gs_sa_plan_bits = array();
+                            foreach ( array( 'media' => __( 'Media', 'gend-society' ), 'codebase' => __( 'Codebase', 'gend-society' ), 'database' => __( 'Database', 'gend-society' ) ) as $gs_sa_res => $gs_sa_lbl ) {
+                                $gs_sa_names = gend_society_hosting_plan_names( $gs_sa_res );
+                                if ( $gs_sa_names ) {
+                                    $gs_sa_plan_bits[] = $gs_sa_lbl . ': ' . implode( ' + ', $gs_sa_names );
+                                }
+                            }
+                            ?>
+                            <span class="gs-dash-sa-muted"><?php echo esc_html( $gs_sa_plan_bits ? implode( ' · ', $gs_sa_plan_bits ) : __( 'No container plan yet', 'gend-society' ) ); ?></span>
 <?php else : ?>
                         <?php if ( $gs_container_any ) : ?>
                             <?php echo esc_html( $gs_container_label ); ?>
@@ -706,7 +721,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                         <?php echo esc_html( $r['used_label'] ); ?>
                         <span class="gs-hosting__resource-card-cap"><?php esc_html_e( 'used on this server', 'gend-society' ); ?></span>
                     </div>
-                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php echo esc_html( function_exists( 'gend_society_origin_moved' ) && ! empty( gend_society_origin_moved()['moved'] ) ? __( 'Container: moved to gend.me hosting', 'gend-society' ) : __( 'Container: after migration', 'gend-society' ) ); ?></div>
+                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php echo esc_html( sprintf( /* translators: %s: plan name or a prompt to pick one. */ __( 'Plan: %s', 'gend-society' ), gend_society_hosting_plan_label( (string) $r['slug'] ) ) ); ?></div>
 <?php else : ?>
                     <div class="gs-hosting__resource-card-usage">
                         <?php echo esc_html( $r['used_label'] ); ?>
@@ -1189,7 +1204,7 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
         if ( $gs_bk_sa && empty( $gs_bk_sa_view['hosted'] ) ) {
             $gs_bk_hero['sub']           = (string) ( $gs_bk_sa_view['text'] ?? '' );
             unset( $gs_bk_hero['pct'], $gs_bk_hero['warn'] ); // no gend.me quota to measure against yet
-            $gs_bk_hero['stats'][1]['v'] = gend_society_after_migration_label();
+            $gs_bk_hero['stats'][1]['v'] = '' !== (string) ( $gs_bk_sa_view['plan'] ?? '' ) ? (string) $gs_bk_sa_view['plan'] : gend_society_hosting_plan_label( 'backups' );
         }
         gend_society_hosting_render_analytics_hero( $gs_bk_hero );
         ?>
@@ -1327,6 +1342,34 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
  *                       User Access moved to the Feature Suite tab (see
  *                       dashboard-remote-membership.php) - no longer rendered here.
  */
+if ( ! function_exists( 'gend_society_hosting_plan_names' ) ) {
+    /**
+     * The hosting-resource plans the membership holds for $res (backups|media|codebase|database|server), from gend.me's
+     * /membership answer (hosting_plans). [] when none or not connected.
+     *
+     * @return string[]
+     */
+    function gend_society_hosting_plan_names( string $res ): array {
+        $mc  = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+        $cur = is_array( $mc ) && is_array( $mc['hosting_plans'][ $res ]['current'] ?? null ) ? $mc['hosting_plans'][ $res ]['current'] : array();
+        $out = array();
+        foreach ( $cur as $row ) {
+            if ( is_array( $row ) && ! empty( $row['name'] ) ) {
+                $out[] = (string) $row['name'];
+            }
+        }
+        return $out;
+    }
+}
+
+if ( ! function_exists( 'gend_society_hosting_plan_label' ) ) {
+    /** The held plan name(s) of a resource, or a prompt to pick one. */
+    function gend_society_hosting_plan_label( string $res ): string {
+        $names = gend_society_hosting_plan_names( $res );
+        return $names ? implode( ' + ', $names ) : __( 'No plan yet', 'gend-society' );
+    }
+}
+
 if ( ! function_exists( 'gend_society_after_migration_label' ) ) {
     /** The placeholder a not-yet-moved install shows where gend.me hosting will report; "Moved" once its site is Live elsewhere. */
     function gend_society_after_migration_label(): string {
@@ -2068,7 +2111,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 // Phase 109-29: a standalone install has no gend.me database quota (no container): no ring, no cap.
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_tables_hero['pct'], $gs_tables_hero['warn'] );
-                    $gs_tables_hero['stats'][1]['v'] = gend_society_after_migration_label();
+                    $gs_tables_hero['stats'][1]['v'] = gend_society_hosting_plan_label( 'database' );
                 }
                 gend_society_hosting_render_analytics_hero( $gs_tables_hero );
                 ?>
@@ -2627,7 +2670,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 // Phase 109-29: no gend.me codebase quota on a standalone install (no container): no ring, no cap.
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_codebase_hero['pct'], $gs_codebase_hero['warn'] );
-                    $gs_codebase_hero['stats'][1]['v'] = gend_society_after_migration_label();
+                    $gs_codebase_hero['stats'][1]['v'] = gend_society_hosting_plan_label( 'codebase' );
                 }
                 gend_society_hosting_render_analytics_hero( $gs_codebase_hero );
                 ?>
