@@ -1219,3 +1219,32 @@ add_action(
 		);
 	}
 );
+
+if ( ! function_exists( 'gend_society_plan_change_label' ) ) {
+	/**
+	 * Wording of the dashboard's plan-change button: "Downgrade" on the highest tier (there is nothing above it), "Change plan"
+	 * during the 7-day trial on any other tier (any plan can be taken), otherwise "Upgrade".
+	 */
+	function gend_society_plan_change_label(): string {
+		if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
+			return __( 'Upgrade', 'gend-society' );
+		}
+		$vm = gend_society_plan_view_model();
+		if ( 'ok' !== ( $vm['state'] ?? '' ) ) {
+			return __( 'Upgrade', 'gend-society' );
+		}
+		$cur = 0;
+		$top = 0;
+		foreach ( (array) ( $vm['tiers'] ?? array() ) as $t ) {
+			$rank = (int) ( $t['rank'] ?? 0 );
+			$top  = max( $top, $rank );
+			if ( ! empty( $t['is_current'] ) || ( (int) ( $vm['plan']['id'] ?? 0 ) > 0 && (int) ( $t['id'] ?? 0 ) === (int) $vm['plan']['id'] ) ) {
+				$cur = $rank;
+			}
+		}
+		if ( $cur > 0 && $cur >= $top ) {
+			return __( 'Downgrade', 'gend-society' ); // nothing above the highest plan, trial or not
+		}
+		return ! empty( $vm['trial']['active'] ) ? __( 'Change plan', 'gend-society' ) : __( 'Upgrade', 'gend-society' );
+	}
+}
