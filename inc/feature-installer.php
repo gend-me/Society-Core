@@ -105,6 +105,25 @@ if ( ! function_exists( 'gend_society_feature_verify_package' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_feature_friendly_error' ) ) {
+	/**
+	 * A request error as something a person can read, and as retryable when it is only a hiccup: a timeout, a connection drop or a
+	 * 5xx page (the raw HTML of a gateway error is never shown). Retryable ones carry the code gs_feature_transient.
+	 *
+	 * @param WP_Error $e Error from a gend.me request.
+	 * @return WP_Error
+	 */
+	function gend_society_feature_friendly_error( WP_Error $e ): WP_Error {
+		$raw       = (string) $e->get_error_message();
+		$plain     = trim( preg_replace( '/\s+/', ' ', wp_strip_all_tags( $raw ) ) );
+		$transient = (bool) preg_match( '/cURL error (28|7|52|56)|timed out|timeout|could not resolve|connection (reset|refused|closed)|50[234]|temporarily unavailable|bad gateway|gateway time-?out/i', $raw );
+		if ( $transient ) {
+			return new WP_Error( 'gs_feature_transient', __( 'gend.me did not answer in time. This is usually brief: it will be tried again.', 'gend-society' ) );
+		}
+		return new WP_Error( (string) $e->get_error_code(), '' !== $plain ? mb_substr( $plain, 0, 240 ) : __( 'gend.me could not be reached.', 'gend-society' ) );
+	}
+}
+
 if ( ! function_exists( 'gend_society_feature_install' ) ) {
 	/**
 	 * Install and activate one dashboard the plan includes.
@@ -149,9 +168,9 @@ if ( ! function_exists( 'gend_society_feature_install' ) ) {
 				gend_society_feature_install_record( $slug, array( 'state' => 'installing', 'step' => $name ) );
 			};
 			$m = gend_society_remote_membership_call( 'features/' . rawurlencode( $slug ) . '/package', array(), 'GET' );
-			if ( is_wp_error( $m ) ) {
-				return $m;
-			}
+				if ( is_wp_error( $m ) ) {
+					return gend_society_feature_friendly_error( $m );
+				}
 			if ( ( $m['plugin'] ?? '' ) !== $plugin || empty( $m['package_url'] ) || ! is_string( $m['package_url'] ) ) {
 				return new WP_Error( 'gs_feature_manifest', __( 'The package was refused: it does not match this dashboard.', 'gend-society' ) );
 			}
@@ -174,11 +193,14 @@ if ( ! function_exists( 'gend_society_feature_install' ) ) {
 				)
 			);
 			if ( is_wp_error( $resp ) ) {
-				return $resp;
-			}
-			if ( 200 !== (int) wp_remote_retrieve_response_code( $resp ) ) {
-				return new WP_Error( 'gs_feature_download', __( 'gend.me could not deliver the package right now.', 'gend-society' ) );
-			}
+					return gend_society_feature_friendly_error( $resp );
+				}
+				$dl_code = (int) wp_remote_retrieve_response_code( $resp );
+				if ( 200 !== $dl_code ) {
+					return $dl_code >= 500 || 0 === $dl_code
+						? new WP_Error( 'gs_feature_transient', __( 'gend.me did not answer in time. This is usually brief: it will be tried again.', 'gend-society' ) )
+						: new WP_Error( 'gs_feature_download', __( 'gend.me could not deliver the package right now.', 'gend-society' ) );
+				}
 			$step( 'verifying' );
 			$pinned = null === $keys ? ( function_exists( 'gend_society_update_public_keys' ) ? gend_society_update_public_keys() : array() ) : $keys;
 			$ok     = gend_society_feature_verify_package( $tmp, $slug, $m, $pinned );
@@ -496,7 +518,7 @@ if ( ! function_exists( 'gend_society_feature_setup_panel_html' ) ) {
     var AJAX = box.getAttribute('data-ajax'), NONCE = box.getAttribute('data-nonce');
     var ONLY = (box.getAttribute('data-gs-setup-only') || '').split(',').filter(Boolean);
     var rowsEl = box.querySelector('[data-gs-setup-rows]'), subEl = box.querySelector('[data-gs-setup-sub]'), actEl = box.querySelector('[data-gs-setup-actions]');
-    var running = false, installedAny = false, timer = null;
+    var running = false, installedAny = false, timer = null, waiting = {};
     function post(action, extra) {
         var fd = new FormData(); fd.append('action', action); fd.append('nonce', NONCE);
         Object.keys(extra || {}).forEach(function (k) { fd.append(k, extra[k]); });
@@ -507,9 +529,12 @@ if ( ! function_exists( 'gend_society_feature_setup_panel_html' ) ) {
         var rows = (data.features || []).filter(function (r) { return ONLY.length === 0 || ONLY.indexOf(r.slug) > -1; });
         var html = '';
         rows.forEach(function (r) {
+            // a row that is queued or waiting to be tried again reads that, not the failure of an earlier run
+            var w = ''; if (!r.done) { w = waiting[r.slug] || ''; }
+            if (w) { r = { slug: r.slug, name: r.name, pct: 0, done: false, failed: false, label: w, message: '' }; }
             html += '<div class="gs-setup__row' + (r.done ? ' is-done' : (r.failed ? ' is-failed' : '')) + '" data-gs-setup-row="' + esc(r.slug) + '">' +
                 '<span class="gs-setup__name">' + esc(r.name) + '</span><span class="gs-setup__bar"><span style="width:' + (r.pct || 0) + '%"></span></span>' +
-                '<span class="gs-setup__label">' + esc(r.label) + '</span>' + (r.failed ? (r.message ? '<p class="gs-setup__msg">' + esc(r.message) + '</p>' : '') : '') + '</div>';
+                '<span class="gs-setup__label">' + esc(r.label) + '</span>' + (r.failed ? (r.message ? '<p class="gs-setup__msg">' + esc(String(r.message).replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 240)) + '</p>' : '') : '') + '</div>';
             document.querySelectorAll('[data-gs-setup-line="' + r.slug + '"]').forEach(function (el) { el.textContent = r.done ? 'Installed and switched on.' : r.label + (r.failed ? '' : '...'); });
         });
         rowsEl.innerHTML = html;
@@ -517,6 +542,7 @@ if ( ! function_exists( 'gend_society_feature_setup_panel_html' ) ) {
     }
     function status() { return post('gend_society_feature_install_status').then(function (j) { if (j.success) { render(j.data); } return j; }); }
     function finish(failedCount) {
+        waiting = {};
         running = false; if (timer) { clearInterval(timer); timer = null; }
         box.classList.add(failedCount ? 'is-idle' : 'is-done');
         box.querySelector('.gs-setup__title').textContent = failedCount ? 'Some dashboards need attention' : 'Your dashboards are ready';
@@ -532,21 +558,36 @@ if ( ! function_exists( 'gend_society_feature_setup_panel_html' ) ) {
         status().then(function (j) {
             var todo = (j.data ? (j.data.missing || []) : []).filter(function (s) { return ONLY.length === 0 || ONLY.indexOf(s) > -1; });
             var failed = 0;
+            todo.forEach(function (s) { waiting[s] = 'Waiting to start'; });
+            var wait = function (ms) { return new Promise(function (res) { setTimeout(res, ms); }); };
             var next = function (i) {
                 if (i >= todo.length) { return status().then(function () { finish(failed); }); }
+                var tries = 0;
                 var attempt = function (n) {
+                    delete waiting[todo[i]];
                     return post('gend_society_install_feature', { feature: todo[i] }).then(function (r) {
                         if (r.success) { installedAny = true; return; }
-                        var busy = r.data ? r.data.code === 'gs_feature_busy' : false;
-                        if (busy) { if (n < 40) { return new Promise(function (res) { setTimeout(res, 3000); }).then(function () { return attempt(n + 1); }); } }
+                        var code = r.data ? r.data.code : '';
+                        if (code === 'gs_feature_busy') { if (n < 40) { return wait(3000).then(function () { return attempt(n + 1); }); } }
+                        // a timeout or a 5xx from gend.me is retried by itself (4 s, 9 s, 16 s) before it is reported
+                        if (code === 'gs_feature_transient') {
+                            if (tries < 3) {
+                                var delay = [4000, 9000, 16000][tries]; tries++;
+                                waiting[todo[i]] = 'gend.me was busy, trying again...';
+                                return status().then(function () { return wait(delay); }).then(function () { return attempt(n + 1); });
+                            }
+                        }
                         failed++;
-                    }).catch(function () { failed++; });
+                    }).catch(function () {
+                        if (tries < 3) { tries++; waiting[todo[i]] = 'Connection dropped, trying again...'; return wait(5000).then(function () { return attempt(n + 1); }); }
+                        failed++;
+                    });
                 };
                 return attempt(0).then(function () { return status(); }).then(function () { return next(i + 1); });
             };
             if (!todo.length) { finish(0); return; }
             next(0);
-        }).catch(function () { finish(1); });
+        }).catch(function () { waiting = {}; finish(1); });
     }
     box.addEventListener('click', function (e) { if (e.target.closest('[data-gs-setup-retry]')) { e.preventDefault(); runAll(); } });
     runAll();
