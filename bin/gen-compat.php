@@ -391,7 +391,7 @@ function gs_gc_late( array $m, string $root ): string {
 	ksort( $consts );
 	$o .= "// Constants probed by other plugins (GS_VERSION: menu parent slugs, feature detection).\n";
 	foreach ( $consts as $old => $new ) {
-		$o .= 'if ( ! defined( ' . gs_gc_q( $old ) . ' ) && defined( ' . gs_gc_q( $new ) . ' ) ) {' . "\n\tdefine( " . gs_gc_q( $old ) . ", $new ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- legacy alias for the pre-1.2.0 name.\n}\n";
+		$o .= 'if ( ! defined( ' . gs_gc_q( $old ) . ' ) && defined( ' . gs_gc_q( $new ) . ' ) ) {' . "\n\tdefine( " . gs_gc_q( $old ) . ", $new );\n}\n";
 	}
 	$o .= "// GS_COLLAB_MARKET_PUBLIC: wp-config may still define the old name; gend-society.php honours it\n"
 		. "// (see bin/gen-compat.php --part=honour). Readers of the old name get the effective value.\n"

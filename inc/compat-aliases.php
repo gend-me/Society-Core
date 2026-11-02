@@ -20,13 +20,13 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 // Constants probed by other plugins (GS_VERSION: menu parent slugs, feature detection).
 if ( ! defined( 'GS_DIR' ) && defined( 'GEND_SOCIETY_DIR' ) ) {
-	define( 'GS_DIR', GEND_SOCIETY_DIR ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- legacy alias for the pre-1.2.0 name.
+	define( 'GS_DIR', GEND_SOCIETY_DIR );
 }
 if ( ! defined( 'GS_URL' ) && defined( 'GEND_SOCIETY_URL' ) ) {
-	define( 'GS_URL', GEND_SOCIETY_URL ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- legacy alias for the pre-1.2.0 name.
+	define( 'GS_URL', GEND_SOCIETY_URL );
 }
 if ( ! defined( 'GS_VERSION' ) && defined( 'GEND_SOCIETY_VERSION' ) ) {
-	define( 'GS_VERSION', GEND_SOCIETY_VERSION ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- legacy alias for the pre-1.2.0 name.
+	define( 'GS_VERSION', GEND_SOCIETY_VERSION );
 }
 // GS_COLLAB_MARKET_PUBLIC: wp-config may still define the old name; gend-society.php honours it
 // (see bin/gen-compat.php --part=honour). Readers of the old name get the effective value.
