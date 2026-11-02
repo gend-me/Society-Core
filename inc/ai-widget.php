@@ -84,6 +84,7 @@ class Gend_Society_AI_Widget {
         wp_enqueue_script( 'aipa-widget', $leo . self::widget_js_file(), array(), $ver, true );
         wp_enqueue_script( 'aipa-widget-leo-flows', $leo . 'widget-leo-flows.js', array( 'aipa-widget' ), $ver, true );
         wp_enqueue_script( 'leo-flow-engine', $leo . 'leo-flow-engine.js', array( 'aipa-widget', 'aipa-widget-leo-flows' ), $ver, true );
+        wp_enqueue_script( 'aipa-widget-unified-chat', $leo . 'widget-unified-chat.js', array( 'aipa-widget', 'aipa-widget-leo-flows' ), $ver, true );
 
         // Config — REST base points at the LOCAL aipa/v1 forwarder, so the
         // widget never talks to the hub directly and never sees the bearer.
