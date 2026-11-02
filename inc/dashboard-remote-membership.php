@@ -2478,6 +2478,9 @@ function gend_society_render_membership_panel( $payload = null ) {
             $gs_default_tab = 'hosting';
         }
         ?>
+        <?php // Dashboards the plan includes but this site does not have yet: live progress while they are installed.
+              if ( function_exists( 'gend_society_feature_setup_panel_html' ) ) { echo gend_society_feature_setup_panel_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+        ?>
         <?php // Free plan: a banner to unlock the dashboards (each plan has an info button that opens Storage > Codebase > Dashboards).
               if ( function_exists( 'gend_society_unlock_banner_html' ) ) { echo gend_society_unlock_banner_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built. ?>
         <div class="gs-mship-tabs">

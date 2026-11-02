@@ -809,6 +809,22 @@ if ( ! function_exists( 'gend_society_plan_refresh_ajax' ) ) {
 }
 add_action( 'wp_ajax_gend_society_plan_refresh', 'gend_society_plan_refresh_ajax' );
 
+/**
+ * Back from the gend.me checkout (?gs_plan_refresh=1): forget the cached plan once so the new plan is read and its
+ * dashboards are queued for install. Read-only for visitors who cannot manage the site.
+ */
+add_action(
+	'admin_init',
+	static function () {
+		// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- only drops a cache; no state is changed from the request.
+		if ( empty( $_GET['gs_plan_refresh'] ) || ! current_user_can( 'manage_options' ) || ! function_exists( 'gend_society_plan_invalidate_all' ) ) {
+			return;
+		}
+		gend_society_plan_invalidate_all();
+		delete_transient( 'gend_society_feature_autoinstall_check' );
+	}
+);
+
 if ( ! function_exists( 'gend_society_feature_plan_status' ) ) {
 	/**
 	 * What the dashboard plan says about one feature (plugin dashboard), from the cached plan view-model. The plan decides

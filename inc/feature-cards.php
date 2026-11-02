@@ -276,7 +276,7 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
                 $gs_fc_rec   = function_exists('gend_society_feature_install_records') ? (gend_society_feature_install_records()[$slug] ?? array()) : array();
                 $gs_fc_rstate = (string) ($gs_fc_rec['state'] ?? '');
                 if (in_array($gs_fc_rstate, array('queued', 'installing'), true)) {
-                    echo '<span class="gs-fc-need" data-gs-fc-installing="1" style="margin:0">' . esc_html__('Included with your plan. Installing now: this page updates when it is ready.', 'gend-society') . '</span>';
+                    echo '<span class="gs-fc-need" data-gs-fc-installing="1" data-gs-setup-line="' . esc_attr((string) $slug) . '" style="margin:0">' . esc_html__('Included with your plan. Setting it up now...', 'gend-society') . '</span>';
                 } else {
                     if ('failed' === $gs_fc_rstate && '' !== (string) ($gs_fc_rec['message'] ?? '')) {
                         echo '<span class="gs-fc-need" style="margin:0 0 8px;color:#fca5a5">' . esc_html((string) $gs_fc_rec['message']) . '</span>';
