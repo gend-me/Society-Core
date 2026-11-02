@@ -23,11 +23,12 @@ if ( ! defined( 'ABSPATH' ) ) {
 
 const GEND_SOCIETY_FEATURE_INSTALLS_OPTION = 'gend_society_feature_installs';
 
-// The dashboard plugins this installer puts here choose where their menu goes by probing GS_VERSION: defined, Sales Team and Project
-// Services sit under the Store menu, otherwise they register under a parent that does not exist and never show. A standalone install
-// does not load the compat layer that normally defines it, so it is defined here (guarded: a wp-config definition wins).
-if ( ! defined( 'GS_VERSION' ) ) {
-	define( 'GS_VERSION', GEND_SOCIETY_VERSION );
+// The dashboard plugins this installer puts here choose where their menu goes by probing the legacy version constant: defined,
+// Sales Team and Project Services sit under the Store menu, otherwise they register under a parent that does not exist and never
+// show. A standalone install does not load the compat layer that normally defines it, so it is defined here (guarded: a
+// wp-config definition wins).
+if ( ! defined( 'GS_VERSION' ) ) { // gend-society-rename: keep
+	define( 'GS_VERSION', GEND_SOCIETY_VERSION ); // gend-society-rename: keep
 }
 
 if ( ! function_exists( 'gend_society_feature_installer_enabled' ) ) {
