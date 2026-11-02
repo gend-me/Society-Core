@@ -28,7 +28,7 @@ const GEND_SOCIETY_FEATURE_INSTALLS_OPTION = 'gend_society_feature_installs';
 // show. A standalone install does not load the compat layer that normally defines it, so it is defined here (guarded: a
 // wp-config definition wins).
 if ( ! defined( 'GS_VERSION' ) ) { // gend-society-rename: keep
-	define( 'GS_VERSION', GEND_SOCIETY_VERSION ); // gend-society-rename: keep
+	define( 'GS_VERSION', GEND_SOCIETY_VERSION ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedConstantFound -- legacy name other plugins probe. gend-society-rename: keep
 }
 
 if ( ! function_exists( 'gend_society_feature_installer_enabled' ) ) {
