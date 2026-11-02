@@ -175,6 +175,12 @@ return array(
 			'note'  => 'Signed self-updates from updates.gend.me (full build, standalone only). Hub/container are image-managed.',
 		),
 		array(
+			'file'  => 'inc/feature-installer.php',
+			'tier'  => 'updater',
+			'needs' => array( 'standalone' ),
+			'note'  => 'Installs and activates the dashboards a plan includes from signed packages on gend.me (full build, standalone only; never deletes).',
+		),
+		array(
 			'file'  => 'inc/dashboard-overview.php',
 			'tier'  => 'customer',
 			'needs' => array( 'wu' ),

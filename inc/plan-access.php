@@ -842,7 +842,14 @@ if ( ! function_exists( 'gend_society_feature_plan_status' ) ) {
 		if ( 'upgrade' === $ft['state'] ) {
 			$out['upgrades'] = gend_society_plan_upgrade_tiers( $vm, is_array( $ft['unlock_plan'] ) ? $ft['unlock_plan'] : null );
 		}
-		return $out;
+		/**
+		 * Filters the local plan status of a feature (tests). Display and scheduling only: gend.me checks the plan again
+		 * before it delivers any package, so changing this never gives a site code it is not entitled to.
+		 *
+		 * @param array  $out     Status.
+		 * @param string $feature Feature slug.
+		 */
+		return (array) apply_filters( 'gend_society_feature_plan_status', $out, $feature );
 	}
 }
 

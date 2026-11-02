@@ -272,8 +272,19 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             // until it ships the card says so instead of offering a button that cannot work.
             if (function_exists('gend_society_build_variant') && 'wporg' === gend_society_build_variant()) {
                 echo '<a class="gs-buy gs-fc-btn" href="' . esc_url(function_exists('gend_society_sa_menu_full_build_url') ? gend_society_sa_menu_full_build_url() : 'https://gend.me') . '" target="_blank" rel="noopener">' . esc_html__('Get the full GenD Society build', 'gend-society') . '</a>';
+            } elseif (function_exists('gend_society_feature_installer_enabled') && gend_society_feature_installer_enabled()) {
+                $gs_fc_rec   = function_exists('gend_society_feature_install_records') ? (gend_society_feature_install_records()[$slug] ?? array()) : array();
+                $gs_fc_rstate = (string) ($gs_fc_rec['state'] ?? '');
+                if (in_array($gs_fc_rstate, array('queued', 'installing'), true)) {
+                    echo '<span class="gs-fc-need" data-gs-fc-installing="1" style="margin:0">' . esc_html__('Included with your plan. Installing now: this page updates when it is ready.', 'gend-society') . '</span>';
+                } else {
+                    if ('failed' === $gs_fc_rstate && '' !== (string) ($gs_fc_rec['message'] ?? '')) {
+                        echo '<span class="gs-fc-need" style="margin:0 0 8px;color:#fca5a5">' . esc_html((string) $gs_fc_rec['message']) . '</span>';
+                    }
+                    echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="install" data-feature="' . esc_attr((string) $slug) . '" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html('failed' === $gs_fc_rstate ? __('Retry install', 'gend-society') : __('Install and activate', 'gend-society')) . '</button>';
+                }
             } else {
-                echo '<span class="gs-fc-need" data-gs-fc-pending="1" style="margin:0">' . esc_html__('Included with your plan. It will be installed and switched on for you automatically.', 'gend-society') . '</span>';
+                echo '<span class="gs-fc-need" style="margin:0">' . esc_html__('Included with your plan.', 'gend-society') . '</span>';
             }
         } else {
             echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';
@@ -459,11 +470,13 @@ function gend_society_feature_cards_ajax_script() {
 
             if (action === 'activate') {
                 $btn.addClass('activating').html('<?php esc_html_e('Activating...', 'gend-society'); ?>');
+            } else if (action === 'install') {
+                $btn.addClass('activating').html('<?php esc_html_e('Installing...', 'gend-society'); ?>');
             } else if (action === 'update') {
                 $btn.addClass('updating').html('<span class="dashicons dashicons-update" style="animation: spin 2s linear infinite;"></span>');
             }
 
-            var ajaxAction = action === 'activate' ? 'gend_society_activate_plugin' : 'gend_society_update_plugin';
+            var ajaxAction = action === 'activate' ? 'gend_society_activate_plugin' : (action === 'install' ? 'gend_society_install_feature' : 'gend_society_update_plugin');
 
             $.ajax({
                 url: ajaxurl,
@@ -471,6 +484,7 @@ function gend_society_feature_cards_ajax_script() {
                 data: {
                     action: ajaxAction,
                     plugin: plugin,
+                    feature: $btn.data('feature') || '',
                     nonce: nonce
                 },
                 success: function(response) {
