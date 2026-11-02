@@ -119,10 +119,16 @@ function gend_society_handle_wallet_topup_purchase() {
         if ( (int) get_post_meta( $pkg, '_aipa_token_package_amount', true ) <= 0 || 'publish' !== get_post_status( $pkg ) ) {
             wp_safe_redirect( $back ); exit;
         }
-        // qty: a custom dollar amount bought as N units of a pack (the desktop app's Top Up
-        // "Custom amount" uses the smallest pack); leo credits tokens per unit x quantity.
-        // Capped so a typo can't build a huge order.
-        WC()->cart->add_to_cart( $pkg, min( 100000, max( 1, $qty ) ) );
+        // amount: a custom dollar amount, bought as N units at the individual token rate; leo
+        // credits tokens per unit x quantity and refuses anything under its minimum at checkout.
+        // qty is what desktop builds before 1.6.337 send. Capped so a typo can't build a huge order.
+        $units = min( 100000, max( 1, $qty ) );
+        if ( $amount > 0 && 'individual' === get_post_meta( $pkg, '_aipa_compute_tier', true ) && function_exists( 'aipa_token_custom_quote' ) ) {
+            $quote = aipa_token_custom_quote( $amount );
+            if ( ! $quote ) { wp_safe_redirect( $back ); exit; }
+            $units = max( 1, (int) $quote['qty'] );
+        }
+        WC()->cart->add_to_cart( $pkg, $units );
 
     } elseif ( 'ai' === $kind ) {
         if ( ! class_exists( 'AIPA_Commerce' ) ) { wp_safe_redirect( $back ); exit; }
@@ -1185,9 +1191,19 @@ function gend_society_render_profile_header() {
     // AI Builder Tokens packages, priced on leo's Token Pricing page (variations
     // of the AI Builder Tokens product). Empty where leo's packages don't exist.
     $ai_packages = [];
+    $ai_custom   = null; // The individual token rate: bought as a chosen amount, never listed as a pack.
     if ( function_exists( 'aipa_token_packages' ) ) {
         foreach ( aipa_token_packages() as $pk ) {
             if ( $pk['tokens'] <= 0 || $pk['price'] <= 0 ) continue;
+            if ( 'individual' === get_post_meta( $pk['id'], '_aipa_compute_tier', true ) ) {
+                $ai_custom = [
+                    'id'     => (int) $pk['id'],
+                    'tokens' => (int) $pk['tokens'],
+                    'price'  => (float) $pk['price'],
+                    'min'    => function_exists( 'aipa_token_custom_min' ) ? (float) aipa_token_custom_min() : 1.0,
+                ];
+                continue;
+            }
             $pk_label = $pk['parent'] ? (string) get_post_meta( $pk['id'], 'attribute_package', true ) : '';
             $ai_packages[] = [
                 'id'     => (int) $pk['id'],
@@ -1915,6 +1931,7 @@ function gend_society_render_profile_header() {
             'taskBalance' => (float) $task_credits,
             'aiBalance'   => (float) $ai_tokens,
             'aiPackages'  => $ai_packages,
+            'aiCustom'    => $ai_custom,
             'dgenBalance' => (float) $dgen_balance,
             'storeBalance'=> (float) $store_credits,
             'creditValue' => (float) $gdc_task_credit_rate,
@@ -2332,8 +2349,10 @@ function gend_society_render_profile_header() {
                 var pkgLabel = el('div', 'gdc-tp-label', 'Choose a package');
                 var chips = el('div', 'gdc-tp-chips gdc-tp-chips--pkg');
                 var chosen = null;
+                var customAmt = null;
                 var pick = function (p, chip) {
                     chosen = p;
+                    if (customAmt) customAmt.value = '';
                     Array.prototype.forEach.call(chips.children, function (c) { c.classList.toggle('is-active', c === chip); });
                     totalRow.innerHTML = 'Total <strong>' + CFG.sym + money(p.price) + '</strong> <small>' +
                         CFG.sym + money(p.price / p.tokens * 1000) + ' / 1,000 tokens</small>';
@@ -2348,12 +2367,35 @@ function gend_society_render_profile_header() {
                     c.appendChild(price);
                     c.addEventListener('click', function () { pick(p, c); });
                     chips.appendChild(c);
-                    if (i === Math.min(1, pkgs.length - 1)) setTimeout(function () { pick(p, c); }, 0);
+                    if (i === 0) setTimeout(function () { pick(p, c); }, 0);
                 });
+                // Your own amount: priced at the individual token rate. The total here is for the buyer; the hub works it out.
+                if (CFG.aiCustom) {
+                    customAmt = el('input', 'gdc-tp-custom');
+                    customAmt.type = 'number'; customAmt.min = String(CFG.aiCustom.min); customAmt.step = '1';
+                    customAmt.placeholder = 'Or enter your own amount';
+                    customAmt.setAttribute('aria-label', 'Amount to spend');
+                    customAmt.addEventListener('input', function () {
+                        var v = parseFloat(customAmt.value);
+                        if (isNaN(v)) return;
+                        Array.prototype.forEach.call(chips.children, function (c) { c.classList.remove('is-active'); });
+                        if (v < CFG.aiCustom.min) {
+                            chosen = null;
+                            totalRow.innerHTML = 'Minimum <strong>' + CFG.sym + money(CFG.aiCustom.min) + '</strong>';
+                            return;
+                        }
+                        chosen = { custom: v };
+                        totalRow.innerHTML = 'Total <strong>' + CFG.sym + money(v) + '</strong> <small>' +
+                            fmt(Math.round(v / CFG.aiCustom.price) * CFG.aiCustom.tokens) + ' tokens</small>';
+                    });
+                }
                 var goPkg = cta('Continue to Secure Checkout', 'var(--gph-blue)', function () {
-                    if (chosen) goCheckout('ai', { pkg: chosen.id });
+                    if (!chosen) return;
+                    if (chosen.custom) goCheckout('ai', { pkg: CFG.aiCustom.id, amount: chosen.custom });
+                    else goCheckout('ai', { pkg: chosen.id });
                 });
-                mount(dialog('var(--gph-blue)', [head, bal, pkgLabel, chips, totalRow, goPkg, foot]), 'var(--gph-blue)');
+                var aiRows = customAmt ? [head, bal, pkgLabel, chips, customAmt, totalRow, goPkg, foot] : [head, bal, pkgLabel, chips, totalRow, goPkg, foot];
+                mount(dialog('var(--gph-blue)', aiRows), 'var(--gph-blue)');
                 return;
             }
             var amtLabel = el('div', 'gdc-tp-label', 'How many tokens would you like?');
