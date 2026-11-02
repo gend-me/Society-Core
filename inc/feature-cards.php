@@ -145,7 +145,14 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         .gs-fc-status { position: absolute; top: 16px; right: 16px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; z-index: 10; backdrop-filter: blur(10px); }
         .gs-fc-status.active { background: rgba(16, 185, 129, 0.8); color: #fff; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4); }
         .gs-fc-status.inactive { background: rgba(20, 24, 34, 0.8); color: var(--gs-muted); border: 1px solid rgba(255,255,255,0.1); }
+        .gs-fc-status.locked { background: rgba(32, 24, 64, 0.88); color: #d9c9ff; border: 1px solid rgba(183,156,255,0.45); }
+        .gs-fc-need { margin: -12px 0 16px 0; font-size: 0.82rem; color: #c4b5fd; }
+        .gs-fc-plans { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .gs-fc-plans .gs-buy { width: 100%; }
     </style>';
+    if (function_exists('gend_society_plan_buy_assets')) {
+        gend_society_plan_buy_assets();
+    }
 
     // 111-12 (MIG-15): after Live the origin's cards for what now runs on the new site read the hub's list (no local state).
     $gs_fc_moved = function_exists('gend_society_origin_moved') ? gend_society_origin_moved() : array('moved' => false, 'to' => '');
@@ -176,6 +183,10 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         // entry name gs_hosting_collect_codebase_breakdown() keys its real
         // disk-walk results by - falls back to the plugin file itself for
         // the rare single-file-plugin case (no subdirectory).
+        $gs_fc_plan      = function_exists('gend_society_feature_plan_status') ? gend_society_feature_plan_status((string) $slug) : array('state' => 'unknown', 'unlock_plan' => null, 'upgrades' => array(), 'vm_state' => 'not_connected', 'plan_is_free' => false);
+        $gs_fc_installed = file_exists(WP_PLUGIN_DIR . '/' . $feature['plugin']);
+        // The dashboard plan decides whether a dashboard can be switched on; where the app is hosted does not.
+        $gs_fc_locked    = !$is_active && !$gs_fc_on_new && 'upgrade' === $gs_fc_plan['state'];
         $gs_fc_folder = (strpos($feature['plugin'], '/') !== false) ? dirname($feature['plugin']) : $feature['plugin'];
         $gs_fc_bytes = $gs_fc_sizes[$gs_fc_folder] ?? null;
 
@@ -186,6 +197,10 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             echo '<div class="gs-fc-status active">' . esc_html__('Active on your new site', 'gend-society') . '</div>';
         } elseif ($is_active) {
             echo '<div class="gs-fc-status active">' . esc_html__('Active', 'gend-society') . '</div>';
+        } elseif ($gs_fc_locked) {
+            $gs_fc_need_name = is_array($gs_fc_plan['unlock_plan']) && '' !== (string) $gs_fc_plan['unlock_plan']['name'] ? (string) $gs_fc_plan['unlock_plan']['name'] : __('a dashboard plan', 'gend-society');
+            /* translators: %s: plan name. */
+            echo '<div class="gs-fc-status locked">' . esc_html(sprintf(__('Requires %s', 'gend-society'), $gs_fc_need_name)) . '</div>';
         } else {
             echo '<div class="gs-fc-status inactive">' . esc_html__('Inactive', 'gend-society') . '</div>';
         }
@@ -201,6 +216,8 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         // Update Button - overlaid bottom-right of the image/header section.
         if ($gs_fc_on_new) {
             // 111-12: the plugin runs on the new site; no update control here.
+        } elseif (!$is_active) {
+            // An inactive dashboard has nothing to update: no update control until it is switched on.
         } elseif ($has_update) {
             echo '<button class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update gs-ajax-action" data-action="update" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '" title="Install Update">';
             echo '<span class="dashicons dashicons-update"></span>';
@@ -221,6 +238,10 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             echo '<div class="gs-fc-size"><span class="dashicons dashicons-editor-code"></span>' . esc_html($gs_fc_bytes !== null ? size_format($gs_fc_bytes, 2) : __('Size unavailable', 'gend-society')) . '</div>';
         }
         echo '<p class="gs-fc-desc">' . esc_html($feature['description']) . '</p>';
+        if ($gs_fc_locked) {
+            /* translators: %s: plan name. */
+            echo '<p class="gs-fc-need">' . esc_html(sprintf(__('Included with %s and higher plans.', 'gend-society'), $gs_fc_need_name)) . '</p>';
+        }
 
         // Actions
         echo '<div class="gs-fc-actions">';
@@ -230,6 +251,25 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             echo '<a href="' . esc_url($gs_fc_moved['to']) . '" target="_blank" rel="noopener noreferrer" class="gs-btn gs-btn-secondary gs-fc-btn" data-gs-fc-new-site="1">' . esc_html__('Open on your new site', 'gend-society') . '</a>';
         } elseif ($is_active) {
             echo '<a href="' . esc_url(admin_url('plugins.php')) . '" class="gs-btn gs-btn-secondary gs-fc-btn">' . esc_html__('Manage Plugin', 'gend-society') . '</a>';
+        } elseif ($gs_fc_locked) {
+            echo '<div class="gs-fc-plans">';
+            $gs_fc_first = true;
+            foreach ((array) $gs_fc_plan['upgrades'] as $gs_fc_t) {
+                /* translators: 1: plan name, 2: price. */
+                echo '<button type="button" class="gs-buy' . ($gs_fc_first ? '' : ' gs-buy--ghost') . '" data-gs-buy-plan="1" data-plan-id="' . esc_attr((string) $gs_fc_t['id']) . '">' . esc_html(sprintf(__('Unlock with %1$s', 'gend-society'), $gs_fc_t['name'])) . ' <span style="opacity:.75;font-weight:600">' . esc_html($gs_fc_t['price_label']) . '</span>' . '</button>';
+                $gs_fc_first = false;
+                break; // one button: the plan that unlocks it (the banner above lists every plan)
+            }
+            if ($gs_fc_first) {
+                echo '<button type="button" class="gs-buy" data-gs-goto-dashboards="1">' . esc_html__('See the plans', 'gend-society') . '</button>';
+            }
+            echo '</div>';
+        } elseif ('unknown' === $gs_fc_plan['state'] && 'not_connected' === $gs_fc_plan['vm_state']) {
+            $gs_fc_connect = function_exists('gend_society_connect_url') ? gend_society_connect_url() : admin_url('index.php');
+            echo '<a class="gs-buy gs-fc-btn" href="' . esc_url($gs_fc_connect) . '">' . esc_html__('Connect to unlock', 'gend-society') . '</a>';
+        } elseif (!$gs_fc_installed) {
+            // Included with the plan but the plugin is not on this site yet: the install-and-activate workflow handles it.
+            echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="install" data-feature="' . esc_attr((string) $slug) . '" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Install and activate', 'gend-society') . '</button>';
         } else {
             echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';
         }

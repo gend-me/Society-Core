@@ -2478,6 +2478,8 @@ function gend_society_render_membership_panel( $payload = null ) {
             $gs_default_tab = 'hosting';
         }
         ?>
+        <?php // Free plan: a banner to unlock the dashboards (each plan has an info button that opens Storage > Codebase > Dashboards).
+              if ( function_exists( 'gend_society_unlock_banner_html' ) ) { echo gend_society_unlock_banner_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built. ?>
         <div class="gs-mship-tabs">
             <div class="gs-mship-tabs-nav" role="tablist">
                 <?php if ( $gs_can_manage ) : ?>
@@ -3283,7 +3285,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                         right.className = 'gs-plan-picker__card-price';
                         right.textContent = p.price_label || '';
                     }
+                    var info = document.createElement('span');
+                    info.className = 'gs-unlock__info';
+                    info.setAttribute('role', 'button');
+                    info.setAttribute('tabindex', '0');
+                    info.setAttribute('data-gs-goto-dashboards', '1');
+                    info.title = 'See what the dashboards include';
+                    info.textContent = 'i';
                     card.appendChild(left);
+                    if (planParams.resource === undefined) { card.appendChild(info); }
                     card.appendChild(right);
                     card.addEventListener('click', function () {
                         if (card.disabled) return;

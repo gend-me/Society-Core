@@ -537,6 +537,7 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 			'tiers'           => array(),
 			'matrix'          => array(),
 			'after_migration' => array(),
+			'features'        => array(), // feature slug => { slug, name, area, state included|upgrade, unlock_plan }
 			'change_plan_url' => '',
 			'hub_origin'      => gend_society_plan_hub_origin(),
 			'install_id'      => gend_society_plan_identity()['install_id'],
@@ -624,10 +625,10 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 			}
 			$slug     = sanitize_key( (string) $a['slug'] );
 			$delivery = 'hub_embed' === ( $a['delivery'] ?? '' ) ? 'hub_embed' : 'container_only';
-			$state    = (string) ( $a['state'] ?? '' );
-			if ( 'container_only' === $delivery ) {
-				$state = 'after_migration';
-			} elseif ( ! in_array( $state, array( 'included', 'upgrade', 'after_migration' ), true ) ) {
+			// The dashboard plan alone decides an area; where the app is hosted does not. A hub that still answers
+			// 'after_migration' (older builds) is read as an upgrade.
+			$state = (string) ( $a['state'] ?? '' );
+			if ( ! in_array( $state, array( 'included', 'upgrade' ), true ) ) {
 				$state = 'upgrade';
 			}
 			$vm['areas'][] = array(
@@ -639,6 +640,27 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 				'features'    => gend_society_plan_strings( $a['features'] ?? array() ),
 				// 109-30 (D29): the gs-hub-<area> pages are gone; included hub areas open on gend.me (Integration Hub card).
 				'admin_url'   => '',
+			);
+		}
+
+		// --- features (plugin dashboards): the catalogue's area decides each one, through the area state above
+		$area_by_slug = array();
+		foreach ( $vm['areas'] as $a_row ) {
+			$area_by_slug[ $a_row['slug'] ] = $a_row;
+		}
+		foreach ( (array) ( $cat['features'] ?? array() ) as $ft ) {
+			if ( ! is_array( $ft ) || empty( $ft['slug'] ) ) {
+				continue;
+			}
+			$fslug  = sanitize_key( (string) $ft['slug'] );
+			$farea  = sanitize_key( (string) ( $ft['area'] ?? '' ) );
+			$fstate = isset( $area_by_slug[ $farea ] ) ? ( 'included' === $area_by_slug[ $farea ]['state'] ? 'included' : 'upgrade' ) : 'unknown';
+			$vm['features'][ $fslug ] = array(
+				'slug'        => $fslug,
+				'name'        => (string) ( $ft['name'] ?? $fslug ),
+				'area'        => $farea,
+				'state'       => $fstate,
+				'unlock_plan' => 'upgrade' === $fstate ? gend_society_plan_unlock( $ft['unlock_plan'] ?? ( $area_by_slug[ $farea ]['unlock_plan'] ?? null ), $tiers ) : null,
 			);
 		}
 
@@ -786,3 +808,200 @@ if ( ! function_exists( 'gend_society_plan_refresh_ajax' ) ) {
 	}
 }
 add_action( 'wp_ajax_gend_society_plan_refresh', 'gend_society_plan_refresh_ajax' );
+
+if ( ! function_exists( 'gend_society_feature_plan_status' ) ) {
+	/**
+	 * What the dashboard plan says about one feature (plugin dashboard), from the cached plan view-model. The plan decides
+	 * it; where the app is hosted does not.
+	 *
+	 * @param string $feature Feature slug (wireframe, blog, email, store, sales, projects, social, membership, rewards).
+	 * @return array{state:string,unlock_plan:?array,plan_is_free:bool,upgrades:array,vm_state:string}
+	 *               state: included | upgrade | unknown (not connected / catalogue not loaded).
+	 *               upgrades: tiers that include the feature and can be bought now: {id, slug, name, price_label}.
+	 */
+	function gend_society_feature_plan_status( string $feature ): array {
+		$out = array(
+			'state'        => 'unknown',
+			'unlock_plan'  => null,
+			'plan_is_free' => false,
+			'upgrades'     => array(),
+			'vm_state'     => 'not_connected',
+		);
+		if ( '' === (string) get_option( 'gend_society_install_token', '' ) || ! function_exists( 'gend_society_plan_view_model' ) ) {
+			return $out;
+		}
+		$vm                  = gend_society_plan_view_model();
+		$out['vm_state']     = (string) ( $vm['state'] ?? 'unreachable' );
+		$out['plan_is_free'] = ! empty( $vm['plan']['is_free'] );
+		$ft                  = $vm['features'][ sanitize_key( $feature ) ] ?? null;
+		if ( ! is_array( $ft ) ) {
+			return $out;
+		}
+		$out['state']       = (string) $ft['state'];
+		$out['unlock_plan'] = $ft['unlock_plan'];
+		if ( 'upgrade' === $ft['state'] ) {
+			$out['upgrades'] = gend_society_plan_upgrade_tiers( $vm, is_array( $ft['unlock_plan'] ) ? $ft['unlock_plan'] : null );
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists( 'gend_society_plan_upgrade_tiers' ) ) {
+	/**
+	 * Tiers that include something, and can be bought now: the unlock plan and every higher one.
+	 *
+	 * @param array      $vm     gend_society_plan_view_model() result.
+	 * @param array|null $unlock {id, slug, name} of the plan that unlocks it (null = every buyable tier).
+	 * @return array<int, array{id:int,slug:string,name:string,price_label:string}>
+	 */
+	function gend_society_plan_upgrade_tiers( array $vm, ?array $unlock ): array {
+		$need = 0;
+		foreach ( (array) ( $vm['tiers'] ?? array() ) as $t ) {
+			if ( is_array( $unlock ) && ( ( (int) $unlock['id'] > 0 && (int) $t['id'] === (int) $unlock['id'] ) || ( '' !== (string) $unlock['slug'] && (string) $t['slug'] === (string) $unlock['slug'] ) ) ) {
+				$need = (int) $t['rank'];
+			}
+		}
+		$out = array();
+		foreach ( (array) ( $vm['tiers'] ?? array() ) as $t ) {
+			if ( ! empty( $t['checkout_allowed'] ) && (int) $t['rank'] >= max( 1, $need ) ) {
+				$out[] = array(
+					'id'          => (int) $t['id'],
+					'slug'        => (string) $t['slug'],
+					'name'        => (string) $t['name'],
+					'price_label' => (string) $t['price_label'],
+				);
+			}
+		}
+		return $out;
+	}
+}
+
+if ( ! function_exists( 'gend_society_plan_buy_assets' ) ) {
+	/**
+	 * Styles and the two small behaviours the plan UI shares, printed once per page:
+	 *  - [data-gs-buy-plan][data-plan-id]  asks gend.me for that plan's checkout (the membership change-plan route) and opens it;
+	 *  - [data-gs-goto-dashboards]         opens Storage > Codebase > Dashboards and scrolls down to it (from another admin page it
+	 *                                      loads the dashboard with that target).
+	 * No double ampersand in the inline script: content filters rewrite it.
+	 */
+	function gend_society_plan_buy_assets(): void {
+		static $done = false;
+		if ( $done ) {
+			return;
+		}
+		$done = true;
+		$ajax  = admin_url( 'admin-ajax.php' );
+		$nonce = wp_create_nonce( 'gs_membership_action' );
+		$dash  = admin_url( 'index.php' );
+		?>
+<style>
+.gs-unlock { display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap; margin: 0 0 26px; padding: 22px 26px; border-radius: 22px; border: 1px solid rgba(183,156,255,.35); background: radial-gradient(600px 220px at 0% 0%, rgba(122,167,255,.16), transparent 70%), linear-gradient(165deg, rgba(30,34,70,.85), rgba(12,16,34,.82)); box-shadow: 0 30px 70px -36px rgba(80,90,255,.55), inset 0 1px 0 rgba(255,255,255,.07); color: #e8eefb; }
+.gs-unlock__text { flex: 1 1 320px; min-width: 0; }
+.gs-unlock__title { margin: 0 0 6px; font-size: 1.25rem; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+.gs-unlock__sub { margin: 0; font-size: .9rem; line-height: 1.55; color: #a9b6d0; }
+.gs-unlock__plans { display: flex; gap: 10px; flex-wrap: wrap; }
+.gs-unlock__plan { display: flex; align-items: center; gap: 10px; padding: 8px 8px 8px 16px; border-radius: 999px; border: 1px solid rgba(148,163,184,.26); background: rgba(255,255,255,.05); }
+.gs-unlock__plan-name { display: block; font-weight: 700; font-size: .85rem; color: #fff; line-height: 1.2; }
+.gs-unlock__plan-price { display: block; font-size: .72rem; color: #8c9bb5; }
+.gs-unlock__info { width: 30px; height: 30px; border-radius: 50%; border: 1px solid rgba(148,163,184,.35); background: transparent; color: #c4d6ff; font-weight: 700; font-size: .8rem; cursor: pointer; display: inline-flex; align-items: center; justify-content: center; }
+.gs-unlock__info:hover, .gs-unlock__info:focus { border-color: rgba(122,167,255,.8); color: #fff; outline: none; }
+.gs-buy { border: 0; border-radius: 999px; padding: 9px 18px; font-size: .74rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #fff; cursor: pointer; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: transform .2s ease, filter .2s ease; }
+.gs-buy:hover, .gs-buy:focus { transform: translateY(-1px); filter: brightness(1.08); color: #fff; outline: none; }
+.gs-buy[disabled] { opacity: .6; cursor: progress; transform: none; }
+.gs-buy--ghost { background: rgba(255,255,255,.06); box-shadow: none; border: 1px solid rgba(148,163,184,.3); color: #e8eefb; }
+</style>
+<script>
+(function () {
+    if (window.gsPlanUiBound) { return; }
+    window.gsPlanUiBound = true;
+    var AJAX = <?php echo wp_json_encode( $ajax ); ?>, NONCE = <?php echo wp_json_encode( $nonce ); ?>, DASH = <?php echo wp_json_encode( $dash ); ?>;
+    function say(msg, title) {
+        if (window.gsDialog) { window.gsDialog.alert(msg, { title: title || 'Notice' }); } else { window.alert(msg); }
+    }
+    function goDashboards() {
+        var root = document.getElementById('gs-mship-root');
+        var tab = root ? root.querySelector('.gs-mship-tab-btn[data-tab="hosting"]') : null;
+        if (!tab) { window.location.href = DASH + '?gs_tab=hosting&gs_goto=dashboards'; return; }
+        tab.click();
+        var hr = document.getElementById('gs-hosting-root-hosting');
+        var cb = hr ? hr.querySelector('.gs-hosting__nav[data-section="codebase"]') : null;
+        if (cb) { cb.click(); }
+        var sub = root.querySelector('[data-gs-codebase-tab="dashboards"]');
+        if (sub) { sub.click(); }
+        setTimeout(function () {
+            var target = root.querySelector('[data-gs-codebase-panel="dashboards"]') || hr;
+            if (target) { if (target.scrollIntoView) { target.scrollIntoView({ behavior: 'smooth', block: 'start' }); } }
+        }, 160);
+    }
+    window.gsGotoDashboards = goDashboards;
+    document.addEventListener('click', function (e) {
+        var g = e.target.closest ? e.target.closest('[data-gs-goto-dashboards]') : null;
+        if (g) { e.preventDefault(); e.stopPropagation(); goDashboards(); return; }
+        var b = e.target.closest ? e.target.closest('[data-gs-buy-plan]') : null;
+        if (!b) { return; }
+        e.preventDefault();
+        var id = b.getAttribute('data-plan-id') || '';
+        if (!id || b.disabled) { return; }
+        var label = b.textContent;
+        b.disabled = true; b.textContent = 'Opening checkout...';
+        var fd = new FormData();
+        fd.append('action', 'gend_society_membership_change_plan'); fd.append('nonce', NONCE); fd.append('plan_id', id);
+        fetch(AJAX, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (r) { return r.json(); }).then(function (j) {
+            var url = j ? (j.data ? j.data.checkout_url : '') : '';
+            if (!j || !j.success || !url) { var m = j ? (j.data ? j.data.message : '') : ''; throw new Error(m ? m : 'Could not start the checkout. Please try again.'); }
+            window.location.href = url;
+        }).catch(function (err) {
+            b.disabled = false; b.textContent = label;
+            say(err.message, 'Could not open the checkout');
+        });
+    }, true);
+    try {
+        var q = new URLSearchParams(window.location.search);
+        if (q.get('gs_goto') === 'dashboards') { window.addEventListener('load', function () { setTimeout(goDashboards, 400); }); }
+    } catch (e) {}
+})();
+</script>
+		<?php
+	}
+}
+
+if ( ! function_exists( 'gend_society_unlock_banner_html' ) ) {
+	/**
+	 * The "Unlock features and dashboards" banner for a connected install on the Free plan ('' for a paid plan, an
+	 * unconnected install, or when the plan data is not available). Each buyable plan has an info button that opens
+	 * Storage > Codebase > Dashboards and an Upgrade button that opens that plan's checkout.
+	 */
+	function gend_society_unlock_banner_html(): string {
+		if ( '' === (string) get_option( 'gend_society_install_token', '' ) || ! function_exists( 'gend_society_plan_view_model' ) || ! current_user_can( 'manage_options' ) ) {
+			return '';
+		}
+		$vm = gend_society_plan_view_model();
+		if ( 'ok' !== ( $vm['state'] ?? '' ) || empty( $vm['plan']['is_free'] ) ) {
+			return '';
+		}
+		$tiers = gend_society_plan_upgrade_tiers( $vm, null );
+		ob_start();
+		gend_society_plan_buy_assets();
+		?>
+<div class="gs-unlock" data-gs-unlock-banner="1" role="region" aria-label="<?php esc_attr_e( 'Unlock features and dashboards', 'gend-society' ); ?>">
+	<div class="gs-unlock__text">
+		<h3 class="gs-unlock__title"><?php esc_html_e( 'Unlock features and dashboards', 'gend-society' ); ?></h3>
+		<p class="gs-unlock__sub"><?php esc_html_e( 'Your Free plan keeps this site connected to gend.me. A dashboard plan unlocks the dashboards below and installs and activates them on this site for you.', 'gend-society' ); ?></p>
+	</div>
+	<div class="gs-unlock__plans">
+		<?php foreach ( $tiers as $t ) : ?>
+		<div class="gs-unlock__plan">
+			<span><span class="gs-unlock__plan-name"><?php echo esc_html( $t['name'] ); ?></span><span class="gs-unlock__plan-price"><?php echo esc_html( $t['price_label'] ); ?></span></span>
+			<button type="button" class="gs-unlock__info" data-gs-goto-dashboards="1" title="<?php esc_attr_e( 'See what the dashboards include', 'gend-society' ); ?>" aria-label="<?php echo esc_attr( sprintf( /* translators: %s: plan name. */ __( 'What %s includes', 'gend-society' ), $t['name'] ) ); ?>">i</button>
+			<button type="button" class="gs-buy" data-gs-buy-plan="1" data-plan-id="<?php echo esc_attr( (string) $t['id'] ); ?>"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></button>
+		</div>
+		<?php endforeach; ?>
+		<?php if ( ! $tiers ) : ?>
+		<button type="button" class="gs-buy gs-buy--ghost" data-gs-goto-dashboards="1"><?php esc_html_e( 'See the dashboards', 'gend-society' ); ?></button>
+		<?php endif; ?>
+	</div>
+</div>
+		<?php
+		return (string) ob_get_clean();
+	}
+}
