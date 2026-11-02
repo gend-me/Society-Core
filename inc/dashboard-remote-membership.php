@@ -2119,7 +2119,7 @@ function gend_society_render_membership_panel( $payload = null ) {
 <?php /* Phase 109-29: standalone UPGRADE opens gend.me's own Change Plan page (membership_url + ?ui=embed&plan_only=1&group=dashboard) in a popup (D14); control lines at column 0 keep hub/container output byte-identical. */ ?>
 <?php if ( $gs_sa ) : ?>
 <?php if ( '' !== $gs_sa_change ) : ?>
-                            <a class="gs-mship-action-btn gs-dash-sa-upgrade" data-gs-popup href="<?php echo esc_url( $gs_sa_change ); ?>" target="_blank" rel="opener"><?php esc_html_e( 'Upgrade', 'gend-society' ); ?></a>
+                            <a class="gs-mship-action-btn gs-dash-sa-upgrade" data-gs-popup href="<?php echo esc_url( $gs_sa_change ); ?>" target="_blank" rel="opener"><?php echo esc_html( function_exists( 'gend_society_plan_change_label' ) ? gend_society_plan_change_label() : __( 'Upgrade', 'gend-society' ) ); ?></a>
 <?php endif; ?>
 <?php else : ?>
                             <button type="button" class="gs-mship-action-btn" data-gs-mship="upgrade-plan" data-group="dashboard" style="display: block; width: 100%; max-width: 420px; margin: 12px auto 0;" aria-expanded="false" aria-controls="gs-plan-picker-membership-top">

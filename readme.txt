@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.9.2
+Stable tag: 1.9.3
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,14 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.9.3 =
+<!-- @build-strip-begin wporg -->
+* Change: the plan button on the dashboard reads Downgrade on the highest plan (there is nothing above it), Change plan during the 7-day trial, and Upgrade otherwise.
+<!-- @build-strip-end wporg -->
+<!-- @build-only-begin wporg -->
+* Maintenance release.
+<!-- @build-only-end wporg -->
 
 = 1.9.2 =
 <!-- @build-strip-begin wporg -->
