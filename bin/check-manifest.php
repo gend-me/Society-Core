@@ -46,7 +46,7 @@ $gs_err    = function ( $msg ) use ( &$gs_errors ) {
 };
 
 $gs_valid_tiers = array( 'core', 'customer', 'container', 'hub', 'updater' );
-$gs_valid_needs = array( 'bp', 'wu', 'paired', 'skin', 'admin', 'standalone' );
+$gs_valid_needs = array( 'bp', 'wu', 'paired', 'skin', 'admin', 'standalone', 'plan_ui' );
 
 $gs_manifest_file = $gs_root . '/inc/bootstrap/manifest.php';
 if ( ! is_file( $gs_manifest_file ) ) {

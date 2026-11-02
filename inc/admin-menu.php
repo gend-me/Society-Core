@@ -309,6 +309,19 @@ function gend_society_suppress_plugin_menus()
         unset($submenu['index.php']);
     }
 
+    // Customers' sub-sites on the hub: the hub's own tools (Cloaked Links, OAuth Server, the WP Ultimo Account and
+    // My Sites pages) belong to the gend.me main site only.
+    if (function_exists('gend_society_runtime_mode') && 'hub' === gend_society_runtime_mode() && is_multisite() && !is_main_site() && !is_super_admin()) {
+        $gs_hub_only_titles = array('Cloaked Links', 'OAuth Server', 'Account', 'My Sites');
+        foreach ($menu as $gs_pos => $gs_item) {
+            $gs_title = trim(html_entity_decode(wp_strip_all_tags((string) preg_replace('/<span.*?<\/span>/s', '', (string) ($gs_item[0] ?? ''))), ENT_QUOTES, 'UTF-8'), " \t\r\n\xC2\xA0");
+            $gs_slug  = (string) ($gs_item[2] ?? '');
+            if (in_array($gs_title, $gs_hub_only_titles, true) || in_array($gs_slug, array('wo_manage_clients', 'account', 'sites'), true)) {
+                unset($menu[$gs_pos], $submenu[$gs_slug]);
+            }
+        }
+    }
+
     // Slugs GenD Society owns — everything else gets removed
     $gs_owned = [
         'index.php',

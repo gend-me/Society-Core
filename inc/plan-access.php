@@ -29,6 +29,29 @@ if ( ! defined( 'ABSPATH' ) ) {
 	exit;
 }
 
+if ( ! function_exists( 'gend_society_plan_launch_membership_id' ) ) {
+	/**
+	 * Membership id when this is a sub-site launched from gend.me/launch (hub mode, the signed-in owner), else 0.
+	 * Such a site is not paired by token: the hub answers its dashboard in-process (gdc_launch_inprocess_request()),
+	 * so it shows the same plan UI as a connected install.
+	 */
+	function gend_society_plan_launch_membership_id(): int {
+		static $cache = null;
+		if ( null !== $cache ) {
+			return $cache;
+		}
+		$cache = 0;
+		if ( ! function_exists( 'gdc_launch_inprocess_request' ) || ! function_exists( 'gend_society_dashboard_get_membership' ) || ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+			return $cache;
+		}
+		$m = gend_society_dashboard_get_membership();
+		if ( $m && is_object( $m ) && method_exists( $m, 'get_id' ) && ( ! method_exists( $m, 'get_meta' ) || '' === (string) $m->get_meta( 'gdc_install_id' ) ) ) {
+			$cache = (int) $m->get_id();
+		}
+		return $cache;
+	}
+}
+
 if ( ! function_exists( 'gend_society_plan_identity' ) ) {
 	/**
 	 * The pairing this install holds: install id, token and hub base URL ('' when missing).
@@ -36,6 +59,14 @@ if ( ! function_exists( 'gend_society_plan_identity' ) ) {
 	 * @return array{install_id:string,token:string,base:string}
 	 */
 	function gend_society_plan_identity(): array {
+		$launch = gend_society_plan_launch_membership_id();
+		if ( $launch > 0 ) {
+			return array(
+				'install_id' => 'launch-' . $launch,
+				'token'      => 'in-process',
+				'base'       => untrailingslashit( network_home_url() ),
+			);
+		}
 		return array(
 			'install_id' => (string) get_option( 'gend_society_install_id', '' ),
 			'token'      => (string) get_option( 'gend_society_install_token', '' ),
@@ -180,6 +211,23 @@ if ( ! function_exists( 'gend_society_plan_hub_get' ) ) {
 			'status'  => 0,
 			'source'  => 'none',
 		);
+		$launch = gend_society_plan_launch_membership_id();
+		if ( $launch > 0 ) {
+			static $launch_routes = array();
+			if ( ! isset( $launch_routes[ $route ] ) || $force ) {
+				$launch_routes[ $route ] = gdc_launch_inprocess_request( $launch, 'GET', $route );
+			}
+			$r = $launch_routes[ $route ];
+			if ( is_wp_error( $r ) ) {
+				$out['state'] = 'unreachable';
+				return $out;
+			}
+			$out['state']   = 'ok';
+			$out['payload'] = $r;
+			$out['status']  = 200;
+			$out['source']  = 'fetch';
+			return $out;
+		}
 		$id = gend_society_plan_identity();
 		if ( '' === $id['install_id'] || '' === $id['token'] || '' === $id['base'] ) {
 			return $out;
@@ -864,7 +912,7 @@ if ( ! function_exists( 'gend_society_feature_plan_status' ) ) {
 			'upgrades'     => array(),
 			'vm_state'     => 'not_connected',
 		);
-		if ( '' === (string) get_option( 'gend_society_install_token', '' ) || ! function_exists( 'gend_society_plan_view_model' ) ) {
+		if ( ( '' === (string) get_option( 'gend_society_install_token', '' ) && gend_society_plan_launch_membership_id() <= 0 ) || ! function_exists( 'gend_society_plan_view_model' ) ) {
 			return $out;
 		}
 		$vm                  = gend_society_plan_view_model();
@@ -1069,7 +1117,7 @@ if ( ! function_exists( 'gend_society_unlock_banner_html' ) ) {
 	 * Storage > Codebase > Dashboards and an Upgrade button that opens that plan's checkout.
 	 */
 	function gend_society_unlock_banner_html(): string {
-		if ( '' === (string) get_option( 'gend_society_install_token', '' ) || ! function_exists( 'gend_society_plan_view_model' ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ( '' === (string) get_option( 'gend_society_install_token', '' ) && gend_society_plan_launch_membership_id() <= 0 ) || ! function_exists( 'gend_society_plan_view_model' ) || ! current_user_can( 'manage_options' ) ) {
 			return '';
 		}
 		$vm = gend_society_plan_view_model();
@@ -1110,7 +1158,7 @@ if ( ! function_exists( 'gend_society_trial_banner_html' ) ) {
 	 * "Payment due". '' outside a trial, for an unconnected install, or for visitors who cannot manage the site.
 	 */
 	function gend_society_trial_banner_html(): string {
-		if ( '' === (string) get_option( 'gend_society_install_token', '' ) || ! function_exists( 'gend_society_plan_view_model' ) || ! current_user_can( 'manage_options' ) ) {
+		if ( ( '' === (string) get_option( 'gend_society_install_token', '' ) && gend_society_plan_launch_membership_id() <= 0 ) || ! function_exists( 'gend_society_plan_view_model' ) || ! current_user_can( 'manage_options' ) ) {
 			return '';
 		}
 		$vm = gend_society_plan_view_model();

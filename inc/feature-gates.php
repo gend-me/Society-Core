@@ -373,6 +373,13 @@ function gend_society_features_enforce_redirect() {
  */
 function gend_society_features_get_cached() {
 
+    // A sub-site launched from gend.me/launch: the hub answers its plan in-process (inc/plan-access.php), so the plan's
+    // areas gate its menu pages like a connected install's.
+    if ( function_exists( 'gend_society_plan_launch_membership_id' ) && gend_society_plan_launch_membership_id() > 0 && function_exists( 'gend_society_plan_features' ) ) {
+        $plan = gend_society_plan_features();
+        return is_array( $plan['payload'] ) ? $plan['payload'] : null;
+    }
+
     // Phase 109 (D10): a connected standalone install reads through the conditional (ETag / 304) fetch in
     // inc/plan-access.php, which keeps this same option cache. Hub and container are unchanged.
     if ( function_exists( 'gend_society_plan_features' ) && function_exists( 'gend_society_runtime_mode' ) && 'standalone' === gend_society_runtime_mode() ) {

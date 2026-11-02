@@ -718,7 +718,7 @@ return array(
 		array(
 			'file'  => 'inc/plan-access.php',
 			'tier'  => 'customer',
-			'needs' => array( 'standalone', 'paired' ),
+			'needs' => array( 'plan_ui' ),
 			'note'  => 'Phase 109: plan/feature data layer, ETag fetches, gend.me Change Plan URL. Standalone, connected only.',
 		),
 		array(

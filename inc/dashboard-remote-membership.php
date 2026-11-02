@@ -354,6 +354,7 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
             'choose_url' => '',
             'learn_url'  => gend_society_dashboard_standalone_action_url( 'membership' ),
             'plan'       => '',
+            'moved'      => false,
         );
         if ( 'not_connected' === $bk['state'] ) {
             $v['badge'] = __( 'Not connected', 'gend-society' );
@@ -363,11 +364,18 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
             $v['text']  = 'revoked' === $bk['state']
                 ? __( 'gend.me no longer accepts this site\'s connection. Reconnect to see backups.', 'gend-society' )
                 : __( 'Could not reach gend.me. Backups will show again once it answers.', 'gend-society' );
-        } elseif ( $v['hosted'] ) {
+        } else {
+            // The plan belongs to the membership, so it is shown (and can be changed) wherever the site runs.
             $names       = isset( $p['plan']['names'] ) && is_array( $p['plan']['names'] ) ? array_map( 'strval', $p['plan']['names'] ) : array();
             $v['plan']   = implode( ' + ', $names );
             $v['badge']  = '' !== $v['plan'] ? sprintf( /* translators: %s: Backup plan name. */ __( 'Active: %s', 'gend-society' ), $v['plan'] ) : __( 'No Active Plan', 'gend-society' );
-            $v['text']   = __( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' );
+            if ( $v['hosted'] ) {
+                $v['text'] = __( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' );
+            } elseif ( '' !== $v['plan'] ) {
+                $v['text'] = __( 'Your backup plan is active. Snapshots and Backup now run on gend.me hosting, so they begin once your site runs there; until then your site keeps its own backups.', 'gend-society' );
+            } else {
+                $v['text'] = __( 'Choose a backup plan for daily snapshots and on-demand backups. They run on gend.me hosting, so they begin once your site runs there; until then your site keeps its own backups.', 'gend-society' );
+            }
             $v['choose_url'] = gend_society_dashboard_standalone_url( $p['choose_url'] ?? '' );
         }
         // The site now lives on gend.me hosting (Live): this original copy keeps no backups of its own to promise, so say where they are.
@@ -375,8 +383,10 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
         if ( ! empty( $moved['moved'] ) ) {
             $v['hosted']     = false;
             $v['backup_now'] = false;
-            $v['badge']      = __( 'Moved', 'gend-society' );
-            $v['text']       = __( 'Backups now run on your new site on gend.me hosting. Open your new site to manage them.', 'gend-society' );
+            $v['moved']      = true;
+            $v['text']       = '' !== $v['plan']
+                ? __( 'Your backup plan is active and now runs on your new site on gend.me hosting. Open your new site to manage backups.', 'gend-society' )
+                : __( 'Backups now run on your new site on gend.me hosting. Choose a plan here or open your new site to manage them.', 'gend-society' );
             $v['learn_url']  = (string) $moved['to'];
         }
         return $v;
@@ -413,6 +423,17 @@ if ( ! function_exists( 'gend_society_email_plan_env' ) ) {
         );
         if ( $sa ) {
             $env['learn_url'] = function_exists( 'gend_society_dashboard_standalone_action_url' ) ? gend_society_dashboard_standalone_action_url( 'membership' ) : '';
+            // The Emails plans belong to the membership: read them from gend.me's /membership answer (hosting_plans.emails).
+            $mc = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+            $hp = ( is_array( $mc ) && is_array( $mc['hosting_plans']['emails'] ?? null ) ) ? $mc['hosting_plans']['emails'] : array();
+            foreach ( array( 'storage', 'sending' ) as $kind ) {
+                if ( ! empty( $hp['current'][ $kind ]['name'] ) ) {
+                    $env['current'][ $kind ] = array( 'id' => (int) ( $hp['current'][ $kind ]['id'] ?? 0 ), 'name' => (string) $hp['current'][ $kind ]['name'] );
+                }
+            }
+            if ( $hp && function_exists( 'gend_society_dashboard_standalone_url' ) ) {
+                $env['choose_url'] = gend_society_dashboard_standalone_url( $hp['choose_url'] ?? '' );
+            }
             return $env;
         }
 
@@ -521,6 +542,7 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
             'cta'         => null,
             'cta_label'   => '',
             'learn_url'   => '',
+            'learn_label' => __( 'Learn more', 'gend-society' ),
             'manage_url'  => (string) ( $env['manage_url'] ?? '' ),
         );
 
@@ -531,20 +553,20 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
                 $v['badge'] = __( 'Not connected', 'gend-society' );
                 $v['text']  = __( 'Connect to gend.me to see email hosting. Your site keeps sending mail its own way until you move it to gend.me hosting.', 'gend-society' );
             } else {
-                $v['state']     = 'after_migration';
-                $v['badge']     = __( 'After migration', 'gend-society' );
-                $v['text']      = __( 'Email hosting runs on gend.me hosting. Your site keeps sending mail its own way until you move it.', 'gend-society' );
                 $v['learn_url'] = (string) ( $env['learn_url'] ?? '' );
                 $moved           = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+                $v['text']      .= ' ' . ( ! empty( $moved['moved'] )
+                    ? __( 'Your mail now goes out from your new site on gend.me hosting, under this plan.', 'gend-society' )
+                    : __( 'Mail goes out through gend.me once your site runs on gend.me hosting; until then your site keeps sending mail its own way.', 'gend-society' ) );
                 if ( ! empty( $moved['moved'] ) ) {
-                    // Live elsewhere: mail now goes out from the new site, so this copy no longer "keeps sending mail its own way".
-                    $v['badge']     = __( 'Moved', 'gend-society' );
-                    $v['text']      = __( 'Email hosting now runs on your new site on gend.me hosting. Open your new site to manage it.', 'gend-society' );
-                    $v['learn_url'] = (string) $moved['to'];
+                    $v['learn_url']   = (string) $moved['to'];
+                    $v['learn_label'] = __( 'Open your new site', 'gend-society' );
                 }
             }
             $v['manage_url'] = '';
-            return $v;
+            if ( 'not_connected' === $v['state'] ) {
+                return $v;
+            }
         }
 
         $plans   = is_array( $env['plans'] ?? null ) ? $env['plans'] : array();
@@ -559,7 +581,7 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
         }
         $active = ! empty( $names ) || ( $st && isset( $st['free'] ) && ! $st['free'] );
 
-        if ( empty( $plans ) && ! $st ) {
+        if ( empty( $plans ) && ! $st && 'standalone' !== $mode ) {
             $v['state']       = 'no_plans';
             $v['badge']       = __( 'No Email Plans Configured', 'gend-society' );
             $v['badge_class'] = 'is-neutral';
@@ -582,6 +604,10 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
             $v['cta'] = array( 'type' => 'popup', 'url' => (string) $env['choose_url'] );
         }
         $v['cta_label'] = $active ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' );
+        if ( 'standalone' === $mode ) {
+            $v['cta']        = '' !== (string) ( $env['choose_url'] ?? '' ) ? array( 'type' => 'popup', 'url' => (string) $env['choose_url'] ) : null;
+            $v['manage_url'] = '';
+        }
 
         $free_gb    = isset( $free['storage_gb'] ) ? (float) $free['storage_gb'] : 1.0;
         $free_sends = isset( $free['sends'] ) ? (int) $free['sends'] : 300;
@@ -814,7 +840,7 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
             <a class="gs-bk-btn gs-bk-btn--cta" data-gs-popup href="<?php echo esc_url( $cta['url'] ); ?>" target="_blank" rel="opener"><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( $v['cta_label'] ); ?></a>
 <?php endif; ?>
 <?php if ( '' !== $v['learn_url'] ) : ?>
-            <a class="gs-bk-btn" href="<?php echo esc_url( $v['learn_url'] ); ?>" target="_blank" rel="noopener"><span class="dashicons dashicons-external"></span><?php esc_html_e( 'Learn more', 'gend-society' ); ?></a>
+            <a class="gs-bk-btn" href="<?php echo esc_url( $v['learn_url'] ); ?>" target="_blank" rel="noopener"><span class="dashicons dashicons-external"></span><?php echo esc_html( $v['learn_label'] ); ?></a>
 <?php endif; ?>
 <?php if ( 'dashboard' === $context && '' !== $v['manage_url'] ) : ?>
             <a class="gs-bk-btn" href="<?php echo esc_url( $v['manage_url'] ); ?>"><span class="dashicons dashicons-email"></span><?php esc_html_e( 'Manage email', 'gend-society' ); ?></a>
@@ -924,6 +950,10 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_local_payload' ) ) {
  * @return array|\WP_Error
  */
 function gend_society_remote_membership_call( string $path, array $body = array(), string $method = 'POST' ) {
+    // Sub-site launched from gend.me/launch: the hub answers in-process (no token, no HTTP).
+    if ( function_exists( 'gend_society_plan_launch_membership_id' ) && gend_society_plan_launch_membership_id() > 0 ) {
+        return gdc_launch_inprocess_request( gend_society_plan_launch_membership_id(), $method, $path, $body );
+    }
     // RUN-01: no gend.me request before the owner consented (always true on hub/container).
     if ( function_exists( 'gend_society_remote_allowed' ) && ! gend_society_remote_allowed( 'membership' ) ) {
         return new WP_Error( 'not_consented', __( 'This site has not been connected to gend.me yet. Press Connect first.', 'gend-society' ) );
@@ -1553,7 +1583,8 @@ function gend_society_render_membership_panel( $payload = null ) {
     $gs_sa_paired  = $gs_sa && gend_society_dashboard_standalone_paired();
     $gs_sa_health  = ( $gs_sa_paired && function_exists( 'gend_society_connection_health_get' ) ) ? (string) gend_society_connection_health_get()['status'] : '';
     $gs_sa_revoked = 'unauthorized' === $gs_sa_health;
-    $gs_sa_change  = ( $gs_sa_paired && ! $gs_sa_revoked && function_exists( 'gend_society_plan_change_plan_url' ) ) ? gend_society_plan_change_plan_url( $payload ) : '';
+    $gs_launch     = function_exists( 'gend_society_plan_launch_membership_id' ) && gend_society_plan_launch_membership_id() > 0;
+    $gs_sa_change  = ( ( $gs_sa_paired && ! $gs_sa_revoked || $gs_launch ) && function_exists( 'gend_society_plan_change_plan_url' ) ) ? gend_society_plan_change_plan_url( $payload ) : '';
     $gs_sa_inherit = ( $gs_sa && 'group' === ( $payload['plan_source'] ?? '' ) && is_array( $payload['inherited_from'] ?? null ) ) ? (string) ( $payload['inherited_from']['group_name'] ?? '' ) : '';
     $gs_sa_connect = $gs_sa_revoked ? __( 'Reconnect', 'gend-society' ) : ( $gs_sa_paired ? __( 'Manage connection', 'gend-society' ) : __( 'Connect to gend.me', 'gend-society' ) );
     // Phase 110-12 (M2): on a connected standalone install the header progress carries Start / Schedule / Cancel /
@@ -2117,7 +2148,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                                 </div>
                             </div>
 <?php /* Phase 109-29: standalone UPGRADE opens gend.me's own Change Plan page (membership_url + ?ui=embed&plan_only=1&group=dashboard) in a popup (D14); control lines at column 0 keep hub/container output byte-identical. */ ?>
-<?php if ( $gs_sa ) : ?>
+<?php if ( $gs_sa || $gs_launch ) : ?>
 <?php if ( '' !== $gs_sa_change ) : ?>
                             <a class="gs-mship-action-btn gs-dash-sa-upgrade" data-gs-popup href="<?php echo esc_url( $gs_sa_change ); ?>" target="_blank" rel="opener"><?php echo esc_html( function_exists( 'gend_society_plan_change_label' ) ? gend_society_plan_change_label() : __( 'Upgrade', 'gend-society' ) ); ?></a>
 <?php endif; ?>
@@ -2438,7 +2469,7 @@ function gend_society_render_membership_panel( $payload = null ) {
 <?php if ( ! empty( $gs_sa_bk['hosted'] ) ) : ?>
                             <button type="button" class="gs-bk-btn" data-gs-hosting-goto="backups"><span class="dashicons dashicons-list-view"></span><?php esc_html_e( 'Manage Backups', 'gend-society' ); ?></button>
 <?php elseif ( '' !== (string) ( $gs_sa_bk['learn_url'] ?? '' ) ) : ?>
-                            <a class="gs-bk-btn" href="<?php echo esc_url( $gs_sa_bk['learn_url'] ); ?>" target="_blank" rel="noopener"><span class="dashicons dashicons-external"></span><?php esc_html_e( 'Learn more', 'gend-society' ); ?></a>
+                            <a class="gs-bk-btn" href="<?php echo esc_url( $gs_sa_bk['learn_url'] ); ?>" target="_blank" rel="noopener"><span class="dashicons dashicons-external"></span><?php echo esc_html( ! empty( $gs_sa_bk['moved'] ) ? __( 'Open your new site', 'gend-society' ) : __( 'Learn more', 'gend-society' ) ); ?></a>
 <?php endif; ?>
 <?php else : ?>
                             <button type="button" class="gs-bk-btn" data-gs-mship="backup-now"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backup now', 'gend-society' ); ?></button>
