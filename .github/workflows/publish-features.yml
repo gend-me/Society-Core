@@ -1,0 +1,149 @@
+name: publish-features
+
+# Publishes signed dashboard-plugin packages to the PRIVATE feature bucket (Phase 114).
+#
+#   manual dispatch only: choose a feature (or all), and the ref of the plugin's own repository (default main).
+#   For each feature: check out its repository -> zip the plugin folder -> sign it (bin/sign-feature.js, Ed25519, the key
+#   pinned in inc/self-update.php) -> upload the versioned zip (never overwritten) -> upload features/<slug>/latest.json LAST
+#   (the manifest is what gend.me hands to a site whose plan includes the feature).
+#
+# gend.me reads this bucket with its own Google identity and gives packages ONLY to installs whose dashboard plan includes the
+# feature; the bucket itself is never public. Sites verify the signature against the pinned keys, so neither this bucket nor
+# gend.me can push unsigned code to a customer site.
+#
+# One-time setup the repository owner does (nothing here reads or prints a secret):
+#   - Actions variable FEATURE_BUCKET   the private bucket name (no gs:// prefix)
+#   - Actions secret   FEATURE_REPOS_TOKEN   a read-only token for the plugin repositories (they are private)
+#   - the Workload Identity principal below needs objectAdmin on the bucket
+# Signing keys are the same secrets the release workflow uses (GEND_UPDATE_SIGNING_KEY / _BACKUP).
+
+on:
+  workflow_dispatch:
+    inputs:
+      feature:
+        description: 'Feature to publish'
+        required: true
+        default: all
+        type: choice
+        options: [all, blog, email, store, sales, projects, social, membership, rewards]
+      ref:
+        description: 'Branch or tag of the plugin repository'
+        required: true
+        default: main
+        type: string
+      key_id:
+        description: 'Signing key id'
+        required: true
+        default: gs-2026a
+        type: choice
+        options: [gs-2026a, gs-2026b]
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.m.outputs.matrix }}
+    steps:
+      - id: m
+        env:
+          WANT: ${{ inputs.feature }}
+        run: |
+          set -euo pipefail
+          all='[
+            {"slug":"blog","repo":"gend-me/Blog-Manager","folder":"blog-manager","plugin":"blog-manager/blog-manager.php"},
+            {"slug":"email","repo":"gend-me/Email-Manager","folder":"email-manager","plugin":"email-manager/email-manager.php"},
+            {"slug":"store","repo":"gend-me/Online-Store","folder":"online-store","plugin":"online-store/online-store.php"},
+            {"slug":"sales","repo":"gend-me/Sales-Team","folder":"sales-team","plugin":"sales-team/advanced-affiliate-system.php"},
+            {"slug":"projects","repo":"gend-me/Remote-Projects","folder":"projects","plugin":"projects/project-service-orders.php"},
+            {"slug":"social","repo":"gend-me/Social-Network","folder":"social-network","plugin":"social-network/social-network.php"},
+            {"slug":"membership","repo":"gend-me/GenD-Blockchain","folder":"contracts-and-payments","plugin":"contracts-and-payments/contracts-and-payments.php"},
+            {"slug":"rewards","repo":"gend-me/Rewards-Programs","folder":"reward-programs","plugin":"reward-programs/reward-programs.php"}
+          ]'
+          if [[ "$WANT" == all ]]; then sel="$all"; else sel="$(jq -c --arg s "$WANT" '[.[] | select(.slug == $s)]' <<< "$all")"; fi
+          [[ "$(jq 'length' <<< "$sel")" -ge 1 ]] || { echo "unknown feature '$WANT'"; exit 1; }
+          echo "matrix=$(jq -c '{include: .}' <<< "$sel")" >> "$GITHUB_OUTPUT"
+
+  publish:
+    needs: plan
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+    concurrency:
+      group: publish-feature-${{ matrix.slug }}
+      cancel-in-progress: false
+    env:
+      KEY_ID: ${{ inputs.key_id }}
+      BUCKET: ${{ vars.FEATURE_BUCKET }}
+    steps:
+      - name: Check configuration
+        run: |
+          set -euo pipefail
+          [[ -n "$BUCKET" ]] || { echo "Actions variable FEATURE_BUCKET is not set"; exit 1; }
+          [[ "$BUCKET" =~ ^[a-z0-9][a-z0-9._-]{2,62}$ ]] || { echo "FEATURE_BUCKET is not a bucket name"; exit 1; }
+          [[ "$KEY_ID" == gs-2026a || "$KEY_ID" == gs-2026b ]] || { echo "unknown key id"; exit 1; }
+
+      - uses: actions/checkout@v4
+        with:
+          path: sc
+
+      - uses: actions/checkout@v4
+        with:
+          repository: ${{ matrix.repo }}
+          ref: ${{ inputs.ref }}
+          token: ${{ secrets.FEATURE_REPOS_TOKEN }}
+          path: work/${{ matrix.folder }}
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Read the version from the plugin header
+        id: ver
+        run: |
+          set -euo pipefail
+          file="work/${{ matrix.plugin }}"
+          [[ -f "$file" ]] || { echo "plugin file ${{ matrix.plugin }} not found in ${{ matrix.repo }}"; exit 1; }
+          ver="$(sed -n 's/^[[:space:]*]*Version:[[:space:]]*\([0-9][0-9.]*\).*/\1/p' "$file" | head -1)"
+          [[ "$ver" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || { echo "version '$ver' is not X.Y.Z"; exit 1; }
+          echo "version=$ver" >> "$GITHUB_OUTPUT"
+
+      - name: Build the package
+        run: |
+          set -euo pipefail
+          cd work
+          zip -qr "../${{ matrix.folder }}.zip" "${{ matrix.folder }}" \
+            -x '*/.git/*' '*/.github/*' '*/node_modules/*' '*/tests/*' '*/.DS_Store' '*/*.map'
+          unzip -l "../${{ matrix.folder }}.zip" | tail -1
+
+      - name: Sign
+        env:
+          GEND_UPDATE_SIGNING_KEY: ${{ env.KEY_ID == 'gs-2026b' && secrets.GEND_UPDATE_SIGNING_KEY_BACKUP || secrets.GEND_UPDATE_SIGNING_KEY }}
+        run: |
+          set -euo pipefail
+          node sc/bin/sign-feature.js --slug "${{ matrix.slug }}" --plugin "${{ matrix.plugin }}" \
+            --version "${{ steps.ver.outputs.version }}" --zip "${{ matrix.folder }}.zip" --out dist --key-id "$KEY_ID" --root sc
+
+      - uses: google-github-actions/auth@v2
+        with:
+          workload_identity_provider: projects/968775684997/locations/global/workloadIdentityPools/github-actions-pool/providers/github
+
+      - uses: google-github-actions/setup-gcloud@v2
+
+      - name: Upload (the manifest goes last)
+        run: |
+          set -euo pipefail
+          dir="dist/features/${{ matrix.slug }}"
+          zip="${{ matrix.slug }}-${{ steps.ver.outputs.version }}.zip"
+          gcloud storage cp --no-clobber "$dir/$zip" "gs://$BUCKET/features/${{ matrix.slug }}/$zip" || true
+          want="$(sha256sum "$dir/$zip" | cut -d' ' -f1)"
+          have="$(gcloud storage cat "gs://$BUCKET/features/${{ matrix.slug }}/$zip" | sha256sum | cut -d' ' -f1)"
+          [[ "$want" == "$have" ]] || { echo "the uploaded package differs from the signed one (a different file already exists for this version)"; exit 1; }
+          gcloud storage cp --cache-control="no-store" "$dir/latest.json" "gs://$BUCKET/features/${{ matrix.slug }}/latest.json"
+          echo "published ${{ matrix.slug }} ${{ steps.ver.outputs.version }}"
