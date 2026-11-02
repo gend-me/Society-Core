@@ -1781,6 +1781,41 @@ function gend_society_render_membership_panel( $payload = null ) {
         #gs-mship-root .gs-mship-action-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; padding: 11px 24px; font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
         #gs-mship-root .gs-mship-action-btn:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 16px 34px -10px rgba(140,120,255,.9), inset 0 1px 0 rgba(255,255,255,.3); }
         #gs-mship-root .gs-mship-open-app { border-radius: 999px; letter-spacing: .12em; }
+        /* Header section: ONE surface (the card) holding two equal tiles. No card inside a card: the grid wrapper is flat, the Integration Hub
+           and the plan share one tile style (label row, content row, one action at the bottom), and the two actions line up. */
+        #gs-mship-root .gs-mship-header { padding-bottom: 18px; margin-bottom: 0; border-bottom: 1px solid var(--hx-line); }
+        #gs-mship-root .gs-mship-grid { margin-top: 20px; }
+        #gs-mship-root .gs-mship-grid > .gs-mship-cell { background: none; border: 0; box-shadow: none; padding: 0; border-radius: 0; }
+        #gs-mship-root .gs-mship-status-plan-row { align-items: stretch; gap: 18px; }
+        #gs-mship-root .gs-mship-status-col { display: flex; flex-direction: column; min-width: 0; }
+        #gs-mship-root .gs-mship-status-col > .gs-mship-cell--group,
+        #gs-mship-root .gs-mship-plan-col { flex: 1 1 auto; display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px 22px; border: 1px solid var(--hx-line2); border-radius: 18px; background: rgba(255,255,255,.035); box-shadow: none; }
+        #gs-mship-root .gs-mship-cell--group[style*="background-image"] { background-image: none !important; background-color: rgba(255,255,255,.035) !important; }
+        #gs-mship-root .gs-mship-group-head { margin: 0; align-items: center; }
+        #gs-mship-root .gs-mship-cell--group h3 { display: block; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; text-align: left; font-size: .7rem; font-weight: 700; letter-spacing: .16em; color: var(--hx-mute); }
+        #gs-mship-root .gs-mship-renewal { display: flex; align-items: center; gap: 10px; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+        #gs-mship-root .gs-mship-renewal .dashicons { color: var(--hx-a); font-size: 18px; width: 18px; height: 18px; }
+        #gs-mship-root .gs-mship-renewal > div > div:first-child { font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--hx-mute); }
+        #gs-mship-root .gs-mship-renewal > div > div:last-child { font-size: .92rem; font-weight: 600; color: var(--hx-text); }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-card { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; text-align: left; padding: 0; margin: 0; background: none; border: 0; box-shadow: none; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-card--link:hover { background: none; transform: none; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-img { width: 64px; height: 64px; border-radius: 14px; flex: 0 0 auto; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-name { font-size: 1.05rem; }
+        /* actions: Visit Hub and Manage connection are quiet, Upgrade is the call to action; all sit at the bottom of their tile */
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-action-btn { width: 100%; margin-top: auto; padding: 12px 20px; }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-action-btn { background: rgba(255,255,255,.06); border: 1px solid var(--hx-line2); box-shadow: none; color: var(--hx-text); }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-action-btn:hover { background: rgba(122,167,255,.16); border-color: rgba(122,167,255,.55); box-shadow: none; }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-hub-visit-btn { width: auto; margin: 0; padding: 7px 16px; }
+        #gs-mship-root .gs-mship-plan-col { align-items: stretch; text-align: left; }
+        #gs-mship-root .gs-mship-plan-col .gs-mship-renewal { align-self: stretch; width: auto; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; }
+        #gs-mship-root .gs-mship-plan-col .gs-mship-plan-card { align-self: stretch; justify-content: flex-start !important; }
+        #gs-mship-root .gs-mship-plan-col .gs-dash-sa-upgrade { align-self: stretch; width: 100%; }
+        .gs-mship-grid ~ .gs-trial, .gs-mship-grid ~ .gs-setup, .gs-mship-grid ~ .gs-unlock { margin: 22px 0 0; }
+        #gs-mship-root .gs-mship-plan-col > * { margin-left: 0 !important; margin-right: 0 !important; max-width: none !important; }
+        #gs-mship-root .gs-mship-plan-col .gs-mship-renewal, #gs-mship-root .gs-mship-plan-col .gs-mship-plan-card { width: 100% !important; justify-content: flex-start !important; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-action-btn { width: 100% !important; max-width: none !important; box-sizing: border-box; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-hub-visit-btn { width: auto !important; flex: 0 0 auto; }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-group-head h3 { white-space: nowrap; }
         /* Top-level tabs: a glass segmented control */
         #gs-mship-root .gs-mship-tabs { border-top: 0; margin-top: 34px; padding-top: 0; }
         #gs-mship-root .gs-mship-tabs-nav { width: fit-content; max-width: 100%; margin: 0 auto 30px; padding: 5px; gap: 4px; border-radius: 999px; background: rgba(255,255,255,.04); border: 1px solid var(--hx-line); backdrop-filter: blur(14px); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
@@ -2477,6 +2512,9 @@ function gend_society_render_membership_panel( $payload = null ) {
         if ( $gs_can_manage && ! empty( $_GET['gdc_dash_embed'] ) ) {
             $gs_default_tab = 'hosting';
         }
+        ?>
+        <?php // 7-day trial: days left, Pay now and Change plan (the trial carries over to the new plan).
+              if ( function_exists( 'gend_society_trial_banner_html' ) ) { echo gend_society_trial_banner_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
         ?>
         <?php // Dashboards the plan includes but this site does not have yet: live progress while they are installed.
               if ( function_exists( 'gend_society_feature_setup_panel_html' ) ) { echo gend_society_feature_setup_panel_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.

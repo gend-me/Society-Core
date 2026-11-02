@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.9.0
+Stable tag: 1.9.1
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,14 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.9.1 =
+<!-- @build-strip-begin wporg -->
+* New: dashboards included in your gend.me plan are downloaded, checked against the release signature, installed and switched on for you, with live progress and a Retry for any that fail. Dashboards your plan does not include show which plan unlocks them, with an Unlock button. Active dashboards have a Deactivate button with a confirmation. During the 7-day trial the dashboard shows the days left with a Pay now button, and you can switch dashboard plan up or down without restarting the trial. The dashboard header is redesigned. Requires the matching gend.me update, which is already live.
+<!-- @build-strip-end wporg -->
+<!-- @build-only-begin wporg -->
+* Maintenance release. Plan-driven dashboards and gend.me hosting are not part of the WordPress.org version.
+<!-- @build-only-end wporg -->
 
 = 1.9.0 =
 <!-- @build-strip-begin wporg -->

@@ -539,6 +539,14 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 			'after_migration' => array(),
 			'features'        => array(), // feature slug => { slug, name, area, state included|upgrade, unlock_plan }
 			'change_plan_url' => '',
+			'trial'           => array(
+				'active'      => false,
+				'days_left'   => 0,
+				'total_days'  => 0,
+				'ends_label'  => '',
+				'pay_pending' => false,
+				'pay_url'     => '',
+			),
 			'hub_origin'      => gend_society_plan_hub_origin(),
 			'install_id'      => gend_society_plan_identity()['install_id'],
 			'fetched_at'      => 0,
@@ -598,8 +606,21 @@ if ( ! function_exists( 'gend_society_plan_view_model' ) ) {
 			'status_label' => (string) ( $mem['status_label'] ?? '' ),
 		);
 
+		// --- 7-day trial (hub: days left, or an invoice raised by Pay now that is not paid yet)
+		$tr = isset( $mem['trial'] ) && is_array( $mem['trial'] ) ? $mem['trial'] : array();
+		if ( $tr ) {
+			$vm['trial'] = array(
+				'active'      => ! empty( $tr['active'] ),
+				'days_left'   => max( 0, (int) ( $tr['days_left'] ?? 0 ) ),
+				'total_days'  => max( 0, (int) ( $tr['total_days'] ?? 0 ) ),
+				'ends_label'  => sanitize_text_field( (string) ( $tr['ends_label'] ?? '' ) ),
+				'pay_pending' => ! empty( $tr['pay_pending'] ),
+				'pay_url'     => esc_url_raw( (string) ( $tr['pay_url'] ?? '' ) ),
+			);
+		}
+
 		// --- source, inheritance, owner, processing
-		$source       = (string) ( $mem['plan_source'] ?? ( $feat['plan_source'] ?? 'connected' ) );
+		$source       =(string) ( $mem['plan_source'] ?? ( $feat['plan_source'] ?? 'connected' ) );
 		$vm['source'] = in_array( $source, array( 'site', 'group', 'connected', 'override' ), true ) ? $source : 'connected';
 		$inh          = $mem['inherited_from'] ?? ( $feat['inherited_from'] ?? null );
 		if ( is_array( $inh ) && 'group' === $vm['source'] ) {
@@ -931,6 +952,16 @@ if ( ! function_exists( 'gend_society_plan_buy_assets' ) ) {
 .gs-buy { border: 0; border-radius: 999px; padding: 9px 18px; font-size: .74rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; color: #fff; cursor: pointer; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); text-decoration: none; display: inline-flex; align-items: center; justify-content: center; transition: transform .2s ease, filter .2s ease; }
 .gs-buy:hover, .gs-buy:focus { transform: translateY(-1px); filter: brightness(1.08); color: #fff; outline: none; }
 .gs-buy[disabled] { opacity: .6; cursor: progress; transform: none; }
+.gs-trial { display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap; margin: 0 0 26px; padding: 20px 26px; border-radius: 22px; border: 1px solid rgba(52,211,153,.35); background: radial-gradient(560px 200px at 0% 0%, rgba(52,211,153,.14), transparent 70%), linear-gradient(165deg, rgba(20,38,52,.88), rgba(12,18,34,.84)); box-shadow: 0 30px 70px -38px rgba(16,185,129,.5), inset 0 1px 0 rgba(255,255,255,.07); color: #e8eefb; }
+.gs-trial--due { border-color: rgba(251,191,36,.45); background: radial-gradient(560px 200px at 0% 0%, rgba(251,191,36,.14), transparent 70%), linear-gradient(165deg, rgba(44,36,20,.88), rgba(14,16,30,.84)); }
+.gs-trial__text { flex: 1 1 320px; min-width: 0; }
+.gs-trial__title { margin: 0 0 4px; font-size: 1.15rem; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+.gs-trial__days { color: #6ee7b7; }
+.gs-trial--due .gs-trial__days { color: #fcd34d; }
+.gs-trial__sub { margin: 0 0 12px; font-size: .88rem; line-height: 1.55; color: #a9b6d0; }
+.gs-trial__bar { height: 6px; max-width: 360px; border-radius: 999px; background: rgba(148,163,184,.2); overflow: hidden; }
+.gs-trial__bar > span { display: block; height: 100%; border-radius: 999px; background: linear-gradient(90deg, #34d399, #6ee7b7); }
+.gs-trial__actions { display: flex; gap: 10px; flex-wrap: wrap; align-items: center; }
 .gs-buy--ghost { background: rgba(255,255,255,.06); box-shadow: none; border: 1px solid rgba(148,163,184,.3); color: #e8eefb; }
 </style>
 <script>
@@ -957,9 +988,34 @@ if ( ! function_exists( 'gend_society_plan_buy_assets' ) ) {
         }, 160);
     }
     window.gsGotoDashboards = goDashboards;
+    function payNow(btn) {
+        var label = btn.textContent;
+        var fd = new FormData();
+        fd.append('action', 'gend_society_trial_pay_now'); fd.append('nonce', NONCE);
+        btn.disabled = true; btn.textContent = 'Opening invoice...';
+        fetch(AJAX, { method: 'POST', credentials: 'same-origin', body: fd }).then(function (r) { return r.json(); }).then(function (j) {
+            var d = j ? j.data : null;
+            if (!j || !j.success) { throw new Error((d ? d.message : '') || 'Could not start the payment. Please try again.'); }
+            if (d) { if (d.pay_url) { window.location.href = d.pay_url; return; } }
+            window.location.reload();
+        }).catch(function (err) {
+            btn.disabled = false; btn.textContent = label;
+            say(err.message, 'Could not start the payment');
+        });
+    }
     document.addEventListener('click', function (e) {
         var g = e.target.closest ? e.target.closest('[data-gs-goto-dashboards]') : null;
         if (g) { e.preventDefault(); e.stopPropagation(); goDashboards(); return; }
+        var pn = e.target.closest ? e.target.closest('[data-gs-pay-now]') : null;
+        if (pn) {
+            e.preventDefault(); e.stopPropagation();
+            if (pn.disabled) { return; }
+            var direct = pn.getAttribute('data-pay-url') || '';
+            if (direct) { window.location.href = direct; return; }
+            var ask = window.gsDialog ? window.gsDialog.confirm('Paying now ends your free trial today. Your plan is billed from today and renews a month from now. You keep everything you have set up.', { title: 'Pay now and end the trial?', ok: 'Pay now', cancel: 'Keep my trial' }) : Promise.resolve(window.confirm('End your free trial and pay now?'));
+            ask.then(function (yes) { if (yes) { payNow(pn); } });
+            return;
+        }
         var b = e.target.closest ? e.target.closest('[data-gs-buy-plan]') : null;
         if (!b) { return; }
         e.preventDefault();
@@ -1028,3 +1084,120 @@ if ( ! function_exists( 'gend_society_unlock_banner_html' ) ) {
 		return (string) ob_get_clean();
 	}
 }
+
+if ( ! function_exists( 'gend_society_trial_banner_html' ) ) {
+	/**
+	 * The 7-day trial notice for the dashboard section: days left, a bar, a Pay now button and a way to change plan
+	 * (the trial carries over to the new plan, it never restarts). After Pay now, until the invoice is paid, it reads
+	 * "Payment due". '' outside a trial, for an unconnected install, or for visitors who cannot manage the site.
+	 */
+	function gend_society_trial_banner_html(): string {
+		if ( '' === (string) get_option( 'gend_society_install_token', '' ) || ! function_exists( 'gend_society_plan_view_model' ) || ! current_user_can( 'manage_options' ) ) {
+			return '';
+		}
+		$vm = gend_society_plan_view_model();
+		$tr = (array) ( $vm['trial'] ?? array() );
+		if ( 'ok' !== ( $vm['state'] ?? '' ) || ( empty( $tr['active'] ) && empty( $tr['pay_pending'] ) ) ) {
+			return '';
+		}
+		$due   = ! empty( $tr['pay_pending'] );
+		$days  = (int) $tr['days_left'];
+		$total = max( 1, (int) $tr['total_days'] );
+		$used  = $due ? 100 : max( 0, min( 100, (int) round( ( ( $total - $days ) / $total ) * 100 ) ) );
+		$plan  = (string) ( $vm['plan']['name'] ?? '' );
+		ob_start();
+		gend_society_plan_buy_assets();
+		?>
+<div class="gs-trial<?php echo $due ? ' gs-trial--due' : ''; ?>" data-gs-trial-banner="1" role="region" aria-label="<?php esc_attr_e( 'Free trial', 'gend-society' ); ?>">
+	<div class="gs-trial__text">
+		<?php if ( $due ) : ?>
+		<h3 class="gs-trial__title"><?php esc_html_e( 'Your payment is due', 'gend-society' ); ?></h3>
+		<p class="gs-trial__sub">
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: %s: plan name. */
+					__( 'You chose to end your trial early. Pay the %s invoice to keep your dashboards running.', 'gend-society' ),
+					'' !== $plan ? $plan : __( 'plan', 'gend-society' )
+				)
+			);
+			?>
+		</p>
+		<?php else : ?>
+		<h3 class="gs-trial__title">
+			<span class="gs-trial__days">
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: %d: whole days left in the free trial. */
+					_n( '%d day left', '%d days left', $days, 'gend-society' ),
+					$days
+				)
+			);
+			?>
+			</span>
+			<?php
+			echo esc_html(
+				sprintf(
+					/* translators: %d: length of the trial in days. */
+					__( ' of your %d-day free trial', 'gend-society' ),
+					$total
+				)
+			);
+			?>
+		</h3>
+		<p class="gs-trial__sub">
+			<?php
+			echo esc_html(
+				'' !== $tr['ends_label']
+					? sprintf(
+						/* translators: %s: date the trial ends. */
+						__( 'Your trial ends on %s and your plan is billed then. You can switch dashboard plan at any time; the 7 days are shared across plans and never restart.', 'gend-society' ),
+						$tr['ends_label']
+					)
+					: __( 'You can switch dashboard plan at any time; the 7 days are shared across plans and never restart.', 'gend-society' )
+			);
+			?>
+		</p>
+		<div class="gs-trial__bar" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="<?php echo esc_attr( (string) $used ); ?>"><span style="width: <?php echo esc_attr( (string) $used ); ?>%"></span></div>
+		<?php endif; ?>
+	</div>
+	<div class="gs-trial__actions">
+		<?php if ( ! $due ) : ?>
+		<button type="button" class="gs-buy gs-buy--ghost" data-gs-goto-dashboards="1"><?php esc_html_e( 'Change plan', 'gend-society' ); ?></button>
+		<?php endif; ?>
+		<button type="button" class="gs-buy" data-gs-pay-now="1"<?php echo $due && '' !== $tr['pay_url'] ? ' data-pay-url="' . esc_url( $tr['pay_url'] ) . '"' : ''; ?>><?php esc_html_e( 'Pay now', 'gend-society' ); ?></button>
+	</div>
+</div>
+		<?php
+		return (string) ob_get_clean();
+	}
+}
+
+/**
+ * Pay now: ends the trial on gend.me (the first invoice is raised at once) and hands back the pay link. The plan cache is
+ * dropped so the banner reflects the new state on the next load.
+ */
+add_action(
+	'wp_ajax_gend_society_trial_pay_now',
+	static function () {
+		if ( function_exists( 'gend_society_membership_ajax_authorize' ) ) {
+			gend_society_membership_ajax_authorize();
+		} elseif ( ! current_user_can( 'manage_options' ) ) {
+			wp_send_json_error( array( 'message' => __( 'Not allowed.', 'gend-society' ) ), 403 );
+		}
+		$r = gend_society_remote_membership_call( 'membership/pay-now', array(), 'POST' );
+		if ( is_wp_error( $r ) ) {
+			wp_send_json_error( array( 'message' => $r->get_error_message() ) );
+		}
+		if ( function_exists( 'gend_society_plan_invalidate_all' ) ) {
+			gend_society_plan_invalidate_all();
+		}
+		wp_send_json_success(
+			array(
+				'pay_url' => esc_url_raw( (string) ( $r['pay_url'] ?? '' ) ),
+				'paid'    => ! empty( $r['paid'] ),
+			)
+		);
+	}
+);
