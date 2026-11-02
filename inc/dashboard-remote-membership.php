@@ -1762,6 +1762,73 @@ function gend_society_render_membership_panel( $payload = null ) {
         .gs-mship-tab-btn.is-active .gs-mship-tab-icon { opacity: 1; filter: drop-shadow(0 0 6px rgba(78,170,255,0.6)); }
         .gs-mship-tab-panel { display: none; }
         .gs-mship-tab-panel.is-active { display: block; }
+        /* Storage and Compute Gas are two top-level tabs over one console (data-view = storage | gas). */
+        .gs-blk { margin: 0 0 22px; }
+        .gs-panel-top { margin: 0 0 22px; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="storage"] .gs-view--gas,
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-view--storage { display: none; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="storage"] .gs-hosting__nav[data-section="compute-gas"],
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="storage"] .gs-hosting__panel[data-panel="compute-gas"] { display: none !important; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-hosting__sidebar,
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-hosting__panel:not([data-panel="compute-gas"]) { display: none !important; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-hosting { grid-template-columns: 1fr; }
+        /* ═══ High-end dashboard layer: one set of tokens and surfaces for the header, tabs, sub-tabs, cards and buttons ═══ */
+        #gs-mship-root { --hx-line: rgba(148,163,184,.14); --hx-line2: rgba(148,163,184,.26); --hx-mute: #8c9bb5; --hx-text: #e8eefb; --hx-a: #7aa7ff; --hx-b: #b79cff; --hx-surface: linear-gradient(165deg, rgba(24,34,60,.80), rgba(10,15,28,.78)); --hx-shadow: 0 30px 70px -36px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.07); font-feature-settings: "tnum" 1, "cv11" 1; }
+        /* Header */
+        #gs-mship-root .gs-mship-header { flex-wrap: wrap; gap: 10px 14px; }
+        #gs-mship-root .gs-mship-header h2 { min-width: 0; line-height: 1.25; overflow-wrap: anywhere; text-transform: none; letter-spacing: -.02em; font-size: 1.75rem; font-weight: 700; color: #fff; }
+        #gs-mship-root .gs-mship-cell { background: var(--hx-surface); border: 1px solid var(--hx-line2); border-radius: 22px; box-shadow: var(--hx-shadow); }
+        #gs-mship-root .gs-mship-action-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; padding: 11px 24px; font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
+        #gs-mship-root .gs-mship-action-btn:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 16px 34px -10px rgba(140,120,255,.9), inset 0 1px 0 rgba(255,255,255,.3); }
+        #gs-mship-root .gs-mship-open-app { border-radius: 999px; letter-spacing: .12em; }
+        /* Top-level tabs: a glass segmented control */
+        #gs-mship-root .gs-mship-tabs { border-top: 0; margin-top: 34px; padding-top: 0; }
+        #gs-mship-root .gs-mship-tabs-nav { width: fit-content; max-width: 100%; margin: 0 auto 30px; padding: 5px; gap: 4px; border-radius: 999px; background: rgba(255,255,255,.04); border: 1px solid var(--hx-line); backdrop-filter: blur(14px); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+        #gs-mship-root .gs-mship-tab-btn { padding: 11px 24px; border-radius: 999px; border: 0; background: transparent; box-shadow: none; color: var(--hx-mute); font-size: .74rem; font-weight: 700; letter-spacing: .16em; transition: color .2s ease, background .25s ease, box-shadow .25s ease; }
+        #gs-mship-root .gs-mship-tab-btn::before { display: none; }
+        #gs-mship-root .gs-mship-tab-btn:hover { color: #fff; background: rgba(255,255,255,.05); transform: none; }
+        #gs-mship-root .gs-mship-tab-btn.is-active { color: #fff; background: linear-gradient(135deg, rgba(122,167,255,.28), rgba(183,156,255,.26)); box-shadow: inset 0 0 0 1px rgba(150,180,255,.45), 0 8px 26px -8px rgba(100,130,255,.55); }
+        /* Sub-tabs: a horizontal underline bar instead of the left sidebar */
+        #gs-mship-root .gs-hosting { display: block; min-height: 0; }
+        #gs-mship-root .gs-hosting__sidebar { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 0; margin: 0 0 28px; border-right: 0; border-bottom: 1px solid var(--hx-line); overflow: visible; }
+        #gs-mship-root .gs-hosting__nav { flex: 0 0 auto; border-radius: 0; margin-bottom: -1px; padding: 12px 18px; border-bottom: 2px solid transparent; background: transparent; color: var(--hx-mute); font-size: .8rem; font-weight: 600; letter-spacing: .06em; transition: color .2s ease, border-color .2s ease; }
+        #gs-mship-root .gs-hosting__nav:hover { background: transparent; color: #fff; }
+        #gs-mship-root .gs-hosting__nav.is-active { background: transparent; color: #fff; border-bottom-color: var(--hx-a); box-shadow: 0 12px 22px -16px rgba(122,167,255,.95); }
+        /* Cards: the same surface everywhere */
+        #gs-mship-root :is(.gs-bk-hero, .gs-bcg-hero, .gs-hosting__resource-card, .gs-hosting__analytics-hero, .gs-hosting__card) { background: var(--hx-surface) !important; border: 1px solid var(--hx-line2) !important; border-radius: 22px !important; box-shadow: var(--hx-shadow) !important; }
+        #gs-mship-root .gs-hosting__resource-card { padding: 20px 22px; transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+        #gs-mship-root .gs-hosting__resource-card:hover { transform: translateY(-3px); border-color: rgba(122,167,255,.5) !important; box-shadow: 0 34px 70px -34px rgba(60,100,255,.55), inset 0 1px 0 rgba(255,255,255,.08) !important; }
+        #gs-mship-root .gs-hosting__resource-card-usage { font-size: 1.55rem; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+        #gs-mship-root .gs-hosting__resource-card-title { font-weight: 700; color: #fff; }
+        #gs-mship-root .gs-hosting__resource-card-hint, #gs-mship-root .gs-hosting__resource-card-meta, #gs-mship-root .gs-hosting__resource-card-cap { color: var(--hx-mute); }
+        #gs-mship-root .gs-hosting__resources-grid { gap: 18px; }
+        #gs-mship-root .gs-hosting__section-title { margin: 0 0 4px; font-size: .72rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--hx-a); }
+        #gs-mship-root .gs-hosting__section-sub { color: var(--hx-mute); }
+        #gs-mship-root :is(.gs-bk-title, .gs-bcg-title, .gs-hosting__analytics-title) { font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; color: #fff; background: none; -webkit-text-fill-color: #fff; }
+        #gs-mship-root :is(.gs-bk-sub, .gs-bcg-sub, .gs-hosting__analytics-sub) { color: var(--hx-mute); }
+        #gs-mship-root :is(.gs-bk-badge, .gs-bcg-badge):not(.is-warn) { background: rgba(122,167,255,.10); border: 1px solid rgba(122,167,255,.30); color: #c4d6ff; font-size: .66rem; letter-spacing: .16em; border-radius: 999px; padding: 5px 13px; }
+        #gs-mship-root .gs-bk-hero { padding: 26px 30px; }
+        #gs-mship-root .gs-bk-hero::before, #gs-mship-root .gs-bk-hero::after { display: none; }
+        #gs-mship-root .gs-bcg-stat { background: rgba(255,255,255,.04); border: 1px solid var(--hx-line); border-radius: 16px; }
+        #gs-mship-root .gs-bcg-stat .v { letter-spacing: -.02em; }
+        /* Buttons inside cards: ghost by default, gradient for the main action */
+        #gs-mship-root :is(.gs-bk-btn, .gs-bcg-btn, .gs-hosting__btn) { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 10px 20px; border: 1px solid var(--hx-line2); background: rgba(255,255,255,.05); color: var(--hx-text); font-size: .76rem; font-weight: 700; letter-spacing: .08em; text-transform: none; box-shadow: none; transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+        #gs-mship-root :is(.gs-bk-btn, .gs-bcg-btn, .gs-hosting__btn):hover { border-color: rgba(122,167,255,.6); background: rgba(122,167,255,.10); color: #fff; transform: translateY(-1px); }
+        #gs-mship-root :is(.gs-bk-btn--cta, .gs-bcg-btn--cta) { border: 0; color: #fff !important; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); }
+        #gs-mship-root :is(.gs-bk-btn--cta, .gs-bcg-btn--cta):hover { filter: brightness(1.08); }
+        #gs-mship-root .gs-hosting__btn.is-danger { border-color: rgba(244,63,94,.45); color: #fda4af; background: rgba(244,63,94,.08); }
+        #gs-mship-root .gs-hosting__table th { letter-spacing: .12em; }
+        #gs-mship-root .gs-hosting__table tbody tr:hover { background: rgba(122,167,255,.05); }
+        #gs-mship-root .gs-bk-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+        #gs-mship-root .gs-bk-main { flex: 1 1 320px; min-width: 0; }
+        #gs-mship-root .gs-bk-actions { flex: 0 0 auto; display: flex; flex-direction: row; justify-content: flex-end; width: auto; gap: 10px; flex-wrap: wrap; }
+        #gs-mship-root :is(.gs-hosting__search, .gs-hosting__select, .gs-hosting input[type="search"], .gs-hosting input[type="text"], .gs-hosting select) { background: rgba(8,14,28,.8); color: var(--hx-text); border: 1px solid var(--hx-line2); border-radius: 12px; padding: 9px 14px; font-size: .84rem; box-shadow: none; }
+        #gs-mship-root :is(.gs-hosting__search, .gs-hosting input[type="search"], .gs-hosting input[type="text"]):focus { outline: none; border-color: rgba(122,167,255,.7); box-shadow: 0 0 0 3px rgba(122,167,255,.16); }
+        /* The Backups / Email cards on top already carry the title: the stats panel below keeps only its numbers. */
+        #gs-mship-root [data-panel="backups"] .gs-panel-top + .gs-hosting__analytics-hero .gs-hosting__analytics-title,
+        #gs-mship-root [data-panel="backups"] .gs-panel-top + .gs-hosting__analytics-hero .gs-hosting__analytics-sub { display: none; }
+        #gs-mship-root .gs-hosting__panel > .gs-panel-top + * { margin-top: 0; }
+        @media (max-width: 720px) { #gs-mship-root .gs-mship-tab-btn { padding: 10px 14px; letter-spacing: .1em; } #gs-mship-root .gs-bk-hero { padding: 20px; } }
 
         /* ── Futuristic dashboard build-up animations ──────────────────
            Each layer of the membership card fades up and into place with
@@ -2063,7 +2130,8 @@ function gend_society_render_membership_panel( $payload = null ) {
                      on gdc_gas_ledger, paid out in real DGEN via
                      gdc_gas_credit_gcp_payee()), gs_hosting_server_price()
                      for Server Costs. ── -->
-                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <?php ob_start(); // the Compute Gas card is shown at the top of the Compute Gas tab ?>
+                <div class="gs-blk gs-blk--gas">
                     <?php
                     $gs_gas_data   = function_exists( 'gend_society_hosting_compute_gas_real_data' ) ? gend_society_hosting_compute_gas_real_data() : array();
                     $gs_gas_earned = function_exists( 'gend_society_hosting_gas_earned_summary' ) ? gend_society_hosting_gas_earned_summary( get_current_user_id() ) : array();
@@ -2229,10 +2297,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                         </div>
                     </div>
                 </div>
+                <?php $gs_blk_gas = ob_get_clean(); ?>
 
                 <!-- ── Email hosting — the Backups card's markup + popup for the Emails plans (storage + sending),
                      placed above Backups (gend_society_render_email_plan_card()). ── -->
-                <?php gend_society_render_email_plan_card( array( 'context' => 'dashboard' ) ); ?>
+                <?php
+                ob_start();
+                gend_society_render_email_plan_card( array( 'context' => 'dashboard' ) );
+                $gs_blk_email = ob_get_clean();
+                ?>
 
                 <!-- ── Backups — full-width bespoke hero (2-column: badge/
                      title/sub on the left, action buttons in their own
@@ -2245,7 +2318,8 @@ function gend_society_render_membership_panel( $payload = null ) {
                      'backups' plan-attach type
                      (gdc_register_backups_plan_product(),
                      gdc_plan_attach_types()). ── -->
-                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <?php ob_start(); // the Backups card is shown at the top of Storage > Backups ?>
+                <div class="gs-blk gs-blk--backups">
                     <?php
                     // Backup Plan pricing tiers — real WP Ultimo plan(s) under the
                     // 'backups' plan-attach type (gdc_register_backups_plan_product(),
@@ -2338,13 +2412,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                         </div>
                     </div>
                 </div>
+                <?php $gs_blk_backups = ob_get_clean(); ?>
 
                 <!-- ── Storage — real usage cards, moved here from Hosting →
                      Storage. Same function the Hosting tab itself calls for
                      the section_group=all (BuddyPress group) case, so this
                      stays in sync automatically. ── -->
+                <?php ob_start(); // the Storage cards are shown at the top of the Storage tab ?>
                 <?php if ( function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) : ?>
-                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div class="gs-blk gs-blk--storage">
                     <?php
                     $gs_top_media_data  = function_exists( 'gend_society_hosting_collect_media' )  ? gend_society_hosting_collect_media()  : array();
                     $gs_top_tables_data = function_exists( 'gend_society_hosting_collect_tables' ) ? gend_society_hosting_collect_tables() : array();
@@ -2356,6 +2432,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                     ?>
                 </div>
                 <?php endif; ?>
+                <?php $gs_blk_storage = ob_get_clean(); ?>
             </div>
 
         </div>
@@ -2382,7 +2459,7 @@ function gend_society_render_membership_panel( $payload = null ) {
         // ?gs_tab=project-contracts&pm_project=<id>, and pm-admin.js opens that project). App/Hosting stay
         // manager-only, exactly as their tab buttons are.
         $gs_tab_req = isset( $_GET['gs_tab'] ) ? sanitize_key( wp_unslash( $_GET['gs_tab'] ) ) : '';
-        if ( 'project-contracts' === $gs_tab_req || ( $gs_can_manage && in_array( $gs_tab_req, array( 'app', 'hosting' ), true ) ) ) {
+        if ( 'project-contracts' === $gs_tab_req || ( $gs_can_manage && in_array( $gs_tab_req, array( 'app', 'hosting', 'compute-gas' ), true ) ) ) {
             $gs_default_tab = $gs_tab_req;
         }
         if ( isset( $_POST['gs_feature_access_nonce'] ) ) {
@@ -2405,7 +2482,8 @@ function gend_society_render_membership_panel( $payload = null ) {
             <div class="gs-mship-tabs-nav" role="tablist">
                 <?php if ( $gs_can_manage ) : ?>
                     <button type="button" class="gs-mship-tab-btn<?php echo 'app' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="app" role="tab"><span class="dashicons dashicons-admin-home gs-mship-tab-icon"></span><?php esc_html_e( 'App', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-mship-tab-btn<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Hosting', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Storage', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn<?php echo 'compute-gas' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="compute-gas" role="tab"><span class="dashicons dashicons-superhero gs-mship-tab-icon"></span><?php esc_html_e( 'Compute Gas', 'gend-society' ); ?></button>
                 <?php endif; ?>
                 <button type="button" class="gs-mship-tab-btn<?php echo $gs_default_tab === 'project-contracts' ? ' is-active' : ''; ?>" data-tab="project-contracts" role="tab"><span class="dashicons dashicons-portfolio gs-mship-tab-icon"></span><?php esc_html_e( 'Projects', 'gend-society' ); ?></button>
                 <?php // Domain + Backups removed from the top tab strip — both
@@ -2435,12 +2513,19 @@ function gend_society_render_membership_panel( $payload = null ) {
             </div>
 
             <!-- Hosting tab (Compute Gas / Servers / Storage / Tables) -->
-            <div class="gs-mship-tab-panel<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-panel="hosting" role="tabpanel">
+            <?php // One console serves two top-level tabs: Storage (Backups / Media / Codebase / Tables / Email) and Compute Gas.
+                  // data-view says which; the tab buttons flip it (see the Tabs script) and CSS shows the matching top block + sub-tabs. ?>
+            <div class="gs-mship-tab-panel<?php echo in_array( $gs_default_tab, array( 'hosting', 'compute-gas' ), true ) ? ' is-active' : ''; ?>" data-panel="hosting" data-view="<?php echo 'compute-gas' === $gs_default_tab ? 'gas' : 'storage'; ?>" role="tabpanel">
+                <div class="gs-view gs-view--storage"><?php echo isset( $gs_blk_storage ) ? $gs_blk_storage : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered above by the Storage cards helper. ?></div>
+                <div class="gs-view gs-view--gas"><?php echo isset( $gs_blk_gas ) ? $gs_blk_gas : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered above. ?></div>
                 <?php
                 if ( function_exists( 'gend_society_render_hosting_tab' ) ) {
                     gend_society_render_hosting_tab( $payload, array(
                         'with_compute_gas' => true,
                         'section_group'    => 'hosting',
+                        'active_section'   => 'compute-gas' === $gs_default_tab ? 'compute-gas' : 'backups',
+                        'panel_top'        => array( 'backups' => isset( $gs_blk_backups ) ? $gs_blk_backups : '' ),
+                        'panel_extra'      => array( 'email' => isset( $gs_blk_email ) ? $gs_blk_email : '' ),
                     ) );
                 }
                 ?>
@@ -2844,8 +2929,26 @@ function gend_society_render_membership_panel( $payload = null ) {
         root.querySelectorAll('.gs-mship-tab-btn').forEach(function (b) {
             b.addEventListener('click', function () {
                 var tab = b.dataset.tab;
+                var panelKey = tab === 'compute-gas' ? 'hosting' : tab;
                 root.querySelectorAll('.gs-mship-tab-btn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
-                root.querySelectorAll('.gs-mship-tab-panel').forEach(function (p) { p.classList.toggle('is-active', p.dataset.panel === tab); });
+                root.querySelectorAll('.gs-mship-tab-panel').forEach(function (p) { p.classList.toggle('is-active', p.dataset.panel === panelKey); });
+                if (panelKey === 'hosting') {
+                    var hp = root.querySelector('.gs-mship-tab-panel[data-panel="hosting"]');
+                    var hr = document.getElementById('gs-hosting-root-hosting');
+                    if (hp) { hp.dataset.view = tab === 'compute-gas' ? 'gas' : 'storage'; }
+                    if (hr) {
+                        var wantNav = hr.querySelector(tab === 'compute-gas' ? '.gs-hosting__nav[data-section="compute-gas"]' : '.gs-hosting__nav.is-active');
+                        var activeNav = hr.querySelector('.gs-hosting__nav.is-active');
+                        if (tab === 'compute-gas') {
+                            if (wantNav) { wantNav.click(); }
+                        } else if (activeNav) {
+                            if (activeNav.dataset.section === 'compute-gas') {
+                                var firstNav = hr.querySelector('.gs-hosting__nav[data-section="backups"]');
+                                if (firstNav) { firstNav.click(); }
+                            }
+                        }
+                    }
+                }
             });
         });
 

@@ -706,7 +706,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                         <?php echo esc_html( $r['used_label'] ); ?>
                         <span class="gs-hosting__resource-card-cap"><?php esc_html_e( 'used on this server', 'gend-society' ); ?></span>
                     </div>
-                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php esc_html_e( 'Container: after migration', 'gend-society' ); ?></div>
+                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php echo esc_html( function_exists( 'gend_society_origin_moved' ) && ! empty( gend_society_origin_moved()['moved'] ) ? __( 'Container: moved to gend.me hosting', 'gend-society' ) : __( 'Container: after migration', 'gend-society' ) ); ?></div>
 <?php else : ?>
                     <div class="gs-hosting__resource-card-usage">
                         <?php echo esc_html( $r['used_label'] ); ?>
@@ -1426,7 +1426,11 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
         'with_permalinks'  => false,
         'with_compute_gas' => false,
         'active_section'   => 'dashboard',
+        'panel_top'        => array(), // section slug => html shown above that panel's own content
+        'panel_extra'      => array(), // slug => html for an extra sub-tab (hosting group: 'email')
     ) );
+    $gs_panel_top   = is_array( $opts['panel_top'] ) ? $opts['panel_top'] : array();
+    $gs_panel_extra = is_array( $opts['panel_extra'] ) ? $opts['panel_extra'] : array();
     $with_settings    = ! empty( $opts['with_settings'] );
     $with_permalinks  = ! empty( $opts['with_permalinks'] );
     $with_compute_gas = ! empty( $opts['with_compute_gas'] );
@@ -1449,7 +1453,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
     // id would collide.
     $gs_hosting_root_id = 'all' === $section_group ? 'gs-hosting-root' : ( 'gs-hosting-root-' . $section_group );
 
-    $active_section = ( 'hosting' === $section_group ) ? 'compute-gas' : 'dashboard';
+    $active_section = ( 'hosting' === $section_group ) ? ( 'compute-gas' === $opts['active_section'] ? 'compute-gas' : 'backups' ) : 'dashboard';
     if ( 'permalinks' === $opts['active_section'] && $with_permalinks ) {
         $active_section = 'permalinks';
     }
@@ -1601,10 +1605,13 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             <?php endif; ?>
             <?php if ( $show_hosting_group ) : ?>
             <?php if ( 'hosting' === $section_group ) : ?>
-            <button type="button" class="gs-hosting__nav" data-section="backups" role="tab"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backups', 'gend-society' ); ?></button>
+            <button type="button" class="gs-hosting__nav<?php echo 'backups' === $active_section ? ' is-active' : ''; ?>" data-section="backups" role="tab"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backups', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="media-library" role="tab"><span class="dashicons dashicons-images-alt2"></span><?php esc_html_e( 'Media', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="codebase" role="tab"><span class="dashicons dashicons-editor-code"></span><?php esc_html_e( 'Codebase', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="tables" role="tab"><span class="dashicons dashicons-database"></span><?php esc_html_e( 'Tables', 'gend-society' ); ?></button>
+            <?php if ( isset( $gs_panel_extra['email'] ) ) : ?>
+            <button type="button" class="gs-hosting__nav" data-section="email" role="tab"><span class="dashicons dashicons-email"></span><?php esc_html_e( 'Email', 'gend-society' ); ?></button>
+            <?php endif; ?>
             <?php else : ?>
             <button type="button" class="gs-hosting__nav" data-section="tables" role="tab"><span class="dashicons dashicons-database"></span><?php esc_html_e( 'Tables', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="media" role="tab"><span class="dashicons dashicons-cloud"></span><?php esc_html_e( 'Storage', 'gend-society' ); ?></button>
@@ -2410,9 +2417,21 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             <?php if ( 'hosting' === $section_group ) : ?>
             <!-- ── Backups sub-panel (split out of the old combined Storage
                  panel - see gs_hosting_render_backups_section()). ── -->
-            <section class="gs-hosting__panel" data-panel="backups" role="tabpanel">
-                <?php gend_society_hosting_render_backups_section( $backups ); ?>
+            <section class="gs-hosting__panel<?php echo 'backups' === $active_section ? ' is-active' : ''; ?>" data-panel="backups" role="tabpanel">
+                <?php
+                if ( isset( $gs_panel_top['backups'] ) ) {
+                    echo '<div class="gs-panel-top">' . $gs_panel_top['backups'] . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the dashboard's own rendered Backups card.
+                }
+                gend_society_hosting_render_backups_section( $backups );
+                ?>
             </section>
+
+<?php if ( isset( $gs_panel_extra['email'] ) ) : ?>
+            <!-- ── Email sub-panel: the Email hosting card, moved here from the top of the dashboard. ── -->
+            <section class="gs-hosting__panel" data-panel="email" role="tabpanel">
+                <?php echo '<div class="gs-panel-top">' . $gs_panel_extra['email'] . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the dashboard's own rendered Email hosting card. ?>
+            </section>
+<?php endif; ?>
 
             <!-- ── Media sub-panel: the real gend-media-optimizer Media Library
                  tab (admin.php?page=blog-manager&tab=media), rendered natively
