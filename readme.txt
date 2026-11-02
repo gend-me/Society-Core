@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.9.1
+Stable tag: 1.9.2
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,14 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.9.2 =
+<!-- @build-strip-begin wporg -->
+* Fix: when gend.me is briefly busy while a dashboard is being installed (a timeout or a temporary error page), the installer now waits and tries again by itself, shows a readable message instead of the raw error page, and always offers Retry afterwards.
+<!-- @build-strip-end wporg -->
+<!-- @build-only-begin wporg -->
+* Maintenance release.
+<!-- @build-only-end wporg -->
 
 = 1.9.1 =
 <!-- @build-strip-begin wporg -->
