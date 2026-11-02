@@ -181,6 +181,8 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         }
     }
 
+    $gs_fc_vm = function_exists('gend_society_plan_view_model') ? gend_society_plan_view_model() : array();
+
     echo '<div class="gs-feature-grid">';
 
     foreach ($features as $slug => $feature) {
@@ -259,7 +261,18 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         echo '<p class="gs-fc-desc">' . esc_html($feature['description']) . '</p>';
         if ($gs_fc_locked) {
             /* translators: %s: plan name. */
-            echo '<p class="gs-fc-need">' . esc_html(sprintf(__('Included with %s and higher plans.', 'gend-society'), $gs_fc_need_name)) . '</p>';
+            // "and higher plans" only when a higher tier exists: the top plan is simply "Included with <plan>".
+            $gs_fc_need_rank = 0;
+            $gs_fc_top_rank  = 0;
+            foreach ((array) ($gs_fc_vm['tiers'] ?? array()) as $gs_fc_tier) {
+                $gs_fc_top_rank = max($gs_fc_top_rank, (int) ($gs_fc_tier['rank'] ?? 0));
+                if (is_array($gs_fc_plan['unlock_plan']) && ((int) ($gs_fc_plan['unlock_plan']['id'] ?? 0) === (int) ($gs_fc_tier['id'] ?? -1) || ('' !== (string) ($gs_fc_plan['unlock_plan']['slug'] ?? '') && (string) $gs_fc_plan['unlock_plan']['slug'] === (string) ($gs_fc_tier['slug'] ?? '')))) {
+                    $gs_fc_need_rank = (int) ($gs_fc_tier['rank'] ?? 0);
+                }
+            }
+            $gs_fc_has_higher = $gs_fc_need_rank > 0 && $gs_fc_top_rank > $gs_fc_need_rank;
+            /* translators: %s: plan name. */
+            echo '<p class="gs-fc-need">' . esc_html(sprintf($gs_fc_has_higher ? __('Included with %s and higher plans.', 'gend-society') : __('Included with %s.', 'gend-society'), $gs_fc_need_name)) . '</p>';
         }
 
         // Actions
