@@ -4,7 +4,7 @@ Tags: hosting, migration, dashboard, connector, community
 Requires at least: 6.7
 Tested up to: 7.1
 Requires PHP: 8.1
-Stable tag: 1.9.4
+Stable tag: 1.9.5
 License: GPLv2 or later
 License URI: https://www.gnu.org/licenses/gpl-2.0.html
 
@@ -129,6 +129,14 @@ After connecting, the Gas Station panel shows a QR code image loaded from api.qr
 Disconnecting the site from gend.me stops all of the above.
 
 == Changelog ==
+
+= 1.9.5 =
+<!-- @build-strip-begin wporg -->
+* Fix: release build of 1.9.4 (Sales Team and Project Services under the Store menu on a standalone site).
+<!-- @build-strip-end wporg -->
+<!-- @build-only-begin wporg -->
+* Maintenance release.
+<!-- @build-only-end wporg -->
 
 = 1.9.4 =
 <!-- @build-strip-begin wporg -->

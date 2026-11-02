@@ -52,7 +52,7 @@ const VARIANTS = {
 		stampTiers: 'core,customer,container,updater',
 		dropUpdateUri: false,
 		remoteRule: 'warn',
-		oldPrefixAllowedIn: ['inc/compat-aliases.php', 'inc/compat-bridges.php'],
+		oldPrefixAllowedIn: ['inc/compat-aliases.php', 'inc/compat-bridges.php', 'inc/feature-installer.php'], // feature-installer: defines the legacy version constant the dashboard plugins probe on a standalone install
 		maxBytes: 0,
 		// Phase 107: the full build updates itself from updates.gend.me.
 		requiredFiles: [{ rel: 'inc/self-update.php', rule: 'full-missing-self-update' }],
