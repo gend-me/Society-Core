@@ -268,8 +268,13 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             $gs_fc_connect = function_exists('gend_society_connect_url') ? gend_society_connect_url() : admin_url('index.php');
             echo '<a class="gs-buy gs-fc-btn" href="' . esc_url($gs_fc_connect) . '">' . esc_html__('Connect to unlock', 'gend-society') . '</a>';
         } elseif (!$gs_fc_installed) {
-            // Included with the plan but the plugin is not on this site yet: the install-and-activate workflow handles it.
-            echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="install" data-feature="' . esc_attr((string) $slug) . '" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Install and activate', 'gend-society') . '</button>';
+            // Included with the plan, not on this site yet. The signed-package installer (Phase 114) will fetch and switch it on by itself;
+            // until it ships the card says so instead of offering a button that cannot work.
+            if (function_exists('gend_society_build_variant') && 'wporg' === gend_society_build_variant()) {
+                echo '<a class="gs-buy gs-fc-btn" href="' . esc_url(function_exists('gend_society_sa_menu_full_build_url') ? gend_society_sa_menu_full_build_url() : 'https://gend.me') . '" target="_blank" rel="noopener">' . esc_html__('Get the full GenD Society build', 'gend-society') . '</a>';
+            } else {
+                echo '<span class="gs-fc-need" data-gs-fc-pending="1" style="margin:0">' . esc_html__('Included with your plan. It will be installed and switched on for you automatically.', 'gend-society') . '</span>';
+            }
         } else {
             echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';
         }
