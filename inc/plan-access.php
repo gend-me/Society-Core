@@ -937,6 +937,8 @@ if ( ! function_exists( 'gend_society_plan_buy_assets' ) ) {
 		$ajax  = admin_url( 'admin-ajax.php' );
 		$nonce = wp_create_nonce( 'gs_membership_action' );
 		$dash  = admin_url( 'index.php' );
+			$vm_pl = function_exists( 'gend_society_plan_view_model' ) ? gend_society_plan_view_model() : array();
+			$popup = (string) ( $vm_pl['change_plan_url'] ?? '' );
 		?>
 <style>
 .gs-unlock { display: flex; align-items: center; justify-content: space-between; gap: 22px; flex-wrap: wrap; margin: 0 0 26px; padding: 22px 26px; border-radius: 22px; border: 1px solid rgba(183,156,255,.35); background: radial-gradient(600px 220px at 0% 0%, rgba(122,167,255,.16), transparent 70%), linear-gradient(165deg, rgba(30,34,70,.85), rgba(12,16,34,.82)); box-shadow: 0 30px 70px -36px rgba(80,90,255,.55), inset 0 1px 0 rgba(255,255,255,.07); color: #e8eefb; }
@@ -968,7 +970,22 @@ if ( ! function_exists( 'gend_society_plan_buy_assets' ) ) {
 (function () {
     if (window.gsPlanUiBound) { return; }
     window.gsPlanUiBound = true;
-    var AJAX = <?php echo wp_json_encode( $ajax ); ?>, NONCE = <?php echo wp_json_encode( $nonce ); ?>, DASH = <?php echo wp_json_encode( $dash ); ?>;
+    var AJAX = <?php echo wp_json_encode( $ajax ); ?>, NONCE = <?php echo wp_json_encode( $nonce ); ?>, DASH = <?php echo wp_json_encode( $dash ); ?>, CHANGE = <?php echo wp_json_encode( $popup ); ?>;
+    // The Unlock / Upgrade buttons open the same Change Plan popup as the header Upgrade button (a window, not a page change);
+    // when it closes the dashboard reloads with the plan refreshed. Blocked popups fall back to the checkout page.
+    function openPlanPopup() {
+        if (!CHANGE) { return false; }
+        var w = null;
+        try { w = window.open(CHANGE, 'gend_society_checkout', 'width=980,height=820'); } catch (e) { w = null; }
+        if (!w) { return false; }
+        try { w.focus(); } catch (e) {}
+        var t = window.setInterval(function () {
+            var closed = true;
+            try { closed = w.closed; } catch (e) { closed = true; }
+            if (closed) { window.clearInterval(t); window.location.href = DASH + '?gs_plan_refresh=1&gs_tab=hosting&gs_goto=dashboards'; }
+        }, 600);
+        return true;
+    }
     function say(msg, title) {
         if (window.gsDialog) { window.gsDialog.alert(msg, { title: title || 'Notice' }); } else { window.alert(msg); }
     }
@@ -1021,6 +1038,7 @@ if ( ! function_exists( 'gend_society_plan_buy_assets' ) ) {
         e.preventDefault();
         var id = b.getAttribute('data-plan-id') || '';
         if (!id || b.disabled) { return; }
+        if (openPlanPopup()) { return; }
         var label = b.textContent;
         b.disabled = true; b.textContent = 'Opening checkout...';
         var fd = new FormData();
