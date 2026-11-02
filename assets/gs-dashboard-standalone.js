@@ -278,7 +278,7 @@
 			var keep = open && !open.hidden;
 			var was = r.getAttribute('data-state');
 			var now = j.data.migration && j.data.migration.state ? j.data.migration.state : '';
-			if (!keep && now && was && now !== was && (now === 'failed' || now === 'complete')) {
+			if (!keep && now && was && now !== was && (now === 'failed' || now === 'complete' || now === 'preview')) {
 				reload(); // the status badge (friendly error) and the panels change with it
 				return;
 			}
@@ -301,6 +301,21 @@
 	}
 
 	document.addEventListener('click', function (ev) {
+		var goDomains = closest(ev.target, '[data-gs-go-domains]');
+		if (goDomains) {
+			ev.preventDefault();
+			var nav = document.querySelector('.gs-hosting__nav[data-section="domains"]');
+			if (nav) {
+				nav.click();
+			}
+			var target = document.querySelector('.gs-hosting__panel[data-panel="domains"]') || document.querySelector('.gs-hosting');
+			if (target && target.scrollIntoView) {
+				window.setTimeout(function () {
+					target.scrollIntoView({ behavior: 'smooth', block: 'start' });
+				}, 60);
+			}
+			return;
+		}
 		var btn = closest(ev.target, '[data-gs-mig-action]');
 		if (btn) {
 			ev.preventDefault();

@@ -531,7 +531,8 @@ if ( ! function_exists( 'gend_society_origin_moved_notice_html' ) ) {
 		$to   = (string) ( $moved['to'] ?? '' );
 		$act  = gend_society_origin_activation_text( gend_society_origin_hub_features() );
 		$tail = '' !== $act ? $act . '.' : __( 'We will list your active features here once your new site has reported them.', 'gend-society' );
-		return '<div class="notice notice-info is-dismissible gs-connection-health-notice gs-moved-notice" data-gs-health-checked="' . esc_attr( 'moved:' . $to ) . '"><p>'
+		return '<style>.gs-moved-notice{background:rgba(16,24,44,.92)!important;border:1px solid rgba(122,167,255,.3)!important;border-left:3px solid #7aa7ff!important;border-radius:12px;color:#dbe6ff;box-shadow:0 18px 50px -28px rgba(0,0,0,.9)}.gs-moved-notice p{color:#dbe6ff}.gs-moved-notice a{color:#9fc0ff}.gs-moved-notice .notice-dismiss::before{color:#9fb0cf}</style>'
+			. '<div class="notice notice-info is-dismissible gs-connection-health-notice gs-moved-notice" data-gs-health-checked="' . esc_attr( 'moved:' . $to ) . '"><p>'
 			. esc_html__( 'This site has moved to', 'gend-society' )
 			. ' <a href="' . esc_url( $to ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $to ) . '</a>. '
 			. esc_html__( 'Your original site has not been changed; to go back, switch your domain back.', 'gend-society' )

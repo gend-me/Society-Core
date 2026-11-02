@@ -172,16 +172,24 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
         }
         // The few style lines ride with the note (Preview + admin only), so the panel's own stylesheet - and every
         // free / Live panel - stays byte-identical.
-        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}</style>';
+        $out  = '<style>.gs-mship-preview-note{margin:0 0 12px;padding:12px 14px;border:1px solid rgba(78,170,255,.3);border-radius:12px;background:rgba(78,170,255,.06);font-size:.85rem;line-height:1.5}.gs-mship-preview-note p{margin:0 0 6px}.gs-mship-preview-note a{color:#8cc8ff;word-break:break-all}.gs-mship-preview-note .gs-mship-action-btn{margin-top:6px}.gs-mship-preview-note .gs-mship-action-btn[disabled]{cursor:not-allowed}.gs-mship-preview-note__ok{font-weight:700;color:#86efac}.gs-mship-next{margin:8px 0 10px;padding:0;list-style:none;counter-reset:gsnext;display:grid;gap:8px}.gs-mship-next li{counter-increment:gsnext;position:relative;padding:8px 12px 8px 42px;border-radius:10px;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.07)}.gs-mship-next li::before{content:counter(gsnext);position:absolute;left:11px;top:8px;width:22px;height:22px;border-radius:50%;background:#4eaaff;color:#04121f;font-weight:700;font-size:.8rem;display:flex;align-items:center;justify-content:center}.gs-mship-next li.is-now{border-color:rgba(78,170,255,.55);background:rgba(78,170,255,.1)}.gs-mship-next .gs-mship-action-btn{margin-top:8px}</style>';
         $out .= '<div class="gs-mship-preview-note" data-gs-preview-note="1" role="note">';
+        $out .= '<p class="gs-mship-preview-note__ok" data-gs-migration-done="1">' . esc_html__( '✓ Migration complete. Your site has been copied to gend.me hosting.', 'gend-society' ) . '</p>';
+        $out .= '<p class="gs-mship-preview-note__title"><strong>' . esc_html__( 'Next steps to put your new site live', 'gend-society' ) . '</strong></p>';
+        $out .= '<ol class="gs-mship-next" data-gs-next-steps="1">';
+        $out .= '<li><strong>' . esc_html__( 'Check your new site.', 'gend-society' ) . '</strong> ';
         if ( '' !== $url ) {
-            $out .= '<p>' . esc_html__( 'Your new site is ready to preview:', 'gend-society' ) . ' <a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a></p>';
+            $out .= '<a href="' . esc_url( $url ) . '" target="_blank" rel="noopener noreferrer">' . esc_html( $url ) . '</a>';
         } else {
-            $out .= '<p>' . esc_html__( 'Your new site is ready to preview.', 'gend-society' ) . '</p>';
+            $out .= esc_html__( 'Open it from the app address in the Domains tab.', 'gend-society' );
         }
-        $out .= '<p>' . esc_html__( 'Your domain still points at your original site.', 'gend-society' ) . ' '
-            . esc_html__( 'You can edit the preview, but the catch-up before you go live overwrites changes made to the same posts.', 'gend-society' ) . ' '
-            . esc_html__( 'Nothing is switched until you add your domain or press Make live.', 'gend-society' ) . '</p>';
+        $out .= '<br>' . esc_html__( 'You can edit it. The catch-up before you go live overwrites changes made to the same posts.', 'gend-society' ) . '</li>';
+        $out .= '<li class="is-now"><strong>' . esc_html__( 'Add your domain.', 'gend-society' ) . '</strong> '
+            . esc_html__( 'In the Domains tab, add your domain and update its DNS records (an A record and a TXT record). Your visitors keep seeing your original site until then.', 'gend-society' )
+            . '<br><button type="button" class="gs-mship-action-btn" data-gs-go-domains="1">' . esc_html__( 'Go to Domains', 'gend-society' ) . ' &darr;</button></li>';
+        $out .= '<li><strong>' . esc_html__( 'Go live.', 'gend-society' ) . '</strong> '
+            . esc_html__( 'Your site goes live by itself when your first domain is verified, or press Make live in the Domains tab.', 'gend-society' ) . '</li>';
+        $out .= '</ol>';
         // 111-11 (MIG-13, P3): the catch-up control exists only on the ORIGIN (a connected standalone install exports there).
         // Disabled until gend.me says a delta is available; the freeze warning is the click's confirm (gs-dashboard-standalone.js).
         if ( function_exists( 'gend_society_dashboard_standalone_paired' ) && gend_society_dashboard_standalone_paired() ) {
@@ -190,6 +198,9 @@ if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
             $dst   = isset( $delta['state'] ) && is_string( $delta['state'] ) ? preg_replace( '/[^a-z]/', '', strtolower( $delta['state'] ) ) : 'idle';
             $busy  = in_array( $dst, array( 'queued', 'exporting', 'applying' ), true );
             $out  .= '<button type="button" class="gs-mship-action-btn is-secondary" data-gs-delta="1"' . ( $avail && ! $busy ? '' : ' disabled' ) . '>' . esc_html__( 'Catch up changes', 'gend-society' ) . '</button>';
+            if ( ! $avail && ! $busy ) {
+                $out .= '<p class="gs-mship-mig__note" data-gs-delta-off="1">' . esc_html__( 'Catching up late changes is not available yet. Avoid changing your original site until you go live.', 'gend-society' ) . '</p>';
+            }
             $out  .= '<p class="gs-mship-mig__note" data-gs-delta-msg="1" data-gs-delta-state="' . esc_attr( '' !== $dst ? $dst : 'idle' ) . '" role="status"></p>';
         }
         $out .= '</div>';
@@ -359,6 +370,15 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
             $v['text']   = __( 'Daily automatic snapshots plus on-demand backups, protecting the storage containers below.', 'gend-society' );
             $v['choose_url'] = gend_society_dashboard_standalone_url( $p['choose_url'] ?? '' );
         }
+        // The site now lives on gend.me hosting (Live): this original copy keeps no backups of its own to promise, so say where they are.
+        $moved = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+        if ( ! empty( $moved['moved'] ) ) {
+            $v['hosted']     = false;
+            $v['backup_now'] = false;
+            $v['badge']      = __( 'Moved', 'gend-society' );
+            $v['text']       = __( 'Backups now run on your new site on gend.me hosting. Open your new site to manage them.', 'gend-society' );
+            $v['learn_url']  = (string) $moved['to'];
+        }
         return $v;
     }
 }
@@ -515,6 +535,13 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
                 $v['badge']     = __( 'After migration', 'gend-society' );
                 $v['text']      = __( 'Email hosting runs on gend.me hosting. Your site keeps sending mail its own way until you move it.', 'gend-society' );
                 $v['learn_url'] = (string) ( $env['learn_url'] ?? '' );
+                $moved           = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+                if ( ! empty( $moved['moved'] ) ) {
+                    // Live elsewhere: mail now goes out from the new site, so this copy no longer "keeps sending mail its own way".
+                    $v['badge']     = __( 'Moved', 'gend-society' );
+                    $v['text']      = __( 'Email hosting now runs on your new site on gend.me hosting. Open your new site to manage it.', 'gend-society' );
+                    $v['learn_url'] = (string) $moved['to'];
+                }
             }
             $v['manage_url'] = '';
             return $v;
@@ -1735,6 +1762,108 @@ function gend_society_render_membership_panel( $payload = null ) {
         .gs-mship-tab-btn.is-active .gs-mship-tab-icon { opacity: 1; filter: drop-shadow(0 0 6px rgba(78,170,255,0.6)); }
         .gs-mship-tab-panel { display: none; }
         .gs-mship-tab-panel.is-active { display: block; }
+        /* Storage and Compute Gas are two top-level tabs over one console (data-view = storage | gas). */
+        .gs-blk { margin: 0 0 22px; }
+        .gs-panel-top { margin: 0 0 22px; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="storage"] .gs-view--gas,
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-view--storage { display: none; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="storage"] .gs-hosting__nav[data-section="compute-gas"],
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="storage"] .gs-hosting__panel[data-panel="compute-gas"] { display: none !important; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-hosting__sidebar,
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-hosting__panel:not([data-panel="compute-gas"]) { display: none !important; }
+        .gs-mship-tab-panel[data-panel="hosting"][data-view="gas"] .gs-hosting { grid-template-columns: 1fr; }
+        /* ═══ High-end dashboard layer: one set of tokens and surfaces for the header, tabs, sub-tabs, cards and buttons ═══ */
+        #gs-mship-root { --hx-line: rgba(148,163,184,.14); --hx-line2: rgba(148,163,184,.26); --hx-mute: #8c9bb5; --hx-text: #e8eefb; --hx-a: #7aa7ff; --hx-b: #b79cff; --hx-surface: linear-gradient(165deg, rgba(24,34,60,.80), rgba(10,15,28,.78)); --hx-shadow: 0 30px 70px -36px rgba(0,0,0,.9), inset 0 1px 0 rgba(255,255,255,.07); font-feature-settings: "tnum" 1, "cv11" 1; }
+        /* Header */
+        #gs-mship-root .gs-mship-header { flex-wrap: wrap; gap: 10px 14px; }
+        #gs-mship-root .gs-mship-header h2 { min-width: 0; line-height: 1.25; overflow-wrap: anywhere; text-transform: none; letter-spacing: -.02em; font-size: 1.75rem; font-weight: 700; color: #fff; }
+        #gs-mship-root .gs-mship-cell { background: var(--hx-surface); border: 1px solid var(--hx-line2); border-radius: 22px; box-shadow: var(--hx-shadow); }
+        #gs-mship-root .gs-mship-action-btn { display: inline-flex; align-items: center; justify-content: center; gap: 8px; border: 0; border-radius: 999px; padding: 11px 24px; font-size: .74rem; font-weight: 700; letter-spacing: .14em; text-transform: uppercase; color: #fff; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); transition: transform .2s ease, box-shadow .2s ease, filter .2s ease; }
+        #gs-mship-root .gs-mship-action-btn:hover { transform: translateY(-1px); filter: brightness(1.08); box-shadow: 0 16px 34px -10px rgba(140,120,255,.9), inset 0 1px 0 rgba(255,255,255,.3); }
+        #gs-mship-root .gs-mship-open-app { border-radius: 999px; letter-spacing: .12em; }
+        /* Header section: ONE surface (the card) holding two equal tiles. No card inside a card: the grid wrapper is flat, the Integration Hub
+           and the plan share one tile style (label row, content row, one action at the bottom), and the two actions line up. */
+        #gs-mship-root .gs-mship-header { padding-bottom: 18px; margin-bottom: 0; border-bottom: 1px solid var(--hx-line); }
+        #gs-mship-root .gs-mship-grid { margin-top: 20px; }
+        #gs-mship-root .gs-mship-grid > .gs-mship-cell { background: none; border: 0; box-shadow: none; padding: 0; border-radius: 0; }
+        #gs-mship-root .gs-mship-status-plan-row { align-items: stretch; gap: 18px; }
+        #gs-mship-root .gs-mship-status-col { display: flex; flex-direction: column; min-width: 0; }
+        #gs-mship-root .gs-mship-status-col > .gs-mship-cell--group,
+        #gs-mship-root .gs-mship-plan-col { flex: 1 1 auto; display: flex; flex-direction: column; gap: 16px; min-width: 0; padding: 20px 22px; border: 1px solid var(--hx-line2); border-radius: 18px; background: rgba(255,255,255,.035); box-shadow: none; }
+        #gs-mship-root .gs-mship-cell--group[style*="background-image"] { background-image: none !important; background-color: rgba(255,255,255,.035) !important; }
+        #gs-mship-root .gs-mship-group-head { margin: 0; align-items: center; }
+        #gs-mship-root .gs-mship-cell--group h3 { display: block; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; backdrop-filter: none; -webkit-backdrop-filter: none; text-align: left; font-size: .7rem; font-weight: 700; letter-spacing: .16em; color: var(--hx-mute); }
+        #gs-mship-root .gs-mship-renewal { display: flex; align-items: center; gap: 10px; margin: 0; padding: 0; background: none; border: 0; box-shadow: none; }
+        #gs-mship-root .gs-mship-renewal .dashicons { color: var(--hx-a); font-size: 18px; width: 18px; height: 18px; }
+        #gs-mship-root .gs-mship-renewal > div > div:first-child { font-size: .7rem; font-weight: 700; letter-spacing: .16em; text-transform: uppercase; color: var(--hx-mute); }
+        #gs-mship-root .gs-mship-renewal > div > div:last-child { font-size: .92rem; font-weight: 600; color: var(--hx-text); }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-card { flex-direction: row; align-items: center; justify-content: flex-start; gap: 16px; text-align: left; padding: 0; margin: 0; background: none; border: 0; box-shadow: none; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-card--link:hover { background: none; transform: none; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-img { width: 64px; height: 64px; border-radius: 14px; flex: 0 0 auto; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-plan-name { font-size: 1.05rem; }
+        /* actions: Visit Hub and Manage connection are quiet, Upgrade is the call to action; all sit at the bottom of their tile */
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-action-btn { width: 100%; margin-top: auto; padding: 12px 20px; }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-action-btn { background: rgba(255,255,255,.06); border: 1px solid var(--hx-line2); box-shadow: none; color: var(--hx-text); }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-action-btn:hover { background: rgba(122,167,255,.16); border-color: rgba(122,167,255,.55); box-shadow: none; }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-hub-visit-btn { width: auto; margin: 0; padding: 7px 16px; }
+        #gs-mship-root .gs-mship-plan-col { align-items: stretch; text-align: left; }
+        #gs-mship-root .gs-mship-plan-col .gs-mship-renewal { align-self: stretch; width: auto; background: none !important; border: 0 !important; box-shadow: none !important; padding: 0 !important; border-radius: 0 !important; }
+        #gs-mship-root .gs-mship-plan-col .gs-mship-plan-card { align-self: stretch; justify-content: flex-start !important; }
+        #gs-mship-root .gs-mship-plan-col .gs-dash-sa-upgrade { align-self: stretch; width: 100%; }
+        .gs-mship-grid ~ .gs-trial, .gs-mship-grid ~ .gs-setup, .gs-mship-grid ~ .gs-unlock { margin: 22px 0 0; }
+        #gs-mship-root .gs-mship-plan-col > * { margin-left: 0 !important; margin-right: 0 !important; max-width: none !important; }
+        #gs-mship-root .gs-mship-plan-col .gs-mship-renewal, #gs-mship-root .gs-mship-plan-col .gs-mship-plan-card { width: 100% !important; justify-content: flex-start !important; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-action-btn { width: 100% !important; max-width: none !important; box-sizing: border-box; }
+        #gs-mship-root .gs-mship-status-plan-row .gs-mship-hub-visit-btn { width: auto !important; flex: 0 0 auto; }
+        #gs-mship-root .gs-mship-cell--group .gs-mship-group-head h3 { white-space: nowrap; }
+        /* Top-level tabs: a glass segmented control */
+        #gs-mship-root .gs-mship-tabs { border-top: 0; margin-top: 34px; padding-top: 0; }
+        #gs-mship-root .gs-mship-tabs-nav { width: fit-content; max-width: 100%; margin: 0 auto 30px; padding: 5px; gap: 4px; border-radius: 999px; background: rgba(255,255,255,.04); border: 1px solid var(--hx-line); backdrop-filter: blur(14px); box-shadow: inset 0 1px 0 rgba(255,255,255,.05); }
+        #gs-mship-root .gs-mship-tab-btn { padding: 11px 24px; border-radius: 999px; border: 0; background: transparent; box-shadow: none; color: var(--hx-mute); font-size: .74rem; font-weight: 700; letter-spacing: .16em; transition: color .2s ease, background .25s ease, box-shadow .25s ease; }
+        #gs-mship-root .gs-mship-tab-btn::before { display: none; }
+        #gs-mship-root .gs-mship-tab-btn:hover { color: #fff; background: rgba(255,255,255,.05); transform: none; }
+        #gs-mship-root .gs-mship-tab-btn.is-active { color: #fff; background: linear-gradient(135deg, rgba(122,167,255,.28), rgba(183,156,255,.26)); box-shadow: inset 0 0 0 1px rgba(150,180,255,.45), 0 8px 26px -8px rgba(100,130,255,.55); }
+        /* Sub-tabs: a horizontal underline bar instead of the left sidebar */
+        #gs-mship-root .gs-hosting { display: block; min-height: 0; }
+        #gs-mship-root .gs-hosting__sidebar { position: static; flex-direction: row; flex-wrap: wrap; gap: 4px; padding: 0; margin: 0 0 28px; border-right: 0; border-bottom: 1px solid var(--hx-line); overflow: visible; }
+        #gs-mship-root .gs-hosting__nav { flex: 0 0 auto; border-radius: 0; margin-bottom: -1px; padding: 12px 18px; border-bottom: 2px solid transparent; background: transparent; color: var(--hx-mute); font-size: .8rem; font-weight: 600; letter-spacing: .06em; transition: color .2s ease, border-color .2s ease; }
+        #gs-mship-root .gs-hosting__nav:hover { background: transparent; color: #fff; }
+        #gs-mship-root .gs-hosting__nav.is-active { background: transparent; color: #fff; border-bottom-color: var(--hx-a); box-shadow: 0 12px 22px -16px rgba(122,167,255,.95); }
+        /* Cards: the same surface everywhere */
+        #gs-mship-root :is(.gs-bk-hero, .gs-bcg-hero, .gs-hosting__resource-card, .gs-hosting__analytics-hero, .gs-hosting__card) { background: var(--hx-surface) !important; border: 1px solid var(--hx-line2) !important; border-radius: 22px !important; box-shadow: var(--hx-shadow) !important; }
+        #gs-mship-root .gs-hosting__resource-card { padding: 20px 22px; transition: transform .25s ease, border-color .25s ease, box-shadow .25s ease; }
+        #gs-mship-root .gs-hosting__resource-card:hover { transform: translateY(-3px); border-color: rgba(122,167,255,.5) !important; box-shadow: 0 34px 70px -34px rgba(60,100,255,.55), inset 0 1px 0 rgba(255,255,255,.08) !important; }
+        #gs-mship-root .gs-hosting__resource-card-usage { font-size: 1.55rem; font-weight: 700; letter-spacing: -.02em; color: #fff; }
+        #gs-mship-root .gs-hosting__resource-card-title { font-weight: 700; color: #fff; }
+        #gs-mship-root .gs-hosting__resource-card-hint, #gs-mship-root .gs-hosting__resource-card-meta, #gs-mship-root .gs-hosting__resource-card-cap { color: var(--hx-mute); }
+        #gs-mship-root .gs-hosting__resources-grid { gap: 18px; }
+        #gs-mship-root .gs-hosting__section-title { margin: 0 0 4px; font-size: .72rem; font-weight: 700; letter-spacing: .2em; text-transform: uppercase; color: var(--hx-a); }
+        #gs-mship-root .gs-hosting__section-sub { color: var(--hx-mute); }
+        #gs-mship-root :is(.gs-bk-title, .gs-bcg-title, .gs-hosting__analytics-title) { font-size: 1.4rem; font-weight: 700; letter-spacing: -.02em; color: #fff; background: none; -webkit-text-fill-color: #fff; }
+        #gs-mship-root :is(.gs-bk-sub, .gs-bcg-sub, .gs-hosting__analytics-sub) { color: var(--hx-mute); }
+        #gs-mship-root :is(.gs-bk-badge, .gs-bcg-badge):not(.is-warn) { background: rgba(122,167,255,.10); border: 1px solid rgba(122,167,255,.30); color: #c4d6ff; font-size: .66rem; letter-spacing: .16em; border-radius: 999px; padding: 5px 13px; }
+        #gs-mship-root .gs-bk-hero { padding: 26px 30px; }
+        #gs-mship-root .gs-bk-hero::before, #gs-mship-root .gs-bk-hero::after { display: none; }
+        #gs-mship-root .gs-bcg-stat { background: rgba(255,255,255,.04); border: 1px solid var(--hx-line); border-radius: 16px; }
+        #gs-mship-root .gs-bcg-stat .v { letter-spacing: -.02em; }
+        /* Buttons inside cards: ghost by default, gradient for the main action */
+        #gs-mship-root :is(.gs-bk-btn, .gs-bcg-btn, .gs-hosting__btn) { display: inline-flex; align-items: center; gap: 8px; border-radius: 999px; padding: 10px 20px; border: 1px solid var(--hx-line2); background: rgba(255,255,255,.05); color: var(--hx-text); font-size: .76rem; font-weight: 700; letter-spacing: .08em; text-transform: none; box-shadow: none; transition: border-color .2s ease, background .2s ease, transform .2s ease; }
+        #gs-mship-root :is(.gs-bk-btn, .gs-bcg-btn, .gs-hosting__btn):hover { border-color: rgba(122,167,255,.6); background: rgba(122,167,255,.10); color: #fff; transform: translateY(-1px); }
+        #gs-mship-root :is(.gs-bk-btn--cta, .gs-bcg-btn--cta) { border: 0; color: #fff !important; background: linear-gradient(135deg, #6d7cff, #a86bff); box-shadow: 0 10px 28px -10px rgba(120,110,255,.8), inset 0 1px 0 rgba(255,255,255,.25); }
+        #gs-mship-root :is(.gs-bk-btn--cta, .gs-bcg-btn--cta):hover { filter: brightness(1.08); }
+        #gs-mship-root .gs-hosting__btn.is-danger { border-color: rgba(244,63,94,.45); color: #fda4af; background: rgba(244,63,94,.08); }
+        #gs-mship-root .gs-hosting__table th { letter-spacing: .12em; }
+        #gs-mship-root .gs-hosting__table tbody tr:hover { background: rgba(122,167,255,.05); }
+        #gs-mship-root .gs-bk-hero { display: flex; align-items: center; justify-content: space-between; gap: 24px; flex-wrap: wrap; }
+        #gs-mship-root .gs-bk-main { flex: 1 1 320px; min-width: 0; }
+        #gs-mship-root .gs-bk-actions { flex: 0 0 auto; display: flex; flex-direction: row; justify-content: flex-end; width: auto; gap: 10px; flex-wrap: wrap; }
+        #gs-mship-root :is(.gs-hosting__search, .gs-hosting__select, .gs-hosting input[type="search"], .gs-hosting input[type="text"], .gs-hosting select) { background: rgba(8,14,28,.8); color: var(--hx-text); border: 1px solid var(--hx-line2); border-radius: 12px; padding: 9px 14px; font-size: .84rem; box-shadow: none; }
+        #gs-mship-root :is(.gs-hosting__search, .gs-hosting input[type="search"], .gs-hosting input[type="text"]):focus { outline: none; border-color: rgba(122,167,255,.7); box-shadow: 0 0 0 3px rgba(122,167,255,.16); }
+        /* The Backups / Email cards on top already carry the title: the stats panel below keeps only its numbers. */
+        #gs-mship-root [data-panel="backups"] .gs-panel-top + .gs-hosting__analytics-hero .gs-hosting__analytics-title,
+        #gs-mship-root [data-panel="backups"] .gs-panel-top + .gs-hosting__analytics-hero .gs-hosting__analytics-sub { display: none; }
+        #gs-mship-root .gs-hosting__panel > .gs-panel-top + * { margin-top: 0; }
+        @media (max-width: 720px) { #gs-mship-root .gs-mship-tab-btn { padding: 10px 14px; letter-spacing: .1em; } #gs-mship-root .gs-bk-hero { padding: 20px; } }
 
         /* ── Futuristic dashboard build-up animations ──────────────────
            Each layer of the membership card fades up and into place with
@@ -2036,7 +2165,8 @@ function gend_society_render_membership_panel( $payload = null ) {
                      on gdc_gas_ledger, paid out in real DGEN via
                      gdc_gas_credit_gcp_payee()), gs_hosting_server_price()
                      for Server Costs. ── -->
-                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <?php ob_start(); // the Compute Gas card is shown at the top of the Compute Gas tab ?>
+                <div class="gs-blk gs-blk--gas">
                     <?php
                     $gs_gas_data   = function_exists( 'gend_society_hosting_compute_gas_real_data' ) ? gend_society_hosting_compute_gas_real_data() : array();
                     $gs_gas_earned = function_exists( 'gend_society_hosting_gas_earned_summary' ) ? gend_society_hosting_gas_earned_summary( get_current_user_id() ) : array();
@@ -2202,10 +2332,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                         </div>
                     </div>
                 </div>
+                <?php $gs_blk_gas = ob_get_clean(); ?>
 
                 <!-- ── Email hosting — the Backups card's markup + popup for the Emails plans (storage + sending),
                      placed above Backups (gend_society_render_email_plan_card()). ── -->
-                <?php gend_society_render_email_plan_card( array( 'context' => 'dashboard' ) ); ?>
+                <?php
+                ob_start();
+                gend_society_render_email_plan_card( array( 'context' => 'dashboard' ) );
+                $gs_blk_email = ob_get_clean();
+                ?>
 
                 <!-- ── Backups — full-width bespoke hero (2-column: badge/
                      title/sub on the left, action buttons in their own
@@ -2218,7 +2353,8 @@ function gend_society_render_membership_panel( $payload = null ) {
                      'backups' plan-attach type
                      (gdc_register_backups_plan_product(),
                      gdc_plan_attach_types()). ── -->
-                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <?php ob_start(); // the Backups card is shown at the top of Storage > Backups ?>
+                <div class="gs-blk gs-blk--backups">
                     <?php
                     // Backup Plan pricing tiers — real WP Ultimo plan(s) under the
                     // 'backups' plan-attach type (gdc_register_backups_plan_product(),
@@ -2311,13 +2447,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                         </div>
                     </div>
                 </div>
+                <?php $gs_blk_backups = ob_get_clean(); ?>
 
                 <!-- ── Storage — real usage cards, moved here from Hosting →
                      Storage. Same function the Hosting tab itself calls for
                      the section_group=all (BuddyPress group) case, so this
                      stays in sync automatically. ── -->
+                <?php ob_start(); // the Storage cards are shown at the top of the Storage tab ?>
                 <?php if ( function_exists( 'gend_society_hosting_render_storage_resource_cards' ) ) : ?>
-                <div style="margin-top: 28px; padding-top: 24px; border-top: 1px solid rgba(255,255,255,0.08);">
+                <div class="gs-blk gs-blk--storage">
                     <?php
                     $gs_top_media_data  = function_exists( 'gend_society_hosting_collect_media' )  ? gend_society_hosting_collect_media()  : array();
                     $gs_top_tables_data = function_exists( 'gend_society_hosting_collect_tables' ) ? gend_society_hosting_collect_tables() : array();
@@ -2329,6 +2467,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                     ?>
                 </div>
                 <?php endif; ?>
+                <?php $gs_blk_storage = ob_get_clean(); ?>
             </div>
 
         </div>
@@ -2355,7 +2494,7 @@ function gend_society_render_membership_panel( $payload = null ) {
         // ?gs_tab=project-contracts&pm_project=<id>, and pm-admin.js opens that project). App/Hosting stay
         // manager-only, exactly as their tab buttons are.
         $gs_tab_req = isset( $_GET['gs_tab'] ) ? sanitize_key( wp_unslash( $_GET['gs_tab'] ) ) : '';
-        if ( 'project-contracts' === $gs_tab_req || ( $gs_can_manage && in_array( $gs_tab_req, array( 'app', 'hosting' ), true ) ) ) {
+        if ( 'project-contracts' === $gs_tab_req || ( $gs_can_manage && in_array( $gs_tab_req, array( 'app', 'hosting', 'compute-gas' ), true ) ) ) {
             $gs_default_tab = $gs_tab_req;
         }
         if ( isset( $_POST['gs_feature_access_nonce'] ) ) {
@@ -2374,11 +2513,20 @@ function gend_society_render_membership_panel( $payload = null ) {
             $gs_default_tab = 'hosting';
         }
         ?>
+        <?php // 7-day trial: days left, Pay now and Change plan (the trial carries over to the new plan).
+              if ( function_exists( 'gend_society_trial_banner_html' ) ) { echo gend_society_trial_banner_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+        ?>
+        <?php // Dashboards the plan includes but this site does not have yet: live progress while they are installed.
+              if ( function_exists( 'gend_society_feature_setup_panel_html' ) ) { echo gend_society_feature_setup_panel_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+        ?>
+        <?php // Free plan: a banner to unlock the dashboards (each plan has an info button that opens Storage > Codebase > Dashboards).
+              if ( function_exists( 'gend_society_unlock_banner_html' ) ) { echo gend_society_unlock_banner_html(); } // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built. ?>
         <div class="gs-mship-tabs">
             <div class="gs-mship-tabs-nav" role="tablist">
                 <?php if ( $gs_can_manage ) : ?>
                     <button type="button" class="gs-mship-tab-btn<?php echo 'app' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="app" role="tab"><span class="dashicons dashicons-admin-home gs-mship-tab-icon"></span><?php esc_html_e( 'App', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-mship-tab-btn<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Hosting', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="hosting" role="tab"><span class="dashicons dashicons-cloud gs-mship-tab-icon"></span><?php esc_html_e( 'Storage', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-mship-tab-btn<?php echo 'compute-gas' === $gs_default_tab ? ' is-active' : ''; ?>" data-tab="compute-gas" role="tab"><span class="dashicons dashicons-superhero gs-mship-tab-icon"></span><?php esc_html_e( 'Compute Gas', 'gend-society' ); ?></button>
                 <?php endif; ?>
                 <button type="button" class="gs-mship-tab-btn<?php echo $gs_default_tab === 'project-contracts' ? ' is-active' : ''; ?>" data-tab="project-contracts" role="tab"><span class="dashicons dashicons-portfolio gs-mship-tab-icon"></span><?php esc_html_e( 'Projects', 'gend-society' ); ?></button>
                 <?php // Domain + Backups removed from the top tab strip — both
@@ -2408,12 +2556,19 @@ function gend_society_render_membership_panel( $payload = null ) {
             </div>
 
             <!-- Hosting tab (Compute Gas / Servers / Storage / Tables) -->
-            <div class="gs-mship-tab-panel<?php echo 'hosting' === $gs_default_tab ? ' is-active' : ''; ?>" data-panel="hosting" role="tabpanel">
+            <?php // One console serves two top-level tabs: Storage (Backups / Media / Codebase / Tables / Email) and Compute Gas.
+                  // data-view says which; the tab buttons flip it (see the Tabs script) and CSS shows the matching top block + sub-tabs. ?>
+            <div class="gs-mship-tab-panel<?php echo in_array( $gs_default_tab, array( 'hosting', 'compute-gas' ), true ) ? ' is-active' : ''; ?>" data-panel="hosting" data-view="<?php echo 'compute-gas' === $gs_default_tab ? 'gas' : 'storage'; ?>" role="tabpanel">
+                <div class="gs-view gs-view--storage"><?php echo isset( $gs_blk_storage ) ? $gs_blk_storage : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered above by the Storage cards helper. ?></div>
+                <div class="gs-view gs-view--gas"><?php echo isset( $gs_blk_gas ) ? $gs_blk_gas : ''; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- rendered above. ?></div>
                 <?php
                 if ( function_exists( 'gend_society_render_hosting_tab' ) ) {
                     gend_society_render_hosting_tab( $payload, array(
                         'with_compute_gas' => true,
                         'section_group'    => 'hosting',
+                        'active_section'   => 'compute-gas' === $gs_default_tab ? 'compute-gas' : 'backups',
+                        'panel_top'        => array( 'backups' => isset( $gs_blk_backups ) ? $gs_blk_backups : '' ),
+                        'panel_extra'      => array( 'email' => isset( $gs_blk_email ) ? $gs_blk_email : '' ),
                     ) );
                 }
                 ?>
@@ -2817,8 +2972,26 @@ function gend_society_render_membership_panel( $payload = null ) {
         root.querySelectorAll('.gs-mship-tab-btn').forEach(function (b) {
             b.addEventListener('click', function () {
                 var tab = b.dataset.tab;
+                var panelKey = tab === 'compute-gas' ? 'hosting' : tab;
                 root.querySelectorAll('.gs-mship-tab-btn').forEach(function (x) { x.classList.toggle('is-active', x === b); });
-                root.querySelectorAll('.gs-mship-tab-panel').forEach(function (p) { p.classList.toggle('is-active', p.dataset.panel === tab); });
+                root.querySelectorAll('.gs-mship-tab-panel').forEach(function (p) { p.classList.toggle('is-active', p.dataset.panel === panelKey); });
+                if (panelKey === 'hosting') {
+                    var hp = root.querySelector('.gs-mship-tab-panel[data-panel="hosting"]');
+                    var hr = document.getElementById('gs-hosting-root-hosting');
+                    if (hp) { hp.dataset.view = tab === 'compute-gas' ? 'gas' : 'storage'; }
+                    if (hr) {
+                        var wantNav = hr.querySelector(tab === 'compute-gas' ? '.gs-hosting__nav[data-section="compute-gas"]' : '.gs-hosting__nav.is-active');
+                        var activeNav = hr.querySelector('.gs-hosting__nav.is-active');
+                        if (tab === 'compute-gas') {
+                            if (wantNav) { wantNav.click(); }
+                        } else if (activeNav) {
+                            if (activeNav.dataset.section === 'compute-gas') {
+                                var firstNav = hr.querySelector('.gs-hosting__nav[data-section="backups"]');
+                                if (firstNav) { firstNav.click(); }
+                            }
+                        }
+                    }
+                }
             });
         });
 
@@ -3153,7 +3326,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                         right.className = 'gs-plan-picker__card-price';
                         right.textContent = p.price_label || '';
                     }
+                    var info = document.createElement('span');
+                    info.className = 'gs-unlock__info';
+                    info.setAttribute('role', 'button');
+                    info.setAttribute('tabindex', '0');
+                    info.setAttribute('data-gs-goto-dashboards', '1');
+                    info.title = 'See what the dashboards include';
+                    info.textContent = 'i';
                     card.appendChild(left);
+                    if (planParams.resource === undefined) { card.appendChild(info); }
                     card.appendChild(right);
                     card.addEventListener('click', function () {
                         if (card.disabled) return;
@@ -3211,6 +3392,15 @@ function gend_society_render_membership_panel( $payload = null ) {
             });
         });
 
+        // A reload after a domain change must land on the Domains tab again (the hosting console remembers it for one load).
+        function keepDomainsTabReload(ms) {
+            try {
+                var hr = document.querySelector('.gs-hosting');
+                if (hr) { sessionStorage.setItem('gsHostingResume:' + hr.id, 'domains'); }
+            } catch (e) {}
+            setTimeout(function () { location.reload(); }, ms || 800);
+        }
+
         // Add domain
         var addForm = root.querySelector('[data-gs-mship="add-domain"]');
         if (addForm) {
@@ -3220,7 +3410,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                 var domain = (input.value || '').trim().toLowerCase();
                 if (!domain) return;
                 ajaxAction('gend_society_membership_domain_add', { domain: domain }, addForm.querySelector('button'))
-                    .then(function () { toast('Domain added.', 'success'); setTimeout(function(){ location.reload(); }, 800); })
+                    .then(function () { toast('Domain added.', 'success'); keepDomainsTabReload(800); })
                     .catch(function (e) { toast(e.message, 'error'); });
             });
         }
@@ -3232,14 +3422,48 @@ function gend_society_render_membership_panel( $payload = null ) {
             var act = b.dataset.gsMship;
 
             if (act === 'verify-domain') {
+                var card = b.closest('.gs-dom');
+                var out = card ? card.querySelector('[data-gs-dom-result]') : null;
+                var say = function (cls, text) {
+                    if (out) { out.className = 'gs-dom__result ' + cls; out.textContent = text; } else { toast(text, cls === 'is-err' ? 'error' : 'success'); }
+                };
+                say('is-busy', 'Checking your DNS records…');
                 ajaxAction('gend_society_membership_domain_verify', { domain: b.dataset.domain }, b)
-                    .then(function (d) { toast('Verify: ' + (d.stage || 'ok'), 'success'); })
-                    .catch(function (e) { toast(e.message, 'error'); });
+                    .then(function (d) {
+                        var c = d.checks || {};
+                        ['a', 'txt'].forEach(function (k) {
+                            var el = card ? card.querySelector('[data-gs-chk="' + k + '"]') : null;
+                            if (!el) { return; }
+                            if (typeof c[k] === 'undefined') { el.textContent = ''; el.className = 'gs-dom__chk'; return; }
+                            el.className = 'gs-dom__chk ' + (c[k] ? 'is-ok' : 'is-miss');
+                            el.textContent = c[k] ? '\u2713 Found' : '\u2717 Not found yet';
+                        });
+                        var st = d.stage || '';
+                        if (st === 'checking-dns' || st === 'failed' || st === '') {
+                            var missing = [];
+                            if (c.a === false) { missing.push('the A record'); }
+                            if (c.txt === false) { missing.push('the TXT record'); }
+                            say('is-warn', (missing.length ? 'We could not see ' + missing.join(' and ') + ' yet. ' : 'Your DNS records were not detected yet. ') + 'DNS changes can take a few minutes to reach us. We re-check every 5 minutes, or press Verify again.');
+                            return;
+                        }
+                        if (st === 'checking-ssl-cert') { say('is-ok', 'DNS verified. Issuing the certificate (1-2 minutes).'); }
+                        else if (st === 'done') { say('is-ok', 'Your domain is verified and secure.'); }
+                        else if (st === 'done-without-ssl') { say('is-warn', 'Your domain works, but its certificate is not issued yet. Press Retry certificate in a minute.'); }
+                        else { say('is-ok', 'Verified. Updating this page...'); }
+                        keepDomainsTabReload(1600);
+                    })
+                    .catch(function (e) { say('is-err', (e && e.message) ? e.message : 'Could not verify this domain. Please try again.'); });
             } else if (act === 'remove-domain') {
-                if (!confirm('Remove ' + b.dataset.domain + '?')) return;
-                ajaxAction('gend_society_membership_domain_remove', { domain: b.dataset.domain }, b)
-                    .then(function () { var li = b.closest('li'); if (li) li.remove(); toast('Domain removed.', 'success'); })
-                    .catch(function (e) { toast(e.message, 'error'); });
+                var doRemove = function () {
+                    ajaxAction('gend_society_membership_domain_remove', { domain: b.dataset.domain }, b)
+                        .then(function () { var cd = b.closest('.gs-dom'); if (cd) { cd.remove(); } toast('Domain removed.', 'success'); keepDomainsTabReload(900); })
+                        .catch(function (e) { toast(e.message, 'error'); });
+                };
+                if (window.gsDialog) {
+                    window.gsDialog.confirm('Visitors will no longer reach your site at ' + b.dataset.domain + '. This does not delete your site.', { title: 'Remove ' + b.dataset.domain + '?', ok: 'Remove domain', danger: true }).then(function (yes) { if (yes) { doRemove(); } });
+                } else if (confirm('Remove ' + b.dataset.domain + '?')) {
+                    doRemove();
+                }
             } else if (act === 'backup-now') {
                 ajaxAction('gend_society_membership_backup_now', {}, b)
                     .then(function () { toast('Backup started. Reload in ~2 minutes.', 'success'); })

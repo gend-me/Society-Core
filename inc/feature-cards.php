@@ -133,7 +133,11 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         .gs-fc-img { width: 100%; height: 160px; object-fit: cover; object-position: top center; border-bottom: 1px solid rgba(255,255,255,0.05); }
         .gs-fc-media .gs-fc-update { position: absolute; bottom: 12px; right: 12px; margin: 0; z-index: 10; background: rgba(20,24,34,0.82); border-color: rgba(255,255,255,0.18); backdrop-filter: blur(10px); }
         .gs-fc-body { padding: 24px; flex: 1; display: flex; flex-direction: column; }
-        .gs-fc-title { margin: 0 0 10px 0; color: #fff; font-size: 1.25rem; font-weight: 700; }
+        .gs-fc-head { display: flex; align-items: flex-start; justify-content: space-between; gap: 12px; margin: 0 0 10px 0; }
+        .gs-fc-title { margin: 0; color: #fff; font-size: 1.25rem; font-weight: 700; line-height: 1.25; }
+        .gs-fc-info { flex: 0 0 auto; width: 32px; height: 32px; margin: -3px -6px 0 0; border-radius: 50%; display: inline-flex; align-items: center; justify-content: center; color: #9fb4ff; text-decoration: none; border: 1px solid rgba(159,180,255,.28); background: rgba(255,255,255,.04); transition: all .2s ease; }
+        .gs-fc-info:hover, .gs-fc-info:focus { color: #fff; border-color: rgba(159,180,255,.8); background: rgba(122,140,255,.22); outline: none; }
+        .gs-fc-info .dashicons { font-size: 18px; width: 18px; height: 18px; }
         .gs-fc-size { margin: -6px 0 10px 0; color: var(--gs-muted); font-size: 0.78rem; display: flex; align-items: center; gap: 5px; }
         .gs-fc-size .dashicons { font-size: 14px; width: 14px; height: 14px; }
         .gs-fc-desc { margin: 0 0 24px 0; color: var(--gs-muted); font-size: 0.9rem; line-height: 1.5; flex: 1; }
@@ -145,7 +149,28 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         .gs-fc-status { position: absolute; top: 16px; right: 16px; padding: 4px 10px; border-radius: 999px; font-size: 0.75rem; font-weight: 700; text-transform: uppercase; letter-spacing: 0.5px; z-index: 10; backdrop-filter: blur(10px); }
         .gs-fc-status.active { background: rgba(16, 185, 129, 0.8); color: #fff; box-shadow: 0 2px 10px rgba(16, 185, 129, 0.4); }
         .gs-fc-status.inactive { background: rgba(20, 24, 34, 0.8); color: var(--gs-muted); border: 1px solid rgba(255,255,255,0.1); }
+        .gs-fc-status.locked { background: rgba(32, 24, 64, 0.88); color: #d9c9ff; border: 1px solid rgba(183,156,255,0.45); }
+        .gs-fc-need { margin: -12px 0 16px 0; font-size: 0.82rem; color: #c4b5fd; }
+        .gs-fc-plans { display: flex; flex-direction: column; gap: 8px; width: 100%; }
+        .gs-fc-plans .gs-buy { width: 100%; }
+        .gs-unlock-btn { position: relative; overflow: hidden; width: 100%; display: flex; align-items: center; gap: 14px; padding: 14px 18px; border-radius: 14px; text-align: left; text-transform: none; letter-spacing: 0; background: linear-gradient(120deg, #5b6cff 0%, #8b5cf6 55%, #c26bff 100%); box-shadow: 0 14px 34px -14px rgba(130,100,255,.95), inset 0 1px 0 rgba(255,255,255,.3); }
+        .gs-unlock-btn::after { content: ""; position: absolute; inset: 0; background: linear-gradient(105deg, transparent 35%, rgba(255,255,255,.28) 50%, transparent 65%); transform: translateX(-120%); transition: transform .7s ease; }
+        .gs-unlock-btn:hover::after, .gs-unlock-btn:focus::after { transform: translateX(120%); }
+        .gs-unlock-btn:hover, .gs-unlock-btn:focus { transform: translateY(-2px); box-shadow: 0 20px 40px -14px rgba(150,110,255,1), inset 0 1px 0 rgba(255,255,255,.35); }
+        .gs-unlock-btn__icon { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; background: rgba(255,255,255,.2); display: inline-flex; align-items: center; justify-content: center; font-size: 18px; line-height: 1; }
+        .gs-unlock-btn__text { flex: 1 1 auto; min-width: 0; display: flex; flex-direction: column; gap: 2px; }
+        .gs-unlock-btn__main { font-size: .95rem; font-weight: 700; line-height: 1.25; color: #fff; }
+        .gs-unlock-btn__price { font-size: .8rem; font-weight: 500; color: rgba(255,255,255,.82); }
+        .gs-fc-plans .gs-unlock-btn { border-radius: 16px !important; text-transform: none !important; letter-spacing: 0 !important; }
+        .gs-fc-plans .gs-unlock-btn span { text-transform: none !important; letter-spacing: 0 !important; }
+        .gs-fc-plans .gs-unlock-btn .gs-unlock-btn__main { font-size: .95rem !important; font-weight: 700 !important; }
+        .gs-fc-plans .gs-unlock-btn .gs-unlock-btn__price { font-size: .8rem !important; font-weight: 500 !important; }
+        .gs-unlock-btn__arrow { flex: 0 0 auto; font-size: 1.25rem; transition: transform .2s ease; }
+        .gs-unlock-btn:hover .gs-unlock-btn__arrow { transform: translateX(4px); }
     </style>';
+    if (function_exists('gend_society_plan_buy_assets')) {
+        gend_society_plan_buy_assets();
+    }
 
     // 111-12 (MIG-15): after Live the origin's cards for what now runs on the new site read the hub's list (no local state).
     $gs_fc_moved = function_exists('gend_society_origin_moved') ? gend_society_origin_moved() : array('moved' => false, 'to' => '');
@@ -155,6 +180,8 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             $gs_fc_hub[$gs_fc_f['slug']] = true;
         }
     }
+
+    $gs_fc_vm = function_exists('gend_society_plan_view_model') ? gend_society_plan_view_model() : array();
 
     echo '<div class="gs-feature-grid">';
 
@@ -176,6 +203,10 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         // entry name gs_hosting_collect_codebase_breakdown() keys its real
         // disk-walk results by - falls back to the plugin file itself for
         // the rare single-file-plugin case (no subdirectory).
+        $gs_fc_plan      = function_exists('gend_society_feature_plan_status') ? gend_society_feature_plan_status((string) $slug) : array('state' => 'unknown', 'unlock_plan' => null, 'upgrades' => array(), 'vm_state' => 'not_connected', 'plan_is_free' => false);
+        $gs_fc_installed = file_exists(WP_PLUGIN_DIR . '/' . $feature['plugin']);
+        // The dashboard plan decides whether a dashboard can be switched on; where the app is hosted does not.
+        $gs_fc_locked    = !$is_active && !$gs_fc_on_new && 'upgrade' === $gs_fc_plan['state'];
         $gs_fc_folder = (strpos($feature['plugin'], '/') !== false) ? dirname($feature['plugin']) : $feature['plugin'];
         $gs_fc_bytes = $gs_fc_sizes[$gs_fc_folder] ?? null;
 
@@ -186,6 +217,10 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
             echo '<div class="gs-fc-status active">' . esc_html__('Active on your new site', 'gend-society') . '</div>';
         } elseif ($is_active) {
             echo '<div class="gs-fc-status active">' . esc_html__('Active', 'gend-society') . '</div>';
+        } elseif ($gs_fc_locked) {
+            $gs_fc_need_name = is_array($gs_fc_plan['unlock_plan']) && '' !== (string) $gs_fc_plan['unlock_plan']['name'] ? (string) $gs_fc_plan['unlock_plan']['name'] : __('a dashboard plan', 'gend-society');
+            /* translators: %s: plan name. */
+            echo '<div class="gs-fc-status locked">' . esc_html(sprintf(__('Requires %s', 'gend-society'), $gs_fc_need_name)) . '</div>';
         } else {
             echo '<div class="gs-fc-status inactive">' . esc_html__('Inactive', 'gend-society') . '</div>';
         }
@@ -201,6 +236,8 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         // Update Button - overlaid bottom-right of the image/header section.
         if ($gs_fc_on_new) {
             // 111-12: the plugin runs on the new site; no update control here.
+        } elseif (!$is_active) {
+            // An inactive dashboard has nothing to update: no update control until it is switched on.
         } elseif ($has_update) {
             echo '<button class="gs-btn gs-btn-secondary gs-fc-btn-icon gs-fc-update gs-ajax-action" data-action="update" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '" title="Install Update">';
             echo '<span class="dashicons dashicons-update"></span>';
@@ -216,11 +253,27 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
 
         // Body
         echo '<div class="gs-fc-body">';
-        echo '<h3 class="gs-fc-title">' . esc_html($feature['name']) . '</h3>';
+        echo '<div class="gs-fc-head"><h3 class="gs-fc-title">' . esc_html($feature['name']) . '</h3>';
+        echo '<a href="' . esc_url($feature['link']) . '" target="_blank" rel="noopener" class="gs-fc-info" title="' . esc_attr__('More info', 'gend-society') . '" aria-label="' . esc_attr(sprintf(/* translators: %s: dashboard name. */ __('More about %s', 'gend-society'), $feature['name'])) . '"><span class="dashicons dashicons-info-outline"></span></a></div>';
         if ($show_sizes) {
             echo '<div class="gs-fc-size"><span class="dashicons dashicons-editor-code"></span>' . esc_html($gs_fc_bytes !== null ? size_format($gs_fc_bytes, 2) : __('Size unavailable', 'gend-society')) . '</div>';
         }
         echo '<p class="gs-fc-desc">' . esc_html($feature['description']) . '</p>';
+        if ($gs_fc_locked) {
+            /* translators: %s: plan name. */
+            // "and higher plans" only when a higher tier exists: the top plan is simply "Included with <plan>".
+            $gs_fc_need_rank = 0;
+            $gs_fc_top_rank  = 0;
+            foreach ((array) ($gs_fc_vm['tiers'] ?? array()) as $gs_fc_tier) {
+                $gs_fc_top_rank = max($gs_fc_top_rank, (int) ($gs_fc_tier['rank'] ?? 0));
+                if (is_array($gs_fc_plan['unlock_plan']) && ((int) ($gs_fc_plan['unlock_plan']['id'] ?? 0) === (int) ($gs_fc_tier['id'] ?? -1) || ('' !== (string) ($gs_fc_plan['unlock_plan']['slug'] ?? '') && (string) $gs_fc_plan['unlock_plan']['slug'] === (string) ($gs_fc_tier['slug'] ?? '')))) {
+                    $gs_fc_need_rank = (int) ($gs_fc_tier['rank'] ?? 0);
+                }
+            }
+            $gs_fc_has_higher = $gs_fc_need_rank > 0 && $gs_fc_top_rank > $gs_fc_need_rank;
+            /* translators: %s: plan name. */
+            echo '<p class="gs-fc-need">' . esc_html(sprintf($gs_fc_has_higher ? __('Included with %s and higher plans.', 'gend-society') : __('Included with %s.', 'gend-society'), $gs_fc_need_name)) . '</p>';
+        }
 
         // Actions
         echo '<div class="gs-fc-actions">';
@@ -229,15 +282,45 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         if ($gs_fc_on_new) {
             echo '<a href="' . esc_url($gs_fc_moved['to']) . '" target="_blank" rel="noopener noreferrer" class="gs-btn gs-btn-secondary gs-fc-btn" data-gs-fc-new-site="1">' . esc_html__('Open on your new site', 'gend-society') . '</a>';
         } elseif ($is_active) {
-            echo '<a href="' . esc_url(admin_url('plugins.php')) . '" class="gs-btn gs-btn-secondary gs-fc-btn">' . esc_html__('Manage Plugin', 'gend-society') . '</a>';
+            echo '<button type="button" class="gs-btn gs-btn-secondary gs-fc-btn gs-fc-deactivate" data-gs-fc-deactivate="1" data-name="' . esc_attr($feature['name']) . '" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Deactivate', 'gend-society') . '</button>';
+        } elseif ($gs_fc_locked) {
+            echo '<div class="gs-fc-plans">';
+            $gs_fc_first = true;
+            foreach ((array) $gs_fc_plan['upgrades'] as $gs_fc_t) {
+                /* translators: 1: plan name, 2: price. */
+                echo '<button type="button" class="gs-buy gs-unlock-btn" data-gs-buy-plan="1" data-plan-id="' . esc_attr((string) $gs_fc_t['id']) . '"><span class="gs-unlock-btn__icon dashicons dashicons-unlock" aria-hidden="true"></span><span class="gs-unlock-btn__text"><span class="gs-unlock-btn__main">' . esc_html(sprintf(__('Unlock with %1$s', 'gend-society'), $gs_fc_t['name'])) . '</span><span class="gs-unlock-btn__price">' . esc_html($gs_fc_t['price_label']) . '</span></span><span class="gs-unlock-btn__arrow" aria-hidden="true">&rarr;</span></button>';
+                $gs_fc_first = false;
+                break; // one button: the plan that unlocks it (the banner above lists every plan)
+            }
+            if ($gs_fc_first) {
+                echo '<button type="button" class="gs-buy" data-gs-goto-dashboards="1">' . esc_html__('See the plans', 'gend-society') . '</button>';
+            }
+            echo '</div>';
+        } elseif ('unknown' === $gs_fc_plan['state'] && 'not_connected' === $gs_fc_plan['vm_state']) {
+            $gs_fc_connect = function_exists('gend_society_connect_url') ? gend_society_connect_url() : admin_url('index.php');
+            echo '<a class="gs-buy gs-fc-btn" href="' . esc_url($gs_fc_connect) . '">' . esc_html__('Connect to unlock', 'gend-society') . '</a>';
+        } elseif (!$gs_fc_installed) {
+            // Included with the plan, not on this site yet. The signed-package installer (Phase 114) will fetch and switch it on by itself;
+            // until it ships the card says so instead of offering a button that cannot work.
+            if (function_exists('gend_society_build_variant') && 'wporg' === gend_society_build_variant()) {
+                echo '<a class="gs-buy gs-fc-btn" href="' . esc_url(function_exists('gend_society_sa_menu_full_build_url') ? gend_society_sa_menu_full_build_url() : 'https://gend.me') . '" target="_blank" rel="noopener">' . esc_html__('Get the full GenD Society build', 'gend-society') . '</a>';
+            } elseif (function_exists('gend_society_feature_installer_enabled') && gend_society_feature_installer_enabled()) {
+                $gs_fc_rec   = function_exists('gend_society_feature_install_records') ? (gend_society_feature_install_records()[$slug] ?? array()) : array();
+                $gs_fc_rstate = (string) ($gs_fc_rec['state'] ?? '');
+                if (in_array($gs_fc_rstate, array('queued', 'installing'), true)) {
+                    echo '<span class="gs-fc-need" data-gs-fc-installing="1" data-gs-setup-line="' . esc_attr((string) $slug) . '" style="margin:0">' . esc_html__('Included with your plan. Setting it up now...', 'gend-society') . '</span>';
+                } else {
+                    if ('failed' === $gs_fc_rstate && '' !== (string) ($gs_fc_rec['message'] ?? '')) {
+                        echo '<span class="gs-fc-need" style="margin:0 0 8px;color:#fca5a5">' . esc_html((string) $gs_fc_rec['message']) . '</span>';
+                    }
+                    echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="install" data-feature="' . esc_attr((string) $slug) . '" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html('failed' === $gs_fc_rstate ? __('Retry install', 'gend-society') : __('Install and activate', 'gend-society')) . '</button>';
+                }
+            } else {
+                echo '<span class="gs-fc-need" style="margin:0">' . esc_html__('Included with your plan.', 'gend-society') . '</span>';
+            }
         } else {
             echo '<button class="gs-btn gs-fc-btn gs-ajax-action" data-action="activate" data-plugin="' . esc_attr($feature['plugin']) . '" data-nonce="' . esc_attr($nonce) . '">' . esc_html__('Activate', 'gend-society') . '</button>';
         }
-
-        // Info Button
-        echo '<a href="' . esc_url($feature['link']) . '" target="_blank" class="gs-btn gs-btn-secondary gs-fc-btn-icon" title="More Info">';
-        echo '<span class="dashicons dashicons-info"></span>';
-        echo '</a>';
 
         echo '</div>'; // End Actions
         echo '</div>'; // End Body
@@ -270,6 +353,37 @@ function gend_society_ajax_activate_plugin() {
     }
 
     wp_send_json_success(array('message' => __('Plugin activated successfully.', 'gend-society')));
+}
+
+/**
+ * AJAX Handler: Deactivate Plugin (a dashboard card's Deactivate, after the owner confirmed). Files and settings are kept;
+ * GenD Society itself can never be switched off from here.
+ */
+add_action('wp_ajax_gend_society_deactivate_plugin', 'gend_society_ajax_deactivate_plugin');
+function gend_society_ajax_deactivate_plugin() {
+    check_ajax_referer('gs_plugin_actions', 'nonce');
+
+    if (!current_user_can('activate_plugins')) {
+        wp_send_json_error(array('message' => __('You do not have permission to deactivate plugins.', 'gend-society')));
+    }
+
+    $plugin = isset($_POST['plugin']) ? sanitize_text_field(wp_unslash($_POST['plugin'])) : '';
+    if ('' === $plugin || validate_file($plugin) !== 0) {
+        wp_send_json_error(array('message' => __('No plugin specified.', 'gend-society')));
+    }
+    if (plugin_basename(GEND_SOCIETY_FILE) === $plugin) {
+        wp_send_json_error(array('message' => __('GenD Society cannot be deactivated from here.', 'gend-society')));
+    }
+
+    if (!function_exists('deactivate_plugins')) {
+        require_once ABSPATH . 'wp-admin/includes/plugin.php';
+    }
+    deactivate_plugins($plugin);
+    if (is_plugin_active($plugin)) {
+        wp_send_json_error(array('message' => __('The plugin could not be deactivated.', 'gend-society')));
+    }
+
+    wp_send_json_success(array('message' => __('Plugin deactivated.', 'gend-society')));
 }
 
 /**
@@ -414,11 +528,13 @@ function gend_society_feature_cards_ajax_script() {
 
             if (action === 'activate') {
                 $btn.addClass('activating').html('<?php esc_html_e('Activating...', 'gend-society'); ?>');
+            } else if (action === 'install') {
+                $btn.addClass('activating').html('<?php esc_html_e('Installing...', 'gend-society'); ?>');
             } else if (action === 'update') {
                 $btn.addClass('updating').html('<span class="dashicons dashicons-update" style="animation: spin 2s linear infinite;"></span>');
             }
 
-            var ajaxAction = action === 'activate' ? 'gend_society_activate_plugin' : 'gend_society_update_plugin';
+            var ajaxAction = action === 'activate' ? 'gend_society_activate_plugin' : (action === 'install' ? 'gend_society_install_feature' : 'gend_society_update_plugin');
 
             $.ajax({
                 url: ajaxurl,
@@ -426,6 +542,7 @@ function gend_society_feature_cards_ajax_script() {
                 data: {
                     action: ajaxAction,
                     plugin: plugin,
+                    feature: $btn.data('feature') || '',
                     nonce: nonce
                 },
                 success: function(response) {
@@ -440,6 +557,31 @@ function gend_society_feature_cards_ajax_script() {
                     alert('<?php esc_html_e('An error occurred during the request.', 'gend-society'); ?>');
                     $btn.removeClass('activating updating').html(originalHtml);
                 }
+            });
+        });
+
+        // Deactivate: ask first (styled popup), then switch the plugin off and reload so the card shows its new state.
+        $(document).on('click', '[data-gs-fc-deactivate]', function(e) {
+            e.preventDefault();
+            var $btn = $(this);
+            if ($btn.hasClass('activating')) return;
+            var name = $btn.data('name') || '<?php echo esc_js(__('this plugin', 'gend-society')); ?>';
+            var msg = '<?php echo esc_js(__('It stops running on this site until you switch it on again. Your content and settings are kept.', 'gend-society')); ?>';
+            var title = '<?php echo esc_js(__('Deactivate', 'gend-society')); ?> ' + name + '?';
+            var ask = window.gsDialog ? window.gsDialog.confirm(msg, { title: title, ok: '<?php echo esc_js(__('Deactivate', 'gend-society')); ?>', cancel: '<?php echo esc_js(__('Keep it active', 'gend-society')); ?>', danger: true }) : Promise.resolve(window.confirm(title + ' ' + msg));
+            ask.then(function(yes) {
+                if (!yes) return;
+                var original = $btn.html();
+                $btn.addClass('activating').text('<?php echo esc_js(__('Deactivating...', 'gend-society')); ?>');
+                $.post(ajaxurl, { action: 'gend_society_deactivate_plugin', plugin: $btn.data('plugin'), nonce: $btn.data('nonce') }).done(function(r) {
+                    if (r && r.success) { location.reload(); return; }
+                    $btn.removeClass('activating').html(original);
+                    var m = (r && r.data && r.data.message) ? r.data.message : '<?php echo esc_js(__('An error occurred.', 'gend-society')); ?>';
+                    if (window.gsDialog) { window.gsDialog.alert(m, { title: '<?php echo esc_js(__('Could not deactivate', 'gend-society')); ?>' }); } else { window.alert(m); }
+                }).fail(function() {
+                    $btn.removeClass('activating').html(original);
+                    window.alert('<?php echo esc_js(__('An error occurred during the request.', 'gend-society')); ?>');
+                });
             });
         });
 

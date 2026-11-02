@@ -22,6 +22,7 @@
 .gs-mship-mig__actions { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; }
 .gs-mship-mig__note { margin: 0; font-size: 0.82rem; line-height: 1.45; color: #fff; opacity: 0.85; text-align: center; }
 .gs-mship-mig__note:empty { display: none; }
+.gs-mship-mig__note--action { opacity: 1; font-weight: 700; font-size: 0.9rem; color: #fde68a; }
 .gs-mship-mig__start { display: flex; flex-direction: column; gap: 12px; padding-top: 12px; border-top: 1px solid rgba(255, 255, 255, 0.08); }
 .gs-mship-mig__start[hidden] { display: none; }
 .gs-mship-mig__freeze { margin: 0; font-size: 0.85rem; line-height: 1.45; color: #fde68a; }
@@ -29,3 +30,29 @@
 .gs-mship-mig__when { display: flex; gap: 14px; align-items: center; flex-wrap: wrap; }
 .gs-mship-mig__when input[type="datetime-local"] { background: #1a1e26; color: #fff; border: 1px solid rgba(255, 255, 255, 0.12); border-radius: 8px; padding: 6px 8px; }
 .gs-mship-mig__start .gend-society-readiness { margin: 0; }
+/* Start step: the readiness card as a summary pill plus one tile per check (matches the hub popup's card). */
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness { margin: 0; padding: 18px 20px; border-radius: 16px; border: 1px solid rgba(56, 189, 248, 0.2); background: linear-gradient(155deg, rgba(15, 23, 42, 0.78), rgba(8, 14, 28, 0.7)); box-shadow: none; color: #e2e8f0; text-align: left; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness h2 { margin: 0 0 4px; padding: 0; font-size: 0.75rem; font-weight: 700; letter-spacing: 0.2em; text-transform: uppercase; color: #67e8f9; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .description { margin: 0 0 12px; font-size: 0.82rem; line-height: 1.45; color: #94a3b8; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-summary { display: inline-flex; align-items: center; gap: 8px; margin: 0 0 14px; padding: 6px 14px; border-radius: 999px; font-size: 0.88rem; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-summary.no-blockers { background: rgba(34, 197, 94, 0.14); border: 1px solid rgba(34, 197, 94, 0.35); color: #86efac; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-summary.no-blockers::before { content: "\2713"; font-weight: 700; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-summary.has-blockers { background: rgba(239, 68, 68, 0.14); border: 1px solid rgba(239, 68, 68, 0.4); color: #fca5a5; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-summary.has-blockers::before { content: "!"; font-weight: 700; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table { display: block; width: 100%; border: 0; background: transparent; box-shadow: none; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table tbody { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table tr { display: grid; grid-template-columns: minmax(0, 1fr) auto; align-items: center; align-content: start; gap: 4px 10px; padding: 10px 14px; border: 1px solid rgba(148, 163, 184, 0.16); border-radius: 12px; background: rgba(8, 15, 27, 0.62) !important; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table td { display: block; padding: 0; border: 0; background: transparent !important; color: #cbd5e1; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table td.gend-society-readiness-label { font-size: 0.82rem; font-weight: 600; color: #f1f5f9; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table td.gend-society-readiness-status { text-align: right; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table td.gend-society-readiness-message { grid-column: 1 / -1; font-size: 0.78rem; line-height: 1.45; color: #94a3b8; overflow-wrap: anywhere; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-badge { display: inline-block; padding: 2px 9px; border-radius: 999px; font-size: 0.72rem; font-weight: 700; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-badge--pass { background: rgba(34, 197, 94, 0.18); color: #86efac; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-badge--warn { background: rgba(234, 179, 8, 0.18); color: #fde047; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-badge--fail { background: rgba(239, 68, 68, 0.2); color: #fca5a5; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-badge--info { background: rgba(56, 189, 248, 0.16); color: #7dd3fc; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness form { margin: 12px 0 0; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness form .button { background: transparent; border: 1px solid rgba(148, 163, 184, 0.35); color: #e2e8f0; border-radius: 999px; padding: 6px 16px; font-weight: 600; cursor: pointer; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness form .button:hover, .gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness form .button:focus { border-color: rgba(56, 189, 248, 0.6); color: #fff; }
+.gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table + .description { margin: 12px 0 0; }
+@media (max-width: 760px) { .gs-mship-progress--migration .gs-mship-mig__start .gend-society-readiness .gend-society-readiness-table tbody { grid-template-columns: minmax(0, 1fr); } }

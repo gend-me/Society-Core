@@ -261,7 +261,23 @@ if ( ! function_exists( 'gend_society_sa_menu_feature_html' ) ) {
 			$h .= '<p class="gs-up-actions"><a class="button button-primary" data-gs-full-build="1" href="' . esc_url( gend_society_sa_menu_full_build_url() ) . '" target="_blank" rel="noopener">' . esc_html__( 'Get the full GenD Society build on gend.me', 'gend-society' ) . '</a></p>';
 		} else {
 			/* translators: %s: feature name. */
-			$h .= '<p>' . esc_html( sprintf( __( '%s is included with your plan. Its feature package is installed from gend.me by a later GenD Society update.', 'gend-society' ), $label ) ) . '</p>';
+			// The dashboards of this area: while they are being installed the page shows each step; once on, the real menu replaces this page.
+			$gs_only = array();
+			if ( function_exists( 'gend_society_plan_view_model' ) ) {
+				foreach ( (array) ( gend_society_plan_view_model()['features'] ?? array() ) as $gs_f ) {
+					if ( (string) $gs_f['area'] === $area ) {
+						$gs_only[] = (string) $gs_f['slug'];
+					}
+				}
+			}
+			$gs_panel = function_exists( 'gend_society_feature_setup_panel_html' ) ? gend_society_feature_setup_panel_html( $gs_only, true ) : '';
+			if ( '' !== $gs_panel ) {
+				/* translators: %s: feature name. */
+				$h .= '<p>' . esc_html( sprintf( __( '%s is included with your plan and is being installed on this site now.', 'gend-society' ), $label ) ) . '</p>' . $gs_panel;
+			} else {
+				/* translators: %s: feature name. */
+				$h .= '<p>' . esc_html( sprintf( __( '%s is included with your plan. The full GenD Society build installs it from gend.me; open Plugins to see it.', 'gend-society' ), $label ) ) . '</p>';
+			}
 		}
 		return $h . '</div>';
 	}

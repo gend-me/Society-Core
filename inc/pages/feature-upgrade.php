@@ -371,7 +371,10 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 		}
 
 		$state = isset( $hint['state'] ) ? (string) $hint['state'] : ( is_array( $area ) ? (string) $area['state'] : 'unknown' );
-		if ( ! in_array( $state, array( 'included', 'upgrade', 'after_migration' ), true ) ) {
+		if ( 'after_migration' === $state ) {
+			$state = 'upgrade'; // hosting never decides access: only the dashboard plan does
+		}
+		if ( ! in_array( $state, array( 'included', 'upgrade' ), true ) ) {
 			$state = 'unknown';
 		}
 		$unlock = null;
@@ -393,32 +396,22 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			/* translators: %s: plan name that unlocks this area. */
 			$h   .= '<p class="gs-up-state" data-gs-up-copy="upgrade">' . esc_html( sprintf( __( 'Available with %s', 'gend-society' ), $name ) ) . '</p>';
 			/* translators: 1: area name, 2: plan name. */
-			$h   .= '<p>' . esc_html( sprintf( __( '%1$s is hosted on gend.me and opens here in wp-admin once this site is on %2$s. The checkout opens in a small gend.me window; this page updates when it closes.', 'gend-society' ), $label, $name ) ) . '</p>';
-			$tier = null;
-			foreach ( (array) ( $vm['tiers'] ?? array() ) as $t ) {
-				if ( is_array( $unlock ) && ( ( (int) $unlock['id'] > 0 && (int) $t['id'] === (int) $unlock['id'] ) || ( '' !== (string) $unlock['slug'] && (string) $t['slug'] === (string) $unlock['slug'] ) ) ) {
-					$tier = $t;
+			$h   .= '<p>' . esc_html( sprintf( __( '%1$s comes with %2$s and the plans above it. Upgrading installs and switches it on for this site; nothing else needs to move.', 'gend-society' ), $label, $name ) ) . '</p>';
+			$ups = function_exists( 'gend_society_plan_upgrade_tiers' ) ? gend_society_plan_upgrade_tiers( $vm, is_array( $unlock ) ? $unlock : null ) : array();
+			$h  .= '<p class="gs-up-actions">';
+			foreach ( $ups as $i => $u ) {
+				/* translators: 1: plan name, 2: price. */
+				$h .= '<button type="button" class="gs-buy' . ( 0 === $i ? '' : ' gs-buy--ghost' ) . '" data-gs-buy-plan="1" data-plan-id="' . esc_attr( (string) $u['id'] ) . '">' . esc_html( sprintf( __( 'Upgrade to %1$s - %2$s', 'gend-society' ), $u['name'], $u['price_label'] ) ) . '</button> ';
+			}
+			if ( ! $ups ) {
+				$change = (string) ( $vm['change_plan_url'] ?? '' );
+				if ( '' !== $change ) {
+					$h .= '<a class="gs-buy" href="' . esc_url( $change ) . '" target="_blank" rel="noopener" data-gs-plan-popup="1">' . esc_html__( 'Choose a plan on gend.me', 'gend-society' ) . '</a> ';
+				} else {
+					$h .= '<span class="gs-up-note">' . esc_html__( 'A plan cannot be bought from this site right now.', 'gend-society' ) . '</span> ';
 				}
 			}
-			$change = (string) ( $vm['change_plan_url'] ?? '' );
-			$h     .= '<p class="gs-up-actions">';
-			if ( '' !== $change && ( ! $tier || ! empty( $tier['checkout_allowed'] ) ) ) {
-				$h .= '<a class="button button-primary" href="' . esc_url( $change ) . '" target="_blank" rel="noopener" data-gs-plan-popup="1">' . esc_html__( 'Choose a plan on gend.me', 'gend-society' ) . '</a> ';
-			} else {
-				$h .= '<span class="gs-up-note">' . esc_html__( 'This plan cannot be bought from this site right now.', 'gend-society' ) . '</span> ';
-			}
-			$h .= '<a class="button" href="' . esc_url( $plan_card ) . '">' . esc_html__( 'Your plan on the dashboard', 'gend-society' ) . '</a>';
-			$h .= '</p>';
-		} elseif ( 'after_migration' === $state ) {
-			$h .= '<p class="gs-up-state" data-gs-up-copy="after_migration">' . esc_html__( 'Runs on your gend.me container after migration', 'gend-society' ) . '</p>';
-			/* translators: %s: area name. */
-			$h  .= '<p>' . esc_html( sprintf( __( '%s needs the gend.me container this site moves to when you migrate, so it is not available on this install before then. Your plan decides which areas are switched on there.', 'gend-society' ), $label ) ) . '</p>';
-			$out = gend_society_feature_upgrade_container_plans_url();
-			$h  .= '<p class="gs-up-actions">';
-			if ( '' !== $out ) {
-				$h .= '<a class="button button-primary" href="' . esc_url( $out ) . '" target="_blank" rel="noopener" data-gs-up-outbound="1">' . esc_html__( 'See container plans on gend.me', 'gend-society' ) . '</a> ';
-			}
-			$h .= '<a class="button" href="' . esc_url( $plan_card ) . '">' . esc_html__( 'Your plan on the dashboard', 'gend-society' ) . '</a>';
+			$h .= '<button type="button" class="gs-buy gs-buy--ghost" data-gs-goto-dashboards="1">' . esc_html__( 'What each plan includes', 'gend-society' ) . '</button>';
 			$h .= '</p>';
 		} elseif ( 'included' === $state ) {
 			$open = is_array( $area ) && '' !== (string) ( $area['admin_url'] ?? '' ) ? (string) $area['admin_url'] : $plan_url;
@@ -430,7 +423,11 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			$h .= '<p class="gs-up-actions"><a class="button" href="' . esc_url( $plan_card ) . '">' . esc_html__( 'Your plan on the dashboard', 'gend-society' ) . '</a></p>';
 		}
 		$h .= $refresh;
-		return $h . '</div>';
+		ob_start();
+		if ( function_exists( 'gend_society_plan_buy_assets' ) ) {
+			gend_society_plan_buy_assets();
+		}
+		return ob_get_clean() . $h . '</div>';
 	}
 }
 

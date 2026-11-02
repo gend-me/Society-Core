@@ -650,7 +650,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                     <div class="gs-hosting__stat-label"><?php esc_html_e( 'Container Plan', 'gend-society' ); ?></div>
                     <div style="color:#fff; font-size:1rem; font-weight:600; margin-top:4px;">
 <?php if ( $gs_sa ) : ?>
-                            <span class="gs-dash-sa-muted"><?php esc_html_e( 'After migration', 'gend-society' ); ?></span>
+                            <span class="gs-dash-sa-muted"><?php echo esc_html( gend_society_after_migration_label() ); ?></span>
 <?php else : ?>
                         <?php if ( $gs_container_any ) : ?>
                             <?php echo esc_html( $gs_container_label ); ?>
@@ -706,7 +706,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                         <?php echo esc_html( $r['used_label'] ); ?>
                         <span class="gs-hosting__resource-card-cap"><?php esc_html_e( 'used on this server', 'gend-society' ); ?></span>
                     </div>
-                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php esc_html_e( 'Container: after migration', 'gend-society' ); ?></div>
+                    <div class="gs-hosting__resource-card-meta gs-dash-sa-muted"><?php echo esc_html( function_exists( 'gend_society_origin_moved' ) && ! empty( gend_society_origin_moved()['moved'] ) ? __( 'Container: moved to gend.me hosting', 'gend-society' ) : __( 'Container: after migration', 'gend-society' ) ); ?></div>
 <?php else : ?>
                     <div class="gs-hosting__resource-card-usage">
                         <?php echo esc_html( $r['used_label'] ); ?>
@@ -896,6 +896,75 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
      * an A record at the hub IP, then register the hostname here to verify.
      */
     function gend_society_render_hosting_domains_panel( $payload ) {
+        if ( function_exists( 'gend_society_dialog_assets' ) ) {
+            gend_society_dialog_assets();
+        }
+        static $gs_dom_css = false;
+        if ( ! $gs_dom_css ) {
+            $gs_dom_css = true;
+            ?>
+<style>
+/* Domains panel: add form, DNS help, Make live and the registered-domain cards. */
+[data-gs-mship="add-domain"] { display: flex; gap: 10px; flex-wrap: wrap; align-items: stretch; margin-top: 12px; }
+[data-gs-mship="add-domain"] input[name="domain"] { flex: 1 1 260px; max-width: 420px; min-height: 44px; box-sizing: border-box; padding: 0 16px; border-radius: 999px; border: 1px solid rgba(148,163,184,.3); background: rgba(6,11,24,.8); color: #f1f5f9; font-size: .95rem; }
+[data-gs-mship="add-domain"] input[name="domain"]:focus { outline: none; border-color: rgba(78,170,255,.7); box-shadow: 0 0 0 3px rgba(78,170,255,.18); }
+[data-gs-mship="add-domain"] .gs-hosting__btn { min-height: 44px; padding: 0 22px; border-radius: 999px; }
+[data-gs-domains-dns] { margin-top: 16px !important; padding: 14px 18px; border-radius: 14px; border: 1px solid rgba(78,170,255,.2); background: rgba(78,170,255,.06); font-size: .88rem; line-height: 1.55; }
+[data-gs-domains-dns] > strong { display: block; margin-bottom: 4px; color: #e2e8f0; font-size: .8rem; letter-spacing: .12em; text-transform: uppercase; }
+[data-gs-domains-dns] ul { margin: 6px 0 0 18px !important; }
+[data-gs-domains-dns] li { margin: 3px 0; color: #cbd5e1; }
+[data-gs-make-live-wrap] { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; margin-top: 16px !important; padding-top: 14px; border-top: 1px solid rgba(148,163,184,.14); }
+[data-gs-make-live-wrap] .gs-hosting__card-desc { margin-left: 0 !important; }
+.gs-dom-list { display: grid; gap: 14px; }
+.gs-dom { padding: 16px 18px; border-radius: 16px; border: 1px solid rgba(148,163,184,.18); background: linear-gradient(155deg, rgba(15,23,42,.7), rgba(8,14,28,.6)); }
+.gs-dom.is-done { border-color: rgba(34,197,94,.35); }
+.gs-dom__head { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; }
+.gs-dom__id { display: flex; align-items: center; gap: 10px; flex-wrap: wrap; min-width: 0; }
+.gs-dom__name { padding: 4px 10px; border-radius: 8px; background: rgba(78,170,255,.12); color: #c7d2fe; font-size: .95rem; font-weight: 600; overflow-wrap: anywhere; }
+.gs-dom__actions { display: flex; gap: 8px; }
+.gs-dom__btn { border-radius: 999px; padding: 7px 18px; font-size: .8rem; font-weight: 700; cursor: pointer; border: 1px solid rgba(148,163,184,.35); background: rgba(255,255,255,.06); color: #e2e8f0; }
+.gs-dom__btn:hover:not([disabled]), .gs-dom__btn:focus { border-color: rgba(78,170,255,.7); outline: none; }
+.gs-dom__btn[disabled] { opacity: .55; cursor: progress; }
+.gs-dom__btn.is-danger { border-color: rgba(244,63,94,.45); color: #fda4af; background: rgba(244,63,94,.08); }
+.gs-dom__records { margin-top: 14px; display: grid; gap: 10px; }
+.gs-dom__hint { margin: 0; font-size: .85rem; color: #94a3b8; }
+.gs-dom__rec { display: grid; grid-template-columns: auto minmax(0,1fr) minmax(0,1.4fr) auto auto; align-items: center; gap: 10px 14px; padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(148,163,184,.14); background: rgba(8,15,27,.6); }
+.gs-dom__type { min-width: 38px; text-align: center; padding: 3px 8px; border-radius: 8px; background: #4eaaff; color: #04121f; font-weight: 800; font-size: .78rem; }
+.gs-dom__field { display: grid; grid-template-columns: 44px minmax(0,1fr) auto; align-items: center; gap: 8px; min-width: 0; }
+.gs-dom__lbl { font-size: .68rem; letter-spacing: .12em; text-transform: uppercase; color: #64748b; }
+.gs-dom__field code { background: transparent; color: #e2e8f0; font-size: .84rem; overflow-wrap: anywhere; }
+.gs-dom__copy { border: 1px solid rgba(148,163,184,.3); background: transparent; color: #94a3b8; border-radius: 999px; padding: 2px 10px; font-size: .7rem; cursor: pointer; }
+.gs-dom__copy:hover, .gs-dom__copy:focus { color: #fff; border-color: rgba(78,170,255,.7); outline: none; }
+.gs-dom__ttl { font-size: .75rem; color: #64748b; white-space: nowrap; }
+.gs-dom__chk { min-width: 90px; font-size: .78rem; font-weight: 700; }
+.gs-dom__chk.is-ok { color: #86efac; }
+.gs-dom__chk.is-miss { color: #fca5a5; }
+.gs-dom__result { margin: 12px 0 0; padding: 0; font-size: .86rem; line-height: 1.5; color: #cbd5e1; }
+.gs-dom__result:empty { display: none; }
+.gs-dom__result.is-busy { color: #94a3b8; }
+.gs-dom__result.is-warn { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(245,158,11,.35); background: rgba(245,158,11,.08); color: #fde68a; }
+.gs-dom__result.is-ok { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(34,197,94,.35); background: rgba(34,197,94,.08); color: #86efac; }
+.gs-dom__result.is-err { padding: 10px 14px; border-radius: 12px; border: 1px solid rgba(244,63,94,.4); background: rgba(244,63,94,.08); color: #fecaca; }
+@media (max-width: 820px) { .gs-dom__rec { grid-template-columns: 1fr; } .gs-dom__type { justify-self: start; } }
+</style>
+<script>
+(function () {
+    if (window.gsDomCopyBound) { return; }
+    window.gsDomCopyBound = true;
+    document.addEventListener('click', function (e) {
+        var b = e.target.closest ? e.target.closest('[data-gs-copy]') : null;
+        if (!b) { return; }
+        var text = b.getAttribute('data-gs-copy') || '';
+        var done = function () { var old = b.textContent; b.textContent = 'Copied'; setTimeout(function () { b.textContent = old; }, 1200); };
+        if (navigator.clipboard) { navigator.clipboard.writeText(text).then(done, function () {}); return; }
+        var ta = document.createElement('textarea'); ta.value = text; document.body.appendChild(ta); ta.select();
+        try { document.execCommand('copy'); done(); } catch (err) {}
+        document.body.removeChild(ta);
+    });
+})();
+</script>
+            <?php
+        }
         $gs_domains = isset( $payload['domains'] ) && is_array( $payload['domains'] ) ? $payload['domains'] : array();
         // Phase 111-10 (MIG-10, N-B3): an armed (externally migrated) install in Preview or Live follows the cutover rules.
         // The template keeps the pre-111 markup byte for byte when the install is not armed (PHP control lines sit at column 0).
@@ -946,7 +1015,7 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
 <?php endif; ?>
 <?php if ( $gs_armed && $gs_open && ! empty( $gs_cut['preview'] ) ) : ?>
             <div style="margin-top: 14px;" data-gs-make-live-wrap="1">
-                <button type="button" class="gs-hosting__btn" data-gs-make-live="1" data-confirm="<?php echo esc_attr__( 'This tells gend.me your site now lives at the app; switch your DNS first or at the same time.', 'gend-society' ); ?>"><?php esc_html_e( 'Make live now', 'gend-society' ); ?></button>
+                <button type="button" class="gs-hosting__btn" data-gs-make-live="1" data-confirm="<?php echo esc_attr__( 'Your new site becomes the live version of your site at its app address. You do not need a domain for this. If you use your own domain, switch its DNS to the new site first or at the same time.', 'gend-society' ); ?>" data-confirm-title="<?php echo esc_attr__( 'Make your new site live?', 'gend-society' ); ?>" data-confirm-ok="<?php echo esc_attr__( 'Make live', 'gend-society' ); ?>"><?php esc_html_e( 'Make live now', 'gend-society' ); ?></button>
                 <span class="gs-hosting__card-desc" style="margin-left: 8px;"><?php esc_html_e( 'Optional: your site also goes live by itself when your first domain is verified.', 'gend-society' ); ?></span>
             </div>
             <script>
@@ -954,20 +1023,28 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
                 var b = document.querySelector('[data-gs-make-live="1"]');
                 if (!b) return;
                 b.addEventListener('click', function () {
-                    if (!window.confirm(b.getAttribute('data-confirm') || '')) return;
-                    var fd = new FormData();
-                    fd.append('action', 'gend_society_migration_go_live');
-                    fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>);
-                    var label = b.textContent;
-                    b.disabled = true;
-                    b.textContent = '...';
-                    fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>, { method: 'POST', body: fd, credentials: 'same-origin' })
-                        .then(function (r) { return r.json(); })
-                        .then(function (j) {
-                            var m = j ? (j.data ? j.data.message : '') : ''; if (!j || !j.success) { throw new Error(m || 'Request failed'); } /* no double ampersand in inline scripts: content filters rewrite it */
-                            window.location.reload();
-                        })
-                        .catch(function (e) { b.disabled = false; b.textContent = label; window.alert(e.message); });
+                    var text = b.getAttribute('data-confirm') || '';
+                    var ask = window.gsDialog ? window.gsDialog.confirm(text, { title: b.getAttribute('data-confirm-title') || '', ok: b.getAttribute('data-confirm-ok') || 'OK' }) : Promise.resolve(window.confirm(text));
+                    ask.then(function (yes) {
+                        if (!yes) { return; }
+                        var fd = new FormData();
+                        fd.append('action', 'gend_society_migration_go_live');
+                        fd.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>);
+                        var label = b.textContent;
+                        b.disabled = true;
+                        b.textContent = '...';
+                        fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php', is_ssl() ? 'https' : 'http' ) ); ?>, { method: 'POST', body: fd, credentials: 'same-origin' })
+                            .then(function (r) { return r.json(); })
+                            .then(function (j) {
+                                var m = j ? (j.data ? j.data.message : '') : ''; if (!j || !j.success) { throw new Error(m || 'Request failed'); } /* no double ampersand in inline scripts: content filters rewrite it */
+                                try { var hr = document.querySelector('.gs-hosting'); if (hr) { sessionStorage.setItem('gsHostingResume:' + hr.id, 'domains'); } } catch (e2) {}
+                                window.location.reload();
+                            })
+                            .catch(function (e) {
+                                b.disabled = false; b.textContent = label;
+                                if (window.gsDialog) { window.gsDialog.alert(e.message, { title: 'Could not make your site live' }); } else { window.alert(e.message); }
+                            });
+                    });
                 });
             })();
             </script>
@@ -979,18 +1056,7 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
             <?php if ( empty( $gs_domains ) ) : ?>
                 <p style="color: var(--gs-muted, #94a3b8); font-style: italic; margin: 0;"><?php esc_html_e( 'No custom domains registered yet — this install is reachable via its hub-issued URL.', 'gend-society' ); ?></p>
             <?php else : ?>
-                <table class="gs-hosting__table">
-                    <thead>
-                        <tr>
-                            <th><?php esc_html_e( 'Domain', 'gend-society' ); ?></th>
-                            <th><?php esc_html_e( 'Status', 'gend-society' ); ?></th>
-<?php if ( $gs_armed ) : ?>
-                            <th><?php esc_html_e( 'SSL', 'gend-society' ); ?></th>
-<?php endif; ?>
-                            <th style="width: 1%;"><?php esc_html_e( 'Action', 'gend-society' ); ?></th>
-                        </tr>
-                    </thead>
-                    <tbody>
+                <div class="gs-dom-list" data-gs-domain-list="1">
                         <?php foreach ( $gs_domains as $gs_d ) :
                             $gs_hostname = (string) ( is_array( $gs_d ) ? ( $gs_d['domain'] ?? ( $gs_d['host'] ?? '' ) ) : $gs_d );
                             if ( $gs_hostname === '' ) {
@@ -1002,32 +1068,52 @@ if ( ! function_exists( 'gend_society_render_hosting_domains_panel' ) ) {
                                 : ( in_array( $gs_status, array( 'fail', 'error', 'invalid' ), true ) ? 'is-err' : 'is-warn' );
                             $gs_stage  = gend_society_domain_stage_view( is_array( $gs_d ) ? (string) ( $gs_d['stage'] ?? '' ) : '' );
                             $gs_dns    = is_array( $gs_d ) && ! empty( $gs_d['dns'] ) && is_array( $gs_d['dns'] ) ? $gs_d['dns'] : array();
+                            $gs_done   = 'is-ok' === $gs_klass && ( ! $gs_armed || 'done' === $gs_stage['stage'] );
                         ?>
-                            <tr data-domain="<?php echo esc_attr( $gs_hostname ); ?>">
-                                <td><code style="background: rgba(78,170,255,0.1); color:#a5b4fc; padding: 2px 6px; border-radius: 4px;"><?php echo esc_html( $gs_hostname ); ?></code><?php if ( $gs_dns ) : ?><details data-gs-domain-dns="1" style="margin-top: 6px;"><summary><?php esc_html_e( 'DNS records', 'gend-society' ); ?></summary><ul style="margin: 6px 0 0 18px; list-style: disc;"><?php
-                                    foreach ( array( 'a_record', 'txt_record' ) as $gs_rk ) {
-                                        $gs_r = isset( $gs_dns[ $gs_rk ] ) && is_array( $gs_dns[ $gs_rk ] ) ? $gs_dns[ $gs_rk ] : array();
-                                        if ( ! $gs_r ) {
-                                            continue;
-                                        }
-                                        /* translators: 1: record type, 2: record name, 3: record value, 4: TTL in seconds. */
-                                        echo '<li>' . esc_html( sprintf( __( '%1$s record: %2$s -> %3$s (TTL %4$s)', 'gend-society' ), (string) ( $gs_r['type'] ?? '' ), (string) ( $gs_r['host'] ?? '' ), (string) ( $gs_r['value'] ?? '' ), (string) ( $gs_r['ttl'] ?? 300 ) ) ) . '</li>';
-                                    }
-                                ?></ul></details><?php endif; ?></td>
-                                <td><span class="gs-hosting__pill <?php echo esc_attr( $gs_klass ); ?>"><?php echo esc_html( $gs_status ?: 'pending' ); ?></span></td>
+                    <div class="gs-dom<?php echo $gs_done ? ' is-done' : ''; ?>" data-domain="<?php echo esc_attr( $gs_hostname ); ?>">
+                        <div class="gs-dom__head">
+                            <div class="gs-dom__id">
+                                <code class="gs-dom__name"><?php echo esc_html( $gs_hostname ); ?></code>
+                                <span class="gs-hosting__pill <?php echo esc_attr( $gs_klass ); ?>"><?php echo esc_html( $gs_status ?: 'pending' ); ?></span>
 <?php if ( $gs_armed ) : ?>
-                                <td data-gs-domain-stage="<?php echo esc_attr( $gs_stage['stage'] ); ?>"><span class="gs-hosting__pill <?php echo esc_attr( $gs_stage['class'] ); ?>"><?php echo esc_html( $gs_stage['text'] ); ?></span></td>
+                                <span data-gs-domain-stage="<?php echo esc_attr( $gs_stage['stage'] ); ?>" class="gs-hosting__pill <?php echo esc_attr( $gs_stage['class'] ); ?>"><?php echo esc_html( $gs_stage['text'] ); ?></span>
 <?php endif; ?>
-                                <td style="text-align: right; white-space: nowrap;">
+                            </div>
 <?php if ( $gs_open ) : ?>
-                                    <button type="button" class="gs-hosting__btn" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="background: rgba(255,255,255,0.08); padding: 4px 10px; font-size: 0.72rem;"><?php echo ( $gs_armed && 'done-without-ssl' === $gs_stage['stage'] ) ? esc_html__( 'Retry certificate', 'gend-society' ) : esc_html__( 'Verify', 'gend-society' ); ?></button>
-                                    <button type="button" class="gs-hosting__btn is-danger" data-gs-mship="remove-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>" style="padding: 4px 10px; font-size: 0.72rem;"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
+                            <div class="gs-dom__actions">
+                                <button type="button" class="gs-dom__btn" data-gs-mship="verify-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>"><?php echo ( $gs_armed && 'done-without-ssl' === $gs_stage['stage'] ) ? esc_html__( 'Retry certificate', 'gend-society' ) : esc_html__( 'Verify', 'gend-society' ); ?></button>
+                                <button type="button" class="gs-dom__btn is-danger" data-gs-mship="remove-domain" data-domain="<?php echo esc_attr( $gs_hostname ); ?>"><?php esc_html_e( 'Remove', 'gend-society' ); ?></button>
+                            </div>
 <?php endif; ?>
-                                </td>
-                            </tr>
+                        </div>
+<?php if ( $gs_dns && ! $gs_done ) : ?>
+                        <div class="gs-dom__records" data-gs-domain-dns="1">
+                            <p class="gs-dom__hint"><?php esc_html_e( 'Add these records where your domain\'s DNS is managed, then press Verify.', 'gend-society' ); ?></p>
+<?php
+                            foreach ( array( 'a_record' => 'a', 'txt_record' => 'txt' ) as $gs_rk => $gs_ck ) {
+                                $gs_r = isset( $gs_dns[ $gs_rk ] ) && is_array( $gs_dns[ $gs_rk ] ) ? $gs_dns[ $gs_rk ] : array();
+                                if ( ! $gs_r ) {
+                                    continue;
+                                }
+                                $gs_rh = (string) ( $gs_r['host'] ?? '' );
+                                $gs_rv = (string) ( $gs_r['value'] ?? '' );
+                                ?>
+                            <div class="gs-dom__rec" data-gs-rec="<?php echo esc_attr( $gs_ck ); ?>">
+                                <span class="gs-dom__type"><?php echo esc_html( (string) ( $gs_r['type'] ?? '' ) ); ?></span>
+                                <div class="gs-dom__field"><span class="gs-dom__lbl"><?php esc_html_e( 'Name', 'gend-society' ); ?></span><code><?php echo esc_html( $gs_rh ); ?></code><button type="button" class="gs-dom__copy" data-gs-copy="<?php echo esc_attr( $gs_rh ); ?>"><?php esc_html_e( 'Copy', 'gend-society' ); ?></button></div>
+                                <div class="gs-dom__field"><span class="gs-dom__lbl"><?php esc_html_e( 'Value', 'gend-society' ); ?></span><code><?php echo esc_html( $gs_rv ); ?></code><button type="button" class="gs-dom__copy" data-gs-copy="<?php echo esc_attr( $gs_rv ); ?>"><?php esc_html_e( 'Copy', 'gend-society' ); ?></button></div>
+                                <span class="gs-dom__ttl"><?php echo esc_html( sprintf( /* translators: %s: TTL in seconds. */ __( 'TTL %s', 'gend-society' ), (string) ( $gs_r['ttl'] ?? 300 ) ) ); ?></span>
+                                <span class="gs-dom__chk" data-gs-chk="<?php echo esc_attr( $gs_ck ); ?>" aria-live="polite"></span>
+                            </div>
+<?php
+                            }
+?>
+                        </div>
+<?php endif; ?>
+                        <p class="gs-dom__result" data-gs-dom-result="1" role="status" aria-live="polite"></p>
+                    </div>
                         <?php endforeach; ?>
-                    </tbody>
-                </table>
+                </div>
             <?php endif; ?>
         </div>
         <?php
@@ -1103,7 +1189,7 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
         if ( $gs_bk_sa && empty( $gs_bk_sa_view['hosted'] ) ) {
             $gs_bk_hero['sub']           = (string) ( $gs_bk_sa_view['text'] ?? '' );
             unset( $gs_bk_hero['pct'], $gs_bk_hero['warn'] ); // no gend.me quota to measure against yet
-            $gs_bk_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+            $gs_bk_hero['stats'][1]['v'] = gend_society_after_migration_label();
         }
         gend_society_hosting_render_analytics_hero( $gs_bk_hero );
         ?>
@@ -1241,7 +1327,95 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
  *                       User Access moved to the Feature Suite tab (see
  *                       dashboard-remote-membership.php) - no longer rendered here.
  */
+if ( ! function_exists( 'gend_society_after_migration_label' ) ) {
+    /** The placeholder a not-yet-moved install shows where gend.me hosting will report; "Moved" once its site is Live elsewhere. */
+    function gend_society_after_migration_label(): string {
+        $moved = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+        return ! empty( $moved['moved'] ) ? __( 'Moved', 'gend-society' ) : __( 'After migration', 'gend-society' );
+    }
+}
+
+if ( ! function_exists( 'gend_society_dialog_assets' ) ) {
+    /**
+     * Styled confirm / alert for the hosting console (replaces the browser's native popups). Printed once per page.
+     * window.gsDialog.confirm(message, {title, ok, cancel, danger}) resolves true / false; window.gsDialog.alert(message,
+     * {title}) resolves when closed. Text is set with textContent, never as HTML. No double ampersand in inline
+     * scripts: content filters rewrite it.
+     */
+    function gend_society_dialog_assets(): void {
+        static $done = false;
+        if ( $done ) {
+            return;
+        }
+        $done = true;
+        ?>
+<style>
+.gs-dlg{position:fixed;inset:0;z-index:2147483000;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(3,6,13,.7);backdrop-filter:blur(8px);animation:gsdlgin .16s ease}
+.gs-dlg__box{width:min(460px,100%);box-sizing:border-box;padding:24px 26px 20px;border-radius:20px;border:1px solid rgba(148,163,184,.25);background:linear-gradient(160deg,rgba(15,23,42,.98),rgba(8,14,28,.98));box-shadow:0 40px 100px rgba(0,0,0,.6);color:#e2e8f0;font-family:inherit}
+.gs-dlg__head{display:flex;align-items:center;gap:12px;margin:0 0 10px}
+.gs-dlg__icon{flex:0 0 32px;width:32px;height:32px;border-radius:50%;display:flex;align-items:center;justify-content:center;background:#4eaaff;color:#04121f;font-weight:800;font-size:17px}
+.gs-dlg--danger .gs-dlg__icon{background:#f43f5e;color:#fff}
+.gs-dlg__title{margin:0;font-size:1.05rem;font-weight:700;color:#f8fafc}
+.gs-dlg__msg{margin:0 0 18px;font-size:.92rem;line-height:1.55;color:#cbd5e1;white-space:pre-line}
+.gs-dlg__actions{display:flex;justify-content:flex-end;gap:10px;flex-wrap:wrap}
+.gs-dlg__btn{border-radius:999px;padding:9px 20px;font-size:.85rem;font-weight:700;cursor:pointer;border:1px solid rgba(148,163,184,.35);background:transparent;color:#e2e8f0}
+.gs-dlg__btn:hover,.gs-dlg__btn:focus{border-color:rgba(78,170,255,.7);outline:none}
+.gs-dlg__btn--ok{border-color:transparent;background:linear-gradient(135deg,#4eaaff,#7dd3fc);color:#04121f}
+.gs-dlg--danger .gs-dlg__btn--ok{background:linear-gradient(135deg,#f43f5e,#fb7185);color:#fff}
+@keyframes gsdlgin{from{opacity:0}to{opacity:1}}
+</style>
+<script>
+(function () {
+    if (window.gsDialog) { return; }
+    function open(kind, message, o) {
+        o = o || {};
+        return new Promise(function (resolve) {
+            var prev = document.activeElement;
+            var ov = document.createElement('div');
+            ov.className = 'gs-dlg' + (o.danger ? ' gs-dlg--danger' : '');
+            ov.setAttribute('role', 'alertdialog');
+            ov.setAttribute('aria-modal', 'true');
+            var box = document.createElement('div'); box.className = 'gs-dlg__box';
+            var head = document.createElement('div'); head.className = 'gs-dlg__head';
+            var ic = document.createElement('span'); ic.className = 'gs-dlg__icon'; ic.setAttribute('aria-hidden', 'true'); ic.textContent = o.danger ? '!' : (kind === 'alert' ? 'i' : '?');
+            var ti = document.createElement('h3'); ti.className = 'gs-dlg__title'; ti.textContent = o.title || (kind === 'alert' ? 'Notice' : 'Please confirm');
+            head.appendChild(ic); head.appendChild(ti);
+            var msg = document.createElement('p'); msg.className = 'gs-dlg__msg'; msg.textContent = message || '';
+            var act = document.createElement('div'); act.className = 'gs-dlg__actions';
+            function done(v) {
+                document.removeEventListener('keydown', onKey, true);
+                if (ov.parentNode) { ov.parentNode.removeChild(ov); }
+                if (prev) { if (prev.focus) { try { prev.focus(); } catch (e) {} } }
+                resolve(v);
+            }
+            function onKey(e) { if (e.key === 'Escape') { e.preventDefault(); done(false); } }
+            var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'gs-dlg__btn gs-dlg__btn--ok'; ok.textContent = o.ok || 'OK';
+            ok.addEventListener('click', function () { done(true); });
+            if (kind === 'confirm') {
+                var no = document.createElement('button'); no.type = 'button'; no.className = 'gs-dlg__btn'; no.textContent = o.cancel || 'Cancel';
+                no.addEventListener('click', function () { done(false); });
+                act.appendChild(no);
+            }
+            act.appendChild(ok);
+            box.appendChild(head); box.appendChild(msg); box.appendChild(act); ov.appendChild(box);
+            ov.addEventListener('mousedown', function (e) { if (e.target === ov) { done(false); } });
+            document.addEventListener('keydown', onKey, true);
+            document.body.appendChild(ov);
+            ok.focus();
+        });
+    }
+    window.gsDialog = {
+        confirm: function (m, o) { return open('confirm', m, o); },
+        alert: function (m, o) { return open('alert', m, o).then(function () { return true; }); }
+    };
+})();
+</script>
+        <?php
+    }
+}
+
 function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) {
+    gend_society_dialog_assets();
     if ( ! current_user_can( 'manage_options' ) ) {
         echo '<p style="color: var(--gs-muted);">' . esc_html__( 'You do not have permission to manage hosting.', 'gend-society' ) . '</p>';
         return;
@@ -1252,7 +1426,11 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
         'with_permalinks'  => false,
         'with_compute_gas' => false,
         'active_section'   => 'dashboard',
+        'panel_top'        => array(), // section slug => html shown above that panel's own content
+        'panel_extra'      => array(), // slug => html for an extra sub-tab (hosting group: 'email')
     ) );
+    $gs_panel_top   = is_array( $opts['panel_top'] ) ? $opts['panel_top'] : array();
+    $gs_panel_extra = is_array( $opts['panel_extra'] ) ? $opts['panel_extra'] : array();
     $with_settings    = ! empty( $opts['with_settings'] );
     $with_permalinks  = ! empty( $opts['with_permalinks'] );
     $with_compute_gas = ! empty( $opts['with_compute_gas'] );
@@ -1275,7 +1453,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
     // id would collide.
     $gs_hosting_root_id = 'all' === $section_group ? 'gs-hosting-root' : ( 'gs-hosting-root-' . $section_group );
 
-    $active_section = ( 'hosting' === $section_group ) ? 'compute-gas' : 'dashboard';
+    $active_section = ( 'hosting' === $section_group ) ? ( 'compute-gas' === $opts['active_section'] ? 'compute-gas' : 'backups' ) : 'dashboard';
     if ( 'permalinks' === $opts['active_section'] && $with_permalinks ) {
         $active_section = 'permalinks';
     }
@@ -1427,10 +1605,13 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             <?php endif; ?>
             <?php if ( $show_hosting_group ) : ?>
             <?php if ( 'hosting' === $section_group ) : ?>
-            <button type="button" class="gs-hosting__nav" data-section="backups" role="tab"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backups', 'gend-society' ); ?></button>
+            <button type="button" class="gs-hosting__nav<?php echo 'backups' === $active_section ? ' is-active' : ''; ?>" data-section="backups" role="tab"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'Backups', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="media-library" role="tab"><span class="dashicons dashicons-images-alt2"></span><?php esc_html_e( 'Media', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="codebase" role="tab"><span class="dashicons dashicons-editor-code"></span><?php esc_html_e( 'Codebase', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="tables" role="tab"><span class="dashicons dashicons-database"></span><?php esc_html_e( 'Tables', 'gend-society' ); ?></button>
+            <?php if ( isset( $gs_panel_extra['email'] ) ) : ?>
+            <button type="button" class="gs-hosting__nav" data-section="email" role="tab"><span class="dashicons dashicons-email"></span><?php esc_html_e( 'Email', 'gend-society' ); ?></button>
+            <?php endif; ?>
             <?php else : ?>
             <button type="button" class="gs-hosting__nav" data-section="tables" role="tab"><span class="dashicons dashicons-database"></span><?php esc_html_e( 'Tables', 'gend-society' ); ?></button>
             <button type="button" class="gs-hosting__nav" data-section="media" role="tab"><span class="dashicons dashicons-cloud"></span><?php esc_html_e( 'Storage', 'gend-society' ); ?></button>
@@ -1887,7 +2068,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 // Phase 109-29: a standalone install has no gend.me database quota (no container): no ring, no cap.
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_tables_hero['pct'], $gs_tables_hero['warn'] );
-                    $gs_tables_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+                    $gs_tables_hero['stats'][1]['v'] = gend_society_after_migration_label();
                 }
                 gend_society_hosting_render_analytics_hero( $gs_tables_hero );
                 ?>
@@ -2236,9 +2417,21 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             <?php if ( 'hosting' === $section_group ) : ?>
             <!-- ── Backups sub-panel (split out of the old combined Storage
                  panel - see gs_hosting_render_backups_section()). ── -->
-            <section class="gs-hosting__panel" data-panel="backups" role="tabpanel">
-                <?php gend_society_hosting_render_backups_section( $backups ); ?>
+            <section class="gs-hosting__panel<?php echo 'backups' === $active_section ? ' is-active' : ''; ?>" data-panel="backups" role="tabpanel">
+                <?php
+                if ( isset( $gs_panel_top['backups'] ) ) {
+                    echo '<div class="gs-panel-top">' . $gs_panel_top['backups'] . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the dashboard's own rendered Backups card.
+                }
+                gend_society_hosting_render_backups_section( $backups );
+                ?>
             </section>
+
+<?php if ( isset( $gs_panel_extra['email'] ) ) : ?>
+            <!-- ── Email sub-panel: the Email hosting card, moved here from the top of the dashboard. ── -->
+            <section class="gs-hosting__panel" data-panel="email" role="tabpanel">
+                <?php echo '<div class="gs-panel-top">' . $gs_panel_extra['email'] . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the dashboard's own rendered Email hosting card. ?>
+            </section>
+<?php endif; ?>
 
             <!-- ── Media sub-panel: the real gend-media-optimizer Media Library
                  tab (admin.php?page=blog-manager&tab=media), rendered natively
@@ -2434,7 +2627,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 // Phase 109-29: no gend.me codebase quota on a standalone install (no container): no ring, no cap.
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_codebase_hero['pct'], $gs_codebase_hero['warn'] );
-                    $gs_codebase_hero['stats'][1]['v'] = __( 'After migration', 'gend-society' );
+                    $gs_codebase_hero['stats'][1]['v'] = gend_society_after_migration_label();
                 }
                 gend_society_hosting_render_analytics_hero( $gs_codebase_hero );
                 ?>
@@ -2634,6 +2827,30 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             });
         });
 
+        // A reload (after adding a domain, verifying, a backup ...) must land on the same sidebar section, not the first one.
+        function reloadKeepSection(delay) {
+            try {
+                var act = root.querySelector('.gs-hosting__nav.is-active');
+                if (act) { sessionStorage.setItem('gsHostingResume:' + root.id, act.dataset.section); }
+            } catch (e) {}
+            setTimeout(function () { location.reload(); }, delay || 700);
+        }
+        (function resumeSection() {
+            var want = '';
+            try {
+                want = sessionStorage.getItem('gsHostingResume:' + root.id) || '';
+                sessionStorage.removeItem('gsHostingResume:' + root.id);
+            } catch (e) {}
+            if (!want) { return; }
+            var navBtn = root.querySelector('.gs-hosting__nav[data-section="' + want + '"]');
+            if (!navBtn) { return; }
+            navBtn.click();
+            setTimeout(function () {
+                var p = root.querySelector('.gs-hosting__panel[data-panel="' + want + '"]') || root;
+                if (p.scrollIntoView) { p.scrollIntoView({ behavior: 'smooth', block: 'start' }); }
+            }, 120);
+        })();
+
         function lazyLoad(section) {
             if (section === 'logs' && !loaded['logs']) {
                 loaded['logs'] = true;
@@ -2659,7 +2876,12 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             var feedbackSection = opts.feedback || 'dashboard';
             root.querySelectorAll(selector).forEach(function(btn){
                 btn.addEventListener('click', function(){
-                    if (opts.confirm && !confirm(opts.confirm)) return;
+                    if (opts.confirm && window.gsDialog && !btn.dataset.gsConfirmed) {
+                        window.gsDialog.confirm(opts.confirm, { title: 'Please confirm', ok: 'Continue' }).then(function (yes) { if (yes) { btn.dataset.gsConfirmed = '1'; btn.click(); } });
+                        return;
+                    }
+                    delete btn.dataset.gsConfirmed;
+                    if (opts.confirm && !window.gsDialog && !confirm(opts.confirm)) return;
                     btn.disabled = true;
                     var orig = btn.textContent;
                     btn.textContent = opts.busy || 'Working…';
@@ -2753,7 +2975,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 post('gend_society_membership_domain_add', { domain: v }).then(function(resp){
                     if (resp && resp.success) {
                         feedback('domains', 'Domain added. Reloading…', 'success');
-                        setTimeout(function(){ location.reload(); }, 700);
+                        reloadKeepSection(700);
                     } else {
                         feedback('domains', (resp && resp.data && resp.data.message) || 'Failed.', 'error');
                     }
@@ -2767,13 +2989,20 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             if (!btn) return;
             var action = btn.dataset.gsHosting === 'domain-verify' ? 'gend_society_membership_domain_verify' : 'gend_society_membership_domain_remove';
             var d = btn.dataset.domain;
+            if (action === 'gend_society_membership_domain_remove' && window.gsDialog) {
+                window.gsDialog.confirm('Visitors will no longer reach your site at ' + d + '. This does not delete your site.', { title: 'Remove ' + d + '?', ok: 'Remove domain', danger: true }).then(function (yes) { if (yes) { runDomainAction(btn, action, d); } });
+                return;
+            }
             if (action === 'gend_society_membership_domain_remove' && !confirm('Remove ' + d + '?')) return;
+            runDomainAction(btn, action, d);
+        });
+        function runDomainAction(btn, action, d) {
             btn.disabled = true;
             feedback('domains', (action === 'gend_society_membership_domain_verify' ? 'Verifying ' : 'Removing ') + d + '…', null);
             post(action, { domain: d }).then(function(resp){
                 if (resp && resp.success) {
                     feedback('domains', 'Done. Reloading…', 'success');
-                    setTimeout(function(){ location.reload(); }, 700);
+                    reloadKeepSection(700);
                 } else {
                     btn.disabled = false;
                     feedback('domains', (resp && resp.data && resp.data.message) || 'Failed.', 'error');
@@ -2782,7 +3011,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 btn.disabled = false;
                 feedback('domains', 'Network error.', 'error');
             });
-        });
+        }
 
         // ── Compute Gas relocated to top-level membership tab. ──
 
@@ -2916,7 +3145,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 post('gend_society_membership_backup_now').then(function(resp){
                     if (resp && resp.success) {
                         feedback('backups', 'Backup started. Reloading list…', 'success');
-                        setTimeout(function(){ location.reload(); }, 900);
+                        reloadKeepSection(900);
                     } else {
                         backupNow.disabled = false;
                         backupNow.textContent = prevBN;
