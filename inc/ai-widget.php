@@ -78,7 +78,7 @@ class Gend_Society_AI_Widget {
 
         $hub  = self::hub_base();
         $leo  = $hub . '/wp-content/plugins/leo/assets/js/';
-        $ver  = '2.1.0-' . GEND_SOCIETY_VERSION; // new Society release = fresh copy of the hub script (its sign-in popup changes with the OAuth provider).
+        $ver  = GEND_SOCIETY_VERSION; // new Society release = fresh copy of the hub script (its sign-in popup changes with the OAuth provider).
 
         // Hub-hosted canonical assets (cross-origin <script src> is fine).
         wp_enqueue_script( 'aipa-widget', $leo . self::widget_js_file(), array(), $ver, true );
