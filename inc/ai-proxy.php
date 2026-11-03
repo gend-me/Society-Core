@@ -216,6 +216,17 @@ class Gend_Society_AI_Proxy {
      * client only if the AIPA one isn't configured.
      */
     protected static function aipa_client() {
+        // gend.me's own OAuth server (Hydra): the shared public client, no secret, PKCE mandatory. The widget popup and
+        // the exchange below both read this, so they stay in lockstep.
+        if ( function_exists( 'gend_society_oauth_provider' ) && 'hydra' === gend_society_oauth_provider() ) {
+            $hub = function_exists( 'gend_society_oauth_hub_url' ) ? gend_society_oauth_hub_url() : self::hub_base();
+            return array(
+                'id'     => 'gend-sites',
+                'secret' => '',
+                'hub'    => untrailingslashit( $hub ),
+                'hydra'  => true,
+            );
+        }
         $id     = (string) get_site_option( 'aipa_oauth_client_id', '' );
         $secret = (string) get_site_option( 'aipa_oauth_client_secret', '' );
         if ( $id === '' && function_exists( 'gend_society_oauth_client_id' ) ) {
@@ -304,11 +315,15 @@ class Gend_Society_AI_Proxy {
         if ( $client_id === '' ) {
             return new WP_REST_Response( array( 'error' => 'no_client', 'message' => 'OAuth client not configured.' ), 503 );
         }
+        $hydra = ! empty( $client['hydra'] );
+        if ( $hydra && $verifier === '' ) {
+            return new WP_REST_Response( array( 'error' => 'missing_verifier', 'message' => 'PKCE verifier is required.' ), 400 );
+        }
 
         $token_body = array(
             'grant_type'   => 'authorization_code',
             'code'         => $code,
-            'redirect_uri' => $hub_url . '/oauth-bridge/',
+            'redirect_uri' => $hub_url . ( $hydra ? '/oauth2-bridge/callback' : '/oauth-bridge/' ),
             'client_id'    => $client_id,
         );
         if ( $verifier !== '' ) {
@@ -329,7 +344,7 @@ class Gend_Society_AI_Proxy {
             $client_secret !== '' ? 'present' : 'absent'
         ) );
 
-        $resp = wp_remote_post( $hub_url . '/oauth/token', array(
+        $resp = wp_remote_post( $hydra ? gend_society_oauth_hydra_url() . '/oauth2/token' : $hub_url . '/oauth/token', array(
             'timeout' => 15,
             'headers' => $headers,
             'body'    => $token_body,
@@ -374,7 +389,7 @@ class Gend_Society_AI_Proxy {
             // locally rather than on the hub).
             $userinfo_url = ( defined( 'GDC_OAUTH_USERINFO_URL' ) && GDC_OAUTH_USERINFO_URL )
                 ? (string) GDC_OAUTH_USERINFO_URL
-                : ( $hub_url . '/oauth/me' );
+                : ( $hydra ? gend_society_oauth_hydra_url() . '/userinfo' : $hub_url . '/oauth/me' );
             $info_resp = wp_remote_get( $userinfo_url, array(
                 'timeout' => 10,
                 'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
