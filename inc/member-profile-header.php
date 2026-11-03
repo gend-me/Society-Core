@@ -4196,6 +4196,61 @@ button.gdc-group-gas__btn:focus-visible {
     }
 }
 
+/* ══ Chat sidebar open ═══════════════════════════════════════════════════
+   The chat takes 440px off the page but media queries still see the whole
+   screen, so these breakpoints are the usual ones plus 440: page 1100 and
+   under, page 720 and under, page 560 and under. The sidebar needs a screen
+   of 900 or more, so the phone rules above never apply with it open.
+   ═══════════════════════════════════════════════════════════════════════ */
+@media (max-width: 1540px) {
+    html.gend-uc-sidebar .gdc-profile-uplink    { padding: 64px 16px 0; }
+    html.gend-uc-sidebar .gdc-profile-hub       { grid-template-columns: 200px minmax(0, 1fr); gap: 16px; }
+    html.gend-uc-sidebar .gdc-identity-inner    { padding: 24px 12px; justify-content: center; }
+    html.gend-uc-sidebar .gdc-avatar            { width: 96px; height: 96px; margin-bottom: 14px; }
+    html.gend-uc-sidebar .gdc-identity-name     { font-size: 1.2rem; }
+    html.gend-uc-sidebar .gdc-identity-auth     { font-size: 0.6rem; letter-spacing: 1.2px; }
+    html.gend-uc-sidebar .gdc-identity-actions  { margin-top: 14px; }
+    html.gend-uc-sidebar .gdc-metrics-port      { gap: 14px; }
+    html.gend-uc-sidebar .gdc-admin-group-row   { flex-wrap: wrap; gap: 8px 10px; padding: 12px 16px; }
+    html.gend-uc-sidebar .gdc-admin-group-info  { flex: 1 1 calc(100% - 60px); }
+    html.gend-uc-sidebar .gdc-admin-group-row .gdc-action-btn {
+        flex: 1 1 0;
+        min-width: 0;
+        padding: 8px 6px;
+        text-align: center;
+        font-size: 0.62rem;
+        letter-spacing: 0.6px;
+        white-space: nowrap;
+    }
+    html.gend-uc-sidebar .gdc-group-gas         { gap: 8px; padding: 0 16px 14px; }
+    html.gend-uc-sidebar .gdc-group-gas__stat   { flex-wrap: wrap; gap: 8px; padding: 10px 12px; min-width: 0; }
+    html.gend-uc-sidebar .gdc-group-gas__text   { flex: 1 1 100%; }
+    html.gend-uc-sidebar .gdc-group-gas__value  { font-size: 1rem; }
+    html.gend-uc-sidebar .gdc-balance-grid      { grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    html.gend-uc-sidebar .gdc-node-content      { padding: 16px 6px; }
+    html.gend-uc-sidebar .gdc-node-label        { font-size: 0.56rem; letter-spacing: 0.6px; margin-bottom: 8px; }
+    html.gend-uc-sidebar .gdc-node-value        { font-size: clamp(0.95rem, 1.5vw, 1.25rem); overflow-wrap: anywhere; }
+    html.gend-uc-sidebar .gdc-topup-btn         { margin-top: 10px; padding: 6px 10px 6px 8px; font-size: 0.56rem; letter-spacing: 0.6px; }
+    html.gend-uc-sidebar .gdc-profile-nav       { margin-top: 20px; }
+    html.gend-uc-sidebar .gdc-profile-nav-inner { column-gap: 8px; justify-content: space-between; padding: 0 8px; }
+    html.gend-uc-sidebar .gdc-profile-nav .gdc-nav-item { gap: 8px; padding: 12px 2px; font-size: 0.72rem; letter-spacing: 1px; }
+    html.gend-uc-sidebar .gdc-profile-nav .gdc-nav-icon { width: 28px; height: 28px; border-radius: 8px; }
+    html.gend-uc-sidebar .gdc-profile-nav .gdc-nav-icon svg { width: 15px; height: 15px; }
+}
+@media (max-width: 1160px) {
+    html.gend-uc-sidebar .gdc-profile-hub       { grid-template-columns: minmax(0, 1fr); gap: 12px; }
+    html.gend-uc-sidebar .gdc-identity-inner    { flex-direction: row; flex-wrap: wrap; gap: 4px 14px; padding: 12px 16px; text-align: left; justify-content: flex-start; }
+    html.gend-uc-sidebar .gdc-avatar            { width: 56px; height: 56px; margin-bottom: 0; }
+    html.gend-uc-sidebar .gdc-identity-actions  { margin-top: 0; }
+    html.gend-uc-sidebar .gdc-profile-nav-inner { display: grid; grid-template-columns: repeat(auto-fit, minmax(96px, 1fr)); gap: 6px; padding: 8px; }
+    html.gend-uc-sidebar .gdc-profile-nav .gdc-nav-item { flex-direction: column; gap: 5px; padding: 8px 2px; font-size: 0.62rem; letter-spacing: 0.6px; }
+}
+@media (max-width: 1000px) {
+    html.gend-uc-sidebar .gdc-group-gas         { grid-template-columns: minmax(0, 1fr); }
+    html.gend-uc-sidebar .gdc-group-gas__text   { flex: 1 1 0; }
+    html.gend-uc-sidebar .gdc-balance-grid      { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
 /* Count badge inside nav items (e.g. "Groups 5"). Also match BP class
    "no-count" (emitted when the number is 0, e.g. Messages with no unread)
    so every nav number gets the same pill treatment. */
