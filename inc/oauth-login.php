@@ -503,6 +503,28 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     // ── Look up local user by email ────────────────────────────────────
     $user = get_user_by( 'email', $email );
     if ( ! $user ) {
+        // The membership owner (gend.me vouched for this email above; GDC_OWNER_EMAIL is baked in by the listener) gets an
+        // administrator account on their own site when its database has none for them - a migrated site's users are the
+        // source site's, not the gend.me account's.
+        $owner_seed = strtolower( trim( gend_society_oauth_config_value( 'GDC_OWNER_EMAIL', '' ) ) );
+        if ( $owner_seed !== '' && strtolower( $email ) === $owner_seed ) {
+            $base  = sanitize_user( (string) strstr( $email, '@', true ), true );
+            $login = $base !== '' ? $base : 'owner';
+            for ( $i = 2; username_exists( $login ); $i++ ) {
+                $login = ( $base !== '' ? $base : 'owner' ) . $i;
+            }
+            $new_id = wp_insert_user( array(
+                'user_login' => $login,
+                'user_email' => $email,
+                'user_pass'  => wp_generate_password( 32, true, true ),
+                'role'       => 'administrator',
+            ) );
+            if ( ! is_wp_error( $new_id ) ) {
+                $user = get_user_by( 'id', $new_id );
+            }
+        }
+    }
+    if ( ! $user ) {
         return new WP_Error( 'no_local_user',
             sprintf( 'No account on this site for %s. Contact the site owner to grant you access.', $email ),
             array( 'status' => 403 )
