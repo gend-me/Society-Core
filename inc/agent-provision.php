@@ -106,6 +106,13 @@ function gend_society_agent_verify_signed_request(\WP_REST_Request $request) {
     }
 
     $pub_b64 = (string) get_option('gend_society_gend_pubkey', '');
+    // A launched sub-site on the hub network has no key of its own, so it uses the main site's. Sub-sites have no
+    // install id either: the signed aud is what stops a request issued for one site being replayed on another.
+    $gs_network_key = false;
+    if ('' === $pub_b64 && is_multisite() && !is_main_site() && function_exists('gend_society_runtime_mode') && 'hub' === gend_society_runtime_mode()) {
+        $pub_b64 = (string) get_blog_option(get_main_site_id(), 'gend_society_gend_pubkey', '');
+        $gs_network_key = '' !== $pub_b64;
+    }
     if ($pub_b64 === '') {
         return new \WP_Error('not_paired', __('This site has not been paired with gend.me.', 'gend-society'), array('status' => 412));
     }
@@ -142,6 +149,10 @@ function gend_society_agent_verify_signed_request(\WP_REST_Request $request) {
 
     // Install ID match check — prevents a signature meant for one container
     // being replayed against another.
+    if ($gs_network_key && (empty($payload['aud']) || untrailingslashit(strtolower(set_url_scheme((string) $payload['aud'], 'https'))) !== untrailingslashit(strtolower(set_url_scheme(home_url(), 'https'))))) {
+        return new \WP_Error('wrong_site', __('This request was not issued for this site.', 'gend-society'), array('status' => 401));
+    }
+
     $expected_install = (string) get_option('gend_society_install_id', '');
     if (!empty($payload['install_id']) && $expected_install !== '' && (string) $payload['install_id'] !== $expected_install) {
         return new \WP_Error('install_mismatch', __('install_id does not match this site.', 'gend-society'), array('status' => 401));

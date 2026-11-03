@@ -108,7 +108,8 @@ function gend_society_user_site_credentials( WP_REST_Request $request ) {
 	}
 
 	$user = null;
-	$on_hub_network = function_exists( 'gend_society_oauth_is_hub_site' ) && gend_society_oauth_is_hub_site();
+	// Every site on the gend.me network shares its user table, whatever its domain.
+	$on_hub_network = is_multisite() && function_exists( 'gend_society_runtime_mode' ) && 'hub' === gend_society_runtime_mode();
 	if ( $on_hub_network ) {
 		$u = get_userdata( $hub_user_id );
 		if ( $u && ( ! is_multisite() || is_user_member_of_blog( $u->ID, get_current_blog_id() ) ) ) {
