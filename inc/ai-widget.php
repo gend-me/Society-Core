@@ -78,7 +78,7 @@ class Gend_Society_AI_Widget {
 
         $hub  = self::hub_base();
         $leo  = $hub . '/wp-content/plugins/leo/assets/js/';
-        $ver  = '2.1.0';
+        $ver  = GEND_SOCIETY_VERSION; // new Society release = fresh copy of the hub script (its sign-in popup changes with the OAuth provider).
 
         // Hub-hosted canonical assets (cross-origin <script src> is fine).
         wp_enqueue_script( 'aipa-widget', $leo . self::widget_js_file(), array(), $ver, true );
@@ -134,6 +134,12 @@ class Gend_Society_AI_Widget {
             'oauthClientId'     => $oauth_client_id,
             'centralHubUrl'     => $oauth_hub_url,
             'oauthClientID'     => $oauth_client_id, // alt-case alias some widget builds read
+            // Where the sign-in popup goes when this site uses gend.me's own OAuth server (Hydra); null = the legacy server.
+            'oauthFlow'         => ! empty( $oauth['hydra'] ) && function_exists( 'gend_society_oauth_hydra_url' ) ? array(
+                'authorize_url' => gend_society_oauth_hydra_url() . '/oauth2/auth',
+                'redirect_uri'  => $oauth_hub_url . '/oauth2-bridge/callback',
+                'scope'         => 'openid profile email',
+            ) : null,
             'icon'              => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_icon' ) : '',
             'leo_avatar'        => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_leo_avatar' ) : '',
             'user_avatar'       => self::user_avatar_url(),

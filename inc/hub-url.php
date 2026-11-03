@@ -83,11 +83,17 @@ if ( ! function_exists( 'gend_society_oauth_client_id' ) ) {
 if ( ! function_exists( 'gend_society_oauth_provider' ) ) {
 	/**
 	 * Which OAuth server the sign-in popup uses: 'hydra' (gend.me's own Ory Hydra at auth.gend.me, shared public client
-	 * "gend-sites", PKCE) or 'legacy' (the hub's WP OAuth Server plugin, per-site client id + secret). Default 'legacy'
-	 * until every site is moved; set GDC_OAUTH_PROVIDER=hydra (constant or environment) or the site option gend_society_oauth_provider to switch a site.
+	 * "gend-sites", PKCE) or 'legacy' (the hub's WP OAuth Server plugin, per-site client id + secret). Hydra is the
+	 * default for every site that signs in against the hub; the hub itself (it signs nobody in against itself) stays
+	 * 'legacy'. Set GDC_OAUTH_PROVIDER=legacy (constant or environment) or the site option gend_society_oauth_provider
+	 * to 'legacy' to put a site back on the old server; 'hydra' forces Hydra.
 	 */
 	function gend_society_oauth_provider(): string {
-		return 'hydra' === strtolower( gend_society_oauth_config_value( 'GDC_OAUTH_PROVIDER', 'gend_society_oauth_provider' ) ) ? 'hydra' : 'legacy';
+		$set = strtolower( gend_society_oauth_config_value( 'GDC_OAUTH_PROVIDER', 'gend_society_oauth_provider' ) );
+		if ( 'legacy' === $set || 'hydra' === $set ) {
+			return $set;
+		}
+		return gend_society_oauth_is_hub_site() ? 'legacy' : 'hydra';
 	}
 }
 

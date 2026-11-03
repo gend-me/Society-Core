@@ -626,6 +626,81 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
 }
 
 // ────────────────────────────────────────────────────────────────────────
+// Token refresh (Hydra)
+// ────────────────────────────────────────────────────────────────────────
+
+if ( ! function_exists( 'gend_society_oauth_maybe_refresh' ) ) {
+	/**
+	 * Keep a signed-in user's hub token alive. Hydra access tokens last an hour and Hydra rotates refresh tokens, so when
+	 * the stored token is within five minutes of expiry (or past it) the refresh token is exchanged for a new pair, and
+	 * both are stored where Leo, Email Manager and the auto-pair read them (user meta gend_oauth_*). One refresh at a
+	 * time per user (a second concurrent use of a rotated refresh token would be refused), and a failed refresh backs
+	 * off instead of retrying on every request. Does nothing on the legacy provider or on the hub itself.
+	 *
+	 * @param int $user_id User id (0 = current user).
+	 * @return bool True when a new token was stored.
+	 */
+	function gend_society_oauth_maybe_refresh( int $user_id = 0 ): bool {
+		$user_id = $user_id > 0 ? $user_id : get_current_user_id();
+		if ( $user_id <= 0 || 'hydra' !== gend_society_oauth_provider() || gend_society_oauth_is_hub_site() ) {
+			return false;
+		}
+		$refresh = (string) get_user_meta( $user_id, 'gend_oauth_refresh_token', true );
+		$expires = (int) get_user_meta( $user_id, 'gend_oauth_token_expires_at', true );
+		if ( '' === $refresh || $expires <= 0 || $expires > time() + 300 ) {
+			return false;
+		}
+		if ( (int) get_user_meta( $user_id, 'gend_oauth_refresh_retry_at', true ) > time() ) {
+			return false;
+		}
+		$lock = 'gs_oauth_refresh_' . $user_id;
+		if ( get_transient( $lock ) ) {
+			return false;
+		}
+		set_transient( $lock, 1, 30 );
+
+		$resp = wp_remote_post( gend_society_oauth_hydra_url() . '/oauth2/token', array(
+			'timeout' => 10,
+			'body'    => array(
+				'grant_type'    => 'refresh_token',
+				'refresh_token' => $refresh,
+				'client_id'     => gend_society_oauth_login_client_id(),
+			),
+		) );
+		if ( is_wp_error( $resp ) ) {
+			update_user_meta( $user_id, 'gend_oauth_refresh_retry_at', time() + 120 );
+			delete_transient( $lock );
+			return false;
+		}
+		$code = (int) wp_remote_retrieve_response_code( $resp );
+		$body = json_decode( (string) wp_remote_retrieve_body( $resp ), true );
+		if ( 200 !== $code || ! is_array( $body ) || empty( $body['access_token'] ) ) {
+			// invalid_grant = this refresh token is spent or revoked: drop it, the user signs in again.
+			if ( is_array( $body ) && 'invalid_grant' === ( $body['error'] ?? '' ) ) {
+				delete_user_meta( $user_id, 'gend_oauth_refresh_token' );
+			}
+			update_user_meta( $user_id, 'gend_oauth_refresh_retry_at', time() + 600 );
+			delete_transient( $lock );
+			return false;
+		}
+		update_user_meta( $user_id, 'gend_oauth_token', (string) $body['access_token'] );
+		if ( ! empty( $body['refresh_token'] ) ) {
+			update_user_meta( $user_id, 'gend_oauth_refresh_token', (string) $body['refresh_token'] );
+		}
+		update_user_meta( $user_id, 'gend_oauth_token_expires_at', time() + max( 60, (int) ( $body['expires_in'] ?? 3600 ) ) );
+		delete_user_meta( $user_id, 'gend_oauth_refresh_retry_at' );
+		delete_transient( $lock );
+		return true;
+	}
+	// After the user is known, before any plugin reads the token. Cheap when nothing is due: two user-meta reads.
+	add_action( 'init', function () {
+		if ( is_user_logged_in() ) {
+			gend_society_oauth_maybe_refresh();
+		}
+	}, 20 );
+}
+
+// ────────────────────────────────────────────────────────────────────────
 // Lost-password redirect
 // ────────────────────────────────────────────────────────────────────────
 
