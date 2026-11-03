@@ -80,6 +80,35 @@ if ( ! function_exists( 'gend_society_oauth_client_id' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_oauth_provider' ) ) {
+	/**
+	 * Which OAuth server the sign-in popup uses: 'hydra' (gend.me's own Ory Hydra at auth.gend.me, shared public client
+	 * "gend-sites", PKCE) or 'legacy' (the hub's WP OAuth Server plugin, per-site client id + secret). Default 'legacy'
+	 * until every site is moved; set GDC_OAUTH_PROVIDER=hydra (constant or environment) or the site option gend_society_oauth_provider to switch a site.
+	 */
+	function gend_society_oauth_provider(): string {
+		return 'hydra' === strtolower( gend_society_oauth_config_value( 'GDC_OAUTH_PROVIDER', 'gend_society_oauth_provider' ) ) ? 'hydra' : 'legacy';
+	}
+}
+
+if ( ! function_exists( 'gend_society_oauth_hydra_url' ) ) {
+	/**
+	 * Public base URL of the gend.me Hydra server (no trailing slash).
+	 */
+	function gend_society_oauth_hydra_url(): string {
+		return rtrim( gend_society_oauth_config_value( 'GDC_HYDRA_URL', '', 'https://auth.gend.me' ), '/' );
+	}
+}
+
+if ( ! function_exists( 'gend_society_oauth_login_client_id' ) ) {
+	/**
+	 * Client id of the sign-in popup: the shared public client with Hydra, else this site's own legacy client.
+	 */
+	function gend_society_oauth_login_client_id(): string {
+		return 'hydra' === gend_society_oauth_provider() ? 'gend-sites' : gend_society_oauth_client_id();
+	}
+}
+
 if ( ! function_exists( 'gend_society_oauth_is_hub_site' ) ) {
 	/**
 	 * True when this WordPress install IS the gend.me hub itself. Compared
