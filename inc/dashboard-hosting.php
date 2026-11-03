@@ -2565,14 +2565,17 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 } else {
                     $gs_md_names  = function_exists( 'gend_society_hosting_plan_names' ) ? gend_society_hosting_plan_names( 'media' ) : array();
                     $gs_md_mc     = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
-                    $gs_md_choose = is_array( $gs_md_mc ) && function_exists( 'gend_society_dashboard_standalone_url' ) ? gend_society_dashboard_standalone_url( $gs_md_mc['hosting_plans']['media']['choose_url'] ?? '' ) : '';
+                    $gs_md_choose = is_array( $gs_md_mc ) && function_exists( 'gend_society_dashboard_hub_link' ) ? gend_society_dashboard_hub_link( $gs_md_mc['hosting_plans']['media']['choose_url'] ?? '' ) : '';
                     $gs_md_moved  = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
                     ?>
+                    <?php $gs_md_hosted = function_exists( 'gend_society_runtime_mode' ) && 'container' === gend_society_runtime_mode(); ?>
                     <div class="gs-bk-card">
-                        <h3><?php echo esc_html( $gs_md_names ? implode( ' + ', $gs_md_names ) : __( 'No Media plan yet', 'gend-society' ) ); ?></h3>
-                        <p style="color: var(--gs-muted, #94a3b8);"><?php echo esc_html( ! empty( $gs_md_moved['moved'] )
-                            ? __( 'Your media library runs on your new site on gend.me hosting, under this plan.', 'gend-society' )
-                            : __( 'Your media library moves to gend.me hosting with your site; this plan is the storage it will use.', 'gend-society' ) ); ?></p>
+                        <h3 style="margin: 0 0 8px; color: #fff; font-size: 1.25rem;"><?php echo esc_html( $gs_md_names ? implode( ' + ', $gs_md_names ) : __( 'No Media plan yet', 'gend-society' ) ); ?></h3>
+                        <p style="color: var(--gs-muted, #94a3b8);"><?php echo esc_html( $gs_md_hosted
+                            ? __( 'Your media library is stored on gend.me hosting, under this plan.', 'gend-society' )
+                            : ( ! empty( $gs_md_moved['moved'] )
+                                ? __( 'Your media library runs on your new site on gend.me hosting, under this plan.', 'gend-society' )
+                                : __( 'Your media library moves to gend.me hosting with your site; this plan is the storage it will use.', 'gend-society' ) ) ); ?></p>
                         <?php if ( '' !== $gs_md_choose ) : ?>
                             <a class="gs-bk-btn gs-bk-btn--cta" data-gs-popup href="<?php echo esc_url( $gs_md_choose ); ?>" target="_blank" rel="opener"><?php echo esc_html( $gs_md_names ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?></a>
                         <?php endif; ?>
