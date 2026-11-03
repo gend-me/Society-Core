@@ -745,6 +745,18 @@ return array(
 			'note'  => 'Feature-scoped desktop chat editing: links a site account to its gend.me user at "Sign in with gend.me" and mints a site-pinned Application Password for that person (signed by gend.me). Must load after agent-provision.php (uses its signature verifier).',
 		),
 		array(
+			'file'  => 'inc/chat-tools.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Chat tools for every feature: one list, signed by gend.me, checked against plan, person and capability.',
+		),
+		array(
+			'file'  => 'inc/chat-tools-actions.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Chat tools that change things, and reads behind admin-ajax handlers.',
+		),
+		array(
 			'file'  => 'inc/agent-chat.php',
 			'tier'  => 'container',
 			'needs' => array(),
