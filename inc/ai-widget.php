@@ -138,7 +138,7 @@ class Gend_Society_AI_Widget {
             'oauthFlow'         => ! empty( $oauth['hydra'] ) && function_exists( 'gend_society_oauth_hydra_url' ) ? array(
                 'authorize_url' => gend_society_oauth_hydra_url() . '/oauth2/auth',
                 'redirect_uri'  => $oauth_hub_url . '/oauth2-bridge/callback',
-                'scope'         => 'openid profile email',
+                'scope'         => 'openid profile email offline_access',
             ) : null,
             'icon'              => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_icon' ) : '',
             'leo_avatar'        => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_leo_avatar' ) : '',
