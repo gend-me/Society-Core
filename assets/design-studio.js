@@ -248,9 +248,20 @@
 			S.templatesLoaded = true;
 		} );
 	}
+	// WordPress stores the site name and tagline HTML-escaped (don&#039;t): show and edit the real text.
+	function readableSettings( s ) {
+		[ 'title', 'description' ].forEach( function ( key ) {
+			if ( typeof s[ key ] === 'string' ) {
+				var box = document.createElement( 'textarea' );
+				box.innerHTML = s[ key ];
+				s[ key ] = box.value;
+			}
+		} );
+		return s;
+	}
 	function loadSettings() {
 		return api( { path: '/wp/v2/settings' } ).then( function ( s ) {
-			S.settings = s;
+			S.settings = readableSettings( s );
 			var ids = [ s.site_logo, s.site_icon ].filter( Boolean );
 			return Promise.all( ids.map( loadMedia ) );
 		} );
@@ -867,7 +878,7 @@
 	}
 	function saveSetting( data, msg ) {
 		return api( { path: '/wp/v2/settings', method: 'POST', data: data } ).then( function ( s ) {
-			S.settings = s;
+			S.settings = readableSettings( s );
 			toast( msg, 'ok' );
 			render();
 			renderNav();
