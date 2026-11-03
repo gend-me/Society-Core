@@ -236,6 +236,10 @@ function gend_society_render_glass_css( $context = 'login' ) {
         }
 
         .login h1 a {
+            background-image: url('<?php echo esc_url( GEND_SOCIETY_URL . 'assets/images/gend-login-logo.webp' ); ?>') !important;
+            background-position: center !important;
+            background-repeat: no-repeat !important;
+            border-radius: 14px;
             background-size: contain !important;
             width: 100% !important;
             height: 80px !important;
