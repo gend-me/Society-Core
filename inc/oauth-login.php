@@ -65,7 +65,7 @@ if ( ! function_exists( 'gend_society_oauth_client_secret' ) ) {
  */
 function gend_society_oauth_should_intercept(): bool {
     if ( gend_society_oauth_is_hub_site() ) return false;
-    if ( gend_society_oauth_client_id() === '' ) return false;
+    if ( gend_society_oauth_login_client_id() === '' ) return false;
     if ( isset( $_GET['gs_native'] ) ) return false;
     return true;
 }
@@ -93,8 +93,23 @@ function gend_society_oauth_render_login_page() {
 
     $redirect_to  = isset( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : admin_url();
     $hub_url      = gend_society_oauth_hub_url();
-    $client_id    = gend_society_oauth_client_id();
+    $client_id    = gend_society_oauth_login_client_id();
     $rest_login   = esc_url_raw( rest_url( 'gend-society/v1/oauth/login' ) );
+    // Where the popup goes and what it asks for: Hydra (PKCE, shared public client) or the hub's legacy OAuth server.
+    // Both hand the code back through a page on the hub origin, which the opener checks below.
+    if ( 'hydra' === gend_society_oauth_provider() ) {
+        $flow = array(
+            'authorize_url' => gend_society_oauth_hydra_url() . '/oauth2/auth',
+            'redirect_uri'  => $hub_url . '/oauth2-bridge/callback',
+            'scope'         => 'openid profile email',
+        );
+    } else {
+        $flow = array(
+            'authorize_url' => $hub_url . '/oauth/authorize',
+            'redirect_uri'  => $hub_url . '/oauth-bridge/',
+            'scope'         => 'profile',
+        );
+    }
 
     // Render the login page chrome via WP's login_header so theme/plugin
     // login_enqueue_scripts hooks fire (login-style.php's CSS still applies).
@@ -193,6 +208,7 @@ function gend_society_oauth_render_login_page() {
         var hubUrl       = <?php echo wp_json_encode( $hub_url ); ?>;
         var clientId     = <?php echo wp_json_encode( $client_id ); ?>;
         var restLoginUrl = <?php echo wp_json_encode( $rest_login ); ?>;
+        var flow         = <?php echo wp_json_encode( $flow ); ?>;
         var redirectTo   = <?php echo wp_json_encode( $redirect_to ); ?>;
 
         var btn   = document.getElementById('gs-oauth-btn');
@@ -228,10 +244,10 @@ function gend_society_oauth_render_login_page() {
                 var p = await pkce();
                 var state = base64url(crypto.getRandomValues(new Uint8Array(16)));
 
-                var authUrl = hubUrl + '/oauth/authorize?' + new URLSearchParams({
+                var authUrl = flow.authorize_url + '?' + new URLSearchParams({
                     response_type:         'code',
                     client_id:             clientId,
-                    redirect_uri:          hubUrl + '/oauth-bridge/',
+                    redirect_uri:          flow.redirect_uri,
                     // Request 'profile' — the standard scope the GenD Core
                     // (and Container Sites Login / Leo) WP-OAuth clients
                     // whitelist. 'basic' is being retired: a client scoped to
@@ -239,7 +255,7 @@ function gend_society_oauth_render_login_page() {
                     // /authorize. The /oauth/me userinfo endpoint returns the
                     // user's email + display_name under 'profile' too, which is
                     // all we need to match the local wp_users row.
-                    scope:                 'profile',
+                    scope:                 flow.scope,
                     state:                 state,
                     code_challenge:        p.challenge,
                     code_challenge_method: 'S256'
@@ -392,8 +408,13 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     }
 
     $hub_url       = gend_society_oauth_hub_url();
-    $client_id     = gend_society_oauth_client_id();
-    $client_secret = gend_society_oauth_client_secret();
+    $hydra         = 'hydra' === gend_society_oauth_provider();
+    $client_id     = gend_society_oauth_login_client_id();
+    // Hydra: the shared client is public (PKCE, no secret) and PKCE is mandatory there.
+    $client_secret = $hydra ? '' : gend_society_oauth_client_secret();
+    if ( $hydra && $verifier === '' ) {
+        return new WP_Error( 'missing_verifier', 'PKCE verifier required.', array( 'status' => 400 ) );
+    }
     if ( $client_id === '' ) {
         return new WP_Error( 'no_client', 'OAuth client not configured. Set GDC_OAUTH_CLIENT_ID.', array( 'status' => 503 ) );
     }
@@ -408,7 +429,7 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     $token_body = array(
         'grant_type'    => 'authorization_code',
         'code'          => $code,
-        'redirect_uri'  => $hub_url . '/oauth-bridge/',
+        'redirect_uri'  => $hub_url . ( $hydra ? '/oauth2-bridge/callback' : '/oauth-bridge/' ),
         'client_id'     => $client_id,
     );
     if ( $verifier !== '' ) $token_body['code_verifier'] = $verifier;
@@ -418,7 +439,8 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
         $token_headers['Authorization'] = 'Basic ' . base64_encode( $client_id . ':' . $client_secret );
     }
 
-    $resp = wp_remote_post( $hub_url . '/oauth/token', array(
+    $token_url = $hydra ? gend_society_oauth_hydra_url() . '/oauth2/token' : $hub_url . '/oauth/token';
+    $resp = wp_remote_post( $token_url, array(
         'timeout' => 15,
         'headers' => $token_headers,
         'body'    => $token_body,
@@ -467,7 +489,7 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     // (e.g. /wp-json/aipa/v1/me).
     $userinfo_url = defined( 'GDC_OAUTH_USERINFO_URL' ) && GDC_OAUTH_USERINFO_URL
         ? (string) GDC_OAUTH_USERINFO_URL
-        : ( $hub_url . '/oauth/me' );
+        : ( $hydra ? gend_society_oauth_hydra_url() . '/userinfo' : $hub_url . '/oauth/me' );
     $info_resp = wp_remote_get( $userinfo_url, array(
         'timeout' => 10,
         'headers' => array( 'Authorization' => 'Bearer ' . $access_token ),
