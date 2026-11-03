@@ -15,6 +15,21 @@ function gend_society_plugin_active($slug)
 }
 
 /**
+ * Store entry of a feature plugin that is off on this container. Reached only when the plan allows the feature
+ * (the area gate redirects every other plan to the upgrade page), so say it is included and where to switch it on.
+ */
+function gend_society_store_feature_inactive_page()
+{
+    global $title;
+    echo '<div class="wrap gend-society-plan gend-society-upgrade"><h1>' . esc_html((string) $title) . '</h1>';
+    echo '<div class="gend-society-card gs-plan-card is-included"><p>' . esc_html__('Included with your plan, but not switched on for this site yet.', 'gend-society') . '</p>';
+    if (current_user_can('activate_plugins')) {
+        echo '<p><a class="button button-primary" href="' . esc_url(admin_url('plugins.php')) . '">' . esc_html__('Open Plugins to switch it on', 'gend-society') . '</a></p>';
+    }
+    echo '</div></div>';
+}
+
+/**
  * Remove the default WP menus and register the GenD Society menu.
  */
 add_action('admin_menu', 'gend_society_register_admin_menu', 5);
@@ -122,7 +137,19 @@ function gend_society_register_admin_menu()
             add_submenu_page(null, __('Store Reports', 'gend-society'), __('Store Reports', 'gend-society'), 'manage_options', 'gdc-store-reports', 'gdc_render_store_reports_page');
         }
 
-        // Note: Sales Team and Projects register their own submenus under gs-store, so we don't need to manually add_submenu_page for them here.
+        // Sales Team and Projects register their own submenus under gs-store when they are active. On a customer
+        // container they can be off (the plan decides), and their entries must stay in the menu: the area gate
+        // (inc/feature-gates.php) then sends a plan without them to the upgrade page, as for every other menu.
+        if ('container' === gend_society_runtime_mode()) {
+            foreach (array(
+                'st_sales_team' => array(__('Sales Team', 'gend-society'), 'sales-team/advanced-affiliate-system.php'),
+                'psoo-projects' => array(__('Project Services', 'gend-society'), 'projects/project-service-orders.php'),
+            ) as $gs_slug => $gs_item) {
+                if (!gend_society_plugin_active($gs_item[1])) {
+                    add_submenu_page('gs-store', $gs_item[0], $gs_item[0], 'manage_options', $gs_slug, 'gend_society_store_feature_inactive_page');
+                }
+            }
+        }
     }
 
     // ── SOCIAL (conditional) ──────────────────────────────────────────────────
