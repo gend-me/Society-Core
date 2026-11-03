@@ -101,7 +101,7 @@ function gend_society_oauth_render_login_page() {
         $flow = array(
             'authorize_url' => gend_society_oauth_hydra_url() . '/oauth2/auth',
             'redirect_uri'  => $hub_url . '/oauth2-bridge/callback',
-            'scope'         => 'openid profile email',
+            'scope'         => 'openid profile email offline_access', // offline_access = Hydra issues a refresh token
         );
     } else {
         $flow = array(
@@ -593,6 +593,9 @@ function gend_society_oauth_login_rest( WP_REST_Request $req ) {
     update_user_meta( $user->ID, 'gend_oauth_token', $access_token );
     if ( $refresh_token !== '' ) {
         update_user_meta( $user->ID, 'gend_oauth_refresh_token', $refresh_token );
+    } elseif ( $hydra ) {
+        // A refresh token left from the old server is not valid at Hydra; keeping it would only fail the next refresh.
+        delete_user_meta( $user->ID, 'gend_oauth_refresh_token' );
     }
     update_user_meta( $user->ID, 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
 

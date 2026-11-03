@@ -381,6 +381,8 @@ class Gend_Society_AI_Proxy {
             update_user_meta( get_current_user_id(), 'gend_oauth_token', $access_token );
             if ( $refresh_token !== '' ) {
                 update_user_meta( get_current_user_id(), 'gend_oauth_refresh_token', $refresh_token );
+            } elseif ( $hydra ) {
+                delete_user_meta( get_current_user_id(), 'gend_oauth_refresh_token' ); // a leftover old-server refresh token is invalid at Hydra
             }
             update_user_meta( get_current_user_id(), 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
         } else {
@@ -416,6 +418,8 @@ class Gend_Society_AI_Proxy {
                         update_user_meta( $user->ID, 'gend_oauth_token', $access_token );
                         if ( $refresh_token !== '' ) {
                             update_user_meta( $user->ID, 'gend_oauth_refresh_token', $refresh_token );
+                        } elseif ( $hydra ) {
+                            delete_user_meta( $user->ID, 'gend_oauth_refresh_token' ); // a leftover old-server refresh token is invalid at Hydra
                         }
                         update_user_meta( $user->ID, 'gend_oauth_token_expires_at', time() + max( 60, $expires_in ) );
                         wp_set_current_user( $user->ID, $user->user_login );
