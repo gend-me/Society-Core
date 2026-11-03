@@ -309,9 +309,10 @@ function gend_society_suppress_plugin_menus()
         unset($submenu['index.php']);
     }
 
-    // Customers' sub-sites on the hub: the hub's own tools (Cloaked Links, OAuth Server, the WP Ultimo Account and
-    // My Sites pages) belong to the gend.me main site only.
-    if (function_exists('gend_society_runtime_mode') && 'hub' === gend_society_runtime_mode() && is_multisite() && !is_main_site() && !is_super_admin()) {
+    // The hub's own tools (Cloaked Links, OAuth Server, the WP Ultimo Account and My Sites pages) belong to the gend.me
+    // main site only: hidden on customers' sub-sites and on every connected or standalone install.
+    $gs_mode_now = function_exists('gend_society_runtime_mode') ? gend_society_runtime_mode() : '';
+    if ('' !== $gs_mode_now && ('hub' !== $gs_mode_now || (is_multisite() && !is_main_site() && !is_super_admin()))) {
         $gs_hub_only_titles = array('Cloaked Links', 'OAuth Server', 'Account', 'My Sites');
         foreach ($menu as $gs_pos => $gs_item) {
             $gs_title = trim(html_entity_decode(wp_strip_all_tags((string) preg_replace('/<span.*?<\/span>/s', '', (string) ($gs_item[0] ?? ''))), ENT_QUOTES, 'UTF-8'), " \t\r\n\xC2\xA0");
