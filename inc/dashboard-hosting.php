@@ -1362,14 +1362,6 @@ if ( ! function_exists( 'gend_society_hosting_plan_names' ) ) {
     }
 }
 
-if ( ! function_exists( 'gend_society_hosting_plan_label' ) ) {
-    /** The held plan name(s) of a resource, or a prompt to pick one. */
-    function gend_society_hosting_plan_label( string $res ): string {
-        $names = gend_society_hosting_plan_names( $res );
-        return $names ? implode( ' + ', $names ) : __( 'No plan yet', 'gend-society' );
-    }
-}
-
 if ( ! function_exists( 'gend_society_after_migration_label' ) ) {
     /** The placeholder a not-yet-moved install shows where gend.me hosting will report; "Moved" once its site is Live elsewhere. */
     function gend_society_after_migration_label(): string {
@@ -2112,6 +2104,8 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
                     unset( $gs_tables_hero['pct'], $gs_tables_hero['warn'] );
                     $gs_tables_hero['stats'][1]['v'] = gend_society_hosting_plan_label( 'database' );
+                    unset( $gs_tables_hero['stats'][5] ); // the plan name is already the Capacity value above
+                    $gs_tables_hero['stats'] = array_values( $gs_tables_hero['stats'] );
                 }
                 gend_society_hosting_render_analytics_hero( $gs_tables_hero );
                 ?>
@@ -2569,7 +2563,24 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         GMO_Editor_Panel::render();
                     }
                 } else {
-                    echo '<p style="color: var(--gs-muted, #94a3b8); font-style: italic;">' . esc_html__( 'Media library is not available on this install.', 'gend-society' ) . '</p>';
+                    $gs_md_names  = function_exists( 'gend_society_hosting_plan_names' ) ? gend_society_hosting_plan_names( 'media' ) : array();
+                    $gs_md_mc     = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+                    $gs_md_choose = is_array( $gs_md_mc ) && function_exists( 'gend_society_dashboard_standalone_url' ) ? gend_society_dashboard_standalone_url( $gs_md_mc['hosting_plans']['media']['choose_url'] ?? '' ) : '';
+                    $gs_md_moved  = function_exists( 'gend_society_origin_moved' ) ? gend_society_origin_moved() : array( 'moved' => false );
+                    ?>
+                    <div class="gs-bk-card">
+                        <h3><?php echo esc_html( $gs_md_names ? implode( ' + ', $gs_md_names ) : __( 'No Media plan yet', 'gend-society' ) ); ?></h3>
+                        <p style="color: var(--gs-muted, #94a3b8);"><?php echo esc_html( ! empty( $gs_md_moved['moved'] )
+                            ? __( 'Your media library runs on your new site on gend.me hosting, under this plan.', 'gend-society' )
+                            : __( 'Your media library moves to gend.me hosting with your site; this plan is the storage it will use.', 'gend-society' ) ); ?></p>
+                        <?php if ( '' !== $gs_md_choose ) : ?>
+                            <a class="gs-bk-btn gs-bk-btn--cta" data-gs-popup href="<?php echo esc_url( $gs_md_choose ); ?>" target="_blank" rel="opener"><?php echo esc_html( $gs_md_names ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?></a>
+                        <?php endif; ?>
+                        <?php if ( ! empty( $gs_md_moved['moved'] ) && ! empty( $gs_md_moved['to'] ) ) : ?>
+                            <a class="gs-bk-btn" href="<?php echo esc_url( (string) $gs_md_moved['to'] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open your new site', 'gend-society' ); ?></a>
+                        <?php endif; ?>
+                    </div>
+                    <?php
                 }
                 ?>
                 <script>
@@ -4333,9 +4344,19 @@ if ( ! function_exists( 'gend_society_hosting_server_price' ) ) {
     }
 }
 
-function gend_society_hosting_plan_label( $billing ) {
-    if ( ! is_array( $billing ) ) return __( 'Default', 'gend-society' );
-    if ( ! empty( $billing['label'] ) ) return (string) $billing['label'];
+/**
+ * Plan label. A resource slug (backups|media|codebase|database|server) gives the held plan name(s) or a prompt to pick one;
+ * a billing array (hub-hosted container) gives its label. (One function: a second, guarded definition of this name was
+ * never defined because this one is hoisted, so every slug fell through to "Default".)
+ *
+ * @param string|array $res
+ */
+function gend_society_hosting_plan_label( $res ) {
+    if ( is_string( $res ) ) {
+        $names = function_exists( 'gend_society_hosting_plan_names' ) ? gend_society_hosting_plan_names( $res ) : array();
+        return $names ? implode( ' + ', $names ) : __( 'No plan yet', 'gend-society' );
+    }
+    if ( is_array( $res ) && ! empty( $res['label'] ) ) return (string) $res['label'];
     return __( 'Default', 'gend-society' );
 }
 
