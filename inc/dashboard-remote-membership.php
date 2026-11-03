@@ -306,6 +306,27 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_url' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_dashboard_hub_link' ) ) {
+    /**
+     * $url when it is a link on this site's gend.me hub, else ''. Works on a container too, where plan-access.php (and its
+     * strict validator) is not loaded: there a link must start with the OAuth hub URL.
+     *
+     * @param mixed $url Candidate.
+     */
+    function gend_society_dashboard_hub_link( $url ): string {
+        $url = is_string( $url ) ? trim( $url ) : '';
+        if ( '' === $url || preg_match( '/[\s[:cntrl:]\\\\]/', $url ) ) {
+            return '';
+        }
+        $strict = gend_society_dashboard_standalone_url( $url );
+        if ( '' !== $strict ) {
+            return $strict;
+        }
+        $hub = function_exists( 'gend_society_oauth_hub_url' ) ? untrailingslashit( (string) gend_society_oauth_hub_url() ) : '';
+        return ( '' !== $hub && 0 === strpos( $url, $hub . '/' ) ) ? $url : '';
+    }
+}
+
 if ( ! function_exists( 'gend_society_dashboard_standalone_action_url' ) ) {
     /**
      * gend.me page for a panel action, opened in a popup / new tab (D14), never in a frame. '' when unavailable.
@@ -516,6 +537,21 @@ if ( ! function_exists( 'gend_society_email_plan_env' ) ) {
             }
             $env['choose_url'] = $url;
         }
+        if ( 'container' === $env['mode'] ) {
+            // A container has no WP Ultimo and (often) no relay state of its own: the Emails plans come from the paired
+            // membership's /membership answer (hosting_plans.emails), as on a standalone install.
+            $mc = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+            $hp = ( is_array( $mc ) && is_array( $mc['hosting_plans']['emails'] ?? null ) ) ? $mc['hosting_plans']['emails'] : array();
+            foreach ( array( 'storage', 'sending' ) as $kind ) {
+                if ( empty( $env['current'][ $kind ] ) && ! empty( $hp['current'][ $kind ]['name'] ) ) {
+                    $env['current'][ $kind ] = array( 'id' => (int) ( $hp['current'][ $kind ]['id'] ?? 0 ), 'name' => (string) $hp['current'][ $kind ]['name'] );
+                }
+            }
+            $cu = gend_society_dashboard_hub_link( $hp['choose_url'] ?? '' );
+            if ( '' !== $cu ) {
+                $env['choose_url'] = $cu;
+            }
+        }
         return $env;
     }
 }
@@ -581,7 +617,7 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
         }
         $active = ! empty( $names ) || ( $st && isset( $st['free'] ) && ! $st['free'] );
 
-        if ( empty( $plans ) && ! $st && 'standalone' !== $mode ) {
+        if ( empty( $plans ) && ! $st && ! in_array( $mode, array( 'standalone', 'container' ), true ) ) {
             $v['state']       = 'no_plans';
             $v['badge']       = __( 'No Email Plans Configured', 'gend-society' );
             $v['badge_class'] = 'is-neutral';
