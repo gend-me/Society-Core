@@ -116,3 +116,92 @@ function gend_society_bt_editor_styles( $settings ) {
 	}
 	return $settings;
 }
+
+add_filter( 'the_generator', '__return_empty_string' );
+
+add_action( 'wp_enqueue_scripts', 'gend_society_bt_built_pages_css', 21 );
+/**
+ * The look of pages built through the chat (one HTML block of plain sections). A stylesheet rather than a style tag,
+ * which WordPress strips from a sub-site admin's content.
+ */
+function gend_society_bt_built_pages_css() {
+	$post = is_singular() ? get_post() : null;
+	if ( ! $post || false === strpos( (string) $post->post_content, 'gs-page' ) ) {
+		return;
+	}
+	gend_society_bt_enqueue_built_pages();
+	// A scene behind a section is plain markup, so WordPress doesn't know to bring the block's files.
+	if ( false !== strpos( (string) $post->post_content, 'gss--section' ) ) {
+		wp_enqueue_style( 'gend-society-scroll-scene' );
+		wp_enqueue_script( 'gend-society-scroll-scene' );
+	}
+}
+
+function gend_society_bt_clean_style_tokens( array $tokens ) {
+	$rules = array(
+		'radius'       => '/^\d{1,3}px$/',
+		'buttonRadius' => '/^\d{1,3}px$/',
+		'space'        => '/^\d?\.?\d{1,2}$/',
+		'entrance'     => '/^(gs-rise|gs-fade|none)$/',
+		'blur'         => '/^\d{1,2}px$/',
+		'glass'        => '/^\d{1,3}%$/',
+		'tilt'         => '/^\d{1,2}deg$/',
+		'headerPosition' => '/^(sticky|static)$/',
+	);
+	$clean = array();
+	foreach ( $rules as $key => $rule ) {
+		if ( isset( $tokens[ $key ] ) && is_string( $tokens[ $key ] ) && preg_match( $rule, $tokens[ $key ] ) ) {
+			$clean[ $key ] = $tokens[ $key ];
+		}
+	}
+	return $clean;
+}
+
+function gend_society_bt_style_tokens() {
+	return gend_society_bt_clean_style_tokens( (array) get_option( 'gend_society_style_tokens', array() ) );
+}
+
+/**
+ * A site's own styling, written through the chat, or '' when it isn't acceptable. No way out of the style tag and nothing
+ * that loads from elsewhere: a sub-site admin can't normally add CSS at all, so this stays narrower than a stylesheet.
+ */
+function gend_society_bt_clean_css( $css ) {
+	$css = trim( (string) preg_replace( '~/\*.*?\*/~s', '', (string) $css ) );
+	if ( '' === $css || strlen( $css ) > 8000 || substr_count( $css, '{' ) !== substr_count( $css, '}' ) ) {
+		return '';
+	}
+	return preg_match( '~url\s*\(|@import|@charset|@namespace|@font-face|expression\s*\(|javascript:|behavior\s*:|-moz-binding|image-set|<|\\\\~i', $css ) ? '' : $css;
+}
+
+function gend_society_bt_enqueue_built_pages() {
+	static $done = false;
+	if ( $done ) {
+		return;
+	}
+	$done = true;
+	wp_enqueue_style( 'gend-society-built-pages', GEND_SOCIETY_URL . 'assets/built-pages.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/built-pages.css' ) );
+	wp_enqueue_script( 'gend-society-built-pages', GEND_SOCIETY_URL . 'assets/built-pages.js', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/built-pages.js' ), array( 'in_footer' => true, 'strategy' => 'defer' ) );
+	$vars = '';
+	foreach ( gend_society_bt_style_tokens() as $key => $value ) {
+		$vars .= '--wp--custom--gs--' . _wp_to_kebab_case( $key ) . ':' . $value . ';';
+	}
+	if ( '' !== $vars ) {
+		wp_add_inline_style( 'gend-society-built-pages', ':root{' . $vars . '}' );
+	}
+	foreach ( (array) get_option( 'gend_society_site_css', array() ) as $css ) {
+		$css = gend_society_bt_clean_css( $css );
+		if ( '' !== $css ) {
+			wp_add_inline_style( 'gend-society-built-pages', $css );
+		}
+	}
+}
+
+add_filter( 'render_block_core/group', 'gend_society_bt_built_chrome_css', 10, 2 );
+/** A built header or footer shows on every page, built or not. A block theme renders its template before wp_head, so this is in time. */
+function gend_society_bt_built_chrome_css( $html, $block ) {
+	$class = (string) ( $block['attrs']['className'] ?? '' );
+	if ( false !== strpos( $class, 'gs-site-header' ) || false !== strpos( $class, 'gs-site-footer' ) ) {
+		gend_society_bt_enqueue_built_pages();
+	}
+	return $html;
+}

@@ -132,6 +132,14 @@ function gend_society_scroll_scene_render( $attributes, $content ) {
 		$alt    = isset( $layer['alt'] ) ? (string) $layer['alt'] : '';
 		$effect = isset( $layer['effect'] ) && in_array( $layer['effect'], $effects, true ) ? $layer['effect'] : 'zoom-in';
 		$img    = '';
+		$frames = '';
+		// A video layer: its frames, drawn with the scroll, in this site's uploads. The first one shows until they load.
+		if ( isset( $layer['frames'] ) && preg_match( '~^https?://[^"\'<>\s]+/gend-scenes/[a-f0-9]{16}/$~D', (string) $layer['frames'] ) ) {
+			$ext    = 'webp' === ( $layer['ext'] ?? '' ) ? 'webp' : 'jpg';
+			$frames = sprintf( ' data-frames="%s" data-count="%d" data-ext="%s"', esc_url( $layer['frames'] ), max( 2, min( 180, (int) ( $layer['count'] ?? 2 ) ) ), $ext );
+			$url    = esc_url( $layer['frames'] . 'f001.' . $ext );
+			$id     = 0;
+		}
 		if ( $id && wp_attachment_is_image( $id ) ) {
 			$img = wp_get_attachment_image(
 				$id,
@@ -153,7 +161,7 @@ function gend_society_scroll_scene_render( $attributes, $content ) {
 		if ( ! $img ) {
 			continue;
 		}
-		$out .= sprintf( '<div class="gss-layer" data-effect="%s">%s</div>', esc_attr( $effect ), $img );
+		$out .= sprintf( '<div class="gss-layer" data-effect="%s"%s>%s</div>', esc_attr( $effect ), $frames, $img );
 	}
 	if ( '' === $out ) {
 		return '';
@@ -169,7 +177,7 @@ function gend_society_scroll_scene_render( $attributes, $content ) {
 	}
 	$wrapper = get_block_wrapper_attributes(
 		array(
-			'class' => 'gss',
+			'class' => 'page' === ( $attributes['mode'] ?? '' ) ? 'gss gss--page' : 'gss',
 			'style' => '--gss-h:' . $height . 'vh',
 		)
 	);

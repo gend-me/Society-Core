@@ -1,0 +1,415 @@
+/* Pages built through the chat: one HTML block of plain sections. Theme presets only, so they follow the style guide. */
+html:has(.gs-page){ overflow-x:clip; }
+.gs-page.alignfull{ width:100vw; max-width:100vw; margin-block:0; margin-inline:calc(50% - 50vw); }
+.gs-page{ font-family:var(--gs-font-body,inherit); color:var(--wp--preset--color--contrast); }
+.gs-page *{ box-sizing:border-box; }
+.gs-page section{ padding:clamp(56px,9vw,112px) clamp(20px,5vw,48px); }
+.gs-page-inner{ max-width:1120px; margin:0 auto; }
+.gs-page h1,.gs-page h2,.gs-page h3{ font-family:var(--gs-font-heading,inherit); line-height:1.12; letter-spacing:-.015em; margin:0 0 .5em; color:var(--wp--preset--color--accent-1); }
+.gs-page h1{ font-size:clamp(2.5rem,6.2vw,4.75rem); max-width:18ch; }
+.gs-page h2{ font-size:clamp(1.85rem,3.6vw,3rem); max-width:24ch; }
+.gs-page h3{ font-size:clamp(1.15rem,1.7vw,1.4rem); line-height:1.25; }
+.gs-page p{ margin:0 0 1em; font-size:clamp(1rem,1.25vw,1.15rem); line-height:1.65; max-width:68ch; }
+.gs-page section > .gs-page-inner > :last-child{ margin-bottom:0; }
+.gs-sec-hero{ position:relative; overflow:hidden; background:radial-gradient(90% 130% at 100% 0,color-mix(in srgb,var(--wp--preset--color--brand-highlight) 55%,transparent),transparent 62%),var(--wp--preset--color--brand-primary); color:var(--wp--preset--color--base); }
+.gs-sec-hero h1,.gs-sec-hero h2{ color:var(--wp--preset--color--base); }
+.gs-sec-hero p{ font-size:clamp(1.1rem,1.7vw,1.4rem); max-width:56ch; opacity:.92; }
+.gs-sec-hero .gs-page-inner{ padding-block:clamp(12px,4vw,48px); }
+.gs-sec-cta{ background:var(--wp--preset--color--accent-5); text-align:center; }
+.gs-sec-cta h2,.gs-sec-cta p{ margin-inline:auto; }
+.gs-page-action{ margin:1.6em 0 0; max-width:none; }
+.gs-page .gs-page-button{ display:inline-block; padding:.9em 1.9em; border-radius:999px; background:var(--wp--preset--color--brand-primary); color:var(--wp--preset--color--base); font-family:var(--gs-font-button,inherit); font-weight:600; font-size:1rem; line-height:1.2; text-decoration:none; transition:transform .2s ease,box-shadow .2s ease; }
+.gs-page .gs-page-button:hover,.gs-page .gs-page-button:focus-visible{ transform:translateY(-2px); box-shadow:0 10px 24px color-mix(in srgb,var(--wp--preset--color--brand-primary) 35%,transparent); }
+.gs-page .gs-page-button:focus-visible{ outline:2px solid currentColor; outline-offset:3px; }
+.gs-sec-hero .gs-page-button{ background:var(--wp--preset--color--base); color:var(--wp--preset--color--brand-primary); }
+.gs-page-cards{ list-style:none; margin:clamp(24px,3.5vw,44px) 0 0; padding:0; display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,270px),1fr)); gap:clamp(14px,2vw,24px); }
+.gs-page-cards li{ padding:clamp(22px,2.6vw,32px); border:1px solid var(--wp--preset--color--accent-6); border-radius:14px; background:var(--wp--preset--color--base); transition:transform .25s ease,border-color .25s ease; }
+.gs-page-cards li:hover{ transform:translateY(-3px); border-color:var(--wp--preset--color--brand-primary); }
+.gs-page-cards p{ font-size:1rem; margin-bottom:0; }
+.gs-page-cards p + p{ margin-top:.8em; }
+.gs-page-num{ display:block; margin-bottom:.8em; font-family:var(--gs-font-mono,monospace); font-size:.8rem; font-weight:700; color:var(--wp--preset--color--brand-primary); }
+.gs-page-list{ margin:1.2em 0 0; padding:0 0 0 1.2em; font-size:clamp(1rem,1.25vw,1.15rem); line-height:1.65; }
+.gs-page-list li{ margin:.35em 0; }
+.gs-page-list li::marker{ color:var(--wp--preset--color--brand-primary); }
+@media (prefers-reduced-motion:reduce){ .gs-page *{ transition:none!important; } }
+/* The header and footer of a built site. */
+.gs-site-header,.gs-site-footer{ width:var(--gs-vw,100vw); max-width:var(--gs-vw,100vw); margin-block:0; margin-inline:calc(50% - var(--gs-vw,100vw) / 2); font-family:var(--gs-font-body,inherit); box-sizing:border-box; }
+html:has(.gs-site-header){ overflow-x:clip; }
+.gs-site-header{ position:sticky; top:var(--wp-admin--admin-bar--height,0px); z-index:50; background:var(--wp--preset--color--base); border-bottom:1px solid var(--wp--preset--color--accent-6); }
+.gs-site-header + *{ margin-block-start:0; }
+.gs-site-header .gs-site-bar > *,.gs-site-footer .gs-site-bar > *,.gs-site-bar .gs-site-brand > *,.gs-site-bar .gs-site-brand-stack > *{ margin-block:0; }
+.gs-site-footer > .gs-site-bar{ margin-block:0; }
+.gs-site-bar{ display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:14px clamp(16px,3vw,36px); max-width:calc(1120px + 2 * clamp(20px,5vw,48px)); margin:0 auto; padding:14px clamp(20px,5vw,48px); box-sizing:border-box; }
+.gs-site-brand{ display:flex; align-items:center; gap:12px; min-width:0; margin:0 auto 0 0; }
+.gs-site-brand .wp-block-site-logo,.gs-site-brand .wp-block-site-logo img{ display:block; margin:0; }
+.gs-site-brand .wp-block-site-title,.gs-site-brand-stack .wp-block-site-title{ margin:0; font-family:var(--gs-font-heading,inherit); font-size:clamp(1.02rem,1.5vw,1.2rem); font-weight:700; line-height:1.2; letter-spacing:-.01em; }
+.gs-site-header a,.gs-site-footer a{ text-decoration:none; color:var(--wp--preset--color--accent-1); }
+.gs-site-nav ul,.gs-site-burger ul{ list-style:none; margin:0; padding:0; }
+.gs-site-nav ul{ display:flex; flex-wrap:wrap; gap:6px clamp(14px,2vw,28px); }
+.gs-site-nav a{ font-size:.97rem; font-weight:500; padding:6px 0; border-bottom:2px solid transparent; transition:border-color .2s ease; }
+.gs-site-nav a:hover,.gs-site-nav a:focus-visible{ border-bottom-color:var(--wp--preset--color--brand-primary); }
+.nav-actions-right{ display:flex; align-items:center; gap:14px; }
+.gs-site-header .gs-site-cta{ display:inline-block; padding:.62em 1.3em; border-radius:999px; background:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1)); color:var(--wp--preset--color--base); font-size:.93rem; font-weight:600; white-space:nowrap; transition:transform .2s ease; }
+.gs-site-header .gs-site-cta:hover,.gs-site-header .gs-site-cta:focus-visible{ transform:translateY(-1px); }
+.gs-site-header .gs-mini-cart-btn{ position:relative; color:var(--wp--preset--color--accent-1)!important; opacity:1; background:none; }
+.gs-site-header .gs-mini-cart-btn svg{ stroke:currentColor; }
+.gs-site-burger{ display:none; position:relative; }
+.gs-site-burger summary{ list-style:none; cursor:pointer; width:42px; height:42px; display:grid; place-items:center; border:1px solid var(--wp--preset--color--accent-6); border-radius:10px; }
+.gs-site-burger summary::-webkit-details-marker{ display:none; }
+.gs-site-burger summary span,.gs-site-burger summary span::before,.gs-site-burger summary span::after{ display:block; width:18px; height:2px; background:var(--wp--preset--color--accent-1); }
+.gs-site-burger summary span{ position:relative; }
+.gs-site-burger summary span::before,.gs-site-burger summary span::after{ content:''; position:absolute; left:0; }
+.gs-site-burger summary span::before{ top:-6px; }
+.gs-site-burger summary span::after{ top:6px; }
+.gs-site-burger nav{ position:absolute; right:0; top:calc(100% + 10px); min-width:220px; padding:8px; background:var(--wp--preset--color--base); border:1px solid var(--wp--preset--color--accent-6); border-radius:12px; box-shadow:0 16px 40px rgba(0,0,0,.14); }
+.gs-site-burger nav a{ display:block; padding:10px 12px; border-radius:8px; }
+.gs-site-burger nav a:hover,.gs-site-burger nav a:focus-visible{ background:var(--wp--preset--color--accent-5); }
+.gs-site-footer{ background:var(--wp--preset--color--accent-5); padding-block:clamp(36px,5vw,64px) 20px; margin-block-start:0; }
+.gs-site-footer .wp-block-site-tagline{ margin:6px 0 0; font-size:.95rem; color:var(--wp--preset--color--contrast); }
+.gs-site-brand-stack{ max-width:46ch; }
+.gs-site-legal{ max-width:calc(1120px + 2 * clamp(20px,5vw,48px)); margin:22px auto 0; padding:0 clamp(20px,5vw,48px); font-size:.84rem; color:var(--wp--preset--color--contrast); box-sizing:border-box; }
+@media (max-width:760px){
+  .gs-site-header .gs-site-nav{ display:none; }
+  .gs-site-header .gs-site-cta{ display:none; }
+  .gs-site-burger{ display:block; }
+  .gs-site-bar{ flex-wrap:nowrap; padding-block:10px; }
+  .gs-site-footer .gs-site-bar{ flex-wrap:wrap; }
+}
+@media (prefers-reduced-motion:reduce){ .gs-site-header *,.gs-site-footer *{ transition:none!important; } }
+/* Forms and chatflows from Talk Flows, in the site's own look. */
+.gs-page-form{ max-width:640px; margin-top:clamp(20px,3vw,36px); }
+.gs-page-form .basic-form-header,.gs-page-form .chat-header{ display:none; }
+.gs-page-form .basic-form-container,.gs-page-form .chat-form-container{ padding:clamp(20px,3vw,32px)!important; border:1px solid var(--wp--preset--color--accent-6)!important; border-radius:14px!important; background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; box-shadow:none!important; backdrop-filter:none!important; font-family:var(--gs-font-body,inherit)!important; max-width:none!important; width:auto!important; }
+.gs-page-form .sn-input-group{ margin:0 0 18px; }
+.gs-page-form label{ display:block; margin-bottom:6px; font-size:.95rem; font-weight:600; color:var(--wp--preset--color--contrast)!important; position:static!important; transform:none!important; }
+.gs-page-form input:not([type=hidden]),.gs-page-form textarea,.gs-page-form select{ display:block; width:100%!important; box-sizing:border-box; padding:12px 14px!important; border:1px solid var(--wp--preset--color--accent-6)!important; border-radius:10px!important; background:#fff!important; color:var(--wp--preset--color--contrast)!important; font:inherit; font-size:1rem; }
+.gs-page-form input:focus,.gs-page-form textarea:focus,.gs-page-form select:focus{ outline:2px solid var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1)); outline-offset:1px; }
+.gs-page-form .sn-submit-btn,.gs-page-form .chat-submit-btn{ display:inline-block; width:auto!important; padding:.9em 1.9em!important; border:0!important; border-radius:999px!important; background:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1))!important; color:var(--wp--preset--color--base)!important; font:inherit; font-weight:600; cursor:pointer; }
+.gs-page-form .sn-submit-btn:disabled{ opacity:.6; cursor:default; }
+.gs-page-form .chat-form-container{ display:flex; flex-direction:column; }
+.gs-page-form .chat-form-container .chat-progress-wrapper{ background:transparent!important; border:0!important; padding:0 0 12px!important; }
+.gs-page-form .chat-form-container .chat-question-counter{ color:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1))!important; }
+.gs-page-form .chat-form-container .chat-progress-bar{ background:var(--wp--preset--color--accent-6)!important; }
+.gs-page-form .chat-form-container .chat-progress-fill{ background:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1))!important; }
+.gs-page-form .chat-form-container .chat-messages{ min-height:200px; max-height:420px; overflow:auto; background:transparent!important; padding:6px 0 14px!important; }
+.gs-page-form .chat-form-container .chat-avatar{ display:none; }
+.gs-page-form .chat-form-container .chat-message{ width:100%; max-width:100%!important; box-sizing:border-box; }
+.gs-page-form .chat-form-container .chat-message--user{ justify-content:flex-start; }
+.gs-page-form .chat-form-container .chat-bubble{ flex:0 1 auto; width:fit-content; max-width:78%; word-break:normal; overflow-wrap:break-word; }
+.gs-page-form .chat-form-container .chat-bubble{ background:var(--wp--preset--color--accent-5)!important; color:var(--wp--preset--color--contrast)!important; border:1px solid var(--wp--preset--color--accent-6)!important; box-shadow:none!important; }
+.gs-page-form .chat-form-container .chat-bubble--user{ background:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1))!important; color:var(--wp--preset--color--base)!important; border-color:transparent!important; }
+.gs-page-form .chat-form-container .chat-input-area{ background:transparent!important; border:0!important; border-top:1px solid var(--wp--preset--color--accent-6)!important; padding:14px 0 0!important; gap:10px!important; align-items:center; }
+.gs-page-form .chat-form-container input.chat-input,.gs-page-form .chat-form-container textarea.chat-input{ flex:1 1 180px!important; min-width:0; width:auto!important; background:#fff!important; color:var(--wp--preset--color--contrast)!important; border:1px solid var(--wp--preset--color--accent-6)!important; border-radius:10px!important; }
+.gs-page-form .chat-form-container .chat-submit-btn{ background:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1))!important; color:var(--wp--preset--color--base)!important; box-shadow:none!important; }
+.gs-page-form .chat-form-container .chat-option-btn{ background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; border:1px solid var(--wp--preset--color--accent-6)!important; }
+.gs-page-form .chat-form-container .chat-option-btn:hover,.gs-page-form .chat-form-container .chat-option-btn.selected{ background:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1))!important; color:var(--wp--preset--color--base)!important; }
+.gs-sec-form p{ max-width:60ch; }
+
+/* Full width whatever order the stylesheets load in: a built header pulls this file in ahead of WordPress's layout rules. */
+/* --gs-vw is the room the page really has: the chat's sidebar takes its share of the screen. */
+html body .gs-page.alignfull{ box-sizing:border-box; width:var(--gs-vw,100vw)!important; max-width:var(--gs-vw,100vw)!important; margin-block:0!important; margin-left:calc(50% - var(--gs-vw,100vw) / 2)!important; margin-right:calc(50% - var(--gs-vw,100vw) / 2)!important; }
+.gs-page .gs-page-button{ font-family:inherit; }
+
+/* What the member has asked for in their style guide: corners, spacing. */
+.gs-page section{ padding-block:calc(clamp(56px,9vw,112px) * var(--wp--custom--gs--space,1)); }
+/* Entrance animations: the style guide's token names the keyframes; a member can turn them off. Pure CSS, so it
+   carries to Astro, and a browser without scroll timelines just shows the content. The fill is backwards only, so a
+   finished card's hover still moves. */
+@keyframes gs-rise{ from{ opacity:0; transform:translateY(36px); } }
+@keyframes gs-fade{ from{ opacity:0; } }
+@media (prefers-reduced-motion:no-preference){
+  .gs-hero-copy > *,.gs-hero-stack li,.gs-sec-hero .gs-page-inner > :not(.gs-hero-grid):not(.gs-hero-copy){ animation-name:var(--wp--custom--gs--entrance,gs-rise); animation-duration:.8s; animation-timing-function:cubic-bezier(.2,.7,.2,1); animation-fill-mode:backwards; }
+  .gs-hero-copy > :nth-child(2),.gs-hero-stack li:nth-child(1){ animation-delay:.14s; }
+  .gs-hero-copy > :nth-child(3),.gs-hero-stack li:nth-child(2){ animation-delay:.28s; }
+  .gs-hero-copy > :nth-child(n+4),.gs-hero-stack li:nth-child(3){ animation-delay:.42s; }
+  @supports (animation-timeline:view()){
+    .gs-page section:not(.gs-sec-hero) .gs-page-inner > :not(.gs-page-cards):not(.gs-cols),.gs-sec-head > *,.gs-col > :not(.gs-page-cards),.gs-page-cards li{ animation-name:var(--wp--custom--gs--entrance,gs-rise); animation-timing-function:linear; animation-fill-mode:backwards; animation-timeline:view(); animation-range:entry 0px entry 170px; }
+    .gs-page section:not(.gs-sec-hero) .gs-page-inner > :nth-child(2),.gs-sec-head > :nth-child(2),.gs-col > :nth-child(2){ animation-range:entry 30px entry 200px; }
+    .gs-page section:not(.gs-sec-hero) .gs-page-inner > :nth-child(n+3),.gs-sec-head > :nth-child(n+3),.gs-col > :nth-child(n+3){ animation-range:entry 60px entry 230px; }
+    .gs-page-cards li:nth-child(2){ animation-range:entry 50px entry 220px; }
+    .gs-page-cards li:nth-child(3){ animation-range:entry 100px entry 270px; }
+    .gs-page-cards li:nth-child(n+4){ animation-range:entry 150px entry 320px; }
+    .gs-col--sticky{ animation:none!important; }
+  }
+}
+.gs-page .gs-page-button,.gs-site-header .gs-site-cta,.gs-page-form .sn-submit-btn,.gs-page-form .chat-form-container .chat-submit-btn{ border-radius:var(--wp--custom--gs--button-radius,999px)!important; }
+.gs-page-cards li,.gs-page-form .basic-form-container,.gs-page-form .chat-form-container{ border-radius:var(--wp--custom--gs--radius,20px)!important; }
+/* Images from the media library. */
+.gs-page section.has-backdrop{ position:relative; isolation:isolate; }
+.gs-page-backdrop{ position:absolute; inset:0; z-index:-1; }
+.gs-page-backdrop::after{ content:''; position:absolute; inset:0; background:linear-gradient(90deg,color-mix(in srgb,var(--wp--preset--color--brand-primary,#111) 86%,transparent),color-mix(in srgb,var(--wp--preset--color--brand-primary,#111) 45%,transparent)); }
+.gs-page-backdrop img{ width:100%; height:100%; object-fit:cover; display:block; }
+.gs-page-figure{ margin:clamp(16px,2.5vw,28px) 0; }
+.gs-page-figure img{ display:block; width:100%; max-height:560px; object-fit:cover; border-radius:var(--wp--custom--gs--radius,20px); }
+
+/* The header goes by its own width, not the screen's: the chat's sidebar can take a large share of a wide screen. */
+.gs-site-header{ container-type:inline-size; }
+.gs-site-header .gs-site-bar{ flex-wrap:nowrap; }
+.gs-site-header .gs-site-brand{ flex:none; margin:0; max-width:40%; }
+.gs-site-header .gs-site-nav{ flex:1 1 0; min-width:0; }
+.gs-site-header .gs-site-nav ul{ justify-content:flex-end; }
+.gs-site-header .nav-actions-right{ flex:none; }
+@container (max-width:860px){
+  .gs-site-header .gs-site-nav,.gs-site-header .gs-site-cta{ display:none; }
+  .gs-site-header .gs-site-burger{ display:block; margin-left:auto; }
+  .gs-site-header .nav-actions-right{ margin-left:auto; }
+  .gs-site-header .nav-actions-right{ order:2; }
+  .gs-site-header .gs-site-burger{ order:3; margin-left:0; }
+  .gs-site-header .gs-site-brand{ max-width:60%; }
+}
+
+/* The web app look: glass over a soft colour field, moving light in the dark sections, 3D cards. Built from the theme's
+   presets and the member's style tokens, so every site's palette carries it. No images or scripts are needed for it to
+   read as finished; built-pages.js only adds the pointer tilt. overflow:clip rather than hidden: a hidden box would
+   become the scroll timeline's container and the entrance animations would never finish. */
+.gs-page,.gs-site-header,.gs-site-footer{
+  --gs-p:var(--wp--preset--color--brand-primary,var(--wp--preset--color--accent-1));
+  --gs-h:var(--wp--preset--color--brand-highlight,var(--gs-p));
+  --gs-bg:var(--wp--preset--color--base);
+  --gs-tx:var(--wp--preset--color--contrast);
+  --gs-hd:var(--wp--preset--color--accent-1);
+  --gs-dark:color-mix(in srgb,var(--gs-p) 62%,#07050f);
+  --gs-r:var(--wp--custom--gs--radius,20px);
+  --gs-blur:var(--wp--custom--gs--blur,18px);
+  --gs-glass:color-mix(in srgb,var(--gs-bg) var(--wp--custom--gs--glass,64%),transparent);
+  --gs-edge:color-mix(in srgb,var(--gs-bg) 62%,color-mix(in srgb,var(--gs-p) 22%,transparent));
+  --gs-shadow:0 1px 0 color-mix(in srgb,#fff 55%,transparent) inset,0 24px 56px -28px color-mix(in srgb,var(--gs-p) 42%,transparent);
+}
+.gs-page{ position:relative; isolation:isolate; background-color:var(--gs-bg); background-image:radial-gradient(52vw 52vw at 88% 6%,color-mix(in srgb,var(--gs-p) 20%,transparent),transparent 70%),radial-gradient(46vw 46vw at 4% 42%,color-mix(in srgb,var(--gs-h) 26%,transparent),transparent 70%),radial-gradient(50vw 50vw at 92% 88%,color-mix(in srgb,var(--gs-p) 15%,transparent),transparent 70%); background-attachment:fixed; }
+.gs-page section{ position:relative; padding-inline:clamp(20px,5vw,48px); }
+.gs-page-inner{ max-width:1180px; }
+.gs-page p{ color:color-mix(in srgb,var(--gs-tx) 88%,transparent); }
+.gs-page h1{ font-size:clamp(2.6rem,5.6vw,4.9rem); line-height:1.04; letter-spacing:-.025em; }
+.gs-page h2{ letter-spacing:-.02em; }
+
+/* Small label over a heading. */
+.gs-page .gs-eyebrow{ display:inline-flex; align-items:center; gap:.6em; margin:0 0 1.2em; padding:.42em 1em; border-radius:999px; font-size:.78rem; font-weight:700; letter-spacing:.12em; text-transform:uppercase; line-height:1.3; color:var(--gs-p); background:var(--gs-glass); border:1px solid var(--gs-edge); -webkit-backdrop-filter:blur(var(--gs-blur)); backdrop-filter:blur(var(--gs-blur)); }
+.gs-page .gs-eyebrow::before{ content:''; width:.5em; height:.5em; border-radius:50%; background:var(--gs-h); box-shadow:0 0 0 .22em color-mix(in srgb,var(--gs-h) 32%,transparent); }
+
+/* Heading and intro over a block of cards. */
+.gs-sec-head{ max-width:760px; margin-bottom:clamp(28px,4vw,52px); }
+.gs-sec-head > :last-child{ margin-bottom:0; }
+.gs-sec-cards .gs-page-cards,.gs-sec-steps .gs-page-cards{ margin-top:0; }
+
+/* Two columns: text sections, split sections, questions, forms. */
+.gs-cols{ display:grid; grid-template-columns:minmax(0,5fr) minmax(0,7fr); gap:clamp(28px,6vw,88px); align-items:start; }
+.gs-cols--even{ grid-template-columns:repeat(2,minmax(0,1fr)); align-items:center; }
+.gs-col > :last-child{ margin-bottom:0; }
+.gs-col--sticky{ position:sticky; top:calc(var(--wp-admin--admin-bar--height,0px) + 96px); }
+.gs-col h2{ margin-bottom:.4em; }
+
+/* Dark sections. */
+.gs-sec-hero,.gs-sec-band{ color:var(--gs-bg); overflow:clip; background:linear-gradient(135deg,var(--gs-dark),color-mix(in srgb,var(--gs-p) 88%,#000) 72%); }
+.gs-sec-hero h1,.gs-sec-hero h2,.gs-sec-band h2,.gs-sec-cta h2{ color:var(--gs-bg); }
+.gs-sec-hero p,.gs-sec-band p,.gs-sec-cta p{ color:color-mix(in srgb,var(--gs-bg) 86%,transparent); opacity:1; }
+.gs-sec-hero::before,.gs-sec-hero::after,.gs-sec-band::before,.gs-sec-cta .gs-page-inner::before{ content:''; position:absolute; z-index:0; border-radius:50%; pointer-events:none; filter:blur(70px); }
+.gs-sec-hero::before{ width:52vw; height:52vw; top:-22vw; right:-10vw; background:color-mix(in srgb,var(--gs-p) 60%,#fff 22%); opacity:.75; animation:gs-drift 19s ease-in-out infinite alternate; }
+.gs-sec-hero::after{ width:38vw; height:38vw; bottom:-20vw; left:-8vw; background:color-mix(in srgb,var(--gs-p) 70%,#fff 12%); animation:gs-drift 24s ease-in-out infinite alternate-reverse; }
+.gs-sec-band::before{ width:44vw; height:44vw; top:-24vw; left:30%; background:color-mix(in srgb,var(--gs-p) 60%,#fff 22%); opacity:.6; animation:gs-drift 22s ease-in-out infinite alternate; }
+@keyframes gs-drift{ to{ transform:translate3d(-6vw,5vw,0) scale(1.14); } }
+.gs-sec-hero > .gs-page-inner,.gs-sec-band > .gs-page-inner{ position:relative; z-index:1; }
+
+/* Hero. */
+.gs-page section.gs-sec-hero{ padding-block:clamp(72px,10vw,136px); }
+.gs-sec-hero .gs-page-inner{ padding-block:0; }
+.gs-sec-hero .gs-eyebrow{ color:var(--gs-bg); background:color-mix(in srgb,var(--gs-bg) 12%,transparent); border-color:color-mix(in srgb,var(--gs-bg) 26%,transparent); }
+.gs-hero-grid{ display:grid; grid-template-columns:minmax(0,7fr) minmax(0,5fr); gap:clamp(32px,6vw,80px); align-items:center; }
+.gs-hero-copy > :last-child{ margin-bottom:0; }
+.gs-hero-stack{ list-style:none; margin:0; padding:0; display:grid; gap:16px; perspective:1200px; }
+.gs-hero-stack li{ display:grid; grid-template-columns:auto 1fr; gap:4px 14px; align-items:center; padding:18px 20px; border-radius:var(--gs-r); color:var(--gs-bg); background:color-mix(in srgb,var(--gs-bg) 11%,transparent); border:1px solid color-mix(in srgb,var(--gs-bg) 24%,transparent); box-shadow:0 1px 0 color-mix(in srgb,#fff 26%,transparent) inset,0 26px 50px -24px rgba(0,0,0,.55); -webkit-backdrop-filter:blur(var(--gs-blur)) saturate(140%); backdrop-filter:blur(var(--gs-blur)) saturate(140%); transform:rotateY(-6deg) rotateX(2deg); transition:transform .45s cubic-bezier(.2,.7,.2,1); }
+.gs-hero-stack li:nth-child(2){ margin-left:clamp(0px,3vw,36px); margin-right:calc(-1 * clamp(0px,1vw,12px)); }
+.gs-hero-stack li:hover{ transform:rotateY(0) rotateX(0) translateZ(26px); }
+.gs-page .gs-hero-stack h3{ margin:0; color:inherit; font-size:1.02rem; line-height:1.3; }
+.gs-page .gs-hero-stack p{ grid-column:2; margin:0; font-size:.9rem; line-height:1.45; }
+.gs-page .gs-hero-stack .gs-icon{ grid-row:span 2; margin:0; background:color-mix(in srgb,var(--gs-bg) 16%,transparent); }
+.gs-page .gs-hero-stack .gs-icon::before{ background:var(--gs-bg); }
+@media (max-width:860px){ .gs-hero-grid,.gs-cols,.gs-cols--even{ grid-template-columns:minmax(0,1fr); } .gs-col--sticky{ position:static; } .gs-hero-stack li{ transform:none; } .gs-hero-stack li:nth-child(2){ margin:0; } }
+
+/* Buttons. */
+.gs-page-action{ display:flex; flex-wrap:wrap; gap:12px; }
+.gs-page .gs-page-button{ position:relative; overflow:clip; color:var(--gs-bg); background:linear-gradient(120deg,var(--gs-p),color-mix(in srgb,var(--gs-p) 68%,var(--gs-h))); box-shadow:0 14px 30px -14px color-mix(in srgb,var(--gs-p) 80%,transparent); transition:transform .25s cubic-bezier(.2,.7,.2,1),box-shadow .25s ease; }
+.gs-page .gs-page-button::after{ content:''; position:absolute; inset:0; background:linear-gradient(105deg,transparent 35%,rgba(255,255,255,.34) 50%,transparent 65%); transform:translateX(-110%); transition:transform .7s ease; }
+.gs-page .gs-page-button:hover::after{ transform:translateX(110%); }
+.gs-page .gs-page-button:hover,.gs-page .gs-page-button:focus-visible{ transform:translateY(-3px); box-shadow:0 22px 38px -16px color-mix(in srgb,var(--gs-p) 90%,transparent); }
+.gs-sec-hero .gs-page-button,.gs-sec-band .gs-page-button,.gs-sec-cta .gs-page-button{ color:var(--gs-p); background:var(--gs-bg); box-shadow:0 16px 36px -14px rgba(0,0,0,.55); }
+.gs-page .gs-page-button.gs-page-button--ghost{ color:var(--gs-p); background:var(--gs-glass); border:1px solid var(--gs-edge); box-shadow:none; }
+.gs-sec-hero .gs-page-button.gs-page-button--ghost,.gs-sec-band .gs-page-button.gs-page-button--ghost,.gs-sec-cta .gs-page-button.gs-page-button--ghost{ color:var(--gs-bg); background:color-mix(in srgb,var(--gs-bg) 12%,transparent); border-color:color-mix(in srgb,var(--gs-bg) 34%,transparent); -webkit-backdrop-filter:blur(10px); backdrop-filter:blur(10px); }
+
+/* Glass cards, arranged by how many there are, with a 3D tilt and a light that follows the pointer. */
+.gs-page-cards{ grid-template-columns:repeat(6,minmax(0,1fr)); perspective:1400px; }
+.gs-page-cards li{ grid-column:span 2; position:relative; overflow:clip; padding:clamp(24px,2.8vw,36px); border:1px solid var(--gs-edge); background:var(--gs-glass); box-shadow:var(--gs-shadow); -webkit-backdrop-filter:blur(var(--gs-blur)) saturate(150%); backdrop-filter:blur(var(--gs-blur)) saturate(150%); transform:rotateX(var(--gs-rx,0deg)) rotateY(var(--gs-ry,0deg)); transform-style:preserve-3d; transition:transform .35s cubic-bezier(.2,.7,.2,1),box-shadow .35s ease,border-color .35s ease; }
+.gs-page-cards li:first-child:nth-last-child(2),.gs-page-cards li:first-child:nth-last-child(2) ~ li{ grid-column:span 3; }
+.gs-page-cards li:first-child:nth-last-child(4){ grid-column:span 4; }
+.gs-page-cards li:first-child:nth-last-child(4) ~ li:last-child{ grid-column:span 4; }
+.gs-page-cards li:first-child:nth-last-child(5),.gs-page-cards li:first-child:nth-last-child(5) + li{ grid-column:span 3; }
+.gs-page-cards li::after{ content:''; position:absolute; inset:0; pointer-events:none; opacity:0; background:radial-gradient(320px circle at var(--gs-mx,50%) var(--gs-my,0%),color-mix(in srgb,var(--gs-h) 34%,transparent),transparent 70%); transition:opacity .3s ease; }
+.gs-page-cards li:hover::after{ opacity:1; }
+.gs-page-cards li:hover{ border-color:color-mix(in srgb,var(--gs-p) 45%,transparent); box-shadow:0 1px 0 color-mix(in srgb,#fff 55%,transparent) inset,0 38px 70px -30px color-mix(in srgb,var(--gs-p) 60%,transparent); transform:translateY(-6px) rotateX(var(--gs-rx,0deg)) rotateY(var(--gs-ry,0deg)); }
+.gs-page-cards h3,.gs-page-cards p,.gs-page-cards .gs-icon,.gs-page-cards .gs-page-num{ position:relative; z-index:1; }
+.gs-page-cards h3{ margin-bottom:.45em; }
+@media (max-width:860px){ .gs-page-cards li,.gs-page-cards li:first-child:nth-last-child(n){ grid-column:1 / -1!important; } }
+
+/* Numbered stages, joined by a line. */
+.gs-sec-steps .gs-page-cards li{ overflow:visible; padding-top:clamp(28px,3vw,40px); }
+.gs-page-cards li .gs-page-num{ display:inline-grid; place-items:center; width:48px; height:48px; margin:0 0 1em; border-radius:50%; font-size:.92rem; color:var(--gs-bg); background:linear-gradient(135deg,var(--gs-p),color-mix(in srgb,var(--gs-p) 60%,var(--gs-h))); box-shadow:0 12px 24px -10px color-mix(in srgb,var(--gs-p) 85%,transparent); }
+@media (min-width:861px){ .gs-sec-steps .gs-page-cards li:not(:last-child)::before{ content:''; position:absolute; z-index:0; top:calc(clamp(28px,3vw,40px) + 24px); left:calc(clamp(24px,2.8vw,36px) + 48px); right:calc(-1 * clamp(14px,2vw,24px)); height:2px; background:linear-gradient(90deg,var(--gs-p),color-mix(in srgb,var(--gs-p) 12%,transparent)); } .gs-sec-steps .gs-page-cards li:first-child:nth-last-child(4){ grid-column:span 2; } .gs-sec-steps .gs-page-cards li:first-child:nth-last-child(4) ~ li:last-child{ grid-column:span 2; } .gs-sec-steps .gs-page-cards:has(> li:first-child:nth-last-child(4)){ grid-template-columns:repeat(8,minmax(0,1fr)); } }
+
+/* Icons: masks in this file, so they're never stripped from a sub-site admin's page. */
+.gs-icon{ display:inline-grid; place-items:center; width:48px; height:48px; margin-bottom:1em; border-radius:14px; background:linear-gradient(135deg,color-mix(in srgb,var(--gs-p) 20%,transparent),color-mix(in srgb,var(--gs-h) 32%,transparent)); }
+.gs-icon::before{ content:''; width:24px; height:24px; background:var(--gs-p); -webkit-mask:var(--gs-i) center/contain no-repeat; mask:var(--gs-i) center/contain no-repeat; }
+.gs-page{ --gs-check:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M8 12l3 3 5-6'/%3E%3C/svg%3E"); }
+.gs-icon-chart{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20V10M10 20V4M16 20v-7M21 20H3'/%3E%3C/svg%3E"); }
+.gs-icon-shield{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l8 3v6c0 5-3.5 8-8 9-4.500-1-8-4-8-9V6zM9 12l2 2 4-4'/%3E%3C/svg%3E"); }
+.gs-icon-rocket{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M5 15c-1.500 1-2 4-2 6 2 0 5-.5 6-2M9 15l-2-2c1-5 5-10 13-10 0 8-5 12-10 13zM15 9h.01'/%3E%3C/svg%3E"); }
+.gs-icon-users{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M16 20v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2M9 10a4 4 0 1 0 0-8 4 4 0 0 0 0 8M22 20v-2a4 4 0 0 0-3-3.900M16 2.100a4 4 0 0 1 0 7.800'/%3E%3C/svg%3E"); }
+.gs-icon-coin{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M15 8.500c-.5-1-1.500-1.500-3-1.500-2 0-3 1-3 2.300 0 3 6 1.700 6 4.700 0 1.200-1 2.300-3 2.300-1.500 0-2.500-.5-3-1.500M12 5.500v13'/%3E%3C/svg%3E"); }
+.gs-icon-handshake{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M2 8l4-3 6 2 6-2 4 3v7l-3 1-6 5-3-2-5-4-3-1zM12 7l-4 4c1 1 2.500 1 3.500 0l1.500-1 5 5'/%3E%3C/svg%3E"); }
+.gs-icon-target{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 17a5 5 0 1 0 0-10 5 5 0 0 0 0 10M12 12h.01'/%3E%3C/svg%3E"); }
+.gs-icon-bolt{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M13 2L4 14h7l-1 8 10-13h-7z'/%3E%3C/svg%3E"); }
+.gs-icon-globe{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M2 12h20M12 2c3 3 4 6.500 4 10s-1 7-4 10c-3-3-4-6.500-4-10s1-7 4-10'/%3E%3C/svg%3E"); }
+.gs-icon-layers{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 2l10 5-10 5L2 7zM2 12l10 5 10-5M2 17l10 5 10-5'/%3E%3C/svg%3E"); }
+.gs-icon-clock{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M12 6v6l4 2'/%3E%3C/svg%3E"); }
+.gs-icon-star{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 3l2.800 5.800 6.200.900-4.500 4.400 1 6.300-5.500-3-5.500 3 1-6.300L3 9.700l6.200-.900z'/%3E%3C/svg%3E"); }
+.gs-icon-chat{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M21 12a8 8 0 0 1-12 7l-6 2 2-6a8 8 0 1 1 16-3'/%3E%3C/svg%3E"); }
+.gs-icon-check{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 22a10 10 0 1 0 0-20 10 10 0 0 0 0 20M8 12l3 3 5-6'/%3E%3C/svg%3E"); }
+.gs-icon-leaf{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M4 20c0-9 6-15 17-16 0 11-6 17-14 16M4 20c3-6 7-9 11-11'/%3E%3C/svg%3E"); }
+.gs-icon-gear{ --gs-i:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23000' stroke-width='1.8' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M12 15a3 3 0 1 0 0-6 3 3 0 0 0 0 6M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2'/%3E%3C/svg%3E"); }
+
+/* Check list and the panel it sits in. */
+.gs-panel{ padding:clamp(24px,3vw,40px); border-radius:var(--gs-r); border:1px solid var(--gs-edge); background:var(--gs-glass); box-shadow:var(--gs-shadow); -webkit-backdrop-filter:blur(var(--gs-blur)) saturate(150%); backdrop-filter:blur(var(--gs-blur)) saturate(150%); }
+.gs-page .gs-page-list{ list-style:none; margin:0; padding:0; display:grid; gap:14px; }
+.gs-page .gs-page-list li{ position:relative; margin:0; padding-left:34px; }
+.gs-page .gs-page-list li::before{ content:''; position:absolute; left:0; top:.2em; width:22px; height:22px; background:var(--gs-p); -webkit-mask:var(--gs-check) center/contain no-repeat; mask:var(--gs-check) center/contain no-repeat; }
+.gs-page .gs-page-list strong{ display:block; font-family:var(--gs-font-heading,inherit); color:var(--gs-hd); }
+.gs-page .gs-page-list p{ margin:.2em 0 0; font-size:.98rem; }
+.gs-col .gs-page-list{ margin-top:1.2em; }
+.gs-page-figure{ margin:0; }
+.gs-page-figure img{ border-radius:var(--gs-r); box-shadow:0 40px 80px -36px color-mix(in srgb,var(--gs-p) 70%,transparent); }
+
+/* Statement band. */
+.gs-page section.gs-sec-band{ padding-block:clamp(72px,10vw,128px); text-align:center; }
+.gs-sec-band h2{ max-width:22ch; margin-inline:auto; font-size:clamp(2rem,4.4vw,3.6rem); }
+.gs-sec-band p{ margin-inline:auto; max-width:60ch; }
+.gs-sec-band .gs-page-action{ justify-content:center; }
+
+/* Closing invitation: a dark card floating on the page. */
+.gs-sec-cta{ background:transparent; }
+.gs-sec-cta .gs-page-inner{ position:relative; overflow:clip; isolation:isolate; max-width:1180px; padding:clamp(44px,7vw,88px) clamp(24px,5vw,72px); border-radius:calc(var(--gs-r) + 8px); background:linear-gradient(130deg,var(--gs-dark),var(--gs-p)); box-shadow:0 50px 90px -46px color-mix(in srgb,var(--gs-p) 90%,transparent); }
+.gs-sec-cta .gs-page-inner::before{ z-index:-1; width:420px; height:420px; right:-120px; top:-200px; background:color-mix(in srgb,var(--gs-p) 55%,#fff 28%); opacity:.7; animation:gs-drift 20s ease-in-out infinite alternate; }
+.gs-sec-cta .gs-page-action{ justify-content:center; }
+
+/* Questions. */
+.gs-faq{ border:1px solid var(--gs-edge); border-radius:calc(var(--gs-r) - 4px); background:var(--gs-glass); box-shadow:var(--gs-shadow); -webkit-backdrop-filter:blur(var(--gs-blur)); backdrop-filter:blur(var(--gs-blur)); }
+.gs-faq + .gs-faq{ margin-top:12px; }
+.gs-faq summary{ display:flex; justify-content:space-between; align-items:center; gap:16px; padding:18px 22px; cursor:pointer; list-style:none; font-family:var(--gs-font-heading,inherit); font-weight:600; font-size:1.08rem; color:var(--gs-hd); }
+.gs-faq summary::-webkit-details-marker{ display:none; }
+.gs-faq summary::after{ content:'+'; flex:none; display:grid; place-items:center; width:30px; height:30px; border-radius:50%; color:var(--gs-bg); background:var(--gs-p); font:400 1.25rem/1 sans-serif; transition:transform .3s ease; }
+.gs-faq[open] summary::after{ transform:rotate(45deg); }
+.gs-faq summary:focus-visible{ outline:2px solid var(--gs-p); outline-offset:2px; border-radius:inherit; }
+.gs-faq p{ padding:0 22px; margin:0 0 18px; }
+
+/* Forms sit on glass too. */
+.gs-page-form{ max-width:none; margin-top:0; }
+.gs-page-form .basic-form-container,.gs-page-form .chat-form-container{ border-color:var(--gs-edge)!important; background:var(--gs-glass)!important; box-shadow:var(--gs-shadow)!important; -webkit-backdrop-filter:blur(var(--gs-blur)) saturate(150%)!important; backdrop-filter:blur(var(--gs-blur)) saturate(150%)!important; }
+
+/* Header: glass, and it stays over the page. A thin bar shows how far down the page you are. */
+.gs-site-header{ background:color-mix(in srgb,var(--gs-bg) 72%,transparent); border-bottom-color:var(--gs-edge); -webkit-backdrop-filter:blur(16px) saturate(160%); backdrop-filter:blur(16px) saturate(160%); }
+.gs-site-header .gs-site-cta{ color:var(--gs-bg); background:linear-gradient(120deg,var(--gs-p),color-mix(in srgb,var(--gs-p) 68%,var(--gs-h))); box-shadow:0 10px 22px -12px color-mix(in srgb,var(--gs-p) 90%,transparent); }
+.gs-site-nav a{ position:relative; border-bottom:0; }
+.gs-site-nav a::after{ content:''; position:absolute; left:0; right:0; bottom:0; height:2px; border-radius:2px; background:linear-gradient(90deg,var(--gs-p),var(--gs-h)); transform:scaleX(0); transform-origin:left; transition:transform .28s ease; }
+.gs-site-nav a:hover::after,.gs-site-nav a:focus-visible::after{ transform:scaleX(1); }
+
+/* Footer: dark, closing the page the way the hero opens it. */
+.gs-site-footer{ position:relative; color:var(--gs-bg); background:linear-gradient(135deg,var(--gs-dark),color-mix(in srgb,var(--gs-p) 80%,#000)); }
+.gs-site-footer a,.gs-site-footer .wp-block-site-title,.gs-site-footer .wp-block-site-title a{ color:var(--gs-bg); }
+.gs-site-footer .wp-block-site-tagline,.gs-site-footer .gs-site-legal{ color:color-mix(in srgb,var(--gs-bg) 76%,transparent); }
+.gs-site-footer .gs-site-nav a::after{ background:var(--gs-bg); }
+/* Same column as the page. */
+.gs-site-bar,.gs-site-legal{ max-width:calc(1180px + 2 * clamp(20px,5vw,48px)); }
+
+/* The moving light and the tilt stop for anyone who asked for less motion. */
+@media (prefers-reduced-motion:reduce){ .gs-sec-hero::before,.gs-sec-hero::after,.gs-sec-band::before,.gs-sec-cta .gs-page-inner::before{ animation:none; } .gs-hero-stack li{ transform:none; } .gs-page-cards li,.gs-page-cards li:hover{ transform:none; } .gs-page .gs-page-button::after{ display:none; } }
+@supports not (backdrop-filter:blur(1px)){ .gs-page,.gs-site-header{ --gs-glass:var(--gs-bg); } }
+
+/* Image spots: a designed panel until the member fills it. Visitors see only the graphic; built-pages.js adds the idea
+   and the Create and Upload buttons for whoever can edit the page. */
+.gs-page-figure img{ aspect-ratio:16/10; height:auto; }
+.gs-image-slot{ position:relative; overflow:clip; display:grid; place-items:center; width:100%; aspect-ratio:16/10; border-radius:var(--gs-r); border:1px solid var(--gs-edge); background:radial-gradient(70% 90% at 82% 12%,color-mix(in srgb,var(--gs-h) 58%,transparent),transparent 70%),radial-gradient(70% 90% at 12% 92%,color-mix(in srgb,var(--gs-p) 60%,transparent),transparent 72%),linear-gradient(135deg,color-mix(in srgb,var(--gs-p) 22%,var(--gs-bg)),color-mix(in srgb,var(--gs-h) 18%,var(--gs-bg))); box-shadow:0 40px 80px -40px color-mix(in srgb,var(--gs-p) 65%,transparent); }
+.gs-image-slot::before{ content:''; position:absolute; width:46%; aspect-ratio:1; left:10%; top:14%; border-radius:50%; background:color-mix(in srgb,var(--gs-bg) 24%,transparent); border:1px solid color-mix(in srgb,var(--gs-bg) 45%,transparent); -webkit-backdrop-filter:blur(8px); backdrop-filter:blur(8px); }
+.gs-image-slot::after{ content:''; position:absolute; width:52%; height:38%; right:8%; bottom:12%; border-radius:var(--gs-r); background:color-mix(in srgb,var(--gs-bg) 30%,transparent); border:1px solid color-mix(in srgb,var(--gs-bg) 50%,transparent); -webkit-backdrop-filter:blur(12px); backdrop-filter:blur(12px); box-shadow:0 24px 44px -24px rgba(0,0,0,.4); }
+.gs-sec-hero .gs-image-slot{ border-color:color-mix(in srgb,var(--gs-bg) 26%,transparent); background:radial-gradient(70% 90% at 82% 12%,color-mix(in srgb,var(--gs-h) 50%,transparent),transparent 70%),color-mix(in srgb,var(--gs-bg) 12%,transparent); }
+.gs-sec-cards .gs-image-slot,.gs-sec-steps .gs-image-slot{ aspect-ratio:21/8; margin-bottom:clamp(24px,3vw,40px); }
+.gs-slot-tools{ position:relative; z-index:1; display:grid; justify-items:center; gap:12px; width:min(86%,420px); padding:18px 20px; text-align:center; border-radius:calc(var(--gs-r) - 4px); color:var(--gs-tx); background:color-mix(in srgb,var(--gs-bg) 86%,transparent); border:1px solid var(--gs-edge); box-shadow:0 20px 44px -20px rgba(0,0,0,.45); -webkit-backdrop-filter:blur(14px); backdrop-filter:blur(14px); font-family:var(--gs-font-body,inherit); }
+.gs-slot-tools small{ font-size:.86rem; line-height:1.4; }
+.gs-slot-tools > div{ display:flex; flex-wrap:wrap; justify-content:center; gap:8px; }
+.gs-slot-tools button,.gs-slot-tools label{ margin:0; padding:.55em 1.1em; border:1px solid var(--gs-p); border-radius:999px; font:600 .86rem/1.2 var(--gs-font-body,inherit); cursor:pointer; color:var(--gs-p); background:transparent; }
+.gs-slot-tools button{ color:var(--gs-bg); background:var(--gs-p); }
+.gs-slot-tools label:focus-within,.gs-slot-tools button:focus-visible{ outline:2px solid var(--gs-p); outline-offset:2px; }
+
+/* The page and footer meet the header and the page with no gap from the theme's block spacing. */
+html body main:has(.gs-page){ margin-block:0!important; }
+html body .wp-block-template-part:has(.gs-site-footer),html body footer:has(.gs-site-footer){ margin-block-start:0!important; }
+
+/* A block theme wraps the header in a part exactly its height, which gives sticky no room: the wrapper is what sticks. */
+.gs-site-header{ position:static; }
+html body .wp-block-template-part:has(> .gs-site-header){ position:var(--wp--custom--gs--header-position,sticky); top:var(--wp-admin--admin-bar--height,0px); z-index:50; margin-block:0; }
+
+/* How a picture is aligned, chosen through the chat. */
+.gs-focus-top-left img{ object-position:0% 0%; }
+.gs-focus-top-center img{ object-position:50% 0%; }
+.gs-focus-top-right img{ object-position:100% 0%; }
+.gs-focus-center-left img{ object-position:0% 50%; }
+.gs-focus-center-right img{ object-position:100% 50%; }
+.gs-focus-bottom-left img{ object-position:0% 100%; }
+.gs-focus-bottom-center img{ object-position:50% 100%; }
+.gs-focus-bottom-right img{ object-position:100% 100%; }
+.gs-page .gs-fit-whole img{ aspect-ratio:auto; max-height:none; object-fit:contain; }
+.gs-page-figure.gs-at-top{ margin-bottom:auto; }
+.gs-page-figure.gs-at-bottom{ margin-top:auto; }
+.gs-cols--even:has(.gs-at-top),.gs-cols--even:has(.gs-at-bottom){ align-items:stretch; }
+.gs-cols--even:has(.gs-at-top) > .gs-col,.gs-cols--even:has(.gs-at-bottom) > .gs-col{ display:flex; flex-direction:column; justify-content:flex-start; }
+
+/* One section's own look, chosen through the chat. */
+.gs-page section[class*="gs-s-corners-"]{ --gs-section-r:var(--gs-r); }
+.gs-page section.gs-s-corners-square{ --gs-section-r:0px; }
+.gs-page section.gs-s-corners-soft{ --gs-section-r:8px; }
+.gs-page section.gs-s-corners-round{ --gs-section-r:28px; }
+.gs-page section[class*="gs-s-corners-"] :is(.gs-page-cards li,.gs-panel,.gs-faq,.gs-image-slot,.gs-page-figure img,.gs-hero-stack li,.basic-form-container,.chat-form-container,.gs-page-button,.gs-icon),.gs-page section.gs-sec-cta[class*="gs-s-corners-"] .gs-page-inner{ border-radius:var(--gs-section-r)!important; }
+.gs-page section.gs-s-background-clear{ background:transparent; color:inherit; }
+.gs-page section.gs-s-background-tint{ background:color-mix(in srgb,var(--gs-p) 8%,var(--gs-bg)); }
+.gs-page section.gs-s-background-dark{ color:var(--gs-bg); background:linear-gradient(135deg,var(--gs-dark),color-mix(in srgb,var(--gs-p) 88%,#000) 72%); }
+.gs-page section.gs-s-background-dark > .gs-page-inner :is(h1,h2,.gs-col > p,.gs-sec-head > p,.gs-page-list li,.gs-page-list strong){ color:var(--gs-bg); }
+.gs-page section.gs-s-text-align-center :is(.gs-sec-head,.gs-col,.gs-hero-copy){ text-align:center; margin-inline:auto; }
+.gs-page section.gs-s-text-align-center :is(h1,h2,p){ margin-inline:auto; }
+.gs-page section.gs-s-text-align-center .gs-page-action{ justify-content:center; }
+.gs-page section.gs-s-text-align-left{ text-align:left; }
+.gs-page section.gs-s-spacing-tight{ --wp--custom--gs--space:.65; }
+.gs-page section.gs-s-spacing-normal{ --wp--custom--gs--space:1; }
+.gs-page section.gs-s-spacing-airy{ --wp--custom--gs--space:1.35; }
+
+/* Icons beside menu items. */
+.gs-site-nav a,.gs-site-burger nav a{ display:inline-flex; align-items:center; gap:8px; }
+.gs-site-burger nav a{ display:flex; }
+.gs-site-header .gs-icon,.gs-site-footer .gs-icon{ width:20px; height:20px; margin:0; border-radius:0; background:none; }
+.gs-site-header .gs-icon::before,.gs-site-footer .gs-icon::before{ width:18px; height:18px; }
+.gs-site-footer .gs-icon::before{ background:var(--gs-bg); }
+
+/* Films in the page, and the editor's controls on a section. */
+.gs-page-figure video{ display:block; width:100%; aspect-ratio:16/10; object-fit:cover; border-radius:var(--gs-r); box-shadow:0 40px 80px -36px color-mix(in srgb,var(--gs-p) 70%,transparent); }
+.gs-page-backdrop video{ width:100%; height:100%; object-fit:cover; display:block; }
+.gs-page section.has-backdrop .gs-page-backdrop{ z-index:0; }
+.gs-page section.has-backdrop > .gs-page-inner{ position:relative; z-index:1; }
+.gs-slot-tools--section{ position:absolute; z-index:2; right:16px; bottom:16px; width:auto; padding:8px 10px; }
+.gs-focus-top-center video,.gs-focus-top-left video,.gs-focus-top-right video{ object-position:50% 0%; }
+.gs-focus-bottom-center video,.gs-focus-bottom-left video,.gs-focus-bottom-right video{ object-position:50% 100%; }
+
+/* Scroll scenes run the full width of the screen, or of the room the chat's sidebar leaves, with light words over the picture. */
+html body .wp-block-gend-society-scroll-scene.alignfull{ box-sizing:border-box; width:var(--gs-vw,100vw)!important; max-width:var(--gs-vw,100vw)!important; margin-inline:calc(50% - var(--gs-vw,100vw) / 2)!important; margin-block:0!important; }
+.wp-block-gend-society-scroll-scene h1,.wp-block-gend-society-scroll-scene h2,.wp-block-gend-society-scroll-scene p{ color:#fff; text-shadow:0 2px 24px rgba(0,0,0,.55); }
+
+/* A scene behind the whole page or one section. Words stay readable on a glass panel over a moving page. */
+html body .gss--page.alignfull{ position:fixed; inset:0 auto auto 0; width:var(--gs-vw,100vw)!important; max-width:none!important; height:100vh; margin:0!important; z-index:-1; }
+body:has(.gss--page) .gs-page{ background:transparent; background-image:none; }
+body:has(.gss--page) .gs-page section:is(.gs-sec-text,.gs-sec-split,.gs-sec-cards,.gs-sec-steps,.gs-sec-faq,.gs-sec-form) > .gs-page-inner{ padding:clamp(20px,3vw,40px); border-radius:var(--gs-r); border:1px solid var(--gs-edge); background:var(--gs-glass); box-shadow:var(--gs-shadow); -webkit-backdrop-filter:blur(var(--gs-blur)) saturate(150%); backdrop-filter:blur(var(--gs-blur)) saturate(150%); }
+html body .gs-page-backdrop .gss--section{ position:absolute; inset:0; width:100%!important; max-width:none!important; height:100%!important; margin:0!important; overflow:clip; }
+html body .gs-page-backdrop .gss--section > .gss-sticky{ position:absolute; inset:0; width:100%; height:100%; }
