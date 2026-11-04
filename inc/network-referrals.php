@@ -217,6 +217,10 @@ function gend_society_nr_tag_args()
     $args = array(GEND_SOCIETY_NR_FROM_PARAM => gend_society_nr_clean_from(wp_parse_url(home_url(), PHP_URL_HOST) . (string) wp_parse_url(home_url(), PHP_URL_PATH)));
     $ref = !empty($_COOKIE['gm_ref']) ? (int) $_COOKIE['gm_ref'] : 0;
     if ($ref > 0) $args[GEND_SOCIETY_NR_REF_PARAM] = $ref;
+    // The install id this site pairs with the hub under: the hub finds the owning membership from it, which a hostname
+    // alone can't do when the address changed (tunnel, custom domain).
+    $install = function_exists('gend_society_oauth_resolve_install_id') ? gend_society_oauth_resolve_install_id() : '';
+    if ($install !== '') $args['gm_install'] = $install;
     return $args;
 }
 

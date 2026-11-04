@@ -256,7 +256,7 @@ class Gend_Society_AI_Widget {
         // The Media Studio lives with Leo, on the hub, and this widget's REST already points there.
         $studio = 'leo/assets/studio/gend-media-studio';
         if ( file_exists( WP_PLUGIN_DIR . "/$studio.js" ) ) {
-            $version = (int) filemtime( WP_PLUGIN_DIR . "/$studio.js" );
+            $version = GEND_SOCIETY_VERSION . '.' . filemtime( WP_PLUGIN_DIR . "/$studio.js" );
             echo '<script>window.GEND_STUDIO=' . wp_json_encode( array( 'js' => plugins_url( "$studio.js" ) . '?v=' . $version, 'css' => plugins_url( "$studio.css" ) . '?v=' . $version ) ) . ';</script>';
         }
         // Image spots on a built page: whoever can edit it can fill them from the chat.
