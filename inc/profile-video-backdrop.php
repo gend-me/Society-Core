@@ -69,6 +69,16 @@ function gend_society_profile_backdrop_current() {
 add_action( 'wp_enqueue_scripts', function () {
     $b = gend_society_profile_backdrop_current();
     if ( ! $b ) return;
+    // A business plan made through the chat has a background of its own, in place of the moving one.
+    if ( function_exists( 'bp_is_group' ) && bp_is_group() && 'business-plan' === (string) bp_current_action() ) {
+        $own = (string) groups_get_groupmeta( (int) bp_get_current_group_id(), '_gs_plan_backdrop', true );
+        if ( '' !== $own ) {
+            wp_register_style( 'gend-society-plan-backdrop', false );
+            wp_enqueue_style( 'gend-society-plan-backdrop' );
+            wp_add_inline_style( 'gend-society-plan-backdrop', '#youzify-group-body{background:linear-gradient(rgba(6,7,20,.35),rgba(6,7,20,.35)),url("' . esc_url( $own ) . '") center/cover fixed no-repeat!important}' . $b['clear'] . '{background:transparent!important}' );
+            return;
+        }
+    }
     $css = GEND_SOCIETY_DIR . 'assets/profile-video-backdrop.css';
     $js  = GEND_SOCIETY_DIR . 'assets/profile-video-backdrop.js';
     wp_enqueue_style( 'gend-society-video-backdrop', GEND_SOCIETY_URL . 'assets/profile-video-backdrop.css', array(), GEND_SOCIETY_VERSION . '.' . @filemtime( $css ) );

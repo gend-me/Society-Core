@@ -63,9 +63,64 @@ class Gend_Society_AI_Widget {
         if ( is_admin() && ! current_user_can( 'edit_posts' ) ) {
             return false;
         }
-        return class_exists( 'Gend_CP_OAuth_Client' )
+        return self::on_hub_login() || ( class_exists( 'Gend_CP_OAuth_Client' )
             && method_exists( 'Gend_CP_OAuth_Client', 'is_connected' )
-            && Gend_CP_OAuth_Client::is_connected( get_current_user_id() );
+            && Gend_CP_OAuth_Client::is_connected( get_current_user_id() ) );
+    }
+
+    /**
+     * An admin of a launched web app on the hub's own domain (gend.me/their-app). Their hub login already covers this
+     * page, so the widget talks to the hub directly and needs no OAuth connection. A mapped domain is a different origin
+     * and stays on the forwarder.
+     */
+    protected static function on_hub_login() {
+        if ( ! is_multisite() || is_main_site() || ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
+            return false;
+        }
+        if ( wp_parse_url( home_url(), PHP_URL_HOST ) !== wp_parse_url( network_home_url(), PHP_URL_HOST ) ) {
+            return false;
+        }
+        return self::linked_group() > 0;
+    }
+
+    /** The group this site was launched for, when both sides agree. 0 otherwise. */
+    protected static function linked_group() {
+        if ( ! function_exists( 'groups_get_groupmeta' ) ) {
+            return 0;
+        }
+        $group_id = (int) get_option( 'gdc_bp_group_id' );
+        return $group_id && (int) groups_get_groupmeta( $group_id, 'gdc_site_id', true ) === get_current_blog_id() ? $group_id : 0;
+    }
+
+    /**
+     * The group whose setup chat should meet this admin on this page, or 0: setup under way, or a new web app that
+     * hasn't started it. Setting up stays in the chat, which also means nothing runs until they click.
+     */
+    protected static function setup_group() {
+        static $found = null;
+        if ( null !== $found ) {
+            return $found;
+        }
+        $found = 0;
+        if ( is_admin() || isset( $_GET['gend_embed'] ) || ! self::on_hub_login() ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended
+            return $found;
+        }
+        $group_id = self::linked_group();
+        $state    = groups_get_groupmeta( $group_id, '_aipa_onboarding', true );
+        if ( is_array( $state ) && $state ) {
+            $open = empty( $state['finished'] ) && empty( $state['dismissed'] );
+        } else {
+            $created = strtotime( (string) ( groups_get_group( $group_id )->date_created ?? '' ) );
+            $open    = $created && $created >= time() - 30 * DAY_IN_SECONDS;
+        }
+        $found = $open ? $group_id : 0;
+        return $found;
+    }
+
+    /** Scripts change with their file on this network; elsewhere a new Society release brings a fresh copy of the hub script. */
+    protected static function asset_version( $file ) {
+        $path = WP_PLUGIN_DIR . '/leo/assets/js/' . $file;
+        return file_exists( $path ) ? GEND_SOCIETY_VERSION . '.' . filemtime( $path ) : GEND_SOCIETY_VERSION;
     }
 
     public static function enqueue() {
@@ -78,13 +133,11 @@ class Gend_Society_AI_Widget {
 
         $hub  = self::hub_base();
         $leo  = $hub . '/wp-content/plugins/leo/assets/js/';
-        $ver  = GEND_SOCIETY_VERSION; // new Society release = fresh copy of the hub script (its sign-in popup changes with the OAuth provider).
-
         // Hub-hosted canonical assets (cross-origin <script src> is fine).
-        wp_enqueue_script( 'aipa-widget', $leo . self::widget_js_file(), array(), $ver, true );
-        wp_enqueue_script( 'aipa-widget-leo-flows', $leo . 'widget-leo-flows.js', array( 'aipa-widget' ), $ver, true );
-        wp_enqueue_script( 'leo-flow-engine', $leo . 'leo-flow-engine.js', array( 'aipa-widget', 'aipa-widget-leo-flows' ), $ver, true );
-        wp_enqueue_script( 'aipa-widget-unified-chat', $leo . 'widget-unified-chat.js', array( 'aipa-widget', 'aipa-widget-leo-flows' ), $ver, true );
+        wp_enqueue_script( 'aipa-widget', $leo . self::widget_js_file(), array(), self::asset_version( self::widget_js_file() ), true );
+        wp_enqueue_script( 'aipa-widget-leo-flows', $leo . 'widget-leo-flows.js', array( 'aipa-widget' ), self::asset_version( 'widget-leo-flows.js' ), true );
+        wp_enqueue_script( 'leo-flow-engine', $leo . 'leo-flow-engine.js', array( 'aipa-widget', 'aipa-widget-leo-flows' ), self::asset_version( 'leo-flow-engine.js' ), true );
+        wp_enqueue_script( 'aipa-widget-unified-chat', $leo . 'widget-unified-chat.js', array( 'aipa-widget', 'aipa-widget-leo-flows' ), self::asset_version( 'widget-unified-chat.js' ), true );
 
         // Config — REST base points at the LOCAL aipa/v1 forwarder, so the
         // widget never talks to the hub directly and never sees the bearer.
@@ -109,11 +162,15 @@ class Gend_Society_AI_Widget {
             );
         $oauth_client_id = (string) ( $oauth['id'] ?? '' );
         $oauth_hub_url   = untrailingslashit( (string) ( $oauth['hub'] ?? self::hub_base() ) );
+        // On the hub's own domain the hub is the same origin: its routes take this login and nonce directly.
+        $local = self::on_hub_login()
+            ? esc_url_raw( network_home_url( 'wp-json/aipa/v1' ) )
+            : esc_url_raw( get_rest_url( null, 'aipa/v1' ) );
         return apply_filters( 'aipa_widget_config', array( // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- foreign hook from leo.
             // Local namespace — forwarded to the hub by GS_AI_Proxy.
-            'rest'              => esc_url_raw( get_rest_url( null, 'aipa/v1' ) ),
+            'rest'              => $local,
             'rest_url'          => trailingslashit( esc_url_raw( get_rest_url( get_current_blog_id() ) ) ),
-            'rest_assistant'    => esc_url_raw( get_rest_url( null, 'aipa/v1' ) ),
+            'rest_assistant'    => $local,
             'restBase'          => trailingslashit( esc_url_raw( get_rest_url( get_current_blog_id() ) ) ),
             'nonce'             => wp_create_nonce( 'wp_rest' ),
             'model'             => 'gemini-2.0-flash',
@@ -193,10 +250,28 @@ class Gend_Society_AI_Widget {
         $done = true;
         echo "\n<!-- GS AI WIDGET START -->\n";
         echo '<aipa-widget></aipa-widget>';
+        if ( self::setup_group() ) {
+            echo '<script>window.GEND_UC_AUTO=' . (int) self::setup_group() . ';</script>';
+        }
+        // The Media Studio lives with Leo, on the hub, and this widget's REST already points there.
+        $studio = 'leo/assets/studio/gend-media-studio';
+        if ( file_exists( WP_PLUGIN_DIR . "/$studio.js" ) ) {
+            $version = GEND_SOCIETY_VERSION . '.' . filemtime( WP_PLUGIN_DIR . "/$studio.js" );
+            echo '<script>window.GEND_STUDIO=' . wp_json_encode( array( 'js' => plugins_url( "$studio.js" ) . '?v=' . $version, 'css' => plugins_url( "$studio.css" ) . '?v=' . $version ) ) . ';</script>';
+        }
+        // Image spots on a built page: whoever can edit it can fill them from the chat.
+        if ( is_singular() && current_user_can( 'edit_post', get_the_ID() ) && self::linked_group() ) {
+            echo '<script>window.GEND_UC_SPOTS=' . wp_json_encode( array( 'group' => (int) self::linked_group(), 'page' => get_the_title() ) ) . ';</script>';
+        }
         echo "\n<!-- GS AI WIDGET END -->\n";
     }
 
     public static function shortcode_wireframe( $atts ) {
+        // The widget removes its floating chat when it finds an embed. While setup is what this admin should see, the
+        // old wireframe chat on a launched site's starter page steps aside.
+        if ( self::setup_group() ) {
+            return '';
+        }
         $atts = shortcode_atts( array( 'height' => '90vh', 'width' => '100%' ), $atts, 'aipa_wireframe' );
 
         // Regenerate-mode entry: an admin clicked Replace / Add Section /

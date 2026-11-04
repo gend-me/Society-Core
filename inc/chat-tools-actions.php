@@ -135,6 +135,32 @@ add_filter(
 			$id = WP_Theme_JSON_Resolver::get_user_global_styles_post_id();
 			return $rest( 'POST', '/wp/v2/global-styles/' . (int) $id, array_intersect_key( $a, array_flip( array( 'settings', 'styles' ) ) ) );
 		} );
+		$add( 'app_style_tokens_save', 'Save the corners, spacing and entrance animation that built pages follow.', array( 'tokens' => $obj ), 'app.theme_builder', $theme, 'write', 'edit_theme_options', static function ( $a ) {
+			$tokens = array_merge( gend_society_bt_style_tokens(), gend_society_bt_clean_style_tokens( (array) ( $a['tokens'] ?? array() ) ) );
+			update_option( 'gend_society_style_tokens', $tokens, false );
+			return array( 'saved' => array_keys( $tokens ) );
+		} );
+		$add( 'app_site_css_save', 'Add, replace or remove one named block of this site\'s styling.', array( 'name' => $str, 'css' => $str ), 'app.theme_builder', $theme, 'write', 'edit_theme_options', static function ( $a ) {
+			$name = sanitize_title( (string) ( $a['name'] ?? '' ) );
+			if ( '' === $name ) {
+				return array( 'error' => 'name is required' );
+			}
+			$all = (array) get_option( 'gend_society_site_css', array() );
+			if ( '' === trim( (string) ( $a['css'] ?? '' ) ) ) {
+				unset( $all[ $name ] );
+			} else {
+				$css = gend_society_bt_clean_css( (string) $a['css'] );
+				if ( '' === $css ) {
+					return array( 'error' => 'That styling was refused: no url(), @import, @font-face, backslashes or angle brackets, balanced braces, up to 8000 characters.' );
+				}
+				if ( ! isset( $all[ $name ] ) && count( $all ) >= 30 ) {
+					return array( 'error' => 'This site has 30 blocks of styling. Replace or remove one.' );
+				}
+				$all[ $name ] = $css;
+			}
+			update_option( 'gend_society_site_css', $all, false );
+			return array( 'saved' => array_keys( $all ) );
+		} );
 		$add( 'app_site_identity_save', 'Change the site name, tagline, logo or favicon (media ids).', array( 'title' => $str, 'description' => $str, 'site_logo' => $num, 'site_icon' => $num ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) use ( $rest ) {
 			return $rest( 'POST', '/wp/v2/settings', array_intersect_key( $a, array_flip( array( 'title', 'description', 'site_logo', 'site_icon' ) ) ) );
 		} );
@@ -251,8 +277,8 @@ add_filter(
 		$add( 'talk_chatflow_create', 'Create a chatflow as a draft.', array( 'title' => $str ), 'app.talk_flows', $talk, 'write', 'manage_options', static function ( $a ) use ( $rest ) {
 			return $rest( 'POST', '/em/v1/chatflows', array( 'title' => (string) ( $a['title'] ?? '' ) ) );
 		} );
-		$add( 'talk_flow_save', 'Save a chatflow or form: its title, and its whole question list when given. Read it first and keep what was not asked to change.', array( 'id' => $num, 'title' => $str, 'questions' => array( 'type' => 'array', 'items' => $obj ) ), 'app.talk_flows', $talk, 'write', '', static function ( $a ) use ( $rest ) {
-			return $rest( 'POST', '/em/v1/chatflows/' . (int) ( $a['id'] ?? 0 ), array_intersect_key( $a, array_flip( array( 'title', 'questions' ) ) ) );
+		$add( 'talk_flow_save', 'Save a chatflow or form: its title, and its whole question list when given. Read it first and keep what was not asked to change.', array( 'id' => $num, 'title' => $str, 'questions' => array( 'type' => 'array', 'items' => $obj ), 'notification_email' => $str ), 'app.talk_flows', $talk, 'write', '', static function ( $a ) use ( $rest ) {
+			return $rest( 'POST', '/em/v1/chatflows/' . (int) ( $a['id'] ?? 0 ), array_intersect_key( $a, array_flip( array( 'title', 'questions', 'notification_email' ) ) ) );
 		}, static function ( $a ) {
 			// Live flows reach customers.
 			return 'publish' === get_post_status( (int) ( $a['id'] ?? 0 ) ) ? 'confirm' : 'write';

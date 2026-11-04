@@ -154,7 +154,7 @@
             return p.length > 3 ? parseFloat(p[3]) : 1;
         }
         function rgbOf(c) { var m = /rgba?\((\d+),\s*(\d+),\s*(\d+)/.exec(c || ''); return m ? [m[1], m[2], m[3]] : [10, 14, 24]; }
-        var KEEP = '.aas-grow-cta, .aas-grow-cta-link, button, a, [role="button"], .button, .gs-vbg-keep';
+        var KEEP = '.aas-grow-cta, .aas-grow-cta-link, button, a, [role="button"], .button, .gs-vbg-keep, [data-panel="plan"] .psoo-bp__section, [data-panel="plan"] .psoo-bp__sidenav';
         // Tab roots that paint a solid backdrop of their own go transparent: the scene is the only background.
         function clearRoots() {
             if (!CFG.clear) return;

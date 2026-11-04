@@ -29,9 +29,9 @@
 	<p class="has-text-align-center has-small-font-size">
 		<?php
 		printf(
-			/* translators: Designed with WordPress. %s: WordPress link. */
+			/* translators: Designed with gend.me. %s: gend.me link. */
 			esc_html__( 'Designed with %s', 'gend-society-theme' ),
-			'<a href="' . esc_url( __( 'https://wordpress.org', 'gend-society-theme' ) ) . '" rel="nofollow">WordPress</a>'
+			'<a href="https://gend.me/">gend.me</a>'
 		);
 		?>
 	</p>
