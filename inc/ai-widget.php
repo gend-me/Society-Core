@@ -139,6 +139,7 @@ class Gend_Society_AI_Widget {
                 'authorize_url' => gend_society_oauth_hydra_url() . '/oauth2/auth',
                 'redirect_uri'  => $oauth_hub_url . '/oauth2-bridge/callback',
                 'scope'         => 'openid profile email offline_access',
+                'extra'         => function_exists( 'gend_society_nr_tag_args' ) && function_exists( 'gend_society_oauth_is_hub_site' ) && ! gend_society_oauth_is_hub_site() ? gend_society_nr_tag_args() : new stdClass(),
             ) : null,
             'icon'              => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_icon' ) : '',
             'leo_avatar'        => function_exists( 'gend_society_remote_asset_url' ) ? gend_society_remote_asset_url( 'ai_widget_leo_avatar' ) : '',

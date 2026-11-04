@@ -102,6 +102,9 @@ function gend_society_oauth_render_login_page() {
             'authorize_url' => gend_society_oauth_hydra_url() . '/oauth2/auth',
             'redirect_uri'  => $hub_url . '/oauth2-bridge/callback',
             'scope'         => 'openid profile email offline_access', // offline_access = Hydra issues a refresh token
+            // Where this visitor came from (gm_from) and the gend.me affiliate this site remembers (gm_ref): extra authorize
+            // parameters Hydra ignores but records, so the hub can credit a new gend.me account to the right Sales team.
+            'extra'         => function_exists( 'gend_society_nr_tag_args' ) && ! gend_society_oauth_is_hub_site() ? gend_society_nr_tag_args() : new stdClass(),
         );
     } else {
         $flow = array(
@@ -244,7 +247,7 @@ function gend_society_oauth_render_login_page() {
                 var p = await pkce();
                 var state = base64url(crypto.getRandomValues(new Uint8Array(16)));
 
-                var authUrl = flow.authorize_url + '?' + new URLSearchParams({
+                var authUrl = flow.authorize_url + '?' + new URLSearchParams(Object.assign({}, flow.extra || {}, {
                     response_type:         'code',
                     client_id:             clientId,
                     redirect_uri:          flow.redirect_uri,
@@ -259,7 +262,7 @@ function gend_society_oauth_render_login_page() {
                     state:                 state,
                     code_challenge:        p.challenge,
                     code_challenge_method: 'S256'
-                }).toString();
+                })).toString();
 
                 var w = 480, h = 720;
                 var x = (window.screen.width  - w) / 2;
