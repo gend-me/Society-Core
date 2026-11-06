@@ -2681,7 +2681,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 <?php
                 $gs_codebase_data = function_exists( 'gend_society_hosting_collect_codebase' ) ? gend_society_hosting_collect_codebase() : array();
                 $gs_codebase_used = (int) ( $gs_codebase_data['bytes_used'] ?? 0 );
-                $gs_codebase_cap  = (int) apply_filters( 'gend_society_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 );
+                $gs_codebase_cap  = gend_society_hosting_codebase_plan_bytes();
                 $gs_codebase_pct  = gend_society_hosting_pct( $gs_codebase_used, $gs_codebase_cap );
 
                 $gs_codebase_hero = array(
@@ -3747,6 +3747,7 @@ function gend_society_hosting_collect_media( $force_rescan = false ) {
     $key   = 'gend_society_hosting_media_usage';
     $cache = $force_rescan ? false : get_transient( $key );
     if ( is_array( $cache ) ) {
+        $cache['plan_bytes'] = gend_society_hosting_media_plan_bytes(); // the scan is kept for an hour, the plan is not
         return $cache;
     }
     $uploads_dir = wp_upload_dir();
@@ -3804,7 +3805,7 @@ function gend_society_hosting_collect_container_resources( $media_data, $tables_
 
     // Media storage (uploads PVC)
     $media_used = (int) ( $media_data['bytes_used'] ?? 0 );
-    $media_cap  = (int) ( $media_data['plan_bytes'] ?? gend_society_hosting_media_plan_bytes() );
+    $media_cap  = gend_society_hosting_media_plan_bytes();
     $resources[] = array(
         'slug'       => 'media',
         'label'      => __( 'Media Storage', 'gend-society' ),
@@ -3853,7 +3854,7 @@ function gend_society_hosting_collect_container_resources( $media_data, $tables_
     // don't hit the disk.
     $code_data = gend_society_hosting_collect_codebase();
     $code_used = (int) ( $code_data['bytes_used'] ?? 0 );
-    $code_cap  = (int) apply_filters( 'gend_society_hosting_codebase_plan_bytes', 2 * 1024 * 1024 * 1024 ); // 2 GB default
+    $code_cap  = gend_society_hosting_codebase_plan_bytes();
     $resources[] = array(
         'slug'       => 'codebase',
         'label'      => __( 'Codebase Storage', 'gend-society' ),
@@ -3883,22 +3884,65 @@ function gend_society_hosting_collect_container_resources( $media_data, $tables_
     return (array) apply_filters( 'gend_society_hosting_container_resources', $resources );
 }
 
+/**
+ * Size, in bytes, of the plan this site's membership holds for a storage resource (media|database|codebase|backups).
+ * 0 when it holds none or the size is not known: the caller then keeps its default. On gend.me the membership's own
+ * products are read; a container or a connected install reads gend.me's /membership answer
+ * (hosting_plans.<resource>.size_gb).
+ */
+function gend_society_hosting_plan_size_bytes( string $res ): int {
+    static $memo = array();
+    if ( isset( $memo[ $res ] ) ) {
+        return $memo[ $res ];
+    }
+    $gb         = 0.0;
+    $types      = array( 'media' => 'media', 'database' => 'database', 'codebase' => 'code' );
+    $membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+    if ( $membership && is_object( $membership ) && method_exists( $membership, 'get_all_products' ) ) {
+        if ( 'backups' === $res ) {
+            $policy = function_exists( 'gdc_backup_resolve_membership_policy' ) ? (array) gdc_backup_resolve_membership_policy( $membership ) : array();
+            $gb     = ! empty( $policy['enabled'] ) ? (float) ( $policy['storage_gb'] ?? 0 ) : 0.0;
+        } elseif ( isset( $types[ $res ] ) ) {
+            foreach ( (array) $membership->get_all_products() as $row ) {
+                $prod = is_array( $row ) && isset( $row['product'] ) ? $row['product'] : null;
+                if ( ! $prod || ! is_object( $prod ) || ! method_exists( $prod, 'get_meta' ) ) {
+                    continue;
+                }
+                if ( $types[ $res ] === (string) $prod->get_meta( 'wu_container_storage_type', '' ) ) {
+                    $gb = max( $gb, (float) $prod->get_meta( 'wu_container_tier_size_gb', 0 ) );
+                }
+            }
+        }
+    } else {
+        $mc = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
+        $gb = is_array( $mc ) ? (float) ( $mc['hosting_plans'][ $res ]['size_gb'] ?? 0 ) : 0.0;
+    }
+    $memo[ $res ] = $gb > 0 ? (int) round( $gb * 1024 * 1024 * 1024 ) : 0;
+    return $memo[ $res ];
+}
+
 function gend_society_hosting_db_plan_bytes() {
-    // Default 5 GB. Future: pull from membership payload `plan->db_quota_bytes`.
-    return (int) apply_filters( 'gend_society_hosting_db_plan_bytes', 5 * 1024 * 1024 * 1024 );
+    // The held Database plan's size; 5 GB where none is known.
+    $plan = gend_society_hosting_plan_size_bytes( 'database' );
+    return (int) apply_filters( 'gend_society_hosting_db_plan_bytes', $plan > 0 ? $plan : 5 * 1024 * 1024 * 1024 );
 }
 
 function gend_society_hosting_media_plan_bytes() {
-    // Default 20 GB.
-    return (int) apply_filters( 'gend_society_hosting_media_plan_bytes', 20 * 1024 * 1024 * 1024 );
+    // The held Media plan's size; 20 GB where none is known.
+    $plan = gend_society_hosting_plan_size_bytes( 'media' );
+    return (int) apply_filters( 'gend_society_hosting_media_plan_bytes', $plan > 0 ? $plan : 20 * 1024 * 1024 * 1024 );
+}
+
+function gend_society_hosting_codebase_plan_bytes() {
+    // The held Codebase plan's size; 2 GB where none is known.
+    $plan = gend_society_hosting_plan_size_bytes( 'codebase' );
+    return (int) apply_filters( 'gend_society_hosting_codebase_plan_bytes', $plan > 0 ? $plan : 2 * 1024 * 1024 * 1024 );
 }
 
 function gend_society_hosting_backups_plan_bytes() {
-    // Default 10 GB. Same hardcoded-but-filterable idiom as
-    // gs_hosting_db_plan_bytes()/gs_hosting_media_plan_bytes() above -
-    // none of these three pull a real per-membership quota yet either,
-    // this isn't a lower bar than its siblings.
-    return (int) apply_filters( 'gend_society_hosting_backups_plan_bytes', 10 * 1024 * 1024 * 1024 );
+    // The held Backup Storage plan's size; 10 GB where none is known.
+    $plan = gend_society_hosting_plan_size_bytes( 'backups' );
+    return (int) apply_filters( 'gend_society_hosting_backups_plan_bytes', $plan > 0 ? $plan : 10 * 1024 * 1024 * 1024 );
 }
 
 /**
