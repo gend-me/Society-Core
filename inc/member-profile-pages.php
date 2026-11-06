@@ -336,9 +336,18 @@ function gend_society_inject_profile_page_embed() {
     // (chrome-stripped by gdc_tab_only_strip_chrome() further down this file).
     $media_slug = function_exists( 'gend_sn_profile_media_slug' ) ? gend_sn_profile_media_slug() : 'media';
     $media_url  = add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . $media_slug ) );
+    // Print the tab CSS before the markup: the panels below are large, and CSS printed after them leaves the tab buttons unstyled until the parser reaches it.
+    ob_start();
+    gend_society_overview_tabs_assets();
+    $gs_ov_assets = ob_get_clean();
+    if ( preg_match( '#<style>.*?</style>#s', $gs_ov_assets, $gs_ov_m ) ) {
+        echo $gs_ov_m[0];
+        $gs_ov_assets = str_replace( $gs_ov_m[0], '', $gs_ov_assets );
+    }
     ?>
-    <div class="gs-overview-wrap">
-        <div class="gs-overview-tabs" role="tablist">
+    <div class="gs-overview-wrap<?php echo $is_own_profile ? '' : ' gs-overview-wrap--visitor'; ?>">
+        <?php // Another member's profile: these tabs are the profile menu itself (header nav ov-* items), so the strip is hidden. ?>
+        <div class="gs-overview-tabs" role="tablist"<?php echo $is_own_profile ? '' : ' hidden'; ?>>
             <button type="button" class="gs-overview-tab is-active" data-gs-ov-tab="cover" role="tab" aria-selected="true"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/></svg></span><?php esc_html_e( 'Cover', 'gend-society' ); ?></button>
             <button type="button" class="gs-overview-tab" data-gs-ov-tab="resume" role="tab" aria-selected="false"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/></svg></span><?php esc_html_e( 'Resume', 'gend-society' ); ?></button>
             <button type="button" class="gs-overview-tab" data-gs-ov-tab="social" role="tab" aria-selected="false"><span class="gs-ov-ico"><svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6"/></svg></span><?php esc_html_e( 'Social', 'gend-society' ); ?></button>
@@ -370,7 +379,7 @@ function gend_society_inject_profile_page_embed() {
 
     </div>
     <?php
-    gend_society_overview_tabs_assets();
+    echo $gs_ov_assets;
 }
 
 /**
@@ -412,6 +421,7 @@ function gend_society_overview_tabs_assets() {
     @media (max-width:720px) {
         .gs-overview-tabs { justify-content:center; }
     }
+    .gs-overview-tabs[hidden] { display:none !important; }
     .gs-overview-panel { display:none; }
     .gs-overview-panel.is-active { display:block; }
     .gs-overview-media-frame { display:block; width:100%; min-height:80vh; height:80vh; border:0; background:transparent; border-radius:12px; overflow:hidden; }
@@ -431,6 +441,8 @@ function gend_society_overview_tabs_assets() {
 
         var tabs   = wrap.querySelectorAll('.gs-overview-tab');
         var panels = wrap.querySelectorAll('.gs-overview-panel');
+        // Another member's profile: the header nav items (data-gs-ov) are these tabs.
+        var navLinks = document.querySelectorAll('.gdc-profile-nav [data-gs-ov]');
         tabs.forEach(function (tab) {
             tab.addEventListener('click', function () {
                 var target = tab.getAttribute('data-gs-ov-tab');
@@ -439,15 +451,28 @@ function gend_society_overview_tabs_assets() {
                 tab.classList.add('is-active'); tab.setAttribute('aria-selected','true');
                 var p = wrap.querySelector('[data-gs-ov-panel="' + target + '"]');
                 if (p) p.classList.add('is-active');
+                navLinks.forEach(function (a) { a.classList.toggle('gdc-nav-item--active', a.getAttribute('data-gs-ov') === target); });
+            });
+        });
+        function openSub(key) {
+            if (key === 'portfolio') key = 'media';
+            var t = key && wrap.querySelector('.gs-overview-tab[data-gs-ov-tab="' + key + '"]');
+            if (t) t.click();
+            return !!t;
+        }
+        navLinks.forEach(function (a) {
+            a.addEventListener('click', function (e) {
+                var key = a.getAttribute('data-gs-ov');
+                if (!openSub(key)) return;
+                e.preventDefault();
+                try { history.replaceState(null, '', '#' + (key === 'media' ? 'portfolio' : key)); } catch (err) {}
             });
         });
 
-        // Deep-link: #resume / #contracts / etc. opens that sub-tab on load.
+        // Deep-link: #resume / #contracts / #portfolio etc. opens that sub-tab on load.
         var hash = (window.location.hash || '').replace('#','');
-        if (hash) {
-            var deep = wrap.querySelector('.gs-overview-tab[data-gs-ov-tab="' + hash + '"]');
-            if (deep) deep.click();
-        }
+        if (hash) openSub(hash);
+        window.addEventListener('hashchange', function () { openSub((window.location.hash || '').replace('#','')); });
 
         // Force full width by expanding every ancestor up to <body> — bypasses
         // guessing which Youzify/theme class constrains the overview column.
@@ -603,7 +628,7 @@ function gend_society_render_cover_panel() {
         <!-- The actual editor — preloaded immediately in the background so it's
              ready (or nearly ready) the moment the user clicks Edit. -->
         <iframe class="gdc-ppe-frame" id="gdc-ppe-frame"
-                src="<?php echo esc_url( $edit_url ); ?>"
+                data-src="<?php echo esc_url( $edit_url ); ?>"
                 title="Profile Page Editor" allowfullscreen></iframe>
     </div>
 
@@ -619,6 +644,15 @@ function gend_society_render_cover_panel() {
         // ── Move modal to <body> so it escapes any CSS stacking context
         //    created by transforms/animations on ancestor elements.
         document.body.appendChild(modal);
+
+        // Members have no wp-admin access: start the scoped editing session (cookie) first, then
+        // load the editor. If the request fails, load it anyway (admins don't need the session).
+        function loadEditor() { if (!frame.src) frame.src = frame.getAttribute('data-src'); }
+        var sess = new FormData();
+        sess.append('action', 'gend_society_profile_editor');
+        sess.append('nonce', <?php echo wp_json_encode( wp_create_nonce( 'gs_profile_editor' ) ); ?>);
+        fetch(<?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>, { method: 'POST', body: sess, credentials: 'same-origin' })
+            .then(loadEditor, loadEditor);
 
         // Track when the preloaded iframe finishes loading.
         // If the modal is already open at that point, dismiss the loading screen.
@@ -644,7 +678,19 @@ function gend_society_render_cover_panel() {
         function closeEditor() {
             modal.hidden = true;
             document.body.style.overflow = '';
-            window.location.href = profileUrl;
+            // Refresh the cover in place and restart the editor frame, so reopening is instant and
+            // never shows the stale hidden editor (navigating to the same URL does nothing when it has a #hash).
+            editorReady = false;
+            frame.src = frame.getAttribute('data-src');
+            fetch(profileUrl.split('#')[0], { credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.text(); })
+                .then(function (html) {
+                    var next = new DOMParser().parseFromString(html, 'text/html').querySelector('#gdc-profile-page-embed .profile-canvas-frame');
+                    var cur  = document.querySelector('#gdc-profile-page-embed .profile-canvas-frame');
+                    if (!next || !cur) throw new Error('no cover');
+                    cur.innerHTML = next.innerHTML;
+                })
+                .catch(function () { window.location.reload(); });
         }
 
         document.addEventListener('click', function (e) {
@@ -4067,6 +4113,27 @@ function gend_society_tab_only_share_modal() {
 // Guards: bp_is_user_friends() ensures we only wrap the friends/connections page.
 
 add_action( 'bp_before_member_body', 'gend_society_member_friends_tabs_open', 1 );
+add_action( 'bp_before_member_body', 'gend_society_member_friends_center_css', 2 );
+
+/** Connections pages (Friendships, Requests): everything centred (owner 2026-11-06). */
+function gend_society_member_friends_center_css() {
+    if ( ! function_exists( 'bp_is_user_friends' ) || ! bp_is_user_friends() ) return;
+    ?>
+    <style id="gs-member-friends-center-css">
+    body.friends .youzify-page-main-content #subnav.item-list-tabs > ul { display: flex !important; flex-wrap: wrap; justify-content: center !important; align-items: center; gap: 12px; float: none !important; }
+    body.friends .youzify-page-main-content #subnav.item-list-tabs > ul > li { float: none !important; }
+    body.friends .youzify-page-main-content #subnav.item-list-tabs > ul > li.last,
+    body.friends .youzify-page-main-content #subnav.item-list-tabs > ul > li.filter { margin: 0 !important; flex-basis: 100%; display: flex; justify-content: center; align-items: center; gap: 10px; }
+    body.friends #friend-list.item-list { display: flex !important; flex-wrap: wrap; justify-content: center !important; gap: 20px; grid-template-columns: none !important; margin-left: auto !important; margin-right: auto !important; }
+    body.friends #friend-list.item-list > li { flex: 0 1 340px; max-width: 100%; margin: 0 !important; text-align: center; }
+    body.friends #friend-list.item-list > li :is(.item-avatar, .item, .item-title, .item-meta) { text-align: center; margin-left: auto; margin-right: auto; float: none !important; }
+    body.friends #friend-list.item-list > li .action { display: flex; justify-content: center; flex-wrap: wrap; gap: 12px; float: none !important; position: static !important; }
+    body.friends :is(#pag-top, #pag-bottom, .pagination) { display: flex; flex-direction: column; align-items: center; text-align: center; float: none; }
+    body.friends :is(#pag-top, #pag-bottom, .pagination) > * { float: none !important; }
+    body.friends .youzify-main-column > #message, body.friends .youzify-main-column #message.info { text-align: center; }
+    </style>
+    <?php
+}
 add_action( 'bp_after_member_body',  'gend_society_member_friends_tabs_close', 99 );
 
 function gend_society_member_friends_tabs_open() {
@@ -4087,6 +4154,7 @@ function gend_society_member_friends_tabs_open() {
 
     .gs-member-friends-tabs {
         display: flex;
+        justify-content: center;
         gap: 12px;
         margin-bottom: 24px;
         border-bottom: 1px solid rgba(255,255,255,0.1);
@@ -4370,22 +4438,6 @@ function gend_society_member_friends_tabs_open() {
             </button>
             <button type="button"
                     class="gs-member-friends-tab"
-                    data-gs-panel="referral-sales"
-                    role="tab"
-                    aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('referral-sales') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'Referrals', 'gend-society' ); ?></span>
-            </button>
-            <button type="button"
-                    class="gs-member-friends-tab"
-                    data-gs-panel="sales-team"
-                    role="tab"
-                    aria-selected="false">
-                <span class="gs-tab-icon" aria-hidden="true"><?php echo function_exists('gend_society_get_profile_nav_icon') ? gend_society_get_profile_nav_icon('sales-team') : ''; ?></span>
-                <span class="gs-tab-label"><?php esc_html_e( 'Sales Team', 'gend-society' ); ?></span>
-            </button>
-            <button type="button"
-                    class="gs-member-friends-tab"
                     data-gs-panel="invite"
                     role="tab"
                     aria-selected="false">
@@ -4411,28 +4463,7 @@ function gend_society_member_friends_tabs_close() {
     ?>
         </div><!-- /panel:connections -->
 
-        <div class="gs-member-friends-panel" data-gs-panel="referral-sales" role="tabpanel">
-            <?php
-            // The full AAS dashboard renders here. The shortcode
-            // [affiliate_sales_dashboard] internally has 3 top-level tabs
-            // (Referral Sales / Sales Team / Payments & Analytics). We use
-            // JS below to (a) hide its tab strip and (b) move the Sales Team
-            // and Payments sub-panels OUT of here into our new top-level
-            // panels — so the user only sees the Referral Sales sub-tabs
-            // (Tracking URLs / Sales / Commission Rates / Linked Apps)
-            // beneath the "Your Network is a Lifetime Asset" header.
-            if ( function_exists( 'aas_earnings_endpoint_content' ) ) {
-                aas_earnings_endpoint_content();
-            } else {
-                echo '<p class="psoo-pm-empty">' . esc_html__( 'Earnings dashboard not available.', 'gend-society' ) . '</p>';
-            }
-            ?>
-        </div><!-- /panel:referral-sales -->
-
-        <div class="gs-member-friends-panel" data-gs-panel="sales-team" role="tabpanel">
-            <!-- populated by JS - sales-team panel relocated here from the AAS dashboard -->
-        </div><!-- /panel:sales-team -->
-
+        <?php // Referrals + Sales Team panels removed 2026-11-06: both live under Commissions (Contracts) only. ?>
         <div class="gs-member-friends-panel" data-gs-panel="invite" role="tabpanel">
             <?php
             // Same content as Contracts → Commissions → Referrals → Tracking URLs (sales-team [affiliate_link]); the
@@ -4492,75 +4523,6 @@ function gend_society_member_friends_tabs_close() {
             } );
         } );
 
-        // ── Relocate the AAS dashboard's two non-Referral panels ─────────
-        // The affiliate sales dashboard shortcode renders 3 top-level
-        // panels (referral-sales / sales-team / payments). We want to
-        // promote sales-team and payments to OUR top-level tabs and hide
-        // the inner tab strip - so the Referral Sales panel only shows
-        // the 4 sub-tabs (Tracking URLs / Sales / Commission Rates /
-        // Linked Apps) under the Lifetime Asset header.
-        function gsRelocateAasPanels () {
-            var dashboard = wrap.querySelector('.aas-affiliate-dashboard');
-            if ( ! dashboard ) return false;
-
-            // Hide the dashboard's own 3-tab strip
-            var innerTabs = dashboard.querySelector('.aas-dashboard-tabs');
-            if ( innerTabs ) innerTabs.style.display = 'none';
-
-            // Move the sales-team panel out
-            var salesTeamPanel = dashboard.querySelector('[data-aas-panel="sales-team"]');
-            var salesTeamHost  = wrap.querySelector('.gs-member-friends-panel[data-gs-panel="sales-team"]');
-            if ( salesTeamPanel && salesTeamHost && salesTeamPanel.parentElement !== salesTeamHost ) {
-                salesTeamPanel.removeAttribute('hidden');
-                salesTeamPanel.setAttribute('aria-hidden', 'false');
-                salesTeamPanel.classList.add('is-active');
-                salesTeamHost.appendChild( salesTeamPanel );
-            }
-
-            // Lift the Referral Performance Pulse + metric grid out of the
-            // payments sub-panel and dock them ABOVE the referral-sales sub-tab
-            // strip. This replaces the old "Payments & Analytics" top-level tab
-            // — those KPIs make more sense visible on the Referral Sales tab
-            // landing.
-            var referralPanel = dashboard.querySelector('[data-aas-panel="referral-sales"]');
-            var subtabsRow    = referralPanel ? referralPanel.querySelector('.aas-dashboard-subtabs') : null;
-            var perfPulse     = dashboard.querySelector('.aas-card.aas-analytics-hero');
-            var perfGrid      = dashboard.querySelector('.aas-card.aas-metric-grid--analytics');
-            if ( referralPanel && subtabsRow ) {
-                if ( perfPulse && perfPulse.parentElement !== referralPanel ) {
-                    referralPanel.insertBefore( perfPulse, subtabsRow );
-                }
-                if ( perfGrid && perfGrid.parentElement !== referralPanel ) {
-                    referralPanel.insertBefore( perfGrid, subtabsRow );
-                }
-            }
-
-            return true;
-        }
-
-        // Defer the move until AFTER the AAS dashboard JS has wired up its
-        // sub-tab click handlers. AAS attaches them in a DOMContentLoaded
-        // listener that walks the .aas-affiliate-dashboard container looking
-        // for [data-aas-panel] children — so if we move the panels OUT before
-        // that walk runs, those panels are skipped and their sub-tabs never
-        // get click handlers (the symptom: sub-tabs render but do nothing on
-        // click). DOM moves preserve attached listeners, so initializing first
-        // and moving second gives us both correct placement and working clicks.
-        function gsScheduleRelocate () {
-            // setTimeout(0) inside DOMContentLoaded queues us behind AAS's
-            // own DOMContentLoaded handler.
-            if ( document.readyState === 'loading' ) {
-                document.addEventListener( 'DOMContentLoaded', function () {
-                    setTimeout( gsRelocateAasPanels, 0 );
-                } );
-            } else {
-                setTimeout( gsRelocateAasPanels, 0 );
-            }
-        }
-        gsScheduleRelocate();
-        // Belt + braces: re-run on window load too, in case the dashboard
-        // hydrates content lazily after DOMContentLoaded.
-        window.addEventListener( 'load', gsRelocateAasPanels );
     }());
     </script>
     <?php
