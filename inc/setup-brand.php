@@ -1414,6 +1414,100 @@ function gend_society_sb_affiliate_account_content() {
 	}
 }
 
+// ---- Projects in My Account: the dashboards each customer or team member may follow ----
+
+/** The group the site's Projects page and dashboards belong to. */
+function gend_society_sb_projects_group_id() {
+	$pid = gend_society_sb_find_page_with( 'psoo_pm_group_projects' );
+	if ( $pid && preg_match( '/\[psoo_pm_group_projects[^\]]*group_id="(\d+)"/', (string) get_post_field( 'post_content', $pid ), $m ) ) {
+		return (int) $m[1];
+	}
+	return gend_society_sb_site_group_id();
+}
+
+/** The Projects dashboards this viewer may see on this web app, by id. */
+function gend_society_sb_account_dashboards( $user_id ) {
+	if ( ! $user_id || ! gend_society_sb_scoped() || ! function_exists( 'psoo_dash_get_all' ) || ! function_exists( 'psoo_dash_user_can_view' ) ) {
+		return array();
+	}
+	$group = gend_society_sb_projects_group_id();
+	$out   = array();
+	foreach ( (array) psoo_dash_get_all() as $id => $d ) {
+		if ( is_array( $d ) && psoo_dash_user_can_view( $d, (int) $user_id, $group ) ) {
+			$out[ (string) $id ] = $d;
+		}
+	}
+	return $out;
+}
+
+add_filter( 'woocommerce_get_query_vars', 'gend_society_sb_projects_query_var' );
+function gend_society_sb_projects_query_var( $vars ) {
+	if ( gend_society_sb_scoped() ) {
+		$vars['my-projects'] = 'my-projects';
+	}
+	return $vars;
+}
+
+add_action( 'init', 'gend_society_sb_projects_flush', 99 );
+/** The new account endpoint needs its rewrite rule, once per site. */
+function gend_society_sb_projects_flush() {
+	if ( gend_society_sb_scoped() && '1' !== get_option( 'gend_society_projects_endpoint_flushed' ) ) {
+		update_option( 'gend_society_projects_endpoint_flushed', '1', true ); // checked on every request
+		flush_rewrite_rules( false );
+	}
+}
+
+add_filter( 'woocommerce_account_menu_items', 'gend_society_sb_projects_account_item', 31 );
+/** A Projects tab after Orders, for anyone with a dashboard to follow. */
+function gend_society_sb_projects_account_item( $items ) {
+	if ( ! gend_society_sb_account_dashboards( get_current_user_id() ) ) {
+		return $items;
+	}
+	$out = array();
+	foreach ( (array) $items as $k => $v ) {
+		$out[ $k ] = $v;
+		if ( 'orders' === $k ) {
+			$out['my-projects'] = __( 'Projects', 'gend-society' );
+		}
+	}
+	if ( ! isset( $out['my-projects'] ) ) {
+		$out = array_slice( $out, 0, 1, true ) + array( 'my-projects' => __( 'Projects', 'gend-society' ) ) + array_slice( $out, 1, null, true );
+	}
+	return $out;
+}
+
+add_filter( 'woocommerce_endpoint_my-projects_title', 'gend_society_sb_projects_account_title' );
+function gend_society_sb_projects_account_title() {
+	return __( 'Projects', 'gend-society' );
+}
+
+add_action( 'woocommerce_account_my-projects_endpoint', 'gend_society_sb_projects_account_content' );
+/** One dashboard at a time, with a tab for each the viewer may see. */
+function gend_society_sb_projects_account_content() {
+	$dash = gend_society_sb_account_dashboards( get_current_user_id() );
+	if ( ! $dash ) {
+		echo '<p>' . esc_html__( 'There is nothing to follow here yet.', 'gend-society' ) . '</p>';
+		return;
+	}
+	$ids  = array_map( 'strval', array_keys( $dash ) );
+	$want = isset( $_GET['dashboard'] ) ? sanitize_key( wp_unslash( $_GET['dashboard'] ) ) : ''; // phpcs:ignore WordPress.Security.NonceVerification -- choosing which dashboard to view
+	$cur  = in_array( $want, $ids, true ) ? $want : $ids[0];
+	if ( count( $ids ) > 1 ) {
+		echo '<nav class="gs-account-dash-tabs" aria-label="' . esc_attr__( 'Dashboards', 'gend-society' ) . '">';
+		foreach ( $dash as $id => $d ) {
+			$id = (string) $id;
+			printf(
+				'<a href="%s"%s>%s</a>',
+				esc_url( add_query_arg( 'dashboard', $id, wc_get_account_endpoint_url( 'my-projects' ) ) ),
+				$id === $cur ? ' class="is-current" aria-current="page"' : '',
+				esc_html( (string) ( $d['title'] ?? $id ) )
+			);
+		}
+		echo '</nav>';
+	}
+	echo do_shortcode( '[psoo_dashboard id="' . esc_attr( $cur ) . '" group_id="' . (int) gend_society_sb_projects_group_id() . '"]' ); // phpcs:ignore WordPress.Security.EscapeOutput -- the Projects plugin's own escaped output
+}
+
 add_action( 'bp_setup_nav', 'gend_society_sb_affiliate_profile_tab', 102 );
 /** An Affiliate tab on the member's own profile. */
 function gend_society_sb_affiliate_profile_tab() {

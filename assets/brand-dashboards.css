@@ -115,3 +115,9 @@ body.gs-brand-site.gs-invite-frame code{ background:color-mix(in srgb,var(--b-pr
 
 /* gend.me's status lines and pulse badges ("DEEP_LINK_v2", "GROWTH_ENGINE", "Signature Bonding: ACTIVE") read as gend.me, not as the web app. */
 body.gs-brand-site .aas-affiliate-dashboard :is(.aas-phs-footer,.aas-grow__foot,.aas-phs-badge,.aas-grow__badge){ display:none!important; }
+
+/* My Account > Projects: one tab per dashboard the viewer may follow. */
+body.gs-brand-site .gs-account-dash-tabs{ display:flex; flex-wrap:wrap; gap:8px; margin:0 0 20px; }
+body.gs-brand-site .gs-account-dash-tabs a{ padding:8px 16px; border-radius:999px; border:1px solid var(--b-line); background:var(--b-surface); color:var(--b-text); text-decoration:none; font-weight:600; }
+body.gs-brand-site .gs-account-dash-tabs a:hover{ border-color:var(--b-primary); color:var(--b-primary); }
+body.gs-brand-site .gs-account-dash-tabs a.is-current{ background:var(--b-primary); border-color:var(--b-primary); color:#fff; }
