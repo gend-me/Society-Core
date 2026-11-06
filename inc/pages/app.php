@@ -11,7 +11,7 @@
         <div class="gs-card">
             <div class="gs-card-header">
                 <h3><span class="dashicons dashicons-admin-appearance"></span>
-                    <?php esc_html_e('Theme Editor', 'gend-society'); ?>
+                    <?php esc_html_e('Theme Builder', 'gend-society'); ?>
                 </h3>
             </div>
             <div class="gs-card-body">

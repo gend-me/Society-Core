@@ -389,7 +389,7 @@ function gend_society_studio_sections() {
 			'icon'     => 'portfolio',
 			'blurb'    => __( 'Team dashboards your members work in.', 'gend-society' ),
 			'active'   => $has_proj,
-			'requires' => __( 'Remote Projects', 'gend-society' ),
+			'requires' => __( 'Project Management', 'gend-society' ),
 			'groups'   => array(
 				array(
 					'items' => array(
@@ -405,7 +405,7 @@ function gend_society_studio_sections() {
 			'icon'     => 'groups',
 			'blurb'    => __( 'Member profiles, groups, the activity feed and wallets.', 'gend-society' ),
 			'active'   => $has_social,
-			'requires' => __( 'Social Profiles', 'gend-society' ),
+			'requires' => __( 'Member Management', 'gend-society' ),
 			'groups'   => array(
 				// One page each: header, menu + pages by audience, sidebars, directory (inc/social-pages.php).
 				// The separate settings screens only when that builder is missing. One page per entry, so no headings.
