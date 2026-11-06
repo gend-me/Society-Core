@@ -708,9 +708,10 @@ add_filter(
 			return gend_society_sb_social_tab_risk( $a );
 		} );
 		$add( 'bank_earning_hooks', 'The earning rules (myCRED hooks) a point type can use, with whether each is on and its points, limit and log text.', array( 'point_type' => $str ), 'social.point_bank', $bank, 'read', 'manage_options', static function ( $a ) {
-			return gend_society_chat_tools_earning_hooks( sanitize_key( (string) ( $a['point_type'] ?? '' ) ) );
+			// The list of earning rules is the same for every type, so with none named it reads the site's main points.
+			return gend_society_chat_tools_earning_hooks( sanitize_key( (string) ( $a['point_type'] ?? '' ) ) ?: 'mycred_default' );
 		} );
-		$add( 'bank_earning_rules_save', 'Change a point type\'s earning rules. rules: [{hook, enabled, creds, limit (like 0/x, 5/d, 10/w, 20/m, 1/t), log}]. Only the hooks sent change; read bank_earning_hooks first.', array( 'point_type' => $str, 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'write', 'manage_options', static function ( $a ) use ( $blocked, $network_type, $network_blocked ) {
+		$add( 'bank_earning_rules_save', 'Change a point type\'s earning rules. rules: [{hook, enabled, creds, limit (like 0/x, 5/d, 10/w, 20/m, 1/t), log}]; woocommerce_each_order also takes reward_on_each (fixed_rate or percentage), percent, base (subtotal or total) and point_value, so points can follow what was spent. Only the hooks sent change; read bank_earning_hooks first.', array( 'point_type' => $str, 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'write', 'manage_options', static function ( $a ) use ( $blocked, $network_type, $network_blocked ) {
 			$type = sanitize_key( (string) ( $a['point_type'] ?? '' ) );
 			if ( in_array( $type, gend_society_chat_tools_value_types(), true ) ) {
 				return $blocked;
@@ -940,6 +941,20 @@ function gend_society_chat_tools_earning_rules_save( string $type, array $rules 
 		}
 		if ( isset( $r['log'] ) && '' !== $r['log'] ) {
 			$row['log'] = sanitize_text_field( (string) $r['log'] );
+		}
+		// Points for each order can be a share of what was spent: the order rule's own extra settings (reward-programs
+		// sanitises them through aas_hooks_extra_prefs).
+		if ( 'woocommerce_each_order' === $h && isset( $r['reward_on_each'] ) ) {
+			$row['extra'] = (string) wp_json_encode(
+				array(
+					'reward_on_each' => 'percentage' === $r['reward_on_each'] ? 'percentage' : 'fixed_rate',
+					'creds'          => (float) ( $r['creds'] ?? 0 ),
+					'percent'        => min( 100, max( 0, (float) ( $r['percent'] ?? 0 ) ) ),
+					'base'           => 'total' === ( $r['base'] ?? '' ) ? 'total' : 'subtotal',
+					'point_value'    => max( 0.000001, (float) ( $r['point_value'] ?? 1 ) ),
+					'log'            => sanitize_text_field( (string) ( $r['log'] ?? '' ) ),
+				)
+			);
 		}
 		if ( isset( $r['subs'] ) && is_array( $r['subs'] ) ) {
 			$subs = array();
