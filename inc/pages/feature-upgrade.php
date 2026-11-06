@@ -158,6 +158,17 @@ function gend_society_render_feature_upgrade_page() {
             .gs-up-back { margin-top: 28px; }
             .gs-up-back a { color: rgba(255,255,255,0.6); text-decoration: none; }
             .gs-up-back a:hover { color: #fff; }
+            .gs-up-info { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 10px; margin: 0 0 22px; color: rgba(255,255,255,0.7); font-size: 0.9rem; }
+            .gs-up-info a, .gs-up-more { color: #9fd0ff; text-decoration: none; font-weight: 700; }
+            .gs-up-info a { padding: 6px 12px; border-radius: 999px; border: 1px solid rgba(78,170,255,0.35); background: rgba(78,170,255,0.1); }
+            .gs-up-info a:hover, .gs-up-info a:focus, .gs-up-more:hover, .gs-up-more:focus { color: #fff; border-color: rgba(78,170,255,0.8); }
+            .gs-up-more { font-size: 0.82rem; }
+            @media (max-width: 700px) {
+                .gs-up-shell { margin: 12px 0; padding: 20px 16px; border-radius: 16px; }
+                .gs-up-shell h1 { font-size: 1.4rem; }
+                .gs-up-grid { grid-template-columns: minmax(0, 1fr); }
+                .gs-up-card { padding: 18px; }
+            }
         </style>
 
         <div class="gs-up-shell">
@@ -189,6 +200,19 @@ function gend_society_render_feature_upgrade_page() {
                 ?>
             </p>
 
+            <?php
+            $gs_up_links = function_exists( 'gend_society_feature_info_links' ) ? gend_society_feature_info_links( '' !== $required_child ? $required_child : $required ) : array();
+            $gs_up_plans = function_exists( 'gend_society_plan_info_urls' ) ? gend_society_plan_info_urls() : array();
+            if ( $gs_up_links ) :
+                ?>
+                <p class="gs-up-info">
+                    <span><?php esc_html_e( 'See what you unlock:', 'gend-society' ); ?></span>
+                    <?php foreach ( $gs_up_links as $gs_up_name => $gs_up_url ) : ?>
+                        <a href="<?php echo esc_url( $gs_up_url ); ?>" target="_blank" rel="noopener"><?php echo esc_html( $gs_up_name ); ?></a>
+                    <?php endforeach; ?>
+                </p>
+            <?php endif; ?>
+
             <div class="gs-up-grid">
                 <?php
                 foreach ( $tiers as $tier ) :
@@ -207,6 +231,9 @@ function gend_society_render_feature_upgrade_page() {
                                 <span><?php echo esc_html( gend_society_feature_area_label( $a ) ); ?></span>
                             <?php endforeach; ?>
                         </div>
+                        <?php if ( ! empty( $gs_up_plans[ $tier['slug'] ] ) ) : ?>
+                            <a class="gs-up-more" href="<?php echo esc_url( $gs_up_plans[ $tier['slug'] ] ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Everything in this plan', 'gend-society' ); ?> &rarr;</a>
+                        <?php endif; ?>
                         <?php if ( $is_current ) : ?>
                             <span class="gs-up-cta is-current-cta">✓ <?php esc_html_e( 'Your current plan', 'gend-society' ); ?></span>
                         <?php else : ?>
@@ -397,6 +424,14 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			$h   .= '<p class="gs-up-state" data-gs-up-copy="upgrade">' . esc_html( sprintf( __( 'Available with %s', 'gend-society' ), $name ) ) . '</p>';
 			/* translators: 1: area name, 2: plan name. */
 			$h   .= '<p>' . esc_html( sprintf( __( '%1$s comes with %2$s and the plans above it. Upgrading installs and switches it on for this site; nothing else needs to move.', 'gend-society' ), $label, $name ) ) . '</p>';
+			$info = function_exists( 'gend_society_feature_info_links' ) ? gend_society_feature_info_links( $area_slug ) : array();
+			if ( $info ) {
+				$h .= '<p class="gs-up-info">' . esc_html__( 'See what you unlock:', 'gend-society' );
+				foreach ( $info as $info_name => $info_url ) {
+					$h .= ' <a href="' . esc_url( $info_url ) . '" target="_blank" rel="noopener">' . esc_html( $info_name ) . '</a>';
+				}
+				$h .= '</p>';
+			}
 			$ups = function_exists( 'gend_society_plan_upgrade_tiers' ) ? gend_society_plan_upgrade_tiers( $vm, is_array( $unlock ) ? $unlock : null ) : array();
 			$h  .= '<p class="gs-up-actions">';
 			foreach ( $ups as $i => $u ) {
