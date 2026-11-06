@@ -95,6 +95,8 @@ return array(
 			'file'  => 'inc/brand-tokens.php',
 			'tier'  => 'core',
 			'needs' => array(),
+			'note'  => 'Brand font roles: --gs-font-heading/body/button/mono from Global Styles (Design Studio Font Types), on the front end, in block editors and in the studio preview, so hand-written page CSS follows the site fonts.',
+		),
 		array(
 			'file'  => 'inc/setup-brand.php',
 			'tier'  => 'core',
@@ -106,8 +108,6 @@ return array(
 			'tier'  => 'core',
 			'needs' => array(),
 			'note'  => 'Keeps gend.me operations on gend.me: hub sub-sites get no network capability, hub-only routes or money jobs.',
-		),
-			'note'  => 'Brand font roles: --gs-font-heading/body/button/mono from Global Styles (Design Studio Font Types), on the front end, in block editors and in the studio preview, so hand-written page CSS follows the site fonts.',
 		),
 		array(
 			'file'  => 'inc/html-visual-edit.php',
