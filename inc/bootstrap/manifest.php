@@ -104,10 +104,28 @@ return array(
 			'note'  => 'The approved style guide on the store pages, store emails and social emails of a site set up through the chat.',
 		),
 		array(
+			'file'  => 'inc/live-widgets.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Live dashboard widgets ([gs_live]): the site\'s own store, projects, proposals and community numbers, animated, in the style guide colours.',
+		),
+		array(
+			'file'  => 'inc/community-home.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'The community home of a web app (Activity) as a designed page: hero with live numbers and a community panel in place of the starter widgets.',
+		),
+		array(
 			'file'  => 'inc/hub-boundary.php',
 			'tier'  => 'core',
 			'needs' => array(),
 			'note'  => 'Keeps gend.me operations on gend.me: hub sub-sites get no network capability, hub-only routes or money jobs.',
+		),
+		array(
+			'file'  => 'inc/app-wording.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'App wording: live app sections (group content endpoint panels) keep a shown-text => new-text list (block attribute gsTexts, Wording panel) applied to their text nodes and placeholders when they render.',
 		),
 		array(
 			'file'  => 'inc/html-visual-edit.php',
@@ -185,12 +203,6 @@ return array(
 			'tier'  => 'updater',
 			'needs' => array( 'standalone' ),
 			'note'  => 'Signed self-updates from updates.gend.me (full build, standalone only). Hub/container are image-managed.',
-		),
-		array(
-			'file'  => 'inc/feature-installer.php',
-			'tier'  => 'updater',
-			'needs' => array( 'standalone' ),
-			'note'  => 'Installs and activates the dashboards a plan includes from signed packages on gend.me (full build, standalone only; never deletes).',
 		),
 		array(
 			'file'  => 'inc/dashboard-overview.php',
@@ -644,6 +656,12 @@ return array(
 			'file'  => 'inc/profile-portfolio-mosaic.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
+		),
+		array(
+			'file'  => 'inc/member-settings-popup.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Designed Settings popup (profile, photo, cover, account, email notifications) on the profile nav gear.',
 		),
 		array(
 			'file'  => 'inc/profile-resume.php',

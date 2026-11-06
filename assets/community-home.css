@@ -1,0 +1,144 @@
+/*
+ * The community home of a web app (inc/community-home.php): the Activity directory as a designed page in the style
+ * guide, on top of community-brand.css. Hero with the live numbers, the feed beside a sidebar panel, a post box that
+ * reads as one card, and posts as cards. Theme presets only, so a dark or light guide both work.
+ */
+html body.gs-brand-site.buddypress {
+  --ch-surface: var(--wp--preset--color--brand-surface, var(--wp--preset--color--base, #fff));
+  --ch-text: var(--wp--preset--color--brand-on-surface, var(--wp--preset--color--contrast, #1d2230));
+  --ch-muted: color-mix(in srgb, var(--ch-text) 62%, transparent);
+  --ch-primary: var(--wp--preset--color--brand-primary, #6a0dad);
+  --ch-secondary: var(--wp--preset--color--brand-secondary, var(--ch-primary));
+  --ch-line: color-mix(in srgb, var(--ch-text) 11%, transparent);
+  --ch-soft: color-mix(in srgb, var(--ch-primary) 9%, var(--ch-surface));
+  --ch-radius: var(--wp--custom--gs--radius, 18px);
+  --ch-shadow: 0 1px 2px color-mix(in srgb, var(--ch-text) 6%, transparent), 0 18px 40px -26px color-mix(in srgb, var(--ch-primary) 55%, transparent);
+}
+
+/* Words take the guide's colours and fonts, not the network's light-on-dark ones. */
+html body.gs-brand-site.buddypress #youzify,
+html body.gs-brand-site.buddypress #youzify .youzify-main-column,
+html body.gs-brand-site.buddypress #youzify .youzify-sidebar-column { color: var(--ch-text) !important; font-family: var(--gs-font-body, inherit) !important; }
+
+/* ---- Hero ---- */
+.gs-ch-hero {
+  position: relative;
+  overflow: hidden;
+  max-width: 1180px;
+  margin: clamp(16px, 3vw, 32px) auto clamp(20px, 3vw, 32px);
+  padding: clamp(28px, 5vw, 56px) clamp(22px, 5vw, 56px);
+  border-radius: calc(var(--ch-radius) + 8px);
+  background: linear-gradient(135deg, var(--ch-primary), color-mix(in srgb, var(--ch-secondary) 70%, var(--ch-primary)));
+  color: #fff;
+  box-shadow: var(--ch-shadow);
+  isolation: isolate;
+}
+.gs-ch-hero__glow {
+  position: absolute;
+  inset: -40%;
+  z-index: -1;
+  background: radial-gradient(40% 40% at 25% 30%, color-mix(in srgb, #fff 28%, transparent), transparent 70%),
+    radial-gradient(35% 35% at 80% 70%, color-mix(in srgb, var(--ch-secondary) 60%, #fff 10%), transparent 70%);
+  filter: blur(10px);
+  animation: gs-ch-drift 18s ease-in-out infinite alternate;
+}
+.gs-ch-hero__body { position: relative; max-width: 760px; }
+.gs-ch-hero__kicker { margin: 0 0 10px; font-size: 0.78rem; font-weight: 700; letter-spacing: 0.16em; text-transform: uppercase; opacity: 0.85; color: #fff !important; }
+html body.gs-brand-site.buddypress .gs-ch-hero h1 { margin: 0; font: 700 clamp(1.9rem, 4.4vw, 3.1rem)/1.08 var(--gs-font-heading, inherit); color: #fff !important; letter-spacing: -0.01em; }
+.gs-ch-hero__lead { margin: 12px 0 0; font-size: clamp(1rem, 1.6vw, 1.15rem); line-height: 1.5; opacity: 0.92; color: #fff !important; }
+.gs-ch-hero__stats { display: flex; flex-wrap: wrap; gap: 10px; margin: 24px 0 0; padding: 0; list-style: none; }
+.gs-ch-hero__stats li { display: flex; align-items: baseline; gap: 8px; padding: 10px 16px; border-radius: 999px; background: color-mix(in srgb, #fff 16%, transparent); border: 1px solid color-mix(in srgb, #fff 26%, transparent); backdrop-filter: blur(8px); animation: gs-ch-rise 0.6s ease both; animation-delay: calc(var(--i, 0) * 90ms + 150ms); }
+.gs-ch-hero__stats b { font: 700 1.25rem/1 var(--gs-font-heading, inherit); color: #fff; font-variant-numeric: tabular-nums; }
+.gs-ch-hero__stats span { font-size: 0.88rem; color: #fff; opacity: 0.88; }
+
+/* Designed sections on community pages (a chat-built top or band) keep their own light-on-dark words. */
+html body.gs-brand-site.buddypress :is(.gs-sec-hero, .gs-sec-band, .gs-sec-cta) :is(h1, h2, h3, h4, p, .gs-eyebrow) { color: inherit !important; }
+
+/* ---- Layout: the feed beside the panel ---- */
+html body.gs-brand-site.buddypress #youzify-bp { max-width: 1180px; margin: 0 auto; padding: 0 clamp(16px, 3vw, 24px) 48px; background: transparent !important; }
+@media (min-width: 1024px) {
+  html body.gs-brand-site.buddypress .youzify-right-sidebar-layout { display: grid !important; grid-template-columns: minmax(0, 1fr) 330px; gap: 28px; align-items: start; }
+  html body.gs-brand-site.buddypress .youzify-right-sidebar-layout > .youzify-main-column,
+  html body.gs-brand-site.buddypress .youzify-right-sidebar-layout > .youzify-sidebar-column { width: auto !important; float: none !important; margin: 0 !important; }
+  html body.gs-brand-site.buddypress .youzify-right-sidebar-layout > .youzify-sidebar-column { position: sticky; top: 96px; }
+}
+
+/* ---- Filter tabs ---- */
+html body.gs-brand-site.buddypress #youzify-wall-nav { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 12px; margin: 0 0 18px; padding: 0 !important; border: 0 !important; background: transparent !important; }
+html body.gs-brand-site.buddypress #youzify-wall-nav .activity-type-tabs ul { display: flex; flex-wrap: wrap; gap: 8px; margin: 0; padding: 0; }
+html body.gs-brand-site.buddypress #youzify-wall-nav .activity-type-tabs li { margin: 0 !important; float: none !important; list-style: none; }
+html body.gs-brand-site.buddypress #youzify-wall-nav .activity-type-tabs li a { display: inline-flex !important; align-items: center; gap: 8px; padding: 9px 16px !important; border-radius: 999px !important; border: 1px solid var(--ch-line) !important; background: var(--ch-surface) !important; color: var(--ch-text) !important; font: 600 0.9rem/1 var(--gs-font-body, inherit) !important; text-transform: none !important; letter-spacing: 0 !important; box-shadow: none !important; transition: border-color 0.2s, color 0.2s, transform 0.2s; }
+html body.gs-brand-site.buddypress #youzify-wall-nav .activity-type-tabs li a:hover { border-color: var(--ch-primary) !important; color: var(--ch-primary) !important; transform: translateY(-1px); }
+html body.gs-brand-site.buddypress #youzify-wall-nav .activity-type-tabs li:is(.selected, .current) a { background: var(--ch-primary) !important; border-color: var(--ch-primary) !important; color: #fff !important; }
+html body.gs-brand-site.buddypress #youzify-wall-nav .activity-type-tabs li a span { min-width: 22px; padding: 2px 7px; border-radius: 999px; background: color-mix(in srgb, currentColor 14%, transparent) !important; color: inherit !important; font-size: 0.75rem; text-align: center; }
+
+/* ---- The post box ---- */
+html body.gs-brand-site.buddypress #youzify-wall-form { margin: 0 0 22px !important; padding: 0 !important; border-radius: var(--ch-radius) !important; border: 1px solid var(--ch-line) !important; background: var(--ch-surface) !important; box-shadow: var(--ch-shadow) !important; overflow: hidden; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-options { display: flex !important; flex-wrap: wrap; gap: 6px; margin: 0 !important; padding: 12px 14px !important; border-bottom: 1px solid var(--ch-line) !important; background: var(--ch-soft) !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-options::-webkit-scrollbar { display: none; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-opts-item { flex: 0 0 auto; width: auto !important; margin: 0 !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-opts-item label { display: inline-flex !important; align-items: center; gap: 7px; height: auto !important; padding: 8px 13px !important; border-radius: 999px !important; border: 1px solid transparent !important; background: transparent !important; color: var(--ch-muted) !important; font: 600 0.85rem/1 var(--gs-font-body, inherit) !important; text-transform: none !important; letter-spacing: 0 !important; box-shadow: none !important; cursor: pointer; transition: background 0.2s, color 0.2s; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-opts-item label i { font-size: 0.95rem; color: var(--ch-primary) !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-opts-item label:hover { background: var(--ch-surface) !important; color: var(--ch-text) !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-opts-item input:checked + label { background: var(--ch-surface) !important; border-color: var(--ch-line) !important; color: var(--ch-text) !important; box-shadow: 0 2px 8px -4px color-mix(in srgb, var(--ch-primary) 60%, transparent) !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form #whats-new-content { display: flex; gap: 14px; margin: 0 !important; padding: 18px 18px 8px !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-author { position: static !important; flex: 0 0 48px; margin: 0 !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form #whats-new-content textarea#whats-new { margin: 0 !important; text-indent: 0 !important; padding-left: 0 !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-author img { width: 48px !important; height: 48px !important; border-radius: 50% !important; box-shadow: 0 0 0 3px var(--ch-soft); }
+html body.gs-brand-site.buddypress #youzify-wall-form textarea#whats-new { flex: 1; min-height: 72px; padding: 10px 0 !important; border: 0 !important; background: transparent !important; color: var(--ch-text) !important; font: 400 1.05rem/1.5 var(--gs-font-body, inherit) !important; box-shadow: none !important; resize: vertical; }
+html body.gs-brand-site.buddypress #youzify-wall-form textarea#whats-new::placeholder { color: var(--ch-muted); }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; padding: 12px 18px 16px !important; border-top: 1px solid var(--ch-line) !important; background: transparent !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-actions select,
+html body.gs-brand-site.buddypress #youzify-wall-form .youzify-wall-actions .nice-select { border-radius: 999px !important; border: 1px solid var(--ch-line) !important; background: var(--ch-surface) !important; color: var(--ch-text) !important; }
+html body.gs-brand-site.buddypress #youzify-wall-form :is(.youzify-wall-post, #aw-whats-new-submit, button[type=submit]) { padding: 11px 26px !important; border-radius: 999px !important; border: 0 !important; background: linear-gradient(135deg, var(--ch-primary), color-mix(in srgb, var(--ch-secondary) 70%, var(--ch-primary))) !important; color: #fff !important; font: 700 0.92rem/1 var(--gs-font-button, var(--gs-font-body, inherit)) !important; letter-spacing: 0.02em; box-shadow: 0 8px 20px -10px var(--ch-primary) !important; transition: transform 0.2s, box-shadow 0.2s; }
+html body.gs-brand-site.buddypress #youzify-wall-form :is(.youzify-wall-post, #aw-whats-new-submit, button[type=submit]):hover { transform: translateY(-1px); box-shadow: 0 12px 26px -12px var(--ch-primary) !important; }
+
+/* ---- Posts ---- */
+html body.gs-brand-site.buddypress #youzify .activity-list { display: grid; gap: 16px; margin: 0; padding: 0; }
+html body.gs-brand-site.buddypress #youzify .activity-list > li { margin: 0 !important; padding: 18px 20px !important; border-radius: var(--ch-radius) !important; border: 1px solid var(--ch-line) !important; background: var(--ch-surface) !important; box-shadow: var(--ch-shadow) !important; animation: gs-ch-rise 0.5s ease both; transition: transform 0.2s, border-color 0.2s; }
+html body.gs-brand-site.buddypress #youzify .activity-list > li:hover { transform: translateY(-2px); border-color: color-mix(in srgb, var(--ch-primary) 40%, var(--ch-line)) !important; }
+html body.gs-brand-site.buddypress #youzify .activity-list .activity-avatar img { border-radius: 50% !important; }
+html body.gs-brand-site.buddypress #youzify .activity-list :is(.activity-header, .youzify-post-head) { color: var(--ch-muted) !important; }
+html body.gs-brand-site.buddypress #youzify .activity-list :is(.activity-inner, .youzify-post-inner) { color: var(--ch-text) !important; font-size: 1rem; line-height: 1.6; }
+
+/* Nothing yet. */
+html body.gs-brand-site.buddypress #youzify #message.info { margin: 0; padding: clamp(28px, 5vw, 48px) 24px !important; border-radius: var(--ch-radius) !important; border: 1px dashed color-mix(in srgb, var(--ch-primary) 35%, var(--ch-line)) !important; background: var(--ch-soft) !important; text-align: center; }
+html body.gs-brand-site.buddypress #youzify #message.info p { margin: 0 !important; padding: 0 !important; border: 0 !important; background: transparent !important; color: var(--ch-muted) !important; font: 500 1rem/1.5 var(--gs-font-body, inherit) !important; }
+html body.gs-brand-site.buddypress #youzify #message.info p::before { content: ""; display: block; width: 46px; height: 46px; margin: 0 auto 14px; background: linear-gradient(135deg, var(--ch-primary), var(--ch-secondary)); -webkit-mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") center/contain no-repeat; mask: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M4 3h16a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1H8l-4 4V4a1 1 0 0 1 1-1z'/%3E%3C/svg%3E") center/contain no-repeat; }
+
+/* ---- Sidebar panel ---- */
+html body.gs-brand-site.buddypress .youzify-sidebar-column .widget { margin: 0 0 16px !important; padding: 0 !important; border: 0 !important; background: transparent !important; box-shadow: none !important; }
+.gs-ch-panel { display: grid; gap: 16px; }
+.gs-ch-card { padding: 18px; border-radius: var(--ch-radius); border: 1px solid var(--ch-line); background: var(--ch-surface); box-shadow: var(--ch-shadow); color: var(--ch-text); animation: gs-ch-rise 0.5s ease both; }
+html body.gs-brand-site.buddypress .gs-ch-card h3 { margin: 0 0 12px; font: 700 0.8rem/1.2 var(--gs-font-body, inherit) !important; letter-spacing: 0.12em; text-transform: uppercase; color: var(--ch-muted) !important; }
+.gs-ch-me { display: grid; grid-template-columns: 64px 1fr; gap: 12px 14px; align-items: center; background: linear-gradient(160deg, var(--ch-soft), var(--ch-surface) 70%); }
+.gs-ch-me img { width: 64px; height: 64px; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 3px var(--ch-surface), 0 0 0 5px color-mix(in srgb, var(--ch-primary) 45%, transparent); }
+.gs-ch-me b { display: block; font: 700 1.05rem/1.2 var(--gs-font-heading, inherit); }
+.gs-ch-me span { font-size: 0.85rem; color: var(--ch-muted); }
+.gs-ch-me .gs-ch-btn { grid-column: 1 / -1; text-align: center; }
+html body.gs-brand-site.buddypress .gs-ch-btn { display: inline-block; padding: 10px 18px; border-radius: 999px; background: var(--ch-primary); color: #fff !important; font: 700 0.88rem/1 var(--gs-font-button, var(--gs-font-body, inherit)); text-decoration: none; transition: transform 0.2s, box-shadow 0.2s; }
+html body.gs-brand-site.buddypress .gs-ch-btn:hover { transform: translateY(-1px); box-shadow: 0 10px 22px -12px var(--ch-primary); }
+html body.gs-brand-site.buddypress .gs-ch-link { margin-left: 10px; color: var(--ch-primary) !important; font-weight: 600; }
+.gs-ch-join b { display: block; font: 700 1.1rem/1.25 var(--gs-font-heading, inherit); }
+.gs-ch-join p { margin: 6px 0 14px; color: var(--ch-muted); }
+.gs-ch-faces { display: grid; grid-template-columns: repeat(auto-fill, minmax(44px, 1fr)); gap: 8px; margin: 0; padding: 0; list-style: none; }
+.gs-ch-faces li { animation: gs-ch-pop 0.45s ease both; animation-delay: calc(var(--i, 0) * 50ms); }
+.gs-ch-faces img { display: block; width: 100%; aspect-ratio: 1; border-radius: 50%; object-fit: cover; box-shadow: 0 0 0 2px var(--ch-surface), 0 0 0 3px var(--ch-line); transition: transform 0.2s, box-shadow 0.2s; }
+.gs-ch-faces a:hover img { transform: scale(1.08); box-shadow: 0 0 0 2px var(--ch-surface), 0 0 0 4px var(--ch-primary); }
+.gs-ch-groups { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+html body.gs-brand-site.buddypress .gs-ch-groups a { display: flex; align-items: center; gap: 12px; padding: 8px; border-radius: 12px; color: var(--ch-text) !important; text-decoration: none; transition: background 0.2s; }
+.gs-ch-groups a:hover { background: var(--ch-soft); }
+.gs-ch-groups img { width: 40px; height: 40px; border-radius: 12px; object-fit: cover; }
+.gs-ch-groups b { display: block; font-weight: 600; }
+.gs-ch-groups em { font-style: normal; font-size: 0.82rem; color: var(--ch-muted); }
+
+@keyframes gs-ch-rise { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: none; } }
+@keyframes gs-ch-pop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: none; } }
+@keyframes gs-ch-drift { from { transform: translate3d(-4%, -2%, 0) rotate(0deg); } to { transform: translate3d(4%, 3%, 0) rotate(8deg); } }
+@media (prefers-reduced-motion: reduce) {
+  .gs-ch-hero__glow, .gs-ch-hero__stats li, .gs-ch-card, .gs-ch-faces li, html body.gs-brand-site.buddypress #youzify .activity-list > li { animation: none !important; }
+}
+@media (max-width: 640px) {
+  .gs-ch-hero { margin-left: 12px; margin-right: 12px; }
+  html body.gs-brand-site.buddypress #youzify-wall-form #whats-new-content { padding: 14px 14px 6px !important; }
+}
