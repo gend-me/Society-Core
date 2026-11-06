@@ -44,7 +44,7 @@ function gend_society_chat_tools_ajax( string $action, array $post = array(), st
 	add_filter( 'wp_die_ajax_handler', $stop, 999 );
 	ob_start();
 	try {
-		do_action( 'wp_ajax_' . $action );
+		do_action( 'wp_ajax_' . $action ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- runs the feature's own handler.
 	} catch ( Gend_Society_Chat_Tools_Stop $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
 		// The handler finished through wp_send_json or wp_die.
 	} finally {
