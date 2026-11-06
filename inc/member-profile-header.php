@@ -228,8 +228,9 @@ function gend_society_topup_embed_trim_assets() {
 add_filter( 'woocommerce_available_payment_gateways', 'gend_society_dedupe_hub_payment_gateways', 100 );
 function gend_society_dedupe_hub_payment_gateways( $gateways ) {
     if ( ! is_array( $gateways ) ) return $gateways;
+    // Sub-sites run on the hub's server, but the bridge gateways are the only way they take payments.
     $is_hub = gend_society_is_hub();
-    if ( ! $is_hub ) return $gateways;
+    if ( ! $is_hub || ! is_main_site() ) return $gateways;
     // Container "bridge" gateways (redundant on the hub) + gend_dgen_hub: DGEN is
     // applied via the C&P wallet panel ("Apply your DGEN and/or store credit") that
     // renders above the gateways, so a separate "Pay with DGEN" gateway radio just
@@ -451,6 +452,7 @@ function gend_society_get_profile_nav_icon( $slug ) {
         'notification'      => 'notifications',
         'notify'            => 'notifications',
         'member-calendar'   => 'calendar',
+        'ov-media'          => 'files',
     ];
     if ( isset( $alias[ $key ] ) ) $key = $alias[ $key ];
 
@@ -495,6 +497,10 @@ function gend_society_get_profile_nav_icon( $slug ) {
         'invest'        => '<rect x="5" y="3" width="14" height="18" rx="2"/><line x1="8.5" y1="8" x2="15.5" y2="8"/><line x1="8.5" y1="12" x2="15.5" y2="12"/><line x1="8.5" y1="16" x2="13" y2="16"/>',
         // Connections (alias to friends visual, kept explicit for clarity)
         'connections'   => '<circle cx="6" cy="6" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="12" cy="18" r="2.5"/><line x1="8" y1="7.5" x2="11" y2="15.5"/><line x1="16" y1="7.5" x2="13" y2="15.5"/><line x1="8.5" y1="6" x2="15.5" y2="6"/>',
+        // Visitor tabs on another member's profile (the Overview sub-tabs; Portfolio = ov-media via the alias above)
+        'ov-cover'      => '<rect x="3" y="4" width="18" height="16" rx="2"/><circle cx="9" cy="10" r="2"/><path d="m21 16-5-5-9 9"/>',
+        'ov-resume'     => '<path d="M14 3H7a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h10a2 2 0 0 0 2-2V8z"/><path d="M14 3v5h5"/><path d="M9 13h6M9 17h4"/>',
+        'ov-social'     => '<circle cx="18" cy="5" r="2.5"/><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="19" r="2.5"/><path d="m8.2 10.8 7.6-4.6M8.2 13.2l7.6 4.6"/>',
     ];
 
     $body = isset( $icons[ $key ] )
@@ -511,7 +517,8 @@ function gend_society_get_profile_nav_icon( $slug ) {
 // `visitors`. We hide it from our primary nav (above) and add an equivalent
 // subnav entry under friends. The `link` parameter points the subnav directly
 // at the existing /visitors/ URL so the underlying screen function still runs.
-add_action( 'bp_setup_nav', 'gend_society_visitors_to_friends_subnav', 999 );
+// Removed 2026-11-06: the who-viewed add-on behind /visitors/ was removed 2026-10-28, so the tab opened a 404.
+// add_action( 'bp_setup_nav', 'gend_society_visitors_to_friends_subnav', 999 );
 function gend_society_visitors_to_friends_subnav() {
     if ( ! function_exists( 'bp_core_new_subnav_item' ) ) return;
     if ( ! function_exists( 'bp_is_active' ) || ! bp_is_active( 'friends' ) ) return;
@@ -802,6 +809,86 @@ function gend_society_gas_unpaid_orders( $user_id ) {
  * tracking as the monthly run; no invoice email, the member is paying now).
  */
 add_action( 'wp_ajax_gend_society_gas_pay_now', 'gend_society_gas_pay_now' );
+
+/**
+ * Boot veil: the member profile stays hidden for the first moments of a page load and fades in once the page is styled,
+ * instead of showing half-built panels, unstyled text and images popping in. Pure-CSS failsafe: it is visible after 3.2 s
+ * whatever the script does. Popups and embedded tab frames (?gdc_tab_only) are not veiled.
+ */
+add_action( 'wp_head', function () {
+    if ( ! function_exists( 'bp_is_user' ) || ! bp_is_user() || ! empty( $_GET['gdc_tab_only'] ) ) return;
+    ?>
+    <style id="gdc-boot-veil">
+        html:not(.gdc-ready) body.bp-user #youzify { opacity: 0; animation: gdcVeilFailsafe .01s linear 3.2s forwards; }
+        body.bp-user #youzify { transition: opacity .5s cubic-bezier(.22,1,.36,1); }
+        html.gdc-ready body.bp-user #youzify { opacity: 1; }
+        @keyframes gdcVeilFailsafe { to { opacity: 1; } }
+        html:not(.gdc-ready) body.bp-user::before { content: ""; position: fixed; z-index: 99998; top: 50%; left: 50%; width: 38px; height: 38px; margin: -19px 0 0 -19px; border-radius: 50%; border: 3px solid rgba(255,255,255,.1); border-top-color: #b608c9; animation: gdcPjaxSpin .8s linear infinite, gdcVeilFailsafeHide .01s linear 3.2s forwards; pointer-events: none; }
+        @keyframes gdcVeilFailsafeHide { to { opacity: 0; } }
+        @media (prefers-reduced-motion: reduce) { body.bp-user #youzify { transition: none; } }
+    </style>
+    <script>
+    (function () {
+        var d = document.documentElement, done = false;
+        function fin() { if (done) return; done = true; requestAnimationFrame(function () { requestAnimationFrame(function () { d.classList.add('gdc-ready'); }); }); }
+        document.addEventListener('DOMContentLoaded', function () {
+            var f = document.fonts && document.fonts.ready;
+            if (f && f.then) f.then(fin, fin); else fin();
+        });
+        setTimeout(fin, 2500);
+    })();
+    </script>
+    <?php
+}, 1 );
+
+/** Live unread-notification count for the profile nav bell (own profile only: it is the logged-in user's own count). */
+/** Connect button label for a BuddyPress friendship status (viewer -> displayed member). */
+function gend_society_connect_label( $status ) {
+    switch ( $status ) {
+        case 'is_friend':         return __( 'Connected', 'gend-society' );
+        case 'pending':           return __( 'Requested', 'gend-society' );
+        case 'awaiting_response': return __( 'Accept', 'gend-society' );
+        default:                  return __( '+ Connect', 'gend-society' );
+    }
+}
+
+// Profile header Connect button: not connected -> send a request, own pending request -> cancel it,
+// their request -> accept it. Connected stays as is (removing a connection lives on the Connections screen).
+add_action( 'wp_ajax_gend_society_profile_connect', function () {
+    check_ajax_referer( 'gs_profile_connect', 'nonce' );
+    $me     = get_current_user_id();
+    $target = isset( $_POST['user_id'] ) ? absint( $_POST['user_id'] ) : 0;
+    if ( ! $me || ! $target || $target === $me || ! get_userdata( $target ) ) {
+        wp_send_json_error( array( 'message' => __( 'That member could not be found.', 'gend-society' ) ), 400 );
+    }
+    if ( ! function_exists( 'bp_is_active' ) || ! bp_is_active( 'friends' ) || ! function_exists( 'friends_check_friendship_status' ) ) {
+        wp_send_json_error( array( 'message' => __( 'Connections are turned off.', 'gend-society' ) ), 400 );
+    }
+    $status = (string) friends_check_friendship_status( $me, $target );
+    $next   = $status;
+    $ok     = true;
+    if ( 'not_friends' === $status ) {
+        $ok   = (bool) friends_add_friend( $me, $target );
+        $next = 'pending';
+    } elseif ( 'pending' === $status ) {
+        $ok   = (bool) friends_withdraw_friendship( $me, $target );
+        $next = 'not_friends';
+    } elseif ( 'awaiting_response' === $status ) {
+        $ok   = (bool) friends_accept_friendship( friends_get_friendship_id( $target, $me ) );
+        $next = 'is_friend';
+    }
+    if ( ! $ok ) {
+        wp_send_json_error( array( 'message' => __( 'That did not work. Please try again.', 'gend-society' ) ), 500 );
+    }
+    wp_send_json_success( array( 'status' => $next, 'label' => gend_society_connect_label( $next ) ) );
+} );
+
+add_action( 'wp_ajax_gend_society_notif_count', function () {
+    check_ajax_referer( 'gdc_notif_count', 'nonce' );
+    $uid   = get_current_user_id();
+    $count = ( $uid && function_exists( 'bp_notifications_get_unread_notification_count' ) ) ? (int) bp_notifications_get_unread_notification_count( $uid ) : 0;
+    wp_send_json_success( array( 'count' => $count ) );
+} );
 function gend_society_gas_pay_now() {
     check_ajax_referer( 'gend_society_gas_pay' );
     $group_id = isset( $_POST['group_id'] ) ? absint( $_POST['group_id'] ) : 0;
@@ -1087,6 +1174,30 @@ function gend_society_profile_header_nav_items( $user_id ) {
         return ! in_array( isset( $it->slug ) ? $it->slug : '', array( 'member-calendar', 'friends' ), true );
     } ) );
 
+    // ── Another member's profile: the Overview sub-tabs (Cover, Resume, Social, Portfolio) ARE the menu
+    // (user decision 2026-11-06). Each link opens that sub-tab on the Overview page; on the Overview page itself
+    // gend_society_overview_tabs_assets() switches the panel in place. Slugs ov-<sub-tab key>.
+    if ( ! bp_is_my_profile() ) {
+        $gs_ov_url = trailingslashit( bp_displayed_user_domain() );
+        foreach ( $nav_items as $it ) {
+            if ( isset( $it->slug ) && 'overview' === $it->slug && ! empty( $it->link ) ) { $gs_ov_url = $it->link; break; }
+        }
+        $gs_ov_tabs = array(
+            'cover'  => __( 'Cover', 'gend-society' ),
+            'resume' => __( 'Resume', 'gend-society' ),
+            'social' => __( 'Social', 'gend-society' ),
+            'media'  => __( 'Portfolio', 'gend-society' ),
+        );
+        $nav_items = array();
+        foreach ( $gs_ov_tabs as $gs_ov_key => $gs_ov_label ) {
+            $nav_items[] = (object) array(
+                'name' => $gs_ov_label,
+                'slug' => 'ov-' . $gs_ov_key,
+                'link' => $gs_ov_url . '#' . ( 'media' === $gs_ov_key ? 'portfolio' : $gs_ov_key ),
+            );
+        }
+    }
+
     // Profile Styling (inc/profile-styling.php): saved labels, order and hidden tabs.
     $nav_items = (array) apply_filters( 'gend_society_profile_nav_items', $nav_items, $user_id );
 
@@ -1144,7 +1255,8 @@ function gend_society_render_profile_header() {
     // left-to-right).
     $balances = apply_filters( 'gend_society_profile_header_balances', [
         [
-            'label'       => '🇨🇦 DGEN Coins',
+            'label'       => 'DGEN Coins',
+            'flag'        => 'CAD',
             'value'       => number_format( $dgen_balance ),
             'color'       => 'var(--gph-green)',
             'stagger'     => 2,
@@ -1167,7 +1279,8 @@ function gend_society_render_profile_header() {
             'topup_label' => 'Retainers',
         ],
         [
-            'label'       => '🇨🇦 Store Credits',
+            'label'       => 'Store Credits',
+            'flag'        => 'CAD',
             'value'       => '$' . number_format( $store_credits, 2 ),
             'color'       => 'var(--gph-red)',
             'stagger'     => 5,
@@ -1276,9 +1389,9 @@ function gend_society_render_profile_header() {
         : null;
 
     // ── Action buttons ────────────────────────────────────────────────────────
-    $msg_url     = '';
-    $friend_text = '';
-    $friend_url  = '';
+    $msg_url       = '';
+    $friend_text   = '';
+    $friend_status = '';
     if ( ! $is_own_profile && $current_id > 0 ) {
         if ( bp_is_active( 'messages' ) ) {
             $msg_url = bp_loggedin_user_domain()
@@ -1286,10 +1399,8 @@ function gend_society_render_profile_header() {
                 . '/compose/?r=' . bp_get_displayed_user_username();
         }
         if ( bp_is_active( 'friends' ) && function_exists( 'friends_check_friendship_status' ) ) {
-            $status      = friends_check_friendship_status( $current_id, $user_id );
-            $friend_url  = bp_displayed_user_domain();
-            $friend_text = ( 'is_friend' === $status ) ? 'Connected'
-                         : ( ( 'pending' === $status ) ? 'Pending' : '+ Connect' );
+            $friend_status = (string) friends_check_friendship_status( $current_id, $user_id );
+            $friend_text   = gend_society_connect_label( $friend_status );
         }
     }
 
@@ -1300,7 +1411,10 @@ function gend_society_render_profile_header() {
     // iframe via the existing ?gdc_tab_only=1 mechanism.
     $gdc_settings_popup_url = '';
     if ( $is_own_profile && function_exists( 'bp_get_settings_slug' ) ) {
-        $gdc_settings_popup_url = add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . bp_get_settings_slug() ) );
+        $gdc_settings_popup_args = array( 'gdc_tab_only' => '1' );
+        // inc/member-settings-popup.php serves the designed settings page for ?gdc_set; without it the plain BuddyPress screens load.
+        if ( function_exists( 'gend_society_settings_ui_active' ) ) $gdc_settings_popup_args['gdc_set'] = '1';
+        $gdc_settings_popup_url = add_query_arg( $gdc_settings_popup_args, trailingslashit( bp_displayed_user_domain() . bp_get_settings_slug() ) );
     }
 
     $current_component = bp_current_component();
@@ -1345,52 +1459,7 @@ function gend_society_render_profile_header() {
                             <span class="gdc-avatar-edit-overlay" aria-hidden="true">
                                 <svg viewBox="0 0 24 24" width="20" height="20" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M23 19a2 2 0 0 1-2 2H3a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h4l2-3h6l2 3h4a2 2 0 0 1 2 2z"></path><circle cx="12" cy="13" r="4"></circle></svg>
                             </span>
-                            <?php if ( ! empty( $gdc_settings_popup_url ) ) : ?>
-                            <span id="gdc-avatar-settings-btn" class="gdc-avatar-settings-overlay" role="button" tabindex="0"
-                                  title="<?php esc_attr_e( 'Profile settings', 'gend-society' ); ?>"
-                                  data-settings-url="<?php echo esc_attr( $gdc_settings_popup_url ); ?>">
-                                <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg>
-                            </span>
-                            <?php endif; ?>
                         </button>
-                        <?php if ( ! empty( $gdc_settings_popup_url ) ) : ?>
-                        <script>
-                        (function () {
-                            var gear = document.getElementById('gdc-avatar-settings-btn');
-                            if (!gear || gear.dataset.gdcBound === '1') return;
-                            gear.dataset.gdcBound = '1';
-                            function openSettings(ev) {
-                                // Do NOT bubble to the avatar button (which opens
-                                // the change-photo popup).
-                                ev.preventDefault();
-                                ev.stopPropagation();
-                                var existing = document.getElementById('gdc-profile-settings-overlay');
-                                if (existing) { existing.remove(); }
-                                var overlay = document.createElement('div');
-                                overlay.id = 'gdc-profile-settings-overlay';
-                                overlay.style.cssText = 'position:fixed;inset:0;z-index:2147483600;display:flex;align-items:center;justify-content:center;padding:20px;background:rgba(2,8,23,.85);backdrop-filter:blur(6px);';
-                                overlay.addEventListener('click', function (e) { if (e.target === overlay) overlay.remove(); });
-                                var dialog = document.createElement('div');
-                                dialog.style.cssText = 'position:relative;width:min(1100px,100%);height:min(90vh,900px);background:#0a1019;border-radius:20px;overflow:hidden;box-shadow:0 60px 160px rgba(0,0,0,.6),0 0 0 1px rgba(148,163,184,.2);display:flex;flex-direction:column;';
-                                var closeBtn = document.createElement('button');
-                                closeBtn.type = 'button';
-                                closeBtn.textContent = '×';
-                                closeBtn.style.cssText = 'position:absolute;top:14px;right:14px;background:rgba(15,23,42,.85);color:#f1f5f9;border:1px solid rgba(148,163,184,.3);width:34px;height:34px;border-radius:999px;cursor:pointer;font-size:20px;line-height:1;z-index:2;';
-                                closeBtn.addEventListener('click', function () { overlay.remove(); });
-                                dialog.appendChild(closeBtn);
-                                var iframe = document.createElement('iframe');
-                                iframe.src = gear.getAttribute('data-settings-url') || '';
-                                iframe.setAttribute('title', 'Profile settings');
-                                iframe.style.cssText = 'border:0;width:100%;flex:1;background:#0a1019;';
-                                dialog.appendChild(iframe);
-                                overlay.appendChild(dialog);
-                                document.body.appendChild(overlay);
-                            }
-                            gear.addEventListener('click', openSettings);
-                            gear.addEventListener('keydown', function (e) { if (e.key === 'Enter' || e.key === ' ') { openSettings(e); } });
-                        })();
-                        </script>
-                        <?php endif; ?>
                         <?php else : ?>
                         <img src="<?php echo esc_url( $avatar_url ); ?>"
                              alt="<?php echo esc_attr( $display_name ); ?>"
@@ -1406,12 +1475,48 @@ function gend_society_render_profile_header() {
                         ?>
                         <div id="gs-profile-actions" class="gdc-identity-actions">
                             <?php if ( $msg_url ) : ?>
-                            <a href="<?php echo esc_url( $msg_url ); ?>" class="gdc-action-btn">Message</a>
+                            <a href="<?php echo esc_url( $msg_url ); ?>" class="gdc-action-btn" data-gs-chat-user="<?php echo (int) $user_id; ?>" data-user-name="<?php echo esc_attr( $display_name ); ?>" data-user-avatar="<?php echo esc_url( $avatar_url ); ?>">Message</a>
                             <?php endif; ?>
                             <?php if ( $friend_text ) : ?>
-                            <a href="<?php echo esc_url( $friend_url ); ?>" class="gdc-action-btn gdc-action-btn--connect"><?php echo esc_html( $friend_text ); ?></a>
+                            <button type="button" class="gdc-action-btn gdc-action-btn--connect" data-gs-connect="<?php echo (int) $user_id; ?>" data-status="<?php echo esc_attr( $friend_status ); ?>"><?php echo esc_html( $friend_text ); ?></button>
                             <?php endif; ?>
                         </div>
+                        <?php if ( $msg_url || $friend_text ) : ?>
+                        <script>
+                        /* Message -> chat widget thread with this member; Connect -> send / cancel / accept a connection request. */
+                        (function () {
+                            if (window.__gsProfileActionsBound) return;
+                            window.__gsProfileActionsBound = true;
+                            var ajax  = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+                            var nonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_profile_connect' ) ); ?>;
+                            document.addEventListener('click', function (ev) {
+                                var m = ev.target.closest && ev.target.closest('[data-gs-chat-user]');
+                                if (m && typeof window.emChatOpenUser === 'function') {
+                                    ev.preventDefault();
+                                    window.emChatOpenUser({ user_id: parseInt(m.getAttribute('data-gs-chat-user'), 10) || 0, display_name: m.getAttribute('data-user-name') || '', avatar_url: m.getAttribute('data-user-avatar') || '' });
+                                    return;
+                                }
+                                var b = ev.target.closest && ev.target.closest('[data-gs-connect]');
+                                if (!b || b.disabled) return;
+                                ev.preventDefault();
+                                var st = b.getAttribute('data-status');
+                                if (st === 'is_friend') return;
+                                if (st === 'pending' && !window.confirm(<?php echo wp_json_encode( __( 'Cancel your connection request?', 'gend-society' ) ); ?>)) return;
+                                var was = b.textContent;
+                                b.disabled = true; b.classList.add('is-busy');
+                                var fd = new FormData();
+                                fd.append('action', 'gend_society_profile_connect'); fd.append('nonce', nonce); fd.append('user_id', b.getAttribute('data-gs-connect'));
+                                fetch(ajax, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+                                    if (!j || !j.success) throw new Error((j && j.data && j.data.message) || '');
+                                    b.setAttribute('data-status', j.data.status); b.textContent = j.data.label;
+                                }).catch(function (e) {
+                                    b.textContent = was;
+                                    window.alert(e.message || <?php echo wp_json_encode( __( 'That did not work. Please try again.', 'gend-society' ) ); ?>);
+                                }).then(function () { b.disabled = false; b.classList.remove('is-busy'); });
+                            });
+                        })();
+                        </script>
+                        <?php endif; ?>
                     </div>
                 </div>
             </div>
@@ -1845,7 +1950,7 @@ function gend_society_render_profile_header() {
                     <div class="gdc-kbx gdc-stagger-<?php echo (int) $b['stagger']; ?>"
                          style="--kbx-color: <?php echo esc_attr( $b['color'] ); ?>">
                         <div class="gdc-node-content">
-                            <div class="gdc-node-label"><?php echo esc_html( $b['label'] ); ?></div>
+                            <div class="gdc-node-label"><?php echo esc_html( $b['label'] ); if ( ! empty( $b['flag'] ) && class_exists( 'Gend_CP_Price_Oracle' ) ) echo Gend_CP_Price_Oracle::flag_html( $b['flag'] ); // phpcs:ignore WordPress.Security.EscapeOutput ?></div>
                             <div class="gdc-node-value" style="color: <?php echo esc_attr( $b['color'] ); ?>">
                                 <?php echo esc_html( $b['value'] ); ?>
                             </div>
@@ -1884,20 +1989,140 @@ function gend_society_render_profile_header() {
         <nav class="gdc-profile-nav" id="gdc-profile-nav" aria-label="Profile navigation">
             <div class="gdc-profile-nav-inner">
                 <?php foreach ( $nav_items as $i => $item ) :
-                    $is_active = ( $current_component === $item->slug );
+                    // Visitor tabs (ov-*) open an Overview sub-tab; Cover is the one showing when the Overview loads.
+                    $gs_ov     = ( 0 === strpos( (string) $item->slug, 'ov-' ) ) ? substr( $item->slug, 3 ) : '';
+                    $is_active = $gs_ov ? ( 'overview' === $current_component && 'cover' === $gs_ov ) : ( $current_component === $item->slug );
                 ?>
-                <a href="<?php echo esc_url( $item->link ); ?>"
+                <a href="<?php echo esc_url( $item->link ); ?>"<?php echo $gs_ov ? ' data-gs-ov="' . esc_attr( $gs_ov ) . '"' : ''; ?>
                    class="gdc-nav-item gdc-nav-item--<?php echo sanitize_html_class( $item->slug ); ?><?php echo $is_active ? ' gdc-nav-item--active' : ''; ?>"
                    style="--gdc-nav-i: <?php echo (int) $i; ?>">
                     <span class="gdc-nav-icon" aria-hidden="true"><?php echo gend_society_get_profile_nav_icon( $item->slug ); ?></span>
                     <span class="gdc-nav-text"><?php echo wp_kses( $item->name, [ 'span' => [ 'class' => true ] ] ); ?></span>
                 </a>
                 <?php endforeach; ?>
+                <?php if ( $is_own_profile ) :
+                    $gdc_notif_url   = ( function_exists( 'bp_is_active' ) && bp_is_active( 'notifications' ) && function_exists( 'bp_get_notifications_slug' ) )
+                        ? add_query_arg( 'gdc_tab_only', '1', trailingslashit( bp_displayed_user_domain() . bp_get_notifications_slug() ) ) : '';
+                    $gdc_notif_count = ( $gdc_notif_url && function_exists( 'bp_notifications_get_unread_notification_count' ) )
+                        ? (int) bp_notifications_get_unread_notification_count( $user_id ) : 0;
+                    $gdc_tool_i      = count( $nav_items );
+                ?>
+                <?php if ( $gdc_notif_url ) : ?>
+                <button type="button" class="gdc-nav-item gdc-nav-tool gdc-nav-tool--notifications" id="gdc-nav-notifications"
+                        data-popup-url="<?php echo esc_attr( $gdc_notif_url ); ?>" data-popup-title="<?php esc_attr_e( 'Notifications', 'gend-society' ); ?>"
+                        title="<?php esc_attr_e( 'Notifications', 'gend-society' ); ?>" aria-label="<?php esc_attr_e( 'Notifications', 'gend-society' ); ?>"
+                        style="--gdc-nav-i: <?php echo (int) $gdc_tool_i; ?>">
+                    <span class="gdc-nav-icon" aria-hidden="true"><?php echo gend_society_get_profile_nav_icon( 'notifications' ); ?><span class="gdc-nav-badge" id="gdc-nav-notif-count" data-count="<?php echo (int) $gdc_notif_count; ?>" <?php echo $gdc_notif_count ? '' : 'hidden'; ?>><?php echo $gdc_notif_count > 99 ? '99+' : (int) $gdc_notif_count; ?></span></span>
+                    <span class="gdc-nav-text"><?php esc_html_e( 'Alerts', 'gend-society' ); ?></span>
+                </button>
+                <?php endif; ?>
+                <?php if ( ! empty( $gdc_settings_popup_url ) ) : ?>
+                <button type="button" class="gdc-nav-item gdc-nav-tool gdc-nav-tool--settings" id="gdc-nav-settings"
+                        data-popup-url="<?php echo esc_attr( $gdc_settings_popup_url ); ?>" data-popup-title="<?php esc_attr_e( 'Profile settings', 'gend-society' ); ?>"
+                        title="<?php esc_attr_e( 'Settings', 'gend-society' ); ?>" aria-label="<?php esc_attr_e( 'Settings', 'gend-society' ); ?>"
+                        style="--gdc-nav-i: <?php echo (int) $gdc_tool_i + 1; ?>">
+                    <span class="gdc-nav-icon" aria-hidden="true"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"></circle><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09a1.65 1.65 0 0 0-1-1.51 1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09a1.65 1.65 0 0 0 1.51-1 1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33h0a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51h0a1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82v0a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"></path></svg></span>
+                    <span class="gdc-nav-text"><?php esc_html_e( 'Settings', 'gend-society' ); ?></span>
+                </button>
+                <?php endif; ?>
+                <?php endif; ?>
             </div>
         </nav>
         <?php endif; ?>
 
     </section>
+
+    <?php if ( $is_own_profile ) : ?>
+    <script>
+    /* Settings + Notifications popups (nav tools) and the live notification counter. */
+    (function () {
+        if (window.gdcNavToolsBound) return;
+        window.gdcNavToolsBound = true;
+        var ajax = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+        var nonce = <?php echo wp_json_encode( wp_create_nonce( 'gdc_notif_count' ) ); ?>;
+
+        function setCount(n) {
+            var b = document.getElementById('gdc-nav-notif-count');
+            if (!b) return;
+            n = parseInt(n, 10) || 0;
+            b.dataset.count = n;
+            b.textContent = n > 99 ? '99+' : n;
+            b.hidden = n < 1;
+        }
+        function refreshCount() {
+            if (document.hidden || !document.getElementById('gdc-nav-notif-count')) return;
+            var fd = new FormData();
+            fd.append('action', 'gend_society_notif_count');
+            fd.append('nonce', nonce);
+            fetch(ajax, { method: 'POST', body: fd, credentials: 'same-origin', cache: 'no-store' })
+                .then(function (r) { return r.json(); })
+                .then(function (j) { if (j && j.success) setCount(j.data.count); })
+                .catch(function () {});
+        }
+        setInterval(refreshCount, 60000);
+        document.addEventListener('visibilitychange', function () { if (!document.hidden) refreshCount(); });
+
+        function openPopup(btn) {
+            var old = document.getElementById('gdc-profile-settings-overlay');
+            if (old) old.remove();
+            var overlay = document.createElement('div');
+            overlay.id = 'gdc-profile-settings-overlay';
+            overlay.className = 'gdc-popup-overlay';
+            overlay.setAttribute('role', 'dialog');
+            overlay.setAttribute('aria-modal', 'true');
+            overlay.setAttribute('aria-label', btn.getAttribute('data-popup-title') || '');
+            var dialog = document.createElement('div');
+            dialog.className = 'gdc-popup-dialog';
+            var bar = document.createElement('div');
+            bar.className = 'gdc-popup-bar';
+            var ttl = document.createElement('span');
+            ttl.className = 'gdc-popup-title';
+            ttl.textContent = btn.getAttribute('data-popup-title') || '';
+            var close = document.createElement('button');
+            close.type = 'button';
+            close.className = 'gdc-popup-close';
+            close.setAttribute('aria-label', 'Close');
+            close.textContent = '×';
+            var loader = document.createElement('div');
+            loader.className = 'gdc-popup-loader';
+            var frame = document.createElement('iframe');
+            frame.setAttribute('title', btn.getAttribute('data-popup-title') || '');
+            frame.className = 'gdc-popup-frame';
+            frame.addEventListener('load', function () { if (!frame.getAttribute('src')) return; loader.classList.add('is-done'); frame.classList.add('is-ready'); });
+            var changed = false;
+            function onMsg(e) { if (e.origin === location.origin && e.data && e.data.gdcSettings === 'changed') changed = true; }
+            window.addEventListener('message', onMsg);
+            function shut() {
+                overlay.classList.remove('is-open');
+                document.body.style.overflow = '';
+                document.removeEventListener('keydown', onKey);
+                window.removeEventListener('message', onMsg);
+                if (changed) { location.reload(); return; }
+                setTimeout(function () { overlay.remove(); }, 200);
+                refreshCount();
+            }
+            function onKey(e) { if (e.key === 'Escape') shut(); }
+            close.addEventListener('click', shut);
+            overlay.addEventListener('click', function (e) { if (e.target === overlay) shut(); });
+            document.addEventListener('keydown', onKey);
+            bar.appendChild(ttl);
+            bar.appendChild(close);
+            dialog.appendChild(bar);
+            dialog.appendChild(loader);
+            dialog.appendChild(frame);
+            overlay.appendChild(dialog);
+            document.body.appendChild(overlay);
+            document.body.style.overflow = 'hidden';
+            frame.src = btn.getAttribute('data-popup-url') || '';
+            requestAnimationFrame(function () { overlay.classList.add('is-open'); close.focus(); });
+        }
+        document.addEventListener('click', function (e) {
+            var btn = e.target.closest && e.target.closest('.gdc-nav-tool');
+            if (btn) { e.preventDefault(); openPopup(btn); }
+        });
+    })();
+    </script>
+    <?php endif; ?>
 
     <?php if ( $is_own_profile ) :
         $gdc_task_credit_rate = 50.0;
@@ -2808,7 +3033,7 @@ function gend_society_render_profile_header() {
         }
 
         function markActive(url) {
-            document.querySelectorAll('.gdc-nav-item').forEach(function (it) {
+            document.querySelectorAll('.gdc-nav-item:not(.gdc-nav-tool)').forEach(function (it) {
                 var on = false;
                 try {
                     var p = new URL(it.href, location.href).pathname;
@@ -3354,12 +3579,11 @@ body.bp-user .youzify-inline-mobile-nav {
     pointer-events: none;
     /* Cinematic backdrop boot: focus-pull rising out of black (opacity + blur
        only, so fixed attachment is never disturbed). */
-    animation: gdcCoverIn 3s cubic-bezier(0.22,1,0.36,1) both;
+    animation: gdcCoverIn 1.2s cubic-bezier(0.22,1,0.36,1) both;
 }
 @keyframes gdcCoverIn {
-    from { opacity: 0; filter: blur(26px) brightness(0)    saturate(1.35) contrast(1.04); }
-    60%  { opacity: 1; }
-    to   { opacity: 1; filter: blur(0)    brightness(0.98) saturate(1.35) contrast(1.04); }
+    from { opacity: 0; }
+    to   { opacity: 1; }
 }
 /* background-attachment: fixed is unreliable on mobile — fall back to scroll */
 @media (max-width: 768px) {
@@ -3459,6 +3683,9 @@ body.bp-user .youzify-inline-mobile-nav {
     /* Cinematic beat: the cover is glimpsed sharp, then the frost rolls in. */
     animation: gdcGlassIn 1.9s cubic-bezier(0.16,1,0.3,1) 0.35s both;
 }
+/* Covers show exactly as uploaded so call-to-action covers read (owner 2026-11-06): no frosted sheet, tint or colour filter. */
+.gdc-profile-uplink::after { display: none !important; }
+.gdc-profile-uplink::before { filter: none !important; }
 @keyframes gdcGlassIn {
     from {
         opacity: 0;
@@ -3655,6 +3882,11 @@ body.bp-user .youzify-inline-mobile-nav {
     border-color: var(--gph-green);
     background: rgba(0,255,136,0.1);
 }
+button.gdc-action-btn { font-family: inherit; line-height: inherit; cursor: pointer; }
+.gdc-action-btn--connect[data-status="is_friend"] { border-color: rgba(0,255,136,0.45); color: var(--gph-green) !important; cursor: default; }
+.gdc-action-btn--connect[data-status="pending"] { border-style: dashed; }
+.gdc-action-btn--connect[data-status="awaiting_response"] { border-color: var(--gph-magenta); background: rgba(182,8,201,0.18); }
+.gdc-action-btn--connect.is-busy { opacity: 0.6; pointer-events: none; }
 .gdc-action-btn--connect:hover {
     border-color: var(--gph-blue);
     background: rgba(137,194,224,0.1);
@@ -3864,7 +4096,7 @@ button.gdc-group-gas__btn:focus-visible {
     border-top: 1px solid var(--gph-border);
     background: rgba(0,0,0,0.3);
     opacity: 0;
-    animation: gdcNavReveal 0.6s ease forwards 1.2s;
+    animation: gdcNavReveal 0.4s ease forwards 0.2s;
 }
 @keyframes gdcNavReveal {
     to { opacity: 1; }
@@ -3900,7 +4132,7 @@ button.gdc-group-gas__btn:focus-visible {
     opacity: 0;
     transform: translateY(14px);
     animation: gdcNavItemEnter 0.55s cubic-bezier(0.22,1,0.36,1) forwards;
-    animation-delay: calc(1.35s + var(--gdc-nav-i, 0) * 0.07s);
+    animation-delay: calc(0.3s + var(--gdc-nav-i, 0) * 0.05s);
 }
 @keyframes gdcNavItemEnter {
     to { opacity: 1; transform: none; }
@@ -3939,7 +4171,7 @@ button.gdc-group-gas__btn:focus-visible {
     opacity: 0;
     transform: scale(0.45) rotate(-12deg);
     animation: gdcNavIconPower 0.55s cubic-bezier(0.34,1.56,0.64,1) forwards;
-    animation-delay: calc(1.55s + var(--gdc-nav-i, 0) * 0.07s);
+    animation-delay: calc(0.4s + var(--gdc-nav-i, 0) * 0.05s);
 }
 .gdc-nav-icon svg {
     width: 14px;
@@ -3969,7 +4201,7 @@ button.gdc-group-gas__btn:focus-visible {
     pointer-events: none;
     opacity: 0;
     animation: gdcNavIconScan 0.9s ease-out forwards;
-    animation-delay: calc(1.75s + var(--gdc-nav-i, 0) * 0.07s);
+    animation-delay: calc(0.55s + var(--gdc-nav-i, 0) * 0.05s);
 }
 @keyframes gdcNavIconScan {
     0%   { opacity: 0;   background-position:  220% 0; }
@@ -4185,6 +4417,24 @@ button.gdc-group-gas__btn:focus-visible {
     .gdc-nav-item--member-wallet   { order: 6; }
 }
 
+/* Phones/tablets: the header grid single auto column grew to its widest content (518px on a 390px screen) and the cards
+   were clipped. Every track and child may shrink; rows and labels wrap. */
+.gdc-profile-hub > *, .gdc-metrics-port > *, .gdc-identity-inner > * { min-width: 0; }
+@media (max-width: 1100px) {
+    .gdc-profile-hub { grid-template-columns: minmax(0, 1fr); }
+}
+@media (max-width: 720px) {
+    .gdc-identity-wrap, .gdc-metrics-port { width: 100%; max-width: 100%; }
+    .gdc-identity-auth { letter-spacing: 1px; font-size: 0.62rem; overflow-wrap: anywhere; }
+    .gdc-admin-group-row { flex-wrap: wrap; gap: 10px; }
+    .gdc-admin-group-row .gdc-action-btn { flex: 1 1 0; min-width: 0; text-align: center; }
+    .gdc-admin-group-info { flex: 1 1 calc(100% - 64px); min-width: 0; }
+    .gdc-group-gas { grid-template-columns: minmax(0, 1fr); }
+    /* own profile: 4 tabs + Alerts + Settings = 6 chips, two rows of three (labels never break mid-word) */
+    .gdc-profile-nav-inner:has(.gdc-nav-tool) { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+    .gdc-nav-text { word-break: normal; overflow-wrap: normal; hyphens: none; }
+}
+
 /* Very narrow phones — drop to 3 columns to keep labels readable */
 @media (max-width: 380px) {
     .gdc-profile-nav-inner {
@@ -4277,6 +4527,47 @@ button.gdc-group-gas__btn:focus-visible {
     border-color: rgba(182,8,201,0.35);
     color: var(--gph-magenta);
 }
+
+
+/* ══ Nav tools: Notifications + Settings (own profile) ═══════════════════ */
+button.gdc-nav-tool { background: none; border-left: 0; border-right: 0; border-top: 0; font-family: inherit; cursor: pointer; appearance: none; -webkit-appearance: none; }
+.gdc-nav-tool .gdc-nav-text { display: none; }
+@media (min-width: 721px) {
+    .gdc-nav-tool { margin-left: clamp(0px, 1vw, 12px); }
+    .gdc-nav-tool:first-of-type, .gdc-nav-item:not(.gdc-nav-tool) + .gdc-nav-tool { margin-left: clamp(12px, 2.5vw, 40px); padding-left: clamp(12px, 2vw, 32px); border-left: 1px solid var(--gph-border); }
+}
+.gdc-nav-tool:hover .gdc-nav-icon, .gdc-nav-tool:focus-visible .gdc-nav-icon { color: var(--gph-blue); border-color: rgba(137,194,224,0.45); background: rgba(137,194,224,0.08); transform: translateY(-2px); }
+.gdc-nav-tool:focus-visible { outline: 2px solid var(--gph-blue); outline-offset: 2px; border-radius: 10px; }
+.gdc-nav-badge { position: absolute; top: -7px; right: -7px; min-width: 18px; height: 18px; padding: 0 5px; box-sizing: border-box; display: inline-flex; align-items: center; justify-content: center; border-radius: 999px; background: var(--gph-magenta); color: #fff; font-size: 0.62rem; font-weight: 800; letter-spacing: 0; line-height: 1; box-shadow: 0 0 10px rgba(182,8,201,0.6), 0 0 0 2px #0b0e14; }
+.gdc-nav-badge[hidden] { display: none; }
+.gdc-nav-tool--notifications .gdc-nav-badge:not([hidden]) { animation: gdcBadgePop 0.35s cubic-bezier(0.34,1.56,0.64,1); }
+@keyframes gdcBadgePop { from { transform: scale(0.4); opacity: 0; } to { transform: none; opacity: 1; } }
+.gdc-nav-icon { overflow: visible; }
+@media (max-width: 720px) {
+    .gdc-nav-tool .gdc-nav-text { display: -webkit-box; }
+    .gdc-nav-badge { top: -5px; right: -5px; }
+}
+@media (max-width: 380px) { .gdc-nav-tool .gdc-nav-text { font-size: 0.56rem; } }
+
+/* Popups (settings / notifications): glass dialog, fades in, content shows once loaded */
+.gdc-popup-overlay { position: fixed; inset: 0; z-index: 2147483600; display: flex; align-items: center; justify-content: center; padding: 20px; background: rgba(2,8,23,.85); -webkit-backdrop-filter: blur(6px); backdrop-filter: blur(6px); opacity: 0; transition: opacity .2s ease; }
+.gdc-popup-overlay.is-open { opacity: 1; }
+.gdc-popup-dialog { position: relative; width: min(1100px, 100%); height: min(90vh, 900px); height: min(90dvh, 900px); background: #0a1019; border-radius: 20px; overflow: hidden; box-shadow: 0 60px 160px rgba(0,0,0,.6), 0 0 0 1px rgba(148,163,184,.2); display: flex; flex-direction: column; transform: translateY(14px) scale(.985); transition: transform .25s cubic-bezier(.22,1,.36,1); }
+.gdc-popup-overlay.is-open .gdc-popup-dialog { transform: none; }
+.gdc-popup-bar { flex: 0 0 auto; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 14px 10px 20px; border-bottom: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.02); position: relative; z-index: 3; }
+.gdc-popup-title { color: #e2e8f0; font: 800 .78rem/1 Inter, sans-serif; letter-spacing: 1.6px; text-transform: uppercase; }
+.gdc-popup-close { flex: 0 0 auto; width: 36px; height: 36px; border-radius: 999px; cursor: pointer; background: rgba(15,23,42,.85); color: #f1f5f9; border: 1px solid rgba(148,163,184,.3); font-size: 20px; line-height: 1; }
+.gdc-popup-close:hover { background: rgba(182,8,201,.6); }
+.gdc-popup-frame { border: 0; width: 100%; flex: 1; background: #0a1019; opacity: 0; transition: opacity .25s ease; }
+.gdc-popup-frame.is-ready { opacity: 1; }
+.gdc-popup-loader { position: absolute; inset: 57px 0 0 0; display: flex; align-items: center; justify-content: center; z-index: 2; background: #0a1019; transition: opacity .25s ease; }
+.gdc-popup-loader::before { content: ""; width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(255,255,255,.12); border-top-color: var(--gph-magenta, #b608c9); animation: gdcPjaxSpin .8s linear infinite; }
+.gdc-popup-loader.is-done { opacity: 0; pointer-events: none; }
+@media (max-width: 720px) {
+    .gdc-popup-overlay { padding: 0; align-items: flex-end; }
+    .gdc-popup-dialog { width: 100%; height: 94vh; height: 94dvh; border-radius: 20px 20px 0 0; }
+}
+@media (prefers-reduced-motion: reduce) { .gdc-popup-overlay, .gdc-popup-dialog, .gdc-popup-frame, .gdc-popup-loader { transition: none; } .gdc-nav-badge { animation: none !important; } }
 
 /* ══════════════════════════════════════════════════════════════════════
    YOUZIFY CONTENT SECTIONS — dark terminal aesthetic

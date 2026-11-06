@@ -658,6 +658,12 @@ return array(
 			'needs' => array( 'bp' ),
 		),
 		array(
+			'file'  => 'inc/member-settings-popup.php',
+			'tier'  => 'container',
+			'needs' => array( 'bp' ),
+			'note'  => 'Designed Settings popup (profile, photo, cover, account, email notifications) on the profile nav gear.',
+		),
+		array(
 			'file'  => 'inc/profile-resume.php',
 			'tier'  => 'container',
 			'needs' => array( 'bp' ),
