@@ -2387,6 +2387,12 @@ function gend_society_render_membership_panel( $payload = null ) {
                                 <span class="dashicons dashicons-awards icon"></span>
                                 <div class="k"><?php esc_html_e( 'Earned', 'gend-society' ); ?></div>
                                 <div class="v"><?php echo esc_html( $gs_gas_earned['total_earned_dgen_label'] ?? '0.00 DGEN' ); ?></div>
+                                <?php if ( isset( $gs_gas_earned['awaiting_label'], $gs_gas_earned['completed_label'] ) ) : ?>
+                                    <div style="color: rgba(226,232,240,.5); font-size: 0.7rem; margin-top: 4px;"><?php
+                                        /* translators: 1: amount waiting for customers to pay their gas invoice, 2: amount paid out */
+                                        echo esc_html( sprintf( __( 'Awaiting payment %1$s · Paid %2$s', 'gend-society' ), $gs_gas_earned['awaiting_label'], $gs_gas_earned['completed_label'] ) );
+                                    ?></div>
+                                <?php endif; ?>
                             </div>
                             <div class="gs-bcg-stat" style="--gs-bcg-accent:#a855f7;">
                                 <span class="dashicons dashicons-networking icon"></span>

@@ -4883,13 +4883,18 @@ function gend_society_hosting_gas_earned_summary( $user_id ) {
         $gas    = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
         $earned = is_array( $gas['payload'] ) && isset( $gas['payload']['earned'] ) && is_array( $gas['payload']['earned'] ) ? $gas['payload']['earned'] : array();
         $total  = (float) ( $earned['total'] ?? 0 );
-        return array(
+        $out    = array(
             'event_count'             => (int) ( $earned['events'] ?? 0 ),
             'total_earned'            => $total,
             'total_earned_label'      => number_format( $total, 6 ) . ' GAS',
             'total_earned_dgen_label' => '' !== (string) ( $earned['label'] ?? '' ) ? (string) $earned['label'] : number_format( $total, 2 ) . ' DGEN',
             'last_earned'             => (string) ( $earned['last'] ?? '' ),
         );
+        if ( isset( $earned['awaiting'], $earned['completed'] ) ) {
+            $out['awaiting_label']  = number_format( (float) $earned['awaiting'], 2 ) . ' DGEN';
+            $out['completed_label'] = number_format( (float) $earned['completed'], 2 ) . ' DGEN';
+        }
+        return $out;
     }
     global $wpdb;
     $ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
@@ -4900,8 +4905,12 @@ function gend_society_hosting_gas_earned_summary( $user_id ) {
     ), ARRAY_A );
 
     $total_earned = $row ? (float) $row['total_earned'] : 0.0;
+    // Awaiting = on a customer's unpaid monthly invoice; completed = paid into this owner's DGEN balance.
+    $payouts = function_exists( '\WP_Ultimo\Integrations\gdc_gas_payout_totals' ) ? (array) \WP_Ultimo\Integrations\gdc_gas_payout_totals( (int) $user_id ) : null;
 
     return array(
+        'awaiting_label'     => null === $payouts ? null : number_format( (float) ( $payouts['awaiting'] ?? 0 ), 2 ) . ' DGEN',
+        'completed_label'    => null === $payouts ? null : number_format( (float) ( $payouts['completed'] ?? 0 ), 2 ) . ' DGEN',
         'event_count'        => $row ? (int) $row['event_count'] : 0,
         'total_earned'       => $total_earned,
         'total_earned_label' => number_format( $total_earned, 6 ) . ' GAS',
