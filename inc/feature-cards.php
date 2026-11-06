@@ -25,68 +25,123 @@ function gend_society_get_feature_definitions()
     return array(
         'wireframe' => array(
             'name' => __('Theme Builder', 'gend-society'),
-            'description' => __('Generate high-fidelity UI maps and backend login flows instantly using LEO’s generation engine.', 'gend-society'),
+            'description' => __('Create a complete brand style guide and seamlessly apply it across fully customizable theme sections to launch your Web App quickly.', 'gend-society'),
             'plugin' => 'gend-society/gend-society.php',
             'image' => gend_society_feature_card_image('wireframe'),
-            'link' => 'https://gend.me/wireframe-generation/'
+            'link' => 'https://gend.me/theme-builder/',
+            'child' => 'app.theme_builder',
+            'plan' => 'content-builder'
         ),
         'blog' => array(
             'name' => __('Content Campaigns', 'gend-society'),
-            'description' => __('Turn your content into a community hub with integrated social sharing and engagement tools.', 'gend-society'),
+            'description' => __('Supercharge your marketing with built-in analytics, seamless media management, page control, blog postings, social tools, and high-speed ad campaigns.', 'gend-society'),
             'plugin' => 'blog-manager/blog-manager.php',
             'image' => gend_society_feature_card_image('blog'),
-            'link' => 'https://gend.me/social-blogs/'
+            'link' => 'https://gend.me/content-campaigns/',
+            'child' => 'app.content_campaigns',
+            'plan' => 'content-builder'
         ),
         'email' => array(
             'name' => __('Talk Flows', 'gend-society'),
-            'description' => __('Automate high-touch communication and keep your users engaged with targeted community updates.', 'gend-society'),
+            'description' => __('Connect directly with your users through comprehensive email campaigns, dynamic forms, interactive chatflows, streamlined applications, and dedicated support management.', 'gend-society'),
             'plugin' => 'email-manager/email-manager.php',
             'image' => gend_society_feature_card_image('email'),
-            'link' => 'https://gend.me/community-emails/'
+            'link' => 'https://gend.me/talk-flows/',
+            'child' => 'app.talk_flows',
+            'plan' => 'content-builder'
         ),
         'store' => array(
             'name' => __('Store Management', 'gend-society'),
-            'description' => __('Centralize your inventory, orders, and fulfillment in one intuitive dashboard.', 'gend-society'),
+            'description' => __('Sell with a full catalog, personalised custom products, vendors, order and subscription tracking, store emails and every payment gateway in one dashboard.', 'gend-society'),
             'plugin' => 'online-store/online-store.php',
             'image' => gend_society_feature_card_image('store'),
-            'link' => 'https://gend.me/store-management/'
+            'link' => 'https://gend.me/store-management/',
+            'child' => 'store.store_management',
+            'plan' => 'store-owner'
         ),
         'sales' => array(
             'name' => __('Sales Team', 'gend-society'),
-            'description' => __('Empower your sales team with real-time tracking, lead management, and performance analytics.', 'gend-society'),
+            'description' => __('Send trackable proposals, set referral, role and member commission contracts, manage your team and its uplines, and control every sales notification from one dashboard.', 'gend-society'),
             'plugin' => 'sales-team/advanced-affiliate-system.php',
             'image' => gend_society_feature_card_image('sales'),
-            'link' => 'https://gend.me/sales-team/'
+            'link' => 'https://gend.me/sales-team/',
+            'child' => 'store.sales_team',
+            'plan' => 'store-owner'
         ),
         'projects' => array(
-            'name' => __('Project Services', 'gend-society'),
-            'description' => __('Coordinate global teams and track deliverables with integrated project management for store owners.', 'gend-society'),
+            'name' => __('Project Management', 'gend-society'),
+            'description' => __('Turn the services you sell into tracked projects with tasks and milestones, custom team dashboards, time and progress reports, and contracts for the people who do the work.', 'gend-society'),
             'plugin' => 'projects/project-service-orders.php',
             'image' => gend_society_feature_card_image('projects'),
-            'link' => 'https://gend.me/remote-projects/'
+            'link' => 'https://gend.me/project-management/',
+            'child' => 'store.project_services',
+            'plan' => 'store-owner'
         ),
         'social' => array(
-            'name' => __('Social Profiles', 'gend-society'),
-            'description' => __('Allow users to create rich, customizable profiles that drive identity and connection.', 'gend-society'),
+            'name' => __('Member Management', 'gend-society'),
+            'description' => __('Organise members with types and custom profile fields, run groups with their own roles, invite new people and keep the community safe with restrictions, moderation and reports.', 'gend-society'),
             'plugin' => 'social-network/social-network.php',
             'image' => gend_society_feature_card_image('social'),
-            'link' => 'https://gend.me/social-profiles/'
-        ),
-        'membership' => array(
-            'name' => __('Contracts & Payments', 'gend-society'),
-            'description' => __('Total control over tiers, permissions, and access for your exclusive community.', 'gend-society'),
-            'plugin' => 'contracts-and-payments/contracts-and-payments.php',
-            'image' => gend_society_feature_card_image('membership'),
-            'link' => 'https://gend.me/membership-management/'
+            'link' => 'https://gend.me/member-management/',
+            'child' => 'social.social_profiles',
+            'plan' => 'social-connector'
         ),
         'rewards' => array(
             'name' => __('Point Bank', 'gend-society'),
-            'description' => __('Incentivize loyalty and engagement with automated points, badges, and perks.', 'gend-society'),
+            'description' => __('Create your own point types, set how members buy, earn, spend, transfer and exchange them, award badges and ranks, and audit every member wallet in seconds.', 'gend-society'),
             'plugin' => 'reward-programs/reward-programs.php',
             'image' => gend_society_feature_card_image('rewards'),
-            'link' => 'https://gend.me/member-rewards/'
+            'link' => 'https://gend.me/point-bank/',
+            'child' => 'social.point_bank',
+            'plan' => 'social-connector'
+        ),
+        'membership' => array(
+            'name' => __('Contracts & Payments', 'gend-society'),
+            'description' => __('See balances in every currency, the money your gateways collect, every commission contract and payout, your business expenses and what you put back into growth, in one finance dashboard.', 'gend-society'),
+            'plugin' => 'contracts-and-payments/contracts-and-payments.php',
+            'image' => gend_society_feature_card_image('membership'),
+            'link' => 'https://gend.me/contracts-payments/',
+            'child' => 'social.contracts_payments',
+            'plan' => 'social-connector'
         )
     );
+}
+
+/**
+ * gend.me page of each dashboard plan: what it includes and the form that starts or upgrades to it.
+ */
+function gend_society_plan_info_urls()
+{
+    return array(
+        'content-builder' => 'https://gend.me/content-builder-launch-your-website-on-gend-me/',
+        'store-owner' => 'https://gend.me/store-owner-launch-your-online-store-on-gend-me/',
+        'social-connector' => 'https://gend.me/social-connector-launch-your-community-on-gend-me/',
+    );
+}
+
+/**
+ * Info pages for a gated menu item ("store.sales_team") or a whole area ("store"): dashboard name => page.
+ * Used by the upgrade prompts so a locked dashboard always links to what it does.
+ */
+function gend_society_feature_info_links($key)
+{
+    $key = strtolower(trim((string) $key));
+    // Older area names that gate one of the nine dashboards.
+    $aliases = array('write' => 'app', 'reward' => 'social.point_bank', 'projects' => 'store.project_services');
+    if (isset($aliases[$key])) {
+        $key = $aliases[$key];
+    }
+    $links = array();
+    if ('' === $key) {
+        return $links;
+    }
+    foreach (gend_society_get_feature_definitions() as $feature) {
+        $child = isset($feature['child']) ? (string) $feature['child'] : '';
+        if ($child === $key || 0 === strpos($child, $key . '.')) {
+            $links[(string) $feature['name']] = (string) $feature['link'];
+        }
+    }
+    return $links;
 }
 
 /**
@@ -126,7 +181,7 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
     }
 
     echo '<style>
-        .gs-feature-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 24px; }
+        .gs-feature-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 24px; }
         .gs-fc { background: rgba(255,255,255,0.02); border: 1px solid rgba(255,255,255,0.06); border-radius: 16px; display: flex; flex-direction: column; overflow: hidden; transition: all 0.3s ease; position: relative; }
         .gs-fc:hover { border-color: rgba(255,255,255,0.15); transform: translateY(-3px); box-shadow: 0 10px 30px rgba(0,0,0,0.3); }
         .gs-fc-media { position: relative; }
@@ -167,6 +222,19 @@ function gend_society_render_feature_cards_widget($show_sizes = false)
         .gs-fc-plans .gs-unlock-btn .gs-unlock-btn__price { font-size: .8rem !important; font-weight: 500 !important; }
         .gs-unlock-btn__arrow { flex: 0 0 auto; font-size: 1.25rem; transition: transform .2s ease; }
         .gs-unlock-btn:hover .gs-unlock-btn__arrow { transform: translateX(4px); }
+        @media (max-width: 1100px) { .gs-feature-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; } }
+        @media (max-width: 700px) {
+            .gs-feature-grid { grid-template-columns: minmax(0, 1fr); gap: 16px; }
+            .gs-fc:hover { transform: none; }
+            .gs-fc-img { height: auto; aspect-ratio: 16 / 7; }
+            .gs-fc-body { padding: 18px; }
+            .gs-fc-title { font-size: 1.12rem; }
+            .gs-fc-desc { margin-bottom: 18px; }
+            .gs-fc-info { width: 44px; height: 44px; margin: -8px -8px 0 0; }
+            .gs-fc-btn, .gs-fc-plans .gs-buy { min-height: 46px; }
+            .gs-fc-status { top: 12px; right: 12px; }
+            .gs-unlock-btn { padding: 12px 14px; gap: 10px; }
+        }
     </style>';
     if (function_exists('gend_society_plan_buy_assets')) {
         gend_society_plan_buy_assets();
