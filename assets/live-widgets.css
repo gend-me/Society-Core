@@ -1,0 +1,104 @@
+/*
+ * Live dashboard widgets ([gs_live], inc/live-widgets.php) in the web app's style guide colours. Each widget is its
+ * own card, so it reads the same on a light page or inside the Projects board's dark frame. Numbers count up, bars
+ * grow and the chart draws itself once the widget scrolls into view (live-widgets.js adds .is-in); without the script,
+ * or with reduced motion, everything simply shows finished.
+ */
+.gs-live {
+  --b-surface: var(--wp--preset--color--brand-surface, var(--wp--preset--color--base, #fff));
+  --b-text: var(--wp--preset--color--brand-on-surface, var(--wp--preset--color--contrast, #1d2230));
+  --b-muted: var(--wp--preset--color--brand-on-surface-muted, color-mix(in srgb, var(--b-text) 62%, transparent));
+  --b-primary: var(--wp--preset--color--brand-primary, #6a0dad);
+  --b-secondary: var(--wp--preset--color--brand-secondary, var(--b-primary));
+  --b-line: color-mix(in srgb, var(--b-text) 12%, transparent);
+  --b-soft: color-mix(in srgb, var(--b-primary) 12%, transparent);
+  position: relative;
+  margin: 0 0 18px;
+  padding: clamp(16px, 2.4vw, 24px);
+  border-radius: 20px;
+  background: var(--b-surface);
+  border: 1px solid var(--b-line);
+  box-shadow: 0 1px 2px color-mix(in srgb, var(--b-text) 6%, transparent), 0 12px 32px -18px color-mix(in srgb, var(--b-primary) 45%, transparent);
+  color: var(--b-text);
+  font-family: var(--gs-font-body, inherit);
+  overflow: hidden;
+}
+.gs-live::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 3px;
+  background: linear-gradient(90deg, var(--b-primary), var(--b-secondary));
+}
+.gs-live__title {
+  margin: 0 0 14px;
+  font: 600 1.05rem/1.3 var(--gs-font-heading, inherit);
+  color: var(--b-text);
+}
+.gs-live__tiles {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: 12px;
+}
+.gs-live__tile {
+  padding: 14px 16px;
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--b-primary) 6%, var(--b-surface));
+  border: 1px solid var(--b-line);
+}
+.gs-live__tile span {
+  display: block;
+  font-size: 0.78rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+  color: var(--b-muted);
+}
+.gs-live__num {
+  display: block;
+  margin-top: 6px;
+  font: 700 clamp(1.4rem, 2.6vw, 1.9rem)/1.1 var(--gs-font-heading, inherit);
+  color: var(--b-text);
+  font-variant-numeric: tabular-nums;
+}
+.gs-live__chart { margin: 16px 0 0; }
+.gs-live__chart svg { display: block; width: 100%; height: 150px; overflow: visible; }
+.gs-live__area { fill: var(--b-soft); }
+.gs-live__line { fill: none; stroke: var(--b-primary); stroke-width: 2.5; vector-effect: non-scaling-stroke; stroke-linejoin: round; stroke-linecap: round; }
+.gs-live__chart figcaption { margin-top: 6px; font-size: 0.78rem; color: var(--b-muted); }
+.gs-live__rows, .gs-live__list { list-style: none; margin: 0; padding: 0; display: grid; gap: 12px; }
+.gs-live__row-head { display: flex; justify-content: space-between; gap: 12px; font-size: 0.92rem; }
+.gs-live__row-head b { font-weight: 600; }
+.gs-live__row-head span { color: var(--b-muted); white-space: nowrap; }
+.gs-live__bar { margin-top: 6px; height: 8px; border-radius: 999px; background: var(--b-line); overflow: hidden; }
+.gs-live__bar i { display: block; height: 100%; width: var(--w, 0%); border-radius: inherit; background: linear-gradient(90deg, var(--b-primary), var(--b-secondary)); }
+.gs-live__bar.is-moving i { width: 100%; background: repeating-linear-gradient(115deg, var(--b-primary) 0 14px, color-mix(in srgb, var(--b-primary) 55%, var(--b-surface)) 14px 28px); background-size: 200% 100%; animation: gs-live-move 1.6s linear infinite; opacity: 0.8; }
+.gs-live__list li { display: grid; grid-template-columns: 1fr auto; gap: 2px 12px; padding: 10px 12px; border-radius: 12px; background: color-mix(in srgb, var(--b-text) 3%, var(--b-surface)); border: 1px solid var(--b-line); }
+.gs-live__list li b { font-weight: 600; }
+.gs-live__list li a { color: inherit; text-decoration: none; }
+.gs-live__list li a:hover { color: var(--b-primary); }
+.gs-live__list li span, .gs-live__list li em { font-size: 0.82rem; font-style: normal; color: var(--b-muted); }
+.gs-live__list li em { grid-column: 2; grid-row: 1; text-align: right; }
+.gs-live__list li strong { grid-column: 2; text-align: right; }
+.gs-live__list li.is-late em { color: #c2410c; font-weight: 600; }
+.gs-live__chip { justify-self: end; padding: 2px 10px; border-radius: 999px; background: var(--b-soft); color: var(--b-primary) !important; font-weight: 600; }
+.gs-live__chip--completed { background: color-mix(in srgb, #16a34a 14%, transparent); color: #15803d !important; }
+.gs-live__empty { margin: 12px 0 0; font-size: 0.9rem; color: var(--b-muted); }
+
+/* Coming into view. */
+@media (prefers-reduced-motion: no-preference) {
+  .gs-live.is-armed .gs-live__tile,
+  .gs-live.is-armed .gs-live__row,
+  .gs-live.is-armed .gs-live__list li { opacity: 0; transform: translateY(8px); transition: opacity 0.5s ease, transform 0.5s ease; transition-delay: calc(var(--i, 0) * 70ms); }
+  .gs-live.is-armed.is-in .gs-live__tile,
+  .gs-live.is-armed.is-in .gs-live__row,
+  .gs-live.is-armed.is-in .gs-live__list li { opacity: 1; transform: none; }
+  .gs-live.is-armed .gs-live__bar:not(.is-moving) i { width: 0; transition: width 1s cubic-bezier(0.2, 0.8, 0.2, 1); transition-delay: calc(var(--i, 0) * 90ms + 150ms); }
+  .gs-live.is-armed.is-in .gs-live__bar:not(.is-moving) i { width: var(--w, 0%); }
+  .gs-live.is-armed .gs-live__line { stroke-dasharray: 1; stroke-dashoffset: 1; transition: stroke-dashoffset 1.4s ease; }
+  .gs-live.is-armed.is-in .gs-live__line { stroke-dashoffset: 0; }
+  .gs-live.is-armed .gs-live__area { opacity: 0; transition: opacity 1s ease 0.6s; }
+  .gs-live.is-armed.is-in .gs-live__area { opacity: 1; }
+  .gs-live__tile { transition: transform 0.2s ease, box-shadow 0.2s ease; }
+}
+@keyframes gs-live-move { to { background-position: -56px 0; } }
+@media (prefers-reduced-motion: reduce) { .gs-live__bar.is-moving i { animation: none; } }

@@ -44,7 +44,7 @@ function gend_society_chat_tools_ajax( string $action, array $post = array(), st
 	add_filter( 'wp_die_ajax_handler', $stop, 999 );
 	ob_start();
 	try {
-		do_action( 'wp_ajax_' . $action ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- runs the feature's own handler.
+		do_action( 'wp_ajax_' . $action );
 	} catch ( Gend_Society_Chat_Tools_Stop $e ) { // phpcs:ignore Generic.CodeAnalysis.EmptyStatement
 		// The handler finished through wp_send_json or wp_die.
 	} finally {
@@ -681,7 +681,7 @@ add_filter(
 		$add( 'site_setup_page_save', 'Create or update a published page: a hero in the brand\'s colours (title and intro) above one feature\'s shortcode. Allowed shortcodes: psoo_dashboard, psoo_pm_group_projects, affiliate_sales_dashboard, affiliate_link, affiliate_earnings, referral_team, gs_affiliate_register, gend_wallet, chat_form. A page the member made at that address is left as it is.', array( 'title' => $str, 'slug' => $str, 'intro' => $str, 'shortcode' => $str, 'hero' => $bool ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
 			return gend_society_sb_setup_page_save( $a );
 		} );
-		$add( 'projects_dashboard_save', 'Create a Projects dashboard, or update one this tool made (id). audience: members (any logged-in member), team (the site\'s admins, editors and shop managers, and its group\'s admins and moderators) or customers (people with a paid order). sections: [{title, width: full|two-thirds|half|third, content: text or HTML with shortcodes}]. Returns its id and shortcode.', array( 'id' => $str, 'title' => $str, 'description' => $str, 'audience' => array( 'type' => 'string', 'enum' => array( 'members', 'team', 'customers' ) ), 'show_on_dashboard' => $bool, 'sections' => array( 'type' => 'array', 'items' => $obj ) ), 'store.project_services', $proj, 'write', 'manage_options', static function ( $a ) {
+		$add( 'projects_dashboard_save', 'Create a Projects dashboard, or update one this tool made (id). audience: members (any logged-in member), team (the site\'s admins, editors and shop managers, and its group\'s admins and moderators) or customers (people with a paid order). sections: [{title, width: full|two-thirds|half|third, content: text or HTML with shortcodes}]. Build sections from live widgets, [gs_live type="TYPE" title="Title"], one per section, with at most one short line of guidance: ' . ( defined( 'GEND_SOCIETY_LIVE_TYPES' ) ? implode( '; ', array_map( static fn( $k, $v ) => $k . ' = ' . $v, array_keys( GEND_SOCIETY_LIVE_TYPES ), GEND_SOCIETY_LIVE_TYPES ) ) : 'sales, top_products, projects, tasks, pipeline, community, my_orders, my_projects' ) . '. Team widgets show only to the team, my_ ones only the viewer\'s own. Never put [psoo_pm_group_projects] in a dashboard: the Projects page has the board. Returns its id and shortcode.', array( 'id' => $str, 'title' => $str, 'description' => $str, 'audience' => array( 'type' => 'string', 'enum' => array( 'members', 'team', 'customers' ) ), 'show_on_dashboard' => $bool, 'sections' => array( 'type' => 'array', 'items' => $obj ) ), 'store.project_services', $proj, 'write', 'manage_options', static function ( $a ) {
 			return gend_society_sb_dashboard_save( $a );
 		} );
 		$add( 'affiliate_program_setup_save', 'Choose whether people must join the affiliate program before their links earn (require_registration). registration_page_id is the page with [gs_affiliate_register]; form_id is a Talk Flows form whose submission enrols the sender. program_name is what the member called the program, shown on its account and profile tabs.', array( 'require_registration' => $bool, 'registration_page_id' => $num, 'form_id' => $num, 'program_name' => $str ), 'store.sales_team', $sales, 'write', 'manage_options', static function ( $a ) {
@@ -708,9 +708,10 @@ add_filter(
 			return gend_society_sb_social_tab_risk( $a );
 		} );
 		$add( 'bank_earning_hooks', 'The earning rules (myCRED hooks) a point type can use, with whether each is on and its points, limit and log text.', array( 'point_type' => $str ), 'social.point_bank', $bank, 'read', 'manage_options', static function ( $a ) {
-			return gend_society_chat_tools_earning_hooks( sanitize_key( (string) ( $a['point_type'] ?? '' ) ) );
+			// The list of earning rules is the same for every type, so with none named it reads the site's main points.
+			return gend_society_chat_tools_earning_hooks( sanitize_key( (string) ( $a['point_type'] ?? '' ) ) ?: 'mycred_default' );
 		} );
-		$add( 'bank_earning_rules_save', 'Change a point type\'s earning rules. rules: [{hook, enabled, creds, limit (like 0/x, 5/d, 10/w, 20/m, 1/t), log}]. Only the hooks sent change; read bank_earning_hooks first.', array( 'point_type' => $str, 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'write', 'manage_options', static function ( $a ) use ( $blocked, $network_type, $network_blocked ) {
+		$add( 'bank_earning_rules_save', 'Change a point type\'s earning rules. rules: [{hook, enabled, creds, limit (like 0/x, 5/d, 10/w, 20/m, 1/t), log}]; woocommerce_each_order also takes reward_on_each (fixed_rate or percentage), percent, base (subtotal or total) and point_value, so points can follow what was spent. Only the hooks sent change; read bank_earning_hooks first.', array( 'point_type' => $str, 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'write', 'manage_options', static function ( $a ) use ( $blocked, $network_type, $network_blocked ) {
 			$type = sanitize_key( (string) ( $a['point_type'] ?? '' ) );
 			if ( in_array( $type, gend_society_chat_tools_value_types(), true ) ) {
 				return $blocked;
@@ -940,6 +941,20 @@ function gend_society_chat_tools_earning_rules_save( string $type, array $rules 
 		}
 		if ( isset( $r['log'] ) && '' !== $r['log'] ) {
 			$row['log'] = sanitize_text_field( (string) $r['log'] );
+		}
+		// Points for each order can be a share of what was spent: the order rule's own extra settings (reward-programs
+		// sanitises them through aas_hooks_extra_prefs).
+		if ( 'woocommerce_each_order' === $h && isset( $r['reward_on_each'] ) ) {
+			$row['extra'] = (string) wp_json_encode(
+				array(
+					'reward_on_each' => 'percentage' === $r['reward_on_each'] ? 'percentage' : 'fixed_rate',
+					'creds'          => (float) ( $r['creds'] ?? 0 ),
+					'percent'        => min( 100, max( 0, (float) ( $r['percent'] ?? 0 ) ) ),
+					'base'           => 'total' === ( $r['base'] ?? '' ) ? 'total' : 'subtotal',
+					'point_value'    => max( 0.000001, (float) ( $r['point_value'] ?? 1 ) ),
+					'log'            => sanitize_text_field( (string) ( $r['log'] ?? '' ) ),
+				)
+			);
 		}
 		if ( isset( $r['subs'] ) && is_array( $r['subs'] ) ) {
 			$subs = array();

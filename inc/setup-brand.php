@@ -1508,6 +1508,14 @@ function gend_society_sb_projects_account_content() {
 	echo do_shortcode( '[psoo_dashboard id="' . esc_attr( $cur ) . '" group_id="' . (int) gend_society_sb_projects_group_id() . '"]' ); // phpcs:ignore WordPress.Security.EscapeOutput -- the Projects plugin's own escaped output
 }
 
+add_filter( 'aas_dashboard_single_referrals', 'gend_society_sb_scoped' );
+
+add_filter( 'psoo_pm_default_group_id', 'gend_society_sb_projects_default_group' );
+/** A board on a web app with no group named belongs to the site's own group. */
+function gend_society_sb_projects_default_group( $group_id ) {
+	return ! $group_id && gend_society_sb_scoped() ? gend_society_sb_projects_group_id() : $group_id;
+}
+
 add_action( 'bp_setup_nav', 'gend_society_sb_affiliate_profile_tab', 102 );
 /** An Affiliate tab on the member's own profile. */
 function gend_society_sb_affiliate_profile_tab() {
