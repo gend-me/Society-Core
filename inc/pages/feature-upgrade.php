@@ -354,6 +354,81 @@ if ( ! function_exists( 'gend_society_feature_upgrade_container_plans_url' ) ) {
 	}
 }
 
+if ( ! function_exists( 'gend_society_feature_upgrade_dashboard' ) ) {
+	/**
+	 * One of the nine dashboards by its card key (inc/feature-cards.php), with the plan that includes it and
+	 * that plan's gend.me page. Null for an unknown key.
+	 *
+	 * @param string $feature Card key (email, store, sales, projects, rewards, membership, ...).
+	 * @return array{key:string,name:string,description:string,link:string,plan_name:string,plan_url:string,plan_is_top:bool}|null
+	 */
+	function gend_society_feature_upgrade_dashboard( string $feature ): ?array {
+		$feature = sanitize_key( $feature );
+		$defs    = function_exists( 'gend_society_get_feature_definitions' ) ? gend_society_get_feature_definitions() : array();
+		if ( '' === $feature || empty( $defs[ $feature ] ) || ! is_array( $defs[ $feature ] ) ) {
+			return null;
+		}
+		$def       = $defs[ $feature ];
+		$plan      = (string) ( $def['plan'] ?? '' );
+		$plan_name = '';
+		$top_slug  = '';
+		foreach ( gend_society_feature_upgrade_tiers() as $tier ) {
+			$top_slug = (string) $tier['slug'];
+			if ( $top_slug === $plan ) {
+				$plan_name = (string) $tier['name'];
+			}
+		}
+		$plan_urls = function_exists( 'gend_society_plan_info_urls' ) ? gend_society_plan_info_urls() : array();
+		return array(
+			'key'         => $feature,
+			'name'        => (string) ( $def['name'] ?? '' ),
+			'description' => (string) ( $def['description'] ?? '' ),
+			'link'        => (string) ( $def['link'] ?? '' ),
+			'plan_name'   => $plan_name,
+			'plan_url'    => (string) ( $plan_urls[ $plan ] ?? '' ),
+			'plan_is_top' => '' !== $plan && $plan === $top_slug,
+		);
+	}
+}
+
+if ( ! function_exists( 'gend_society_feature_upgrade_dashboard_html' ) ) {
+	/**
+	 * What a dashboard does, the plan that includes it and its gend.me pages. Plain outbound links (new tab):
+	 * nothing is requested from gend.me until one is clicked.
+	 *
+	 * @param array $dash      From gend_society_feature_upgrade_dashboard().
+	 * @param bool  $plan_line Also say which plan includes it (left out where the caller already names the plan).
+	 */
+	function gend_society_feature_upgrade_dashboard_html( array $dash, bool $plan_line = true ): string {
+		$h = '';
+		if ( '' !== (string) $dash['description'] ) {
+			$h .= '<p class="gs-up-pitch">' . esc_html( (string) $dash['description'] ) . '</p>';
+		}
+		if ( $plan_line && '' !== (string) $dash['plan_name'] ) {
+			$h .= '<p class="gs-up-plan">' . esc_html(
+				sprintf(
+					/* translators: %s: plan name. */
+					! empty( $dash['plan_is_top'] ) ? __( 'Included with %s.', 'gend-society' ) : __( 'Included with %s and higher plans.', 'gend-society' ),
+					(string) $dash['plan_name']
+				)
+			) . '</p>';
+		}
+		$links = '';
+		if ( '' !== (string) $dash['link'] ) {
+			/* translators: %s: dashboard name. */
+			$links .= '<a href="' . esc_url( (string) $dash['link'] ) . '" target="_blank" rel="noopener">' . esc_html( sprintf( __( 'See everything in %s', 'gend-society' ), (string) $dash['name'] ) ) . '</a>';
+		}
+		if ( '' !== (string) $dash['plan_url'] && '' !== (string) $dash['plan_name'] ) {
+			/* translators: %s: plan name. */
+			$links .= ' <a href="' . esc_url( (string) $dash['plan_url'] ) . '" target="_blank" rel="noopener">' . esc_html( sprintf( __( 'What %s includes', 'gend-society' ), (string) $dash['plan_name'] ) ) . '</a>';
+		}
+		if ( '' !== $links ) {
+			$h .= '<p class="gs-up-info">' . $links . '</p>';
+		}
+		return $h;
+	}
+}
+
 if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 	/**
 	 * Upgrade / After migration / Included copy for one area (standalone). Returns one escaped element
@@ -361,10 +436,12 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 	 *
 	 * @param string $area_slug Area slug (groups, projects, store, ...).
 	 * @param array  $hint      Optional: 'vm' (view-model to use), 'state' (upgrade | after_migration, e.g. from
-	 *                          a hub 402 / 409 answer), 'unlock_plan' (hub value).
+	 *                          a hub 402 / 409 answer), 'unlock_plan' (hub value), 'feature' (dashboard card key:
+	 *                          the copy then presents that dashboard instead of the whole area).
 	 */
 	function gend_society_feature_upgrade_render_standalone( string $area_slug, array $hint = array() ): string {
 		$area_slug = sanitize_key( $area_slug );
+		$dash      = isset( $hint['feature'] ) ? gend_society_feature_upgrade_dashboard( (string) $hint['feature'] ) : null;
 		$plan_url  = function_exists( 'gend_society_plan_page_url' ) ? gend_society_plan_page_url() : admin_url( 'index.php' );
 		$plan_card = $plan_url . '#gs-mship-root';
 		$connect   = function_exists( 'gend_society_connect_url' ) ? gend_society_connect_url() : admin_url( 'index.php?page=gs-portal-connect' );
@@ -381,11 +458,19 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			}
 		}
 		$label = is_array( $area ) && '' !== (string) ( $area['label'] ?? '' ) ? (string) $area['label'] : ( '' !== $area_slug ? gend_society_feature_area_label( $area_slug ) : __( 'This area', 'gend-society' ) );
+		if ( is_array( $dash ) && '' !== (string) $dash['name'] ) {
+			$label = (string) $dash['name'];
+		}
 
 		if ( ! is_array( $vm ) || 'not_connected' === ( $vm['state'] ?? 'not_connected' ) ) {
 			$h  = '<div class="gend-society-card gs-plan-card gs-up-standalone is-not-connected" data-gs-up-area="' . esc_attr( $area_slug ) . '" data-gs-up-state="not_connected">';
 			$h .= '<h2>' . esc_html( $label ) . '</h2>';
-			$h .= '<p>' . esc_html__( 'Connect this site to gend.me to see which plan includes this area. Nothing is sent to gend.me until you connect.', 'gend-society' ) . '</p>';
+			if ( is_array( $dash ) ) {
+				$h .= gend_society_feature_upgrade_dashboard_html( $dash );
+				$h .= '<p>' . esc_html__( 'Connect this site to gend.me to see your plan and switch this dashboard on. Nothing is sent to gend.me until you connect.', 'gend-society' ) . '</p>';
+			} else {
+				$h .= '<p>' . esc_html__( 'Connect this site to gend.me to see which plan includes this area. Nothing is sent to gend.me until you connect.', 'gend-society' ) . '</p>';
+			}
 			$h .= '<p><a class="button button-primary" href="' . esc_url( $connect ) . '">' . esc_html__( 'Connect to gend.me', 'gend-society' ) . '</a></p>';
 			return $h . '</div>';
 		}
@@ -422,9 +507,16 @@ if ( ! function_exists( 'gend_society_feature_upgrade_render_standalone' ) ) {
 			$name = is_array( $unlock ) && '' !== (string) $unlock['name'] ? (string) $unlock['name'] : __( 'a higher plan', 'gend-society' );
 			/* translators: %s: plan name that unlocks this area. */
 			$h   .= '<p class="gs-up-state" data-gs-up-copy="upgrade">' . esc_html( sprintf( __( 'Available with %s', 'gend-society' ), $name ) ) . '</p>';
+			if ( is_array( $dash ) && '' !== (string) $dash['description'] ) {
+				$h .= '<p class="gs-up-pitch">' . esc_html( (string) $dash['description'] ) . '</p>';
+			}
 			/* translators: 1: area name, 2: plan name. */
 			$h   .= '<p>' . esc_html( sprintf( __( '%1$s comes with %2$s and the plans above it. Upgrading installs and switches it on for this site; nothing else needs to move.', 'gend-society' ), $label, $name ) ) . '</p>';
-			$info = function_exists( 'gend_society_feature_info_links' ) ? gend_society_feature_info_links( $area_slug ) : array();
+			$info = ( ! is_array( $dash ) && function_exists( 'gend_society_feature_info_links' ) ) ? gend_society_feature_info_links( $area_slug ) : array();
+			if ( is_array( $dash ) ) {
+				// The dashboard's own gend.me page and its plan's page (the description is printed above).
+				$h .= gend_society_feature_upgrade_dashboard_html( array_merge( $dash, array( 'description' => '' ) ), false );
+			}
 			if ( $info ) {
 				$h .= '<p class="gs-up-info">' . esc_html__( 'See what you unlock:', 'gend-society' );
 				foreach ( $info as $info_name => $info_url ) {
@@ -470,12 +562,33 @@ if ( ! function_exists( 'gend_society_feature_upgrade_fragment' ) ) {
 	/**
 	 * The upgrade page's refreshable fragment (#gs-feature-upgrade).
 	 *
-	 * @param string     $area Area slug.
-	 * @param array|null $vm   View-model (null: read it).
+	 * @param string     $area    Area slug.
+	 * @param array|null $vm      View-model (null: read it).
+	 * @param string     $feature Dashboard card key when the page is one dashboard's ('' = the whole area).
 	 */
-	function gend_society_feature_upgrade_fragment( string $area, ?array $vm = null ): string {
+	function gend_society_feature_upgrade_fragment( string $area, ?array $vm = null, string $feature = '' ): string {
 		$hint = is_array( $vm ) ? array( 'vm' => $vm ) : array();
+		if ( '' !== $feature ) {
+			$hint['feature'] = $feature;
+		}
 		return '<div id="gs-feature-upgrade" class="gs-feature-upgrade">' . gend_society_feature_upgrade_render_standalone( $area, $hint ) . '</div>';
+	}
+}
+
+if ( ! function_exists( 'gend_society_feature_upgrade_referer_feature' ) ) {
+	/**
+	 * Dashboard card key of the bundled menu page a Refresh came from (its ?page= in the referer), '' otherwise.
+	 */
+	function gend_society_feature_upgrade_referer_feature(): string {
+		if ( ! function_exists( 'gend_society_sa_menu_gated' ) ) {
+			return '';
+		}
+		$query = (string) wp_parse_url( (string) wp_get_raw_referer(), PHP_URL_QUERY );
+		$args  = array();
+		wp_parse_str( $query, $args );
+		$page  = isset( $args['page'] ) && is_string( $args['page'] ) ? sanitize_key( $args['page'] ) : '';
+		$gated = gend_society_sa_menu_gated();
+		return isset( $gated[ $page ]['feature'] ) ? (string) $gated[ $page ]['feature'] : '';
 	}
 }
 
@@ -484,9 +597,10 @@ if ( ! function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
 	 * admin.php?page=gs-feature-upgrade on a standalone install; also the bundled GenD menu pages of features that
 	 * are not on this install (109-35, inc/standalone-menu.php), which pass their area.
 	 *
-	 * @param string $area Area slug ('' = from the request).
+	 * @param string $area    Area slug ('' = from the request).
+	 * @param string $feature Dashboard card key when the page is one dashboard's ('' = the whole area).
 	 */
-	function gend_society_feature_upgrade_page_standalone( string $area = '' ): void {
+	function gend_society_feature_upgrade_page_standalone( string $area = '', string $feature = '' ): void {
 		if ( ! current_user_can( 'manage_options' ) ) {
 			wp_die( esc_html__( 'You are not allowed to view this page.', 'gend-society' ), '', array( 'response' => 403 ) );
 		}
@@ -499,7 +613,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
 		echo esc_html__( 'Your browser blocked the checkout window.', 'gend-society' ) . ' ';
 		echo '<a href="#" target="_blank" rel="opener" data-gs-plan-blocked-link="1">' . esc_html__( 'Open checkout in a new tab', 'gend-society' ) . '</a>';
 		echo '</p></div>';
-		echo gend_society_feature_upgrade_fragment( $area ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+		echo gend_society_feature_upgrade_fragment( $area, null, sanitize_key( $feature ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
 		echo '<p class="gs-up-back"><a href="' . esc_url( $plan_url ) . '">' . esc_html__( 'Back to the dashboard', 'gend-society' ) . '</a></p>';
 		echo '</div>';
 	}
@@ -533,7 +647,7 @@ if ( ! function_exists( 'gend_society_feature_upgrade_refresh_fragment' ) ) {
 		$area = isset( $_POST['gs_area'] ) ? sanitize_key( wp_unslash( (string) $_POST['gs_area'] ) ) : '';
 		// phpcs:enable WordPress.Security.NonceVerification.Missing
 		if ( 'upgrade' === $view && is_array( $vm ) && isset( $vm['state'] ) ) {
-			$html['gs-feature-upgrade'] = gend_society_feature_upgrade_fragment( $area, $vm );
+			$html['gs-feature-upgrade'] = gend_society_feature_upgrade_fragment( $area, $vm, gend_society_feature_upgrade_referer_feature() );
 		}
 		return $html;
 	}

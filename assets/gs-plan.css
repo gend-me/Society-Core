@@ -214,3 +214,21 @@
 .gend-society-plan .gs-up-standalone .gs-up-actions .button {
 	margin: 0 6px 6px 0;
 }
+
+/* One dashboard's upgrade page: what it does, its plan, its gend.me pages. */
+
+.gend-society-plan .gs-up-standalone .gs-up-pitch {
+	max-width: 720px;
+	font-size: 14px;
+	line-height: 1.6;
+}
+
+.gend-society-plan .gs-up-standalone .gs-up-plan {
+	font-weight: 600;
+}
+
+.gend-society-plan .gs-up-standalone .gs-up-info a {
+	display: inline-block;
+	margin: 0 14px 6px 0;
+	font-weight: 600;
+}
