@@ -757,6 +757,7 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                     $gs_res_upgrade_attrs = $gs_can_upgrade && $gs_migrate_url === '' && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' )
                         ? gend_society_hosting_resource_upgrade_data_attrs( $r['slug'] )
                         : '';
+                    $gs_res_info_url      = function_exists( 'gend_society_hosting_info_urls' ) ? (string) ( gend_society_hosting_info_urls()[ $r['slug'] ] ?? '' ) : '';
                     ?>
                     <?php if ( $gs_res_upgrade_attrs !== '' ) : ?>
                     <button type="button"
@@ -768,6 +769,9 @@ if ( ! function_exists( 'gend_society_hosting_render_storage_resource_cards' ) )
                             style="margin-top: auto; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 8px 14px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
                         <?php esc_html_e( 'Upgrade', 'gend-society' ); ?>
                     </button>
+                    <?php if ( '' !== $gs_res_info_url ) : ?>
+                    <a href="<?php echo esc_url( $gs_res_info_url ); ?>" target="_blank" rel="noopener" style="margin-top: 6px; text-align: center; color: var(--gs-muted, #94a3b8); font-size: 0.75rem; text-decoration: underline;"><?php echo esc_html( sprintf( /* translators: %s: Storage name, e.g. Media Storage. */ __( 'About %s', 'gend-society' ), $r['label'] ) ); ?></a>
+                    <?php endif; ?>
                     <?php endif; ?>
                 </div>
             <?php endforeach; ?>
@@ -1257,6 +1261,10 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
                         style="align-self: center; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14; font-weight: 800; text-transform: uppercase; letter-spacing: .06em; border: none; border-radius: 8px; cursor: pointer; font-size: 0.75rem; padding: 9px 16px; box-shadow: 0 6px 18px rgba(34,211,238,.30);">
                     <?php echo esc_html( ! empty( $gs_bk_current ) ? __( 'Change plan', 'gend-society' ) : __( 'Choose a plan', 'gend-society' ) ); ?>
                 </button>
+                <?php $gs_bk_info_url = function_exists( 'gend_society_hosting_info_urls' ) ? (string) ( gend_society_hosting_info_urls()['backups'] ?? '' ) : ''; ?>
+                <?php if ( '' !== $gs_bk_info_url ) : ?>
+                <a href="<?php echo esc_url( $gs_bk_info_url ); ?>" target="_blank" rel="noopener" style="align-self: center; color: var(--gs-muted, #94a3b8); font-size: 0.75rem; text-decoration: underline;"><?php esc_html_e( 'About Backups', 'gend-society' ); ?></a>
+                <?php endif; ?>
             <?php endif; ?>
         </div>
 
@@ -2025,6 +2033,10 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                         <div style="margin-bottom: 14px;">
                             <h4 style="color:#fff; font-size:1.05rem; margin:0;"><?php esc_html_e( 'Servers', 'gend-society' ); ?></h4>
                             <p style="color: var(--gs-muted, #94a3b8); font-size:0.85rem; margin:4px 0 0;"><?php esc_html_e( 'Dedicated server resources for your app — pick a plan and attach it to this membership.', 'gend-society' ); ?></p>
+                            <?php $gs_cg_server_info_url = function_exists( 'gend_society_hosting_info_urls' ) ? (string) ( gend_society_hosting_info_urls()['server'] ?? '' ) : ''; ?>
+                            <?php if ( '' !== $gs_cg_server_info_url ) : ?>
+                            <p style="font-size:0.8rem; margin:6px 0 0;"><a href="<?php echo esc_url( $gs_cg_server_info_url ); ?>" target="_blank" rel="noopener" style="color: var(--gs-muted, #94a3b8); text-decoration: underline;"><?php esc_html_e( 'About Managed Server Hosting', 'gend-society' ); ?></a></p>
+                            <?php endif; ?>
                         </div>
                         <?php
                         $gs_cg_server_embed_url = function_exists( 'gdc_plan_attach_resource_embed_url' ) ? gdc_plan_attach_resource_embed_url( 'server' ) : '';
@@ -2632,6 +2644,10 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 <div style="margin-bottom: 14px;">
                     <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Servers', 'gend-society' ); ?></h4>
                     <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Dedicated server resources for your app — pick a plan and attach it to this membership.', 'gend-society' ); ?></p>
+                    <?php $gs_server_info_url = function_exists( 'gend_society_hosting_info_urls' ) ? (string) ( gend_society_hosting_info_urls()['server'] ?? '' ) : ''; ?>
+                    <?php if ( '' !== $gs_server_info_url ) : ?>
+                    <p class="gs-hosting__section-sub" style="margin: 6px 0 0;"><a href="<?php echo esc_url( $gs_server_info_url ); ?>" target="_blank" rel="noopener" style="color: inherit; text-decoration: underline;"><?php esc_html_e( 'About Managed Server Hosting', 'gend-society' ); ?></a></p>
+                    <?php endif; ?>
                 </div>
                 <?php
                 $gs_server_embed_url = function_exists( 'gdc_plan_attach_resource_embed_url' ) ? gdc_plan_attach_resource_embed_url( 'server' ) : '';

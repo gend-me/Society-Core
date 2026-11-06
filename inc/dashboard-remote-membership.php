@@ -152,6 +152,29 @@ function gend_society_remote_membership_invalidate() {
 add_action( 'wp_login', 'gend_society_remote_membership_invalidate' );
 add_action( 'gs_remote_membership_invalidate', 'gend_society_remote_membership_invalidate' );
 
+if ( ! function_exists( 'gend_society_hosting_info_urls' ) ) {
+    /**
+     * gend.me's public product pages of the Hosted Solutions add-ons. Each page holds the add-on's checkout form and
+     * opens it with a plan already chosen on ?plan_id=<plan id>#start (Backups and Email Hosting take two ids, e.g.
+     * ?plan_id=72,76#start). The URLs carry no query string or fragment.
+     *
+     * @return array<string,string> Keys: media, database, codebase, backups, server, email.
+     */
+    function gend_society_hosting_info_urls(): array {
+        return (array) apply_filters(
+            'gend_society_hosting_info_urls',
+            array(
+                'media'    => 'https://gend.me/grow/infrastructure/storage/media-storage/',
+                'database' => 'https://gend.me/grow/infrastructure/storage/database-storage/',
+                'codebase' => 'https://gend.me/grow/infrastructure/storage/code-database/',
+                'backups'  => 'https://gend.me/grow/infrastructure/backups/backup-storage/',
+                'server'   => 'https://gend.me/grow/infrastructure/servers/managed-server-hosting/',
+                'email'    => 'https://gend.me/grow/infrastructure/emails/email-storage/',
+            )
+        );
+    }
+}
+
 if ( ! function_exists( 'gend_society_migration_preview_note_html' ) ) {
     /**
      * Phase 111-10 (MIG-09, P1/P4/P6): the Preview note under the existing dashboard header. Shown only while the
@@ -373,7 +396,7 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_backups_view' ) ) {
             'text'       => __( 'Backups run on gend.me hosting. Your site keeps its own backups until you move it.', 'gend-society' ),
             'backup_now' => ! empty( $p['hosted'] ) && ! empty( $p['actions']['backup_now'] ),
             'choose_url' => '',
-            'learn_url'  => gend_society_dashboard_standalone_action_url( 'membership' ),
+            'learn_url'  => gend_society_dashboard_standalone_paired() ? (string) ( gend_society_hosting_info_urls()['backups'] ?? '' ) : '', // the Backups product page
             'plan'       => '',
             'moved'      => false,
         );
@@ -443,7 +466,7 @@ if ( ! function_exists( 'gend_society_email_plan_env' ) ) {
             'manage_url' => defined( 'EMAIL_MANAGER_PATH' ) ? admin_url( 'admin.php?page=talk-flows' ) : '',
         );
         if ( $sa ) {
-            $env['learn_url'] = function_exists( 'gend_society_dashboard_standalone_action_url' ) ? gend_society_dashboard_standalone_action_url( 'membership' ) : '';
+            $env['learn_url'] = (string) ( gend_society_hosting_info_urls()['email'] ?? '' ); // the Email Hosting product page
             // The Emails plans belong to the membership: read them from gend.me's /membership answer (hosting_plans.emails).
             $mc = function_exists( 'gend_society_remote_membership_get_cached' ) ? gend_society_remote_membership_get_cached() : null;
             $hp = ( is_array( $mc ) && is_array( $mc['hosting_plans']['emails'] ?? null ) ) ? $mc['hosting_plans']['emails'] : array();

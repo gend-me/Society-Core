@@ -2032,6 +2032,11 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                                     if ( ! empty( $srv_plan['wc_product_id'] ) ) {
                                         $plan_url = add_query_arg( 'add-to-cart', (int) $srv_plan['wc_product_id'], home_url( '/checkout/' ) );
                                     }
+                                    // The Managed Server Hosting page holds the checkout form: open it with this plan chosen.
+                                    $srv_info_url = function_exists( 'gend_society_hosting_info_urls' ) ? (string) ( gend_society_hosting_info_urls()['server'] ?? '' ) : '';
+                                    if ( '' !== $srv_info_url ) {
+                                        $plan_url = ! empty( $srv_plan['id'] ) ? add_query_arg( 'plan_id', (int) $srv_plan['id'], $srv_info_url ) . '#start' : $srv_info_url;
+                                    }
                                 ?>
                                     <div class="gs-cg-plan-card">
                                         <p class="gs-cg-plan-card__name"><?php echo esc_html( (string) ( $srv_plan['name'] ?? '' ) ); ?></p>
@@ -2691,9 +2696,9 @@ function gend_society_compute_container_plan_price( $size_gb, $storage_type ) {
 /**
  * v12.1 — Fetch container plans tagged with a storage type, ordered by
  * ascending size. Reads from WP Ultimo hosting products where the
- * `wu_container_storage_type` meta matches. Falls back to a sensible
- * default trio (Standard / Pro / Enterprise) when no products exist so
- * the upgrade popup always has something to show.
+ * `wu_container_storage_type` meta matches. Returns an empty list when
+ * no such products exist: the upgrade popup then links to the product
+ * page instead of showing invented tiers.
  *
  * @param string $resource Frontend resource slug: 'media' | 'database' | 'codebase'
  * @return array List of plans: [{ id, name, size_gb, size_label, price, price_label, is_default }]
@@ -2740,28 +2745,6 @@ function gend_society_get_container_plans_for_resource( $resource ) {
     if ( ! empty( $out ) ) {
         $mid = (int) floor( count( $out ) / 2 );
         $out[ $mid ]['is_default'] = true;
-    } else {
-        // Fallback trio (only when no WP Ultimo products exist for this type)
-        $defaults = array(
-            'media'    => array( 50, 200, 1024 ),
-            'database' => array( 10, 50, 250 ),
-            'codebase' => array( 5, 20, 100 ),
-        );
-        $tiers = isset( $defaults[ $resource ] ) ? $defaults[ $resource ] : array( 10, 50, 250 );
-        $names = array( __( 'Standard', 'gend-society' ), __( 'Pro', 'gend-society' ), __( 'Enterprise', 'gend-society' ) );
-        foreach ( $tiers as $i => $gb ) {
-            $price = gend_society_compute_container_plan_price( $gb, $storage_type );
-            $out[] = array(
-                'id'          => 0,
-                'name'        => $names[ $i ] ?? sprintf( __( 'Tier %d', 'gend-society' ), $i + 1 ),
-                'size_gb'     => (float) $gb,
-                'size_label'  => $gb >= 1024 ? number_format( $gb / 1024, 1 ) . ' TB' : number_format( $gb, 0 ) . ' GB',
-                'price'       => (float) $price,
-                'price_label' => '$' . number_format( $price, 2 ) . ' / mo',
-                'is_default'  => $i === 1,
-                'gcp_base'    => round( gend_society_gcp_storage_cost_per_gb( $storage_type ) * $gb, 2 ),
-            );
-        }
     }
     return $out;
 }
@@ -3553,9 +3536,14 @@ function gend_society_group_render_hosting_suite( $group_id ) {
                         'database' => gend_society_get_container_plans_for_resource( 'database' ),
                         'codebase' => gend_society_get_container_plans_for_resource( 'codebase' ),
                     );
+                    // The product page of each storage type holds its checkout form: Confirm opens it with the chosen
+                    // plan (?plan_id=<id>#start), and it is the one link offered when no plans are available.
+                    $gs_plans_info = function_exists( 'gend_society_hosting_info_urls' ) ? array_intersect_key( gend_society_hosting_info_urls(), $gs_plans_payload ) : array();
                     ?>
                     <div class="gs-upg-modal" data-gs-upg-modal
                          data-gs-plans="<?php echo esc_attr( wp_json_encode( $gs_plans_payload ) ); ?>"
+                         data-gs-info-urls="<?php echo esc_attr( wp_json_encode( (object) $gs_plans_info ) ); ?>"
+                         data-gs-see-plans="<?php esc_attr_e( 'See the plans', 'gend-society' ); ?>"
                          aria-hidden="true" role="dialog" aria-modal="true">
                         <div class="gs-upg-backdrop" data-gs-upg-close></div>
                         <div class="gs-upg-card">
@@ -3576,23 +3564,7 @@ function gend_society_group_render_hosting_suite( $group_id ) {
                                     <p class="gs-upg-cur-val" data-gs-upg-cap>—</p>
                                 </div>
                             </div>
-                            <div class="gs-upg-reveal gs-upg-plans" style="--gs-i:4">
-                                <div class="gs-upg-plan" data-plan-tier="standard">
-                                    <p class="gs-upg-plan-name"><?php esc_html_e( 'Standard', 'gend-society' ); ?></p>
-                                    <p class="gs-upg-plan-cap" data-plan-cap>—</p>
-                                    <p class="gs-upg-plan-price">$29 / mo</p>
-                                </div>
-                                <div class="gs-upg-plan is-active" data-plan-tier="pro">
-                                    <p class="gs-upg-plan-name"><?php esc_html_e( 'Pro', 'gend-society' ); ?></p>
-                                    <p class="gs-upg-plan-cap" data-plan-cap>—</p>
-                                    <p class="gs-upg-plan-price">$79 / mo</p>
-                                </div>
-                                <div class="gs-upg-plan" data-plan-tier="enterprise">
-                                    <p class="gs-upg-plan-name"><?php esc_html_e( 'Enterprise', 'gend-society' ); ?></p>
-                                    <p class="gs-upg-plan-cap" data-plan-cap>—</p>
-                                    <p class="gs-upg-plan-price">$249 / mo</p>
-                                </div>
-                            </div>
+                            <div class="gs-upg-reveal gs-upg-plans" style="--gs-i:4"><?php // Filled by renderPlanCards() each time the popup opens. ?></div>
                             <div class="gs-upg-reveal gs-upg-actions" style="--gs-i:5">
                                 <button type="button" class="gs-upg-primary" data-gs-upg-confirm>
                                     <?php esc_html_e( 'Confirm Upgrade', 'gend-society' ); ?>
@@ -3619,6 +3591,8 @@ function gend_society_group_render_hosting_suite( $group_id ) {
 
                         var PLANS = {};
                         try { PLANS = JSON.parse(modal.getAttribute('data-gs-plans') || '{}'); } catch (e) { PLANS = {}; }
+                        var INFO = {};
+                        try { INFO = JSON.parse(modal.getAttribute('data-gs-info-urls') || '{}'); } catch (e) { INFO = {}; }
 
                         var COPY = {
                             media:    { title: 'More room for uploads',       lede: 'Every image, video, and file lands here. Bump the cap to keep publishing without cleanup runs.' },
@@ -3631,8 +3605,11 @@ function gend_society_group_render_hosting_suite( $group_id ) {
                         function renderPlanCards(slug) {
                             if (!plansContainer) return;
                             var tiers = PLANS[slug] || [];
+                            if (confirm) confirm.style.display = tiers.length ? '' : 'none';
                             if (!tiers.length) {
-                                plansContainer.innerHTML = '<p style="grid-column: 1 / -1; color: rgba(226,232,240,.6); text-align: center; padding: 24px;">No plans configured for this resource yet.</p>';
+                                plansContainer.innerHTML = INFO[slug]
+                                    ? '<p style="grid-column: 1 / -1; text-align: center; padding: 24px;"><a class="gs-upg-primary" style="text-decoration: none;" href="' + escapeHtml(INFO[slug]) + '" target="_blank" rel="noopener">' + escapeHtml(modal.getAttribute('data-gs-see-plans') || 'See the plans') + '</a></p>'
+                                    : '<p style="grid-column: 1 / -1; color: rgba(226,232,240,.6); text-align: center; padding: 24px;">No plans configured for this resource yet.</p>';
                                 return;
                             }
                             var html = '';
@@ -3692,8 +3669,9 @@ function gend_society_group_render_hosting_suite( $group_id ) {
                             var chosen = modal.querySelector('.gs-upg-plan.is-active');
                             var planId = chosen ? parseInt(chosen.getAttribute('data-plan-id'), 10) : 0;
                             confirm.textContent = 'Redirecting to checkout…';
+                            // Plan ids are membership plans, not store products: the product page holds their checkout form.
                             var url = '/checkout/';
-                            if (planId > 0) url = '/checkout/?add-to-cart=' + planId;
+                            if (INFO[currentSlug]) url = INFO[currentSlug] + (planId > 0 ? '?plan_id=' + planId + '#start' : '');
                             setTimeout(function () { window.location.href = url; }, 400);
                         });
                     })();
