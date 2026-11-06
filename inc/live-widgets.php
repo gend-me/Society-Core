@@ -49,15 +49,8 @@ function gend_society_live_is_team() {
 }
 
 function gend_society_live_assets() {
-	foreach ( array( 'css', 'js' ) as $ext ) {
-		$file = 'assets/live-widgets.' . $ext;
-		$ver  = GEND_SOCIETY_VERSION . '.' . (int) @filemtime( GEND_SOCIETY_DIR . $file );
-		if ( 'css' === $ext ) {
-			wp_enqueue_style( 'gend-society-live', GEND_SOCIETY_URL . $file, array(), $ver );
-		} else {
-			wp_enqueue_script( 'gend-society-live', GEND_SOCIETY_URL . $file, array(), $ver, true );
-		}
-	}
+	wp_enqueue_style( 'gend-society-live', GEND_SOCIETY_URL . 'assets/live-widgets.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/live-widgets.css' ) );
+	wp_enqueue_script( 'gend-society-live', GEND_SOCIETY_URL . 'assets/live-widgets.js', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/live-widgets.js' ), true );
 }
 
 /** The team's numbers, five minutes at a time. */
