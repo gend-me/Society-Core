@@ -692,7 +692,7 @@ add_filter(
 		}, static function ( $a ) {
 			return gend_society_sb_social_header_risk( $a );
 		} );
-		$add( 'app_social_layout_save', 'Put a designed top (block markup) above the members directory, the groups directory or the activity feed, and publish it. The listing stays below. Replacing a layout the member designed needs their confirmation.', array( 'slug' => array( 'type' => 'string', 'enum' => array( 'members-directory', 'groups-directory', 'activity' ) ), 'top' => $str ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
+		$add( 'app_social_layout_save', 'Put a designed top (block markup, in top) above the members directory, the groups directory or the activity feed, or set the profile or group sidebar (its whole content, in content), and publish it. The listing stays below a top. Replacing a layout the member designed needs their confirmation.', array( 'slug' => array( 'type' => 'string', 'enum' => array( 'members-directory', 'groups-directory', 'activity', 'profile-sidebar', 'group-sidebar' ) ), 'top' => $str, 'content' => $str ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
 			return gend_society_sb_social_layout_save( $a );
 		}, static function ( $a ) {
 			return gend_society_sb_social_layout_risk( $a );

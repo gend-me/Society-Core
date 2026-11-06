@@ -1520,6 +1520,9 @@ function gend_society_sb_social_header_risk( array $a ) {
 /** The layouts a directory top can go in: the members and groups directories and the activity feed. */
 const GEND_SOCIETY_SB_TOP_LAYOUTS = array( 'members-directory', 'groups-directory', 'activity' );
 
+/** The sidebars the chat can design: their whole content, from profile widget or group blocks only. */
+const GEND_SOCIETY_SB_SIDEBARS = array( 'profile-sidebar' => array( 'gend-society/profile-widget' ), 'group-sidebar' => array( 'gend-society/group-members', 'gend-society/group-about' ) );
+
 /**
  * Puts a designed top above a directory or the activity feed, with the listing kept below, and publishes it.
  *
@@ -1532,6 +1535,9 @@ function gend_society_sb_social_layout_save( array $a ) {
 	}
 	$slug = sanitize_key( (string) ( $a['slug'] ?? '' ) );
 	$defs = gend_society_ds_layouts();
+	if ( isset( GEND_SOCIETY_SB_SIDEBARS[ $slug ] ) ) {
+		return gend_society_sb_sidebar_save( $slug, (string) ( $a['content'] ?? '' ) );
+	}
 	if ( ! in_array( $slug, GEND_SOCIETY_SB_TOP_LAYOUTS, true ) || ! isset( $defs[ $slug ] ) ) {
 		return array( 'error' => 'slug is one of: ' . implode( ', ', GEND_SOCIETY_SB_TOP_LAYOUTS ) . '.' );
 	}
@@ -1548,6 +1554,30 @@ function gend_society_sb_social_layout_save( array $a ) {
 	}
 	$done = wp_update_post( wp_slash( array( 'ID' => $id, 'post_status' => 'publish', 'post_content' => $top . "
 " . $listing ) ), true );
+	if ( is_wp_error( $done ) ) {
+		return array( 'error' => $done->get_error_message() );
+	}
+	update_post_meta( $id, '_gs_chat_layout', time() );
+	return array( 'id' => (int) $id, 'slug' => $slug, 'published' => true );
+}
+
+/** A sidebar of profile widgets or group blocks, published as the site's sidebar. Nothing but those blocks is kept. */
+function gend_society_sb_sidebar_save( $slug, $content ) {
+	$allowed = GEND_SOCIETY_SB_SIDEBARS[ $slug ];
+	$kept    = '';
+	foreach ( parse_blocks( $content ) as $block ) {
+		if ( in_array( $block['blockName'] ?? '', $allowed, true ) ) {
+			$kept .= serialize_block( $block );
+		}
+	}
+	if ( '' === $kept ) {
+		return array( 'error' => 'content needs at least one of: ' . implode( ', ', $allowed ) . '.' );
+	}
+	$id = gend_society_ds_layout_id( $slug );
+	if ( ! $id ) {
+		return array( 'error' => 'The sidebar could not be made.' );
+	}
+	$done = wp_update_post( wp_slash( array( 'ID' => $id, 'post_status' => 'publish', 'post_content' => $kept ) ), true );
 	if ( is_wp_error( $done ) ) {
 		return array( 'error' => $done->get_error_message() );
 	}
