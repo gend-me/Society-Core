@@ -187,5 +187,5 @@ function gend_society_ch_css() {
 	if ( ! function_exists( 'gend_society_sb_scoped' ) || ! gend_society_sb_scoped() || ! function_exists( 'is_buddypress' ) || ! is_buddypress() ) {
 		return;
 	}
-	wp_enqueue_style( 'gend-society-community-home', GEND_SOCIETY_URL . 'assets/community-home.css', array(), GEND_SOCIETY_VERSION . '.' . (int) @filemtime( GEND_SOCIETY_DIR . 'assets/community-home.css' ) );
+	wp_enqueue_style( 'gend-society-community-home', GEND_SOCIETY_URL . 'assets/community-home.css', array(), GEND_SOCIETY_VERSION . '.' . filemtime( GEND_SOCIETY_DIR . 'assets/community-home.css' ) );
 }
