@@ -163,7 +163,7 @@ function gend_society_settings_notification_groups( $user_id ) {
         $bp->displayed_user->id = $user_id;
     }
     ob_start();
-    do_action( 'bp_notification_settings' );
+    do_action( 'bp_notification_settings' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- BuddyPress core hook.
     $html = ob_get_clean();
     if ( $bp && null !== $was ) $bp->displayed_user = $was;
     $groups = array();
@@ -405,7 +405,7 @@ add_action( 'wp_ajax_gend_society_settings_profile', function () {
         $ids[]         = $p[0];
         $new[ $p[0] ]  = array( 'value' => $p[1] );
     }
-    do_action( 'xprofile_updated_profile', $uid, $ids, false, $old, $new );
+    do_action( 'xprofile_updated_profile', $uid, $ids, false, $old, $new ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- BuddyPress core hook.
     clean_user_cache( $uid );
     wp_send_json_success( array( 'name' => (string) get_userdata( $uid )->display_name ) );
 } );
@@ -463,7 +463,7 @@ add_action( 'wp_ajax_gend_society_settings_notifications', function () {
             bp_update_user_meta( $uid, $r['key'], empty( $posted[ $r['key'] ] ) ? 'no' : 'yes' );
         }
     }
-    do_action( 'bp_core_notification_settings_after_save' );
+    do_action( 'bp_core_notification_settings_after_save' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- BuddyPress core hook.
     wp_send_json_success( array( 'message' => __( 'Notification settings saved.', 'gend-society' ) ) );
 } );
 

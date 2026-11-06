@@ -229,8 +229,8 @@ add_filter( 'woocommerce_available_payment_gateways', 'gend_society_dedupe_hub_p
 function gend_society_dedupe_hub_payment_gateways( $gateways ) {
     if ( ! is_array( $gateways ) ) return $gateways;
     // Sub-sites run on the hub's server, but the bridge gateways are the only way they take payments.
-    $is_hub = gend_society_is_hub() && is_main_site();
-    if ( ! $is_hub ) return $gateways;
+    $is_hub = gend_society_is_hub();
+    if ( ! $is_hub || ! is_main_site() ) return $gateways;
     // Container "bridge" gateways (redundant on the hub) + gend_dgen_hub: DGEN is
     // applied via the C&P wallet panel ("Apply your DGEN and/or store credit") that
     // renders above the gateways, so a separate "Pay with DGEN" gateway radio just
