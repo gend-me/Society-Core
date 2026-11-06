@@ -396,14 +396,15 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
             $gs_gas_earnings = array();
             global $wpdb;
             $gs_gas_ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
-            $gs_gas_rows = $wpdb->get_results(
+            // The viewer's own stations only: what other members' devices earn is theirs to see, not this group's.
+            $gs_gas_rows = $wpdb->get_results( $wpdb->prepare(
                 "SELECT station_id, SUM(units) AS units, SUM(owner_amount) AS owner_amount, MAX(created_at) AS last_earned
                  FROM {$gs_gas_ledger}
-                 WHERE station_id <> ''
+                 WHERE station_id <> '' AND station_user_id = %d
                  GROUP BY station_id
                  ORDER BY owner_amount DESC",
-                ARRAY_A
-            );
+                get_current_user_id()
+            ), ARRAY_A );
             foreach ( (array) $gs_gas_rows as $gs_gas_row ) {
                 $gs_gas_earnings[] = array(
                     'station_id'   => (string) ( $gs_gas_row['station_id'] ?? '' ),
@@ -1681,6 +1682,15 @@ if ( class_exists( 'BP_Group_Extension' ) ) :
                     <section class="gs-cg-connected-card">
                         <h3><?php esc_html_e( 'Earned GAS fees', 'gend-society' ); ?></h3>
                         <p><?php esc_html_e( 'Gas Station Owner commissions earned by connected devices.', 'gend-society' ); ?></p>
+                        <?php
+                        // Awaiting = on customers' unpaid monthly gas invoices; paid = in the owner's DGEN balance.
+                        $gs_cg_payouts = function_exists( '\WP_Ultimo\Integrations\gdc_gas_payout_totals' ) ? \WP_Ultimo\Integrations\gdc_gas_payout_totals( get_current_user_id() ) : null;
+                        if ( is_array( $gs_cg_payouts ) ) : ?>
+                        <p class="gs-cg-payouts" style="margin:-6px 0 14px !important; color:rgba(226,232,240,.72) !important; font-size:.9rem !important;"><?php
+                            /* translators: 1: amount waiting for customers to pay their gas invoice, 2: amount paid out */
+                            echo esc_html( sprintf( __( 'Your payouts: awaiting payment %1$s DGEN · paid %2$s DGEN', 'gend-society' ), number_format( (float) $gs_cg_payouts['awaiting'], 2 ), number_format( (float) $gs_cg_payouts['completed'], 2 ) ) );
+                        ?></p>
+                        <?php endif; ?>
                         <div data-gs-cg-earnings></div>
                     </section>
 
