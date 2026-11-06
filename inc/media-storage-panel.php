@@ -260,3 +260,109 @@ function gend_society_media_storage_panel_inline_js() {
 })();
 JS;
 }
+
+/*
+ * Media Storage plan limit (web apps hosted on gend.me). The media library lives in the web app's own storage
+ * bucket and the Media plan sets its size: an upload that would take the library past that size is refused, with a
+ * message that says why. Only where the plan size is known (a hosted web app paired with its membership): gend.me
+ * itself and installs hosted elsewhere are not limited here.
+ */
+add_filter( 'wp_handle_upload_prefilter', 'gend_society_media_quota_check' );
+add_filter( 'wp_handle_sideload_prefilter', 'gend_society_media_quota_check' );
+add_filter( 'wp_handle_upload', 'gend_society_media_quota_count_upload' );
+add_filter( 'wp_handle_sideload', 'gend_society_media_quota_count_upload' );
+add_filter( 'wp_generate_attachment_metadata', 'gend_society_media_quota_count_sizes' );
+
+/**
+ * The Media plan's size in bytes where uploads are limited to it, else 0.
+ */
+function gend_society_media_quota_bytes(): int {
+	$cap = 0;
+	if ( function_exists( 'gend_society_runtime_mode' ) && 'container' === gend_society_runtime_mode() && function_exists( 'gend_society_hosting_plan_size_bytes' ) ) {
+		$cap = gend_society_hosting_plan_size_bytes( 'media' );
+	}
+	/**
+	 * Filters the size uploads are limited to. 0 = no limit.
+	 *
+	 * @param int $cap Bytes.
+	 */
+	return max( 0, (int) apply_filters( 'gend_society_media_quota_bytes', $cap ) );
+}
+
+/**
+ * Bytes the media library uses: the last scan plus what was uploaded since (the scan is kept for an hour).
+ */
+function gend_society_media_quota_used(): int {
+	$media = function_exists( 'gend_society_hosting_collect_media' ) ? gend_society_hosting_collect_media() : array();
+	return (int) ( $media['bytes_used'] ?? 0 ) + (int) get_transient( 'gend_society_media_added_since_scan' );
+}
+
+/**
+ * Refuses an upload that does not fit the Media plan.
+ *
+ * @param array $file The $_FILES entry (or sideload array): name, size, tmp_name, error.
+ * @return array
+ */
+function gend_society_media_quota_check( $file ) {
+	if ( ! is_array( $file ) || ! empty( $file['error'] ) ) {
+		return $file;
+	}
+	$cap = gend_society_media_quota_bytes();
+	if ( $cap <= 0 ) {
+		return $file;
+	}
+	$size = isset( $file['size'] ) ? (int) $file['size'] : 0;
+	if ( $size <= 0 && ! empty( $file['tmp_name'] ) && is_string( $file['tmp_name'] ) && is_file( $file['tmp_name'] ) ) {
+		$size = (int) filesize( $file['tmp_name'] );
+	}
+	$used = gend_society_media_quota_used();
+	if ( $used + $size > $cap ) {
+		$file['error'] = sprintf(
+			/* translators: 1: plan size, 2: size of the file, 3: free space */
+			__( 'Your Media Storage plan (%1$s) is full: this file is %2$s and %3$s is free. Remove files or upgrade the plan to upload more.', 'gend-society' ),
+			size_format( $cap ),
+			size_format( $size, 1 ),
+			size_format( max( 0, $cap - $used ), 1 )
+		);
+	}
+	return $file;
+}
+
+/**
+ * Adds bytes to what was uploaded since the last scan.
+ */
+function gend_society_media_quota_add( int $bytes ): void {
+	if ( $bytes > 0 && gend_society_media_quota_bytes() > 0 ) {
+		set_transient( 'gend_society_media_added_since_scan', (int) get_transient( 'gend_society_media_added_since_scan' ) + $bytes, 2 * HOUR_IN_SECONDS );
+	}
+}
+
+/**
+ * Counts a stored upload.
+ *
+ * @param array $upload file, url, type.
+ * @return array
+ */
+function gend_society_media_quota_count_upload( $upload ) {
+	if ( is_array( $upload ) && ! empty( $upload['file'] ) && is_string( $upload['file'] ) && is_file( $upload['file'] ) ) {
+		gend_society_media_quota_add( (int) filesize( $upload['file'] ) );
+	}
+	return $upload;
+}
+
+/**
+ * Counts the smaller image sizes WordPress makes from an upload.
+ *
+ * @param array $metadata Attachment metadata.
+ * @return array
+ */
+function gend_society_media_quota_count_sizes( $metadata ) {
+	if ( is_array( $metadata ) && ! empty( $metadata['sizes'] ) && is_array( $metadata['sizes'] ) ) {
+		$bytes = 0;
+		foreach ( $metadata['sizes'] as $size ) {
+			$bytes += is_array( $size ) ? (int) ( $size['filesize'] ?? 0 ) : 0;
+		}
+		gend_society_media_quota_add( $bytes );
+	}
+	return $metadata;
+}
