@@ -97,7 +97,7 @@ function gend_society_get_feature_definitions()
         ),
         'membership' => array(
             'name' => __('Contracts & Payments', 'gend-society'),
-            'description' => __('See balances in every currency, the money your gateways collect, every commission contract and payout, your business expenses and what you put back into growth, in one finance dashboard.', 'gend-society'),
+            'description' => __('See balances in every currency, the money your gateways collect, every commission contract and payout and your expenses, then split the remaining profit between members with Profit Share Tokens.', 'gend-society'),
             'plugin' => 'contracts-and-payments/contracts-and-payments.php',
             'image' => gend_society_feature_card_image('membership'),
             'link' => 'https://gend.me/contracts-payments/',

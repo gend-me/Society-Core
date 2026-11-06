@@ -48,18 +48,19 @@ if ( ! function_exists( 'gend_society_sa_menu_gated' ) ) {
 	/**
 	 * gend.me feature pages bundled as menu pages: page slug => parent, label, plan area, the gend.me plugin that
 	 * provides the feature (the page is only registered here while that plugin is not active). Slugs and labels
-	 * match gend.me/wp-admin.
+	 * match gend.me/wp-admin; 'feature' is the dashboard's card key (inc/feature-cards.php), which the upgrade page uses
+	 * to present that dashboard: what it does, its plan and its gend.me page.
 	 *
-	 * @return array<string,array{parent:string,label:string,area:string,plugin:string}>
+	 * @return array<string,array{parent:string,label:string,area:string,plugin:string,feature:string}>
 	 */
 	function gend_society_sa_menu_gated(): array {
 		return array(
-			'email-manager'           => array( 'parent' => 'gs-content', 'label' => __( 'Talk Flows', 'gend-society' ), 'area' => 'app', 'plugin' => 'email-manager/email-manager.php' ),
-			'gdc-store-settings'      => array( 'parent' => 'gs-store', 'label' => __( 'Store Management', 'gend-society' ), 'area' => 'store', 'plugin' => 'online-store/online-store.php' ),
-			'st_sales_team'           => array( 'parent' => 'gs-store', 'label' => __( 'Sales Team', 'gend-society' ), 'area' => 'store', 'plugin' => 'sales-team/advanced-affiliate-system.php' ),
-			'psoo-projects'           => array( 'parent' => 'gs-store', 'label' => __( 'Project Services', 'gend-society' ), 'area' => 'store', 'plugin' => 'projects/project-service-orders.php' ),
-			'gs-rewards'              => array( 'parent' => 'gs-social', 'label' => __( 'Point Bank', 'gend-society' ), 'area' => 'social', 'plugin' => 'reward-programs/reward-programs.php' ),
-			'gend-contracts-payments' => array( 'parent' => 'gs-social', 'label' => __( 'Contracts & Payments', 'gend-society' ), 'area' => 'social', 'plugin' => 'contracts-and-payments/contracts-and-payments.php' ),
+			'email-manager'           => array( 'parent' => 'gs-content', 'label' => __( 'Talk Flows', 'gend-society' ), 'area' => 'app', 'plugin' => 'email-manager/email-manager.php', 'feature' => 'email' ),
+			'gdc-store-settings'      => array( 'parent' => 'gs-store', 'label' => __( 'Store Management', 'gend-society' ), 'area' => 'store', 'plugin' => 'online-store/online-store.php', 'feature' => 'store' ),
+			'st_sales_team'           => array( 'parent' => 'gs-store', 'label' => __( 'Sales Team', 'gend-society' ), 'area' => 'store', 'plugin' => 'sales-team/advanced-affiliate-system.php', 'feature' => 'sales' ),
+			'psoo-projects'           => array( 'parent' => 'gs-store', 'label' => __( 'Project Services', 'gend-society' ), 'area' => 'store', 'plugin' => 'projects/project-service-orders.php', 'feature' => 'projects' ),
+			'gs-rewards'              => array( 'parent' => 'gs-social', 'label' => __( 'Point Bank', 'gend-society' ), 'area' => 'social', 'plugin' => 'reward-programs/reward-programs.php', 'feature' => 'rewards' ),
+			'gend-contracts-payments' => array( 'parent' => 'gs-social', 'label' => __( 'Contracts & Payments', 'gend-society' ), 'area' => 'social', 'plugin' => 'contracts-and-payments/contracts-and-payments.php', 'feature' => 'membership' ),
 		);
 	}
 }
@@ -294,7 +295,7 @@ if ( ! function_exists( 'gend_society_sa_menu_render_gated' ) ) {
 		// The page title in the gend.me hero style (the skin hides .wrap h1).
 		echo '<div class="wrap gdc-admin-dashboard gs-sa-wrap">' . gend_society_sa_menu_hero( $item['label'], __( 'A gend.me feature. It opens here once your dashboard plan includes it.', 'gend-society' ) ) . '</div>'; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
 		if ( 'included' !== gend_society_sa_menu_area_state( $item['area'] ) && function_exists( 'gend_society_feature_upgrade_page_standalone' ) ) {
-			gend_society_feature_upgrade_page_standalone( $item['area'] );
+			gend_society_feature_upgrade_page_standalone( $item['area'], (string) ( $item['feature'] ?? '' ) );
 			return;
 		}
 		echo '<div class="wrap gend-society-plan gend-society-upgrade"><h1>' . esc_html( $item['label'] ) . '</h1>';
