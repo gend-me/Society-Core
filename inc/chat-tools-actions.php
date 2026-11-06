@@ -82,7 +82,7 @@ function gend_society_chat_tools_rest_json( string $method, string $route, array
 
 /** Point types that hold real value: never changed from the chat. */
 function gend_society_chat_tools_value_types(): array {
-	return array( 'transact', 'gend', 'fund', 'ydgen' );
+	return array( 'transact', 'gend', 'profit_share', 'ydgen' );
 }
 
 /** Whether any argument changes what customers pay or what a vendor earns. */
@@ -119,6 +119,11 @@ add_filter(
 		$social = array( 'gdc-social-network-settings' );
 		$bank   = array( 'gdc-reward-point-bank' );
 		$blocked = array( 'error' => 'That point type holds real value, so it can only be changed by a person in wp-admin.' );
+		// gend.me's own point types: a web app never changes them.
+		$network_blocked = array( 'error' => 'That point type belongs to gend.me, so a web app cannot change it.' );
+		$network_type    = static function ( $key ) {
+			return function_exists( 'gend_society_hb_on_subsite' ) && gend_society_hb_on_subsite() && function_exists( 'gend_society_hb_network_point_types' ) && in_array( (string) $key, gend_society_hb_network_point_types(), true );
+		};
 
 		$add = static function ( $name, $description, $parameters, $area, $pages, $risk, $cap, $run, $risk_for = null ) use ( &$tools ) {
 			$tools[ $name ] = compact( 'name', 'description', 'parameters', 'area', 'pages', 'risk', 'cap', 'run', 'risk_for' );
@@ -139,6 +144,9 @@ add_filter(
 			$tokens = array_merge( gend_society_bt_style_tokens(), gend_society_bt_clean_style_tokens( (array) ( $a['tokens'] ?? array() ) ) );
 			update_option( 'gend_society_style_tokens', $tokens, false );
 			return array( 'saved' => array_keys( $tokens ) );
+		} );
+		$add( 'app_setup_brand_save', 'Put the style guide\'s colours on the store\'s pages, the store emails and the social emails.', array( 'colors' => $obj ), 'app.theme_builder', $theme, 'write', 'edit_theme_options', static function ( $a ) {
+			return gend_society_sb_save( (array) ( $a['colors'] ?? array() ) );
 		} );
 		$add( 'app_site_css_save', 'Add, replace or remove one named block of this site\'s styling.', array( 'name' => $str, 'css' => $str ), 'app.theme_builder', $theme, 'write', 'edit_theme_options', static function ( $a ) {
 			$name = sanitize_title( (string) ( $a['name'] ?? '' ) );
@@ -358,15 +366,18 @@ add_filter(
 
 		// ---- Store: Store Manager ----
 		$prices = array( 'regular_price', 'sale_price', 'status' );
-		$add( 'store_product_create', 'Create a product as a draft.', array( 'name' => $str, 'type' => $str, 'regular_price' => $str, 'description' => $str, 'short_description' => $str, 'sku' => $str, 'categories' => array( 'type' => 'array', 'items' => $obj ) ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
-			$body = array_intersect_key( $a, array_flip( array( 'name', 'type', 'regular_price', 'description', 'short_description', 'sku', 'categories' ) ) );
+		$add( 'store_product_create', 'Create a product as a draft.', array( 'name' => $str, 'type' => $str, 'regular_price' => $str, 'description' => $str, 'short_description' => $str, 'sku' => $str, 'virtual' => array( 'type' => 'boolean' ), 'categories' => array( 'type' => 'array', 'items' => $obj ) ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
+			$body = array_intersect_key( $a, array_flip( array( 'name', 'type', 'regular_price', 'description', 'short_description', 'sku', 'virtual', 'categories' ) ) );
 			$body['status'] = 'draft';
 			return gend_society_chat_tools_pick( array( $rest( 'POST', '/wc/v3/products', $body ) ), array( 'id', 'name', 'status', 'error' ) )[0];
 		} );
-		$add( 'store_product_update', 'Update a product. Changing its price or status needs the member\'s confirmation.', array( 'id' => $num, 'name' => $str, 'description' => $str, 'short_description' => $str, 'sku' => $str, 'regular_price' => $str, 'sale_price' => $str, 'status' => $str, 'stock_quantity' => $num, 'stock_status' => $str, 'manage_stock' => array( 'type' => 'boolean' ), 'categories' => array( 'type' => 'array', 'items' => $obj ) ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
-			$body = array_diff_key( $a, array( 'id' => 1 ) );
+		$add( 'store_product_update', 'Update a product. Changing its price or status needs the member\'s confirmation.', array( 'id' => $num, 'name' => $str, 'description' => $str, 'short_description' => $str, 'sku' => $str, 'regular_price' => $str, 'sale_price' => $str, 'status' => $str, 'stock_quantity' => $num, 'stock_status' => $str, 'manage_stock' => array( 'type' => 'boolean' ), 'image_id' => $num, 'categories' => array( 'type' => 'array', 'items' => $obj ) ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
+			$body = array_diff_key( $a, array( 'id' => 1, 'image_id' => 1 ) );
+			if ( ! empty( $a['image_id'] ) ) {
+				$body['images'] = array( array( 'id' => (int) $a['image_id'] ) );
+			}
 			$r    = $rest( 'PUT', '/wc/v3/products/' . (int) ( $a['id'] ?? 0 ), $body );
-			return isset( $r['error'] ) ? $r : array_intersect_key( $r, array_flip( array( 'id', 'name', 'status', 'price', 'regular_price', 'sale_price', 'stock_status', 'stock_quantity' ) ) );
+			return isset( $r['error'] ) ? $r : array_intersect_key( $r, array_flip( array( 'id', 'name', 'status', 'price', 'regular_price', 'sale_price', 'stock_status', 'stock_quantity' ) ) ) + array( 'image_id' => (int) ( $r['images'][0]['id'] ?? 0 ) );
 		}, static function ( $a ) use ( $prices ) {
 			return gend_society_chat_tools_has_key( $a, $prices ) ? 'confirm' : 'write';
 		} );
@@ -421,8 +432,46 @@ add_filter(
 		$add( 'store_email_toggle', 'Turn a store customer email on or off.', array( 'email_id' => $str, 'enabled' => array( 'type' => 'boolean' ) ), 'store.store_management', $store, 'confirm', '', static function ( $a ) use ( $rest ) {
 			return $rest( 'POST', '/em/v1/wc-email-toggle', array( 'email_id' => sanitize_key( (string) ( $a['email_id'] ?? '' ) ), 'enabled' => ! empty( $a['enabled'] ) ) );
 		} );
-		$add( 'store_email_save', 'Change a store customer email\'s subject, heading or content.', array( 'email_id' => $str, 'subject' => $str, 'heading' => $str, 'content' => $str ), 'store.store_management', $store, 'confirm', '', static function ( $a ) use ( $rest ) {
-			return $rest( 'POST', '/em/v1/wc-email-save', array_intersect_key( $a, array_flip( array( 'email_id', 'subject', 'heading', 'content' ) ) ) );
+		$add( 'store_email_save', 'Change a store customer email\'s subject, heading or message. The message is a short note under the order details, which stay as they are.', array( 'email_id' => $str, 'subject' => $str, 'heading' => $str, 'content' => $str ), 'store.store_management', $store, 'confirm', '', static function ( $a ) use ( $rest ) {
+			$r = $rest( 'POST', '/em/v1/wc-email-save', array_intersect_key( $a, array_flip( array( 'email_id', 'subject', 'heading' ) ) ) );
+			if ( ! isset( $r['error'] ) && isset( $a['content'] ) ) {
+				$key      = 'woocommerce_' . sanitize_key( (string) ( $a['email_id'] ?? '' ) ) . '_settings';
+				$settings = (array) get_option( $key, array() );
+				$settings['additional_content'] = wp_kses_post( (string) $a['content'] );
+				update_option( $key, $settings );
+			}
+			return $r;
+		} );
+		$add( 'store_product_delivery_save', 'Make a purchase of this product add a task to a delivery project.', array( 'product_id' => $num, 'project_id' => $num, 'task_title' => $str, 'task_desc' => $str ), 'store.store_management', $store, 'write', 'edit_products', static function ( $a ) {
+			return gend_society_sb_product_delivery_save( $a );
+		} );
+		$add( 'app_affiliate_page_save', 'Create the Affiliates page, where affiliates get their link and see their earnings.', array(), 'store.sales_team', $sales, 'write', 'manage_options', static function () {
+			return gend_society_sb_affiliate_page();
+		} );
+		$add( 'sales_commission_contract_save', 'Set the store\'s commission contract: rate, team override and return period, which commissions and store rewards both wait out. Paid in DGEN from sales with gend.me Payments on, otherwise in points on the site.', array( 'name' => $str, 'rate' => $num, 'override_rate' => $num, 'return_days' => $num, 'cookie_days' => $num ), 'store.sales_team', $sales, 'confirm', 'manage_options', static function ( $a ) {
+			return gend_society_sb_commission_save( $a );
+		} );
+		$add( 'store_policy_pages_save', 'Create the store\'s Privacy Policy and Terms of Service pages from the business details, and link them at checkout, in emails and in the footer. A page the member edited is kept.', array( 'business_name' => $str, 'contact_email' => $str ), 'store.store_management', $store, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_policy_pages( $a );
+		} );
+		$add( 'store_settings_save', 'Set the store\'s currency and country, and open it to customers.', array( 'currency' => $str, 'country' => $str ), 'store.store_management', $store, 'confirm', 'manage_woocommerce', static function ( $a ) {
+			$currency = strtoupper( (string) ( $a['currency'] ?? '' ) );
+			$country  = strtoupper( (string) ( $a['country'] ?? '' ) );
+			if ( '' !== $currency ) {
+				if ( ! isset( get_woocommerce_currencies()[ $currency ] ) ) {
+					return array( 'error' => 'That is not a currency the store can use.' );
+				}
+				update_option( 'woocommerce_currency', $currency );
+			}
+			if ( '' !== $country ) {
+				if ( ! isset( WC()->countries->get_countries()[ strtok( $country, ':' ) ] ) ) {
+					return array( 'error' => 'That is not a country the store knows.' );
+				}
+				update_option( 'woocommerce_default_country', $country );
+			}
+			// The member has just approved selling these, so the shop can't stay behind a coming soon page.
+			update_option( 'woocommerce_coming_soon', 'no' );
+			return array( 'currency' => get_option( 'woocommerce_currency' ), 'country' => get_option( 'woocommerce_default_country' ) );
 		} );
 
 		// ---- Store: Sales Team ----
@@ -507,6 +556,15 @@ add_filter(
 		} );
 
 		// ---- Social: member management ----
+		$add( 'social_features_save', 'Choose which social network features are on: activity, groups, friends, messages, notifications, moderation.', array( 'features' => $arr ), 'social.social_profiles', $social, 'confirm', 'manage_options', static function ( $a ) {
+			return gend_society_sb_social_features_save( (array) ( $a['features'] ?? array() ) );
+		} );
+		$add( 'social_emails', 'The social network\'s emails with their wording and tokens.', array(), 'social.social_profiles', $social, 'read', 'manage_options', static function () {
+			return gend_society_sb_social_emails();
+		} );
+		$add( 'social_email_save', 'Change one social network email\'s subject or wording. It must keep every {{token}}. These send by themselves.', array( 'type' => $str, 'subject' => $str, 'content' => $str ), 'social.social_profiles', $social, 'confirm', 'manage_options', static function ( $a ) {
+			return gend_society_sb_social_email_save( $a );
+		} );
 		$add( 'members_type_save', 'Create a member type, or rename one when term_id is given.', array( 'term_id' => $num, 'member_type_id' => $str, 'singular_name' => $str, 'plural_name' => $str ), 'social.social_profiles', $social, 'write', '', static function ( $a ) use ( $ajax ) {
 			return ! empty( $a['term_id'] )
 				? $ajax( 'gdc_member_types_update', array_intersect_key( $a, array_flip( array( 'term_id', 'plural_name' ) ) ), 'gdc_member_types' )
@@ -545,19 +603,52 @@ add_filter(
 		$add( 'bank_member_holds', 'Store rewards a member has on hold for one point type.', array( 'user_id' => $num, 'point_type' => $str ), 'social.point_bank', $bank, 'read', 'manage_options', static function ( $a ) {
 			return function_exists( 'rp_holds_pending' ) ? rp_holds_pending( (int) ( $a['user_id'] ?? 0 ), sanitize_key( (string) ( $a['point_type'] ?? '' ) ) ) : array( 'error' => 'Holds are not available on this site.' );
 		} );
-		$add( 'bank_point_type_add', 'Add a point type.', array( 'key' => $str, 'label' => $str, 'singular' => $str ), 'social.point_bank', $bank, 'confirm', '', static function ( $a ) use ( $ajax ) {
+		$add( 'bank_point_type_add', 'Add a point type.', array( 'key' => $str, 'label' => $str, 'singular' => $str ), 'social.point_bank', $bank, 'confirm', '', static function ( $a ) use ( $ajax, $network_type, $network_blocked ) {
+			if ( $network_type( sanitize_key( (string) ( $a['key'] ?? '' ) ) ) ) {
+				return $network_blocked;
+			}
 			return $ajax( 'rp_point_bank_add_type', array_intersect_key( $a, array_flip( array( 'key', 'label', 'singular' ) ) ), 'rp_point_bank_manage_types' );
 		} );
-		$add( 'bank_point_type_details', 'Change a point type\'s names and number format.', array( 'key' => $str, 'label' => $str, 'singular' => $str, 'prefix' => $str, 'suffix' => $str, 'decimals' => $num ), 'social.point_bank', $bank, 'write', '', static function ( $a ) use ( $ajax, $blocked ) {
-			if ( in_array( sanitize_key( (string) ( $a['key'] ?? '' ) ), gend_society_chat_tools_value_types(), true ) ) {
-				return $blocked;
-			}
-			return $ajax( 'rp_point_bank_update_details', array_intersect_key( $a, array_flip( array( 'key', 'label', 'singular', 'prefix', 'suffix', 'decimals' ) ) ), 'rp_point_bank_manage_types' );
-		} );
-		$add( 'bank_point_type_rules', 'Change a point type\'s spend or exchange rules. rules is the whole list; read it first.', array( 'key' => $str, 'kind' => array( 'type' => 'string', 'enum' => array( 'spend', 'exchange' ) ), 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'confirm', '', static function ( $a ) use ( $ajax, $blocked ) {
+		$add( 'bank_point_type_details', 'Change a point type\'s names, number format, wallet line (short_description, up to 160 characters), details page (details_page_id, 0 turns it off) or image (image_id, a media id). Fields left out stay as they are.', array( 'key' => $str, 'label' => $str, 'singular' => $str, 'prefix' => $str, 'suffix' => $str, 'decimals' => $num, 'short_description' => $str, 'details_page_id' => $num, 'image_id' => $num ), 'social.point_bank', $bank, 'write', '', static function ( $a ) use ( $ajax, $blocked, $network_type, $network_blocked ) {
 			$key = sanitize_key( (string) ( $a['key'] ?? '' ) );
 			if ( in_array( $key, gend_society_chat_tools_value_types(), true ) ) {
 				return $blocked;
+			}
+			if ( $network_type( $key ) ) {
+				return $network_blocked;
+			}
+			// The handler resets whatever it isn't sent, so it gets the current values for the fields left out.
+			$post = array_merge( gend_society_chat_tools_point_type_current( $key ), array_intersect_key( $a, array_flip( array( 'label', 'singular', 'prefix', 'suffix', 'decimals' ) ) ) );
+			$post['key'] = $key;
+			// The description, details page and image savers run inside the handler and look for its action name.
+			$post['action'] = 'rp_point_bank_update_details';
+			if ( array_key_exists( 'short_description', $a ) ) {
+				$post['short_description'] = (string) $a['short_description'];
+			}
+			if ( array_key_exists( 'details_page_id', $a ) ) {
+				$pid = (int) $a['details_page_id'];
+				if ( $pid && ( 'page' !== get_post_type( $pid ) || ! current_user_can( 'edit_post', $pid ) ) ) {
+					return array( 'error' => 'details_page_id is not a page on this site.' );
+				}
+				$post['details_page_id']      = $pid;
+				$post['details_page_enabled'] = $pid ? '1' : '0';
+			}
+			if ( array_key_exists( 'image_id', $a ) ) {
+				$iid = (int) $a['image_id'];
+				if ( $iid && ( ! wp_attachment_is_image( $iid ) || ! current_user_can( 'edit_post', $iid ) ) ) {
+					return array( 'error' => 'image_id is not an image in this site\'s media.' );
+				}
+				$post['image_id'] = $iid;
+			}
+			return $ajax( 'rp_point_bank_update_details', $post, 'rp_point_bank_manage_types' );
+		} );
+		$add( 'bank_point_type_rules', 'Change a point type\'s spend or exchange rules. rules is the whole list; read it first.', array( 'key' => $str, 'kind' => array( 'type' => 'string', 'enum' => array( 'spend', 'exchange' ) ), 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'confirm', '', static function ( $a ) use ( $ajax, $blocked, $network_type, $network_blocked ) {
+			$key = sanitize_key( (string) ( $a['key'] ?? '' ) );
+			if ( in_array( $key, gend_society_chat_tools_value_types(), true ) ) {
+				return $blocked;
+			}
+			if ( $network_type( $key ) ) {
+				return $network_blocked;
 			}
 			return $ajax( 'exchange' === ( $a['kind'] ?? '' ) ? 'rp_point_bank_update_exchange' : 'rp_point_bank_update_spend', array( 'key' => $key, 'rules' => wp_json_encode( (array) ( $a['rules'] ?? array() ) ) ), 'rp_point_bank_manage_types' );
 		} );
@@ -583,6 +674,101 @@ add_filter(
 				return array( 'error' => 'No such notice.' );
 			}
 			return gend_society_chat_tools_save_post( 'mycred_email_notice', $a );
+		} );
+
+		// ---- Setup: pages, dashboards, affiliate sign-up, tab content, earning rules ----
+		$bool = array( 'type' => 'boolean' );
+		$add( 'site_setup_page_save', 'Create or update a published page: a hero in the brand\'s colours (title and intro) above one feature\'s shortcode. Allowed shortcodes: psoo_dashboard, psoo_pm_group_projects, affiliate_sales_dashboard, affiliate_link, affiliate_earnings, referral_team, gs_affiliate_register, gend_wallet, chat_form. A page the member made at that address is left as it is.', array( 'title' => $str, 'slug' => $str, 'intro' => $str, 'shortcode' => $str, 'hero' => $bool ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_setup_page_save( $a );
+		} );
+		$add( 'projects_dashboard_save', 'Create a Projects dashboard, or update one this tool made (id). audience: members (any logged-in member), team (the site\'s admins, editors and shop managers, and its group\'s admins and moderators) or customers (people with a paid order). sections: [{title, width: full|two-thirds|half|third, content: text or HTML with shortcodes}]. Returns its id and shortcode.', array( 'id' => $str, 'title' => $str, 'description' => $str, 'audience' => array( 'type' => 'string', 'enum' => array( 'members', 'team', 'customers' ) ), 'show_on_dashboard' => $bool, 'sections' => array( 'type' => 'array', 'items' => $obj ) ), 'store.project_services', $proj, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_dashboard_save( $a );
+		} );
+		$add( 'affiliate_program_setup_save', 'Choose whether people must join the affiliate program before their links earn (require_registration). registration_page_id is the page with [gs_affiliate_register]; form_id is a Talk Flows form whose submission enrols the sender. program_name is what the member called the program, shown on its account and profile tabs.', array( 'require_registration' => $bool, 'registration_page_id' => $num, 'form_id' => $num, 'program_name' => $str ), 'store.sales_team', $sales, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_affiliate_setup_save( $a );
+		} );
+		$add( 'app_social_header_save', 'Save the site\'s own profile or group header (block markup) and make it the default for every profile or group. Profile headers are built from the gend-society/profile-* blocks; group headers from gdc-blocks/group-identity-card. Replacing a header the member designed needs their confirmation.', array( 'scope' => array( 'type' => 'string', 'enum' => array( 'profiles', 'groups' ) ), 'title' => $str, 'content' => $str ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_social_header_save( $a );
+		}, static function ( $a ) {
+			return gend_society_sb_social_header_risk( $a );
+		} );
+		$add( 'app_social_layout_save', 'Put a designed top (block markup) above the members directory, the groups directory or the activity feed, and publish it. The listing stays below. Replacing a layout the member designed needs their confirmation.', array( 'slug' => array( 'type' => 'string', 'enum' => array( 'members-directory', 'groups-directory', 'activity' ) ), 'top' => $str ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_social_layout_save( $a );
+		}, static function ( $a ) {
+			return gend_society_sb_social_layout_risk( $a );
+		} );
+		$add( 'app_studio_template_save', 'Save the site\'s own copy of a Design Studio template, such as page-wallet (pages that show the member wallet). Without content it starts from the theme\'s layout for it. Replacing one the member designed needs their confirmation.', array( 'slug' => $str, 'content' => $str ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_studio_template_save( $a );
+		}, static function ( $a ) {
+			return gend_society_sb_studio_template_risk( $a );
+		} );
+		$add( 'app_social_tab_content_save', 'Put designed content (block HTML) on a profile or group menu tab. Without audience it is the tab\'s default page; with audience (who: all|out|in, roles, memberTypes, profileTypes, groupTypes, features) a page for those viewers. The tab\'s own panel stays below the content. Replacing a page the member wrote needs their confirmation.', array( 'scope' => array( 'type' => 'string', 'enum' => array( 'profiles', 'groups' ) ), 'tab_slug' => $str, 'title' => $str, 'content' => $str, 'audience' => $obj ), 'app.theme_builder', $theme, 'write', 'manage_options', static function ( $a ) {
+			return gend_society_sb_social_tab_content_save( $a );
+		}, static function ( $a ) {
+			return gend_society_sb_social_tab_risk( $a );
+		} );
+		$add( 'bank_earning_hooks', 'The earning rules (myCRED hooks) a point type can use, with whether each is on and its points, limit and log text.', array( 'point_type' => $str ), 'social.point_bank', $bank, 'read', 'manage_options', static function ( $a ) {
+			return gend_society_chat_tools_earning_hooks( sanitize_key( (string) ( $a['point_type'] ?? '' ) ) );
+		} );
+		$add( 'bank_earning_rules_save', 'Change a point type\'s earning rules. rules: [{hook, enabled, creds, limit (like 0/x, 5/d, 10/w, 20/m, 1/t), log}]. Only the hooks sent change; read bank_earning_hooks first.', array( 'point_type' => $str, 'rules' => array( 'type' => 'array', 'items' => $obj ) ), 'social.point_bank', $bank, 'write', 'manage_options', static function ( $a ) use ( $blocked, $network_type, $network_blocked ) {
+			$type = sanitize_key( (string) ( $a['point_type'] ?? '' ) );
+			if ( in_array( $type, gend_society_chat_tools_value_types(), true ) ) {
+				return $blocked;
+			}
+			if ( $network_type( $type ) ) {
+				return $network_blocked;
+			}
+			return gend_society_chat_tools_earning_rules_save( $type, (array) ( $a['rules'] ?? array() ) );
+		} );
+		$add( 'sales_proposal_template_save', 'Create, or update by id, a Sales Team offer template: title, content (HTML), milestones [{title, description, amount in the store currency, days, product_ids}], product_ids (added to the first milestone). A new template is a draft until the owner publishes it.', array( 'id' => $num, 'title' => $str, 'content' => $str, 'milestones' => array( 'type' => 'array', 'items' => $obj ), 'product_ids' => array( 'type' => 'array', 'items' => $num ) ), 'store.sales_team', $sales, 'write', 'edit_others_posts', static function ( $a ) {
+			return gend_society_sb_proposal_template_save( $a );
+		} );
+
+		// ---- Setup: marketing and go-live (tracking tags, SEO engine, media optimiser, speed fixes, connections) ----
+		$bool = array( 'type' => 'boolean' );
+		$add( 'analytics_tracking_get', 'The tracking tags this site loads for visitors: GA4 measurement id, Tag Manager container, Meta pixel and TikTok pixel, and whether Google Analytics is connected for reports.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () {
+			return gend_society_chat_tools_tracking_get();
+		} );
+		$add( 'analytics_tracking_save', 'Set the tracking tags every visitor loads: ga4_id (G-XXXX), gtm_id (GTM-XXXX), fb_pixel_id (digits), tiktok_pixel_id (letters and digits). Only the fields sent change; an empty string removes that tag.', array( 'ga4_id' => $str, 'gtm_id' => $str, 'fb_pixel_id' => $str, 'tiktok_pixel_id' => $str ), 'app.content_campaigns', $cc, 'confirm', 'manage_options', static function ( $a ) {
+			return gend_society_chat_tools_tracking_save( $a );
+		} );
+		$add( 'analytics_tracking_verify', 'Load the home page and report which of the saved tracking tags are really on it.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () use ( $ajax ) {
+			return gend_society_chat_tools_tracking_verify( $ajax );
+		} );
+		$add( 'seo_settings_get', 'The site\'s search and AI discovery settings: organisation details, llms.txt intro and facts, AI crawler policy, noindex for private pages, structured data and IndexNow, with the sitemap, robots.txt and llms.txt addresses.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () use ( $ajax ) {
+			return gend_society_chat_tools_seo_get( $ajax );
+		} );
+		$add( 'seo_settings_save', 'Change search and AI discovery settings. Only the fields sent change. organisation_logo_id is a media id (0 clears). same_as: the business\'s profile URLs. ai_crawlers: allow, search_only or block. Changing ai_crawlers or noindex_private needs the member\'s confirmation.', array( 'organisation_name' => $str, 'organisation_logo_id' => $num, 'same_as' => $arr, 'llms_intro' => $str, 'llms_facts' => $arr, 'ai_crawlers' => array( 'type' => 'string', 'enum' => array( 'allow', 'search_only', 'block' ) ), 'noindex_private' => $bool, 'structured_data' => $bool, 'indexnow' => $bool ), 'app.content_campaigns', $cc, 'write', 'manage_options', static function ( $a ) use ( $ajax ) {
+			return gend_society_chat_tools_seo_save( $a, $ajax );
+		}, static function ( $a ) {
+			return gend_society_chat_tools_seo_risk( $a );
+		} );
+		$add( 'seo_indexnow_submit', 'Tell search engines (Bing, Yandex and others through IndexNow) about every public page on the site now.', array(), 'app.content_campaigns', $cc, 'confirm', 'manage_options', static function () use ( $ajax ) {
+			return gend_society_chat_tools_indexnow_submit( $ajax );
+		} );
+		$add( 'media_settings_get', 'The media optimiser\'s settings (on or off, compression level), whether this server allows it to run, and the progress of optimising existing media.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () {
+			return gend_society_chat_tools_media_get();
+		} );
+		$add( 'media_settings_save', 'Turn the media optimiser on or off (enabled) and choose its compression level (quality_band: lossless, light, balanced or aggressive). Only the fields sent change.', array( 'enabled' => $bool, 'quality_band' => array( 'type' => 'string', 'enum' => array( 'lossless', 'light', 'balanced', 'aggressive' ) ) ), 'app.content_campaigns', $cc, 'write', 'manage_options', static function ( $a ) use ( $rest ) {
+			return gend_society_chat_tools_media_save( $a, $rest );
+		} );
+		$add( 'media_backfill_start', 'Start optimising the media already in the library, in the background (25 files a minute). New uploads are optimised anyway.', array(), 'app.content_campaigns', $cc, 'confirm', 'manage_options', static function () use ( $rest ) {
+			return gend_society_chat_tools_media_backfill_start( $rest );
+		} );
+		$add( 'media_backfill_status', 'Progress of optimising the media already in the library.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () {
+			return gend_society_chat_tools_media_backfill_status();
+		} );
+		$add( 'speed_fixes_get', 'The site\'s speed fixes (page cache, cache time, no media library for visitors, Leo loads on click, tags start after the page shows, GIFs as video, lighter media), page cache figures and the latest mobile speed scores.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () use ( $ajax ) {
+			return gend_society_chat_tools_speed_get( $ajax );
+		} );
+		$add( 'speed_fixes_save', 'Turn speed fixes on or off for visitors: cache, media_guest, leo_click, tags_later, video_swap, media_swap (booleans) and cache_ttl (seconds, 600 to 36000). Only the fields sent change. Script rules are left as they are. Suggest speed_preview_link first.', array( 'cache' => $bool, 'cache_ttl' => $num, 'media_guest' => $bool, 'leo_click' => $bool, 'tags_later' => $bool, 'video_swap' => $bool, 'media_swap' => $bool ), 'app.content_campaigns', $cc, 'confirm', 'manage_options', static function ( $a ) use ( $ajax ) {
+			return gend_society_chat_tools_speed_save( $a, $ajax );
+		} );
+		$add( 'speed_preview_link', 'A link that shows one of this site\'s pages (url, default the home page) as a visitor with every speed fix on, so the member can check it before switching fixes on. It works for 2 hours.', array( 'url' => $str ), 'app.content_campaigns', $cc, 'read', 'manage_options', static function ( $a ) use ( $ajax ) {
+			return gend_society_chat_tools_speed_preview( $a, $ajax );
+		} );
+		$add( 'social_connections_status', 'Which accounts are connected for this site (Google Analytics, Facebook, Instagram, LinkedIn, X/Twitter, TikTok, YouTube), with the account name and a link to connect each one.', array(), 'app.content_campaigns', $cc, 'read', 'manage_options', static function () {
+			return gend_society_chat_tools_connections_status();
 		} );
 
 		return $tools;
@@ -620,4 +806,684 @@ function gend_society_chat_tools_save_post( string $type, array $a ): array {
 		$r                = wp_insert_post( $u, true );
 	}
 	return is_wp_error( $r ) ? array( 'error' => $r->get_error_message() ) : array( 'id' => (int) $r );
+}
+/**
+ * A point type's current names and number format, so a details save that sends only some fields keeps the rest
+ * (the Point Bank handler resets whatever it isn't sent).
+ *
+ * @param string $key Point type.
+ * @return array
+ */
+function gend_society_chat_tools_point_type_current( string $key ): array {
+	$types   = function_exists( 'mycred_get_types' ) ? (array) mycred_get_types() : array();
+	$default = defined( 'MYCRED_DEFAULT_TYPE_KEY' ) ? MYCRED_DEFAULT_TYPE_KEY : 'mycred_default';
+	$opt     = function_exists( 'mycred_get_option' ) ? mycred_get_option( $key === $default ? 'mycred_pref_core' : 'mycred_pref_core_' . $key ) : array();
+	$opt     = is_array( $opt ) ? $opt : array();
+	return array(
+		'label'              => (string) ( $opt['name']['plural'] ?? ( $types[ $key ] ?? '' ) ),
+		'singular'           => (string) ( $opt['name']['singular'] ?? '' ),
+		'prefix'             => (string) ( $opt['format']['prefix'] ?? '' ),
+		'suffix'             => (string) ( $opt['format']['suffix'] ?? '' ),
+		'decimals'           => (int) ( $opt['format']['decimals'] ?? 0 ),
+		'decimal_separator'  => (string) ( $opt['format']['separators']['decimal'] ?? '.' ),
+		'thousand_separator' => (string) ( $opt['format']['separators']['thousand'] ?? ',' ),
+	);
+}
+
+/** The sales team's Earn studio code, which the earning tools go through. */
+function gend_society_chat_tools_hooks_ready(): bool {
+	return function_exists( 'aas_mycred_installed_hooks' ) && function_exists( 'aas_hooks_get_type_prefs' ) && function_exists( 'aas_hooks_paused' ) && function_exists( 'mycred_get_types' );
+}
+
+/**
+ * The earning rules a point type can use.
+ *
+ * @param string $type Point type.
+ * @return array
+ */
+function gend_society_chat_tools_earning_hooks( string $type ): array {
+	if ( ! gend_society_chat_tools_hooks_ready() ) {
+		return array( 'error' => 'Earning rules are not available on this web app.' );
+	}
+	if ( ! isset( mycred_get_types()[ $type ] ) ) {
+		return array( 'error' => 'There is no such point type.' );
+	}
+	list( $ids, $titles ) = aas_mycred_installed_hooks();
+	$opt    = aas_hooks_get_type_prefs( $type );
+	$active = isset( $opt['active'] ) && is_array( $opt['active'] ) ? $opt['active'] : array();
+	$paused = aas_hooks_paused()[ $type ] ?? array();
+	$prefs  = isset( $opt['hook_prefs'] ) && is_array( $opt['hook_prefs'] ) ? $opt['hook_prefs'] : array();
+	$pick   = static function ( $p ) {
+		return array_intersect_key( is_array( $p ) ? $p : array(), array_flip( array( 'creds', 'limit', 'log' ) ) );
+	};
+	$out = array();
+	foreach ( $ids as $id ) {
+		$p    = $prefs[ $id ] ?? array();
+		$subs = function_exists( 'aas_hooks_sub_actions' ) ? aas_hooks_sub_actions( $p ) : array();
+		$row  = array(
+			'hook'    => (string) $id,
+			'title'   => (string) ( $titles[ $id ] ?? $id ),
+			'enabled' => in_array( $id, $active, true ),
+			'paused'  => in_array( $id, (array) $paused, true ),
+		);
+		if ( $subs ) {
+			foreach ( $subs as $sk ) {
+				$row['subs'][ $sk ] = $pick( $p[ $sk ] );
+			}
+		} else {
+			$row += $pick( $p );
+		}
+		$out[] = $row;
+	}
+	return array( 'point_type' => $type, 'hooks' => $out );
+}
+
+/**
+ * Saves earning rules through the Earn studio's own Save All handler. That handler replaces every point type's
+ * list, so every other type's rules are sent back exactly as they are.
+ *
+ * @param string $type  Point type.
+ * @param array  $rules [{hook, enabled, creds, limit, log, subs}].
+ * @return array
+ */
+function gend_society_chat_tools_earning_rules_save( string $type, array $rules ): array {
+	if ( ! gend_society_chat_tools_hooks_ready() ) {
+		return array( 'error' => 'Earning rules are not available on this web app.' );
+	}
+	$types = mycred_get_types();
+	if ( ! isset( $types[ $type ] ) ) {
+		return array( 'error' => 'There is no such point type.' );
+	}
+	list( $ids ) = aas_mycred_installed_hooks();
+	$paused      = aas_hooks_paused();
+	$rows        = array();
+	$state       = array(); // this type's hooks: hook => enabled
+	foreach ( array_keys( (array) $types ) as $pt ) {
+		$opt    = aas_hooks_get_type_prefs( (string) $pt );
+		$active = isset( $opt['active'] ) && is_array( $opt['active'] ) ? $opt['active'] : array();
+		foreach ( $active as $h ) {
+			if ( (string) $pt === $type ) {
+				$state[ $h ] = array( 'hook' => $h, 'type' => $type, 'enabled' => '1' );
+			} else {
+				$rows[] = array( 'hook' => $h, 'type' => (string) $pt, 'enabled' => '1' );
+			}
+		}
+		foreach ( (array) ( $paused[ $pt ] ?? array() ) as $h ) {
+			if ( in_array( $h, $active, true ) ) {
+				continue;
+			}
+			if ( (string) $pt === $type ) {
+				$state[ $h ] = array( 'hook' => $h, 'type' => $type, 'enabled' => '0' );
+			} else {
+				$rows[] = array( 'hook' => $h, 'type' => (string) $pt, 'enabled' => '0' );
+			}
+		}
+	}
+	foreach ( array_slice( $rules, 0, 60 ) as $r ) {
+		$r = (array) $r;
+		$h = sanitize_key( (string) ( $r['hook'] ?? '' ) );
+		if ( ! in_array( $h, $ids, true ) ) {
+			return array( 'error' => 'There is no earning rule called "' . $h . '". Read bank_earning_hooks for the list.' );
+		}
+		$row = array( 'hook' => $h, 'type' => $type, 'enabled' => array_key_exists( 'enabled', $r ) && ! $r['enabled'] ? '0' : '1' );
+		if ( isset( $r['creds'] ) && '' !== $r['creds'] ) {
+			if ( ! is_numeric( $r['creds'] ) || (float) $r['creds'] < 0 || (float) $r['creds'] > 1000000 ) {
+				return array( 'error' => 'creds for ' . $h . ' must be a number from 0.' );
+			}
+			$row['creds'] = (string) (float) $r['creds'];
+		}
+		if ( isset( $r['limit'] ) && '' !== $r['limit'] ) {
+			if ( ! preg_match( '#^\d{1,6}/[xdwmt]$#', (string) $r['limit'] ) ) {
+				return array( 'error' => 'limit for ' . $h . ' looks like 0/x (no limit), 5/d, 10/w, 20/m or 1/t.' );
+			}
+			$row['limit'] = (string) $r['limit'];
+		}
+		if ( isset( $r['log'] ) && '' !== $r['log'] ) {
+			$row['log'] = sanitize_text_field( (string) $r['log'] );
+		}
+		if ( isset( $r['subs'] ) && is_array( $r['subs'] ) ) {
+			$subs = array();
+			foreach ( $r['subs'] as $sk => $sv ) {
+				$sv = (array) $sv;
+				$s  = array();
+				if ( isset( $sv['creds'] ) && is_numeric( $sv['creds'] ) && (float) $sv['creds'] >= 0 ) {
+					$s['creds'] = (float) $sv['creds'];
+				}
+				if ( isset( $sv['limit'] ) && preg_match( '#^\d{1,6}/[xdwmt]$#', (string) $sv['limit'] ) ) {
+					$s['limit'] = (string) $sv['limit'];
+				}
+				if ( isset( $sv['log'] ) ) {
+					$s['log'] = sanitize_text_field( (string) $sv['log'] );
+				}
+				if ( $s ) {
+					$subs[ sanitize_key( (string) $sk ) ] = $s;
+				}
+			}
+			$row['subs'] = (string) wp_json_encode( $subs );
+		}
+		$state[ $h ] = $row;
+	}
+	$res = gend_society_chat_tools_ajax( 'aas_save_all_hooks', array( 'hooks' => array_merge( $rows, array_values( $state ) ) ), 'aas_hooks_manager' );
+	if ( isset( $res['error'] ) ) {
+		return $res;
+	}
+	return gend_society_chat_tools_earning_hooks( $type );
+}
+/* ---------------------------------------------------------------------------------------------------------------
+ * Setup: marketing and go-live. Content Campaigns (blog-manager) and the media optimiser own these settings; the
+ * tools write only the named fields, through the features' own handlers where they have one.
+ * ------------------------------------------------------------------------------------------------------------- */
+
+/** gend.me's own site is set up by people in wp-admin: these setup tools change web apps (sub-sites and containers) only. */
+function gend_society_chat_tools_hub_refused() {
+	return is_multisite() && is_main_site() ? array( 'error' => 'This setting belongs to gend.me itself, so it is changed in wp-admin, not from the chat.' ) : null;
+}
+
+/** The four tracking options with what each accepts. */
+function gend_society_chat_tools_tracking_fields(): array {
+	return array(
+		'ga4_id'          => array( 'bm_ga_measurement_id', '/^G-[A-Z0-9]{4,20}$/', 'a GA4 measurement id like G-ABC123XYZ' ),
+		'gtm_id'          => array( 'bm_gtm_container_id', '/^GTM-[A-Z0-9]{4,12}$/', 'a Tag Manager container id like GTM-ABC1234' ),
+		'fb_pixel_id'     => array( 'bm_fb_pixel_id', '/^[0-9]{6,20}$/', 'a Meta pixel id (digits only)' ),
+		'tiktok_pixel_id' => array( 'bm_tiktok_pixel_id', '/^[A-Z0-9]{10,40}$/', 'a TikTok pixel id (letters and digits)' ),
+	);
+}
+
+/** Whether Google Analytics is connected for reports (an active analytics row in the accounts table). */
+function gend_society_chat_tools_google_connected(): bool {
+	global $wpdb;
+	$t = $wpdb->prefix . 'bm_social_accounts';
+	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) !== $t ) {
+		return false;
+	}
+	return (bool) $wpdb->get_var( "SELECT id FROM {$t} WHERE platform = 'analytics' AND status = 1 LIMIT 1" ); // phpcs:ignore WordPress.DB.PreparedSQL.InterpolatedNotPrepared
+}
+
+function gend_society_chat_tools_tracking_get(): array {
+	$out = array();
+	foreach ( gend_society_chat_tools_tracking_fields() as $k => $f ) {
+		$out[ $k ] = trim( (string) get_option( $f[0], '' ) );
+	}
+	$out['google_connected'] = gend_society_chat_tools_google_connected();
+	return $out;
+}
+
+/**
+ * Saves only the four tracking ids, each checked against its format. Nothing is saved when one is wrong.
+ *
+ * @param array $a ga4_id, gtm_id, fb_pixel_id, tiktok_pixel_id; '' removes one.
+ */
+function gend_society_chat_tools_tracking_save( array $a ): array {
+	if ( $refused = gend_society_chat_tools_hub_refused() ) {
+		return $refused;
+	}
+	if ( ! function_exists( 'bm_render_site_head_tags' ) ) {
+		return array( 'error' => 'Content Campaigns is not active on this site.' );
+	}
+	$fields  = gend_society_chat_tools_tracking_fields();
+	$changes = array();
+	foreach ( $fields as $k => $f ) {
+		if ( ! array_key_exists( $k, $a ) || ! is_scalar( $a[ $k ] ) ) {
+			continue;
+		}
+		$v = strtoupper( preg_replace( '/\s+/', '', (string) $a[ $k ] ) );
+		if ( '' !== $v && ! preg_match( $f[1], $v ) ) {
+			return array( 'error' => $k . ' must be ' . $f[2] . '. Nothing was saved.' );
+		}
+		$changes[ $k ] = $v;
+	}
+	if ( ! $changes ) {
+		return array( 'error' => 'Send at least one of ga4_id, gtm_id, fb_pixel_id or tiktok_pixel_id.' );
+	}
+	foreach ( $changes as $k => $v ) {
+		$opt = $fields[ $k ][0];
+		$old = trim( (string) get_option( $opt, '' ) );
+		update_option( $opt, $v );
+		if ( 'gtm_id' === $k && strtoupper( $old ) !== $v ) {
+			// As Analytics > Tag Manager does: a new container forgets the managed one, and no container means GA4 loads directly.
+			delete_option( 'bm_gtm_container_path' );
+			if ( '' === $v ) {
+				update_option( 'bm_ga_direct_via_gtm', '0' );
+			}
+		}
+	}
+	delete_option( 'bm_gtm_last_verify' );
+	return array( 'saved' => array_keys( $changes ) ) + gend_society_chat_tools_tracking_get();
+}
+
+/**
+ * Content Campaigns' own check (GA4 and Tag Manager), plus the two pixels, read from the same public home page.
+ *
+ * @param callable $ajax gend_society_chat_tools_ajax.
+ */
+function gend_society_chat_tools_tracking_verify( $ajax ): array {
+	$ids = gend_society_chat_tools_tracking_get();
+	$r   = $ajax( 'bm_gtm_verify', array(), 'bm_app_content' );
+	if ( isset( $r['error'] ) ) {
+		return $r;
+	}
+	$out = array(
+		'url'        => (string) ( $r['url'] ?? home_url( '/' ) ),
+		'http'       => (int) ( $r['http'] ?? 0 ),
+		'checked_at' => (string) ( $r['checked_at'] ?? '' ),
+		'ga4'        => array( 'id' => $ids['ga4_id'], 'found' => ! empty( $r['gtag'] ) ),
+		'gtm'        => array( 'id' => $ids['gtm_id'], 'found' => ! empty( $r['gtm_head'] ), 'noscript_found' => ! empty( $r['gtm_body'] ) ),
+		'fb_pixel'   => array( 'id' => $ids['fb_pixel_id'], 'found' => false ),
+		'tiktok'     => array( 'id' => $ids['tiktok_pixel_id'], 'found' => false ),
+	);
+	if ( '' !== $ids['ga4_id'] && ! $out['ga4']['found'] && '1' === get_option( 'bm_ga_direct_via_gtm' ) && '' !== $ids['gtm_id'] ) {
+		$out['ga4']['note'] = 'GA4 is set to load through the Tag Manager container, so it is not on the page by itself.';
+	}
+	if ( '' !== $ids['fb_pixel_id'] || '' !== $ids['tiktok_pixel_id'] ) {
+		$resp = wp_remote_get( add_query_arg( 'bm_tag_check', time(), home_url( '/' ) ), array( 'timeout' => 20, 'redirection' => 3, 'headers' => array( 'Cache-Control' => 'no-cache' ) ) );
+		$html = is_wp_error( $resp ) ? '' : (string) wp_remote_retrieve_body( $resp );
+		if ( '' !== $ids['fb_pixel_id'] ) {
+			$out['fb_pixel']['found'] = false !== strpos( $html, "fbq('init','" . $ids['fb_pixel_id'] . "')" );
+		}
+		if ( '' !== $ids['tiktok_pixel_id'] ) {
+			$out['tiktok']['found'] = false !== strpos( $html, "ttq.load('" . $ids['tiktok_pixel_id'] . "')" );
+		}
+	}
+	$missing = array();
+	foreach ( array( 'ga4', 'gtm', 'fb_pixel', 'tiktok' ) as $k ) {
+		if ( '' !== $out[ $k ]['id'] && ! $out[ $k ]['found'] && empty( $out[ $k ]['note'] ) ) {
+			$missing[] = $k;
+		}
+	}
+	$out['all_found'] = ! $missing;
+	if ( $missing ) {
+		$out['missing'] = $missing;
+	}
+	return $out;
+}
+
+/* ---- SEO engine ---- */
+
+/** The SEO engine's stored settings over its defaults: what its save handler needs sent back in full (it resets the rest). */
+function gend_society_chat_tools_seo_stored(): array {
+	$d     = BM_SEO_Engine::defaults();
+	$saved = get_option( BM_SEO_Engine::OPTION, array() );
+	$saved = is_array( $saved ) ? $saved : array();
+	$s     = array_merge( $d, $saved );
+	$s['org'] = array_merge( $d['org'], is_array( $saved['org'] ?? null ) ? $saved['org'] : array() );
+	return $s;
+}
+
+/** The tool's keys onto the engine's. */
+function gend_society_chat_tools_seo_view( array $settings, array $status = array() ): array {
+	$org = (array) ( $settings['org'] ?? array() );
+	$out = array(
+		'organisation_name' => (string) ( $org['name'] ?? '' ),
+		'organisation_logo' => (string) ( $org['logo'] ?? '' ),
+		'same_as'           => array_values( (array) ( $org['same_as'] ?? array() ) ),
+		'llms_intro'        => (string) ( $settings['llms_intro'] ?? '' ),
+		'llms_facts'        => array_values( (array) ( $settings['llms_facts'] ?? array() ) ),
+		'ai_crawlers'       => (string) ( $settings['ai_crawlers'] ?? 'allow' ),
+		'noindex_private'   => ! empty( $settings['noindex_private'] ),
+		'structured_data'   => ! empty( $settings['schema'] ),
+		'indexnow'          => ! empty( $settings['indexnow'] ),
+		'also_on'           => array(
+			'sitemap_clean' => ! empty( $settings['sitemap_clean'] ),
+			'lastmod'       => ! empty( $settings['lastmod'] ),
+			'llms_txt'      => ! empty( $settings['llms'] ),
+			'h1_fix'        => ! empty( $settings['h1_fix'] ),
+		),
+	);
+	if ( $status ) {
+		$last = is_array( $status['indexnow_last'] ?? null ) ? $status['indexnow_last'] : null;
+		$out['status'] = array(
+			'sitemap_url'      => (string) ( $status['sitemap_url'] ?? '' ),
+			'robots_url'       => (string) ( $status['robots_url'] ?? '' ),
+			'llms_url'         => (string) ( $status['llms_url'] ?? '' ),
+			'schema_types'     => array_values( (array) ( $status['schema_types'] ?? array() ) ),
+			'noindex_count'    => (int) ( $status['noindex_count'] ?? 0 ),
+			'faq_pages'        => (int) ( $status['faq_pages'] ?? 0 ),
+			'indexnow_last'    => $last ? array( 'time' => gmdate( 'c', (int) ( $last['time'] ?? 0 ) ), 'urls' => (int) ( $last['urls'] ?? 0 ), 'ok' => ! empty( $last['ok'] ) ) : null,
+			'indexnow_queued'  => (int) ( $status['indexnow_queued'] ?? 0 ),
+		);
+	}
+	return $out;
+}
+
+function gend_society_chat_tools_seo_get( $ajax ): array {
+	$r = $ajax( 'bm_seo_engine_get', array(), 'bm_app_content' );
+	if ( isset( $r['error'] ) ) {
+		return $r;
+	}
+	return gend_society_chat_tools_seo_view( (array) ( $r['settings'] ?? array() ), (array) ( $r['status'] ?? array() ) );
+}
+
+/** Confirm when the save changes who may crawl the site or what search engines may index. */
+function gend_society_chat_tools_seo_risk( array $a ): string {
+	if ( ! class_exists( 'BM_SEO_Engine' ) ) {
+		return 'write';
+	}
+	$s = gend_society_chat_tools_seo_stored();
+	if ( array_key_exists( 'ai_crawlers', $a ) && (string) $a['ai_crawlers'] !== (string) $s['ai_crawlers'] ) {
+		return 'confirm';
+	}
+	if ( array_key_exists( 'noindex_private', $a ) && (bool) $a['noindex_private'] !== ! empty( $s['noindex_private'] ) ) {
+		return 'confirm';
+	}
+	return 'write';
+}
+
+/**
+ * @param array    $a    Tool args (see seo_settings_save).
+ * @param callable $ajax gend_society_chat_tools_ajax.
+ */
+function gend_society_chat_tools_seo_save( array $a, $ajax ): array {
+	if ( $refused = gend_society_chat_tools_hub_refused() ) {
+		return $refused;
+	}
+	if ( ! class_exists( 'BM_SEO_Engine' ) ) {
+		return array( 'error' => 'Content Campaigns\' SEO engine is not active on this site.' );
+	}
+	$s       = gend_society_chat_tools_seo_stored();
+	$changed = array();
+	if ( array_key_exists( 'organisation_name', $a ) ) {
+		$s['org']['name'] = sanitize_text_field( (string) $a['organisation_name'] );
+		$changed[]        = 'organisation_name';
+	}
+	if ( array_key_exists( 'organisation_logo_id', $a ) ) {
+		$lid = (int) $a['organisation_logo_id'];
+		if ( $lid && ( ! wp_attachment_is_image( $lid ) || ! current_user_can( 'edit_post', $lid ) ) ) {
+			return array( 'error' => 'organisation_logo_id is not an image in this site\'s media. Nothing was saved.' );
+		}
+		$s['org']['logo'] = $lid ? (string) wp_get_attachment_image_url( $lid, 'full' ) : '';
+		$changed[]        = 'organisation_logo_id';
+	}
+	if ( array_key_exists( 'same_as', $a ) ) {
+		$urls = array();
+		foreach ( (array) $a['same_as'] as $u ) {
+			$u = esc_url_raw( trim( (string) $u ), array( 'https', 'http' ) );
+			if ( '' !== $u ) {
+				$urls[] = $u;
+			}
+		}
+		$s['org']['same_as'] = array_slice( array_values( array_unique( $urls ) ), 0, 20 );
+		$changed[]           = 'same_as';
+	}
+	if ( array_key_exists( 'llms_intro', $a ) ) {
+		$s['llms_intro'] = (string) $a['llms_intro'];
+		$changed[]       = 'llms_intro';
+	}
+	if ( array_key_exists( 'llms_facts', $a ) ) {
+		$s['llms_facts'] = array_slice( array_values( array_filter( array_map( 'strval', (array) $a['llms_facts'] ), 'strlen' ) ), 0, 40 );
+		$changed[]       = 'llms_facts';
+	}
+	if ( array_key_exists( 'ai_crawlers', $a ) ) {
+		if ( ! in_array( $a['ai_crawlers'], array( 'allow', 'search_only', 'block' ), true ) ) {
+			return array( 'error' => 'ai_crawlers must be allow, search_only or block. Nothing was saved.' );
+		}
+		$s['ai_crawlers'] = $a['ai_crawlers'];
+		$changed[]        = 'ai_crawlers';
+	}
+	foreach ( array( 'noindex_private' => 'noindex_private', 'structured_data' => 'schema', 'indexnow' => 'indexnow' ) as $k => $engine_key ) {
+		if ( array_key_exists( $k, $a ) ) {
+			$s[ $engine_key ] = ! empty( $a[ $k ] ) && 'false' !== $a[ $k ] ? 1 : 0;
+			$changed[]        = $k;
+		}
+	}
+	if ( ! $changed ) {
+		return array( 'error' => 'Nothing to change.' );
+	}
+	$r = $ajax( 'bm_seo_engine_save', array( 'settings' => wp_json_encode( $s ) ), 'bm_app_content' );
+	if ( isset( $r['error'] ) ) {
+		return $r;
+	}
+	$out          = gend_society_chat_tools_seo_view( (array) ( $r['settings'] ?? array() ), (array) ( $r['status'] ?? array() ) );
+	$out['saved'] = $changed;
+	$ignored      = array_values( array_diff( array_keys( $a ), array( 'organisation_name', 'organisation_logo_id', 'same_as', 'llms_intro', 'llms_facts', 'ai_crawlers', 'noindex_private', 'structured_data', 'indexnow' ) ) );
+	if ( $ignored ) {
+		$out['ignored'] = $ignored;
+	}
+	return $out;
+}
+
+function gend_society_chat_tools_indexnow_submit( $ajax ): array {
+	if ( $refused = gend_society_chat_tools_hub_refused() ) {
+		return $refused;
+	}
+	$r = $ajax( 'bm_seo_engine_indexnow_submit_all', array(), 'bm_app_content' );
+	if ( isset( $r['error'] ) ) {
+		return $r;
+	}
+	$results = array();
+	foreach ( (array) ( $r['results'] ?? array() ) as $row ) {
+		$results[] = array( 'count' => (int) ( $row['count'] ?? 0 ), 'http' => (int) ( $row['http'] ?? 0 ), 'error' => (string) ( $row['error'] ?? '' ) );
+	}
+	return array(
+		'ok'      => ! empty( $r['ok'] ),
+		'urls'    => (int) ( $r['urls'] ?? 0 ),
+		'time'    => gmdate( 'c', (int) ( $r['time'] ?? time() ) ),
+		'results' => $results,
+	);
+}
+
+/* ---- Media optimiser ---- */
+
+/** Whether the media optimiser really runs: the server constant and the site switch. */
+function gend_society_chat_tools_media_active(): bool {
+	return class_exists( 'Gend_Media_Optimizer_Bootstrap' ) && method_exists( 'Gend_Media_Optimizer_Bootstrap', 'is_enabled' ) && Gend_Media_Optimizer_Bootstrap::is_enabled();
+}
+
+function gend_society_chat_tools_media_backfill_status(): array {
+	$r = gend_society_chat_tools_rest( 'GET', '/gend-gmo/v1/backfill/status' );
+	if ( ! is_array( $r ) || isset( $r['error'] ) ) {
+		return is_array( $r ) ? $r : array( 'error' => 'The media optimiser is not available on this site.' );
+	}
+	$stats = (array) ( $r['stats'] ?? array() );
+	return array(
+		'running'   => ! empty( $r['running'] ),
+		'remaining' => (int) ( $r['remaining'] ?? 0 ),
+		'stats'     => array_map( 'intval', array_filter( $stats, 'is_numeric' ) ),
+		'active'    => gend_society_chat_tools_media_active(),
+	);
+}
+
+function gend_society_chat_tools_media_view( array $s ): array {
+	$constant = ! empty( $s['master_constant_set'] );
+	$enabled  = ! empty( $s['master_enabled'] );
+	$out      = array(
+		'enabled'          => $enabled,
+		'quality_band'     => (string) ( $s['quality_band'] ?? 'balanced' ),
+		'webm_passthrough' => ! empty( $s['webm_passthrough'] ),
+		'server_allows'    => $constant,
+		'active'           => $constant && $enabled,
+		'codecs'           => array_map( 'boolval', (array) ( $s['codecs'] ?? array() ) ),
+	);
+	if ( ! $constant ) {
+		$out['note'] = 'This server does not allow the media optimiser to run (GEND_MEDIA_OPTIMIZER_ENABLED is not set), so turning it on here changes nothing until gend.me enables it.';
+	}
+	return $out;
+}
+
+function gend_society_chat_tools_media_get(): array {
+	$s = gend_society_chat_tools_rest( 'GET', '/gend-gmo/v1/settings' );
+	if ( ! is_array( $s ) || isset( $s['error'] ) ) {
+		return is_array( $s ) ? $s : array( 'error' => 'The media optimiser is not available on this site.' );
+	}
+	$out             = gend_society_chat_tools_media_view( $s );
+	$out['backfill'] = gend_society_chat_tools_media_backfill_status();
+	return $out;
+}
+
+function gend_society_chat_tools_media_save( array $a, $rest ): array {
+	if ( $refused = gend_society_chat_tools_hub_refused() ) {
+		return $refused;
+	}
+	$p = array();
+	if ( array_key_exists( 'enabled', $a ) ) {
+		$p['master_enabled'] = ! empty( $a['enabled'] ) && 'false' !== $a['enabled'];
+	}
+	if ( array_key_exists( 'quality_band', $a ) ) {
+		if ( ! in_array( $a['quality_band'], array( 'lossless', 'light', 'balanced', 'aggressive' ), true ) ) {
+			return array( 'error' => 'quality_band must be lossless, light, balanced or aggressive. Nothing was saved.' );
+		}
+		$p['quality_band'] = $a['quality_band'];
+	}
+	if ( ! $p ) {
+		return array( 'error' => 'Send enabled or quality_band.' );
+	}
+	$s = $rest( 'POST', '/gend-gmo/v1/settings', $p );
+	if ( ! is_array( $s ) || isset( $s['error'] ) ) {
+		return is_array( $s ) ? $s : array( 'error' => 'The media optimiser is not available on this site.' );
+	}
+	return gend_society_chat_tools_media_view( $s );
+}
+
+function gend_society_chat_tools_media_backfill_start( $rest ): array {
+	if ( $refused = gend_society_chat_tools_hub_refused() ) {
+		return $refused;
+	}
+	if ( ! gend_society_chat_tools_media_active() ) {
+		return array( 'error' => 'The media optimiser is off, so nothing would be optimised. Turn it on first (media_settings_save enabled true); if it stays off, this server does not allow it yet.' );
+	}
+	$r = $rest( 'POST', '/gend-gmo/v1/backfill/start' );
+	if ( ! is_array( $r ) || isset( $r['error'] ) ) {
+		return is_array( $r ) ? array( 'error' => (string) ( $r['message'] ?? $r['error'] ) ) : array( 'error' => 'That could not be started.' );
+	}
+	return array( 'started' => true ) + gend_society_chat_tools_media_backfill_status();
+}
+
+/* ---- Speed fixes ---- */
+
+/** The switches the chat may change. 'scripts' (lean public pages) and its rules stay with a person in Speed > Fixes. */
+function gend_society_chat_tools_speed_keys(): array {
+	return array( 'cache', 'media_guest', 'leo_click', 'tags_later', 'video_swap', 'media_swap' );
+}
+
+function gend_society_chat_tools_speed_view( array $state ): array {
+	$fixes = (array) ( $state['fixes'] ?? array() );
+	$out   = array( 'fixes' => array() );
+	foreach ( $fixes as $k => $v ) {
+		$out['fixes'][ $k ] = (bool) $v;
+	}
+	$cache        = (array) ( $state['cache'] ?? array() );
+	$out['cache'] = array(
+		'ttl'   => (int) ( $cache['ttl'] ?? 0 ),
+		'pages' => (int) ( $cache['pages'] ?? 0 ),
+		'ratio' => $cache['ratio'] ?? null,
+	);
+	$out['labels']        = (array) ( $state['labels'] ?? array() );
+	$out['script_rules']  = count( (array) ( $state['rules'] ?? array() ) );
+	$out['leo_installed'] = ! empty( $state['leo'] );
+	$out['has_tags']      = ! empty( $state['tags'] );
+	$out['chat_can_change'] = array_merge( gend_society_chat_tools_speed_keys(), array( 'cache_ttl' ) );
+	return $out;
+}
+
+function gend_society_chat_tools_speed_get( $ajax ): array {
+	$state = $ajax( 'bm_speed_fixes_get', array(), 'bm_app_content' );
+	if ( isset( $state['error'] ) ) {
+		return $state;
+	}
+	$out = gend_society_chat_tools_speed_view( (array) $state );
+	// Latest mobile scores of the tracked pages, read straight from the results table (the overview handler can seed pages).
+	$out['scores'] = array();
+	if ( class_exists( 'BM_Speed' ) && method_exists( 'BM_Speed', 'latest' ) ) {
+		$tracked = array_slice( (array) ( BM_Speed::settings()['tracked'] ?? array() ), 0, 25 );
+		foreach ( BM_Speed::latest( $tracked, 'mobile' ) as $url => $row ) {
+			$row             = BM_Speed::public_row( $row, false );
+			$out['scores'][] = array_intersect_key( $row, array_flip( array( 'url', 'score', 'lcp', 'cls', 'tbt', 'at' ) ) );
+		}
+	}
+	return $out;
+}
+
+function gend_society_chat_tools_speed_save( array $a, $ajax ): array {
+	if ( $refused = gend_society_chat_tools_hub_refused() ) {
+		return $refused;
+	}
+	$post = array();
+	foreach ( gend_society_chat_tools_speed_keys() as $k ) {
+		if ( array_key_exists( $k, $a ) ) {
+			$post[ $k ] = ! empty( $a[ $k ] ) && 'false' !== $a[ $k ] ? '1' : '0';
+		}
+	}
+	if ( array_key_exists( 'cache_ttl', $a ) ) {
+		$post['cache_ttl'] = (string) max( 600, min( 36000, (int) $a['cache_ttl'] ) );
+	}
+	if ( ! $post ) {
+		return array( 'error' => 'Nothing to change.' );
+	}
+	$state = $ajax( 'bm_speed_fixes_save', $post, 'bm_app_content' );
+	if ( isset( $state['error'] ) ) {
+		return $state;
+	}
+	return array( 'saved' => array_keys( $post ) ) + gend_society_chat_tools_speed_view( (array) $state );
+}
+
+function gend_society_chat_tools_speed_preview( array $a, $ajax ): array {
+	$url = trim( (string) ( $a['url'] ?? '' ) );
+	$r   = $ajax( 'bm_speed_preview_link', array( 'url' => '' !== $url ? $url : home_url( '/' ) ), 'bm_app_content' );
+	if ( isset( $r['error'] ) ) {
+		return 'Unknown page' === $r['error'] ? array( 'error' => 'That is not a page on this site.' ) : $r;
+	}
+	return array(
+		'url'     => esc_url_raw( (string) ( $r['url'] ?? '' ) ),
+		'expires' => gmdate( 'c', time() + 2 * HOUR_IN_SECONDS ),
+	);
+}
+
+/* ---- Connections ---- */
+
+/** Platforms the setup wizard asks about, with the accounts-table platform each one is stored as. */
+function gend_society_chat_tools_connection_platforms(): array {
+	return array(
+		'google_analytics' => 'analytics',
+		'facebook'         => 'facebook',
+		'instagram'        => 'instagram',
+		'linkedin'         => 'linkedin',
+		'twitter'          => 'twitter',
+		'tiktok'           => 'tiktok',
+		'youtube'          => 'youtube',
+	);
+}
+
+/**
+ * Per platform: connected, account (name) and connect_url. From Content Campaigns' connection broker when it has
+ * one, otherwise from the connected accounts (names only; tokens never leave the table).
+ */
+function gend_society_chat_tools_connections_status(): array {
+	$platforms = gend_society_chat_tools_connection_platforms();
+	$out       = array();
+	if ( function_exists( 'bm_oauth_broker_status' ) ) {
+		$b = bm_oauth_broker_status();
+		$b = is_array( $b ) ? $b : array();
+		foreach ( $platforms as $key => $stored ) {
+			$row = $b[ $key ] ?? ( $b[ $stored ] ?? ( 'google_analytics' === $key ? ( $b['google'] ?? null ) : null ) );
+			$row = is_array( $row ) ? $row : array();
+			$label = $row['account'] ?? ( $row['label'] ?? ( $row['account_label'] ?? '' ) );
+			$out[ $key ] = array(
+				'connected'   => ! empty( $row['connected'] ),
+				'account'     => sanitize_text_field( is_array( $label ) ? implode( ', ', array_map( 'strval', $label ) ) : (string) $label ),
+				'connect_url' => esc_url_raw( (string) ( $row['connect_url'] ?? '' ) ),
+			);
+		}
+		return array( 'source' => 'broker', 'platforms' => $out );
+	}
+	global $wpdb;
+	$t    = $wpdb->prefix . 'bm_social_accounts';
+	$rows = array();
+	if ( $wpdb->get_var( $wpdb->prepare( 'SHOW TABLES LIKE %s', $t ) ) === $t ) {
+		$in   = implode( ',', array_fill( 0, count( $platforms ), '%s' ) );
+		// Google Analytics is the site's (any admin may have connected it); social accounts are the person's own.
+		$rows = (array) $wpdb->get_results( $wpdb->prepare( "SELECT platform, name FROM {$t} WHERE status = 1 AND platform IN ($in) AND ( platform = 'analytics' OR user_id = %d ) ORDER BY id DESC LIMIT 100", array_merge( array_values( $platforms ), array( get_current_user_id() ) ) ), ARRAY_A ); // phpcs:ignore WordPress.DB.PreparedSQL
+	}
+	foreach ( $platforms as $key => $stored ) {
+		$names = array();
+		foreach ( $rows as $r ) {
+			if ( $r['platform'] === $stored ) {
+				$names[] = sanitize_text_field( (string) $r['name'] );
+			}
+		}
+		$out[ $key ] = array(
+			'connected'   => (bool) $names,
+			'account'     => implode( ', ', array_unique( $names ) ),
+			'connect_url' => '',
+		);
+	}
+	return array( 'source' => 'accounts', 'platforms' => $out );
 }

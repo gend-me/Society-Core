@@ -98,6 +98,18 @@ return array(
 			'note'  => 'Brand font roles: --gs-font-heading/body/button/mono from Global Styles (Design Studio Font Types), on the front end, in block editors and in the studio preview, so hand-written page CSS follows the site fonts.',
 		),
 		array(
+			'file'  => 'inc/setup-brand.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'The approved style guide on the store pages, store emails and social emails of a site set up through the chat.',
+		),
+		array(
+			'file'  => 'inc/hub-boundary.php',
+			'tier'  => 'core',
+			'needs' => array(),
+			'note'  => 'Keeps gend.me operations on gend.me: hub sub-sites get no network capability, hub-only routes or money jobs.',
+		),
+		array(
 			'file'  => 'inc/html-visual-edit.php',
 			'tier'  => 'core',
 			'needs' => array(),
