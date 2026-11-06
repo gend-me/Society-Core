@@ -636,7 +636,7 @@ function gend_society_build_frontend_nav()
   // sidebar entry.
   $content_children = [];
   if (current_user_can('edit_theme_options')) {
-    $content_children[] = ['label' => __('Theme Editor', 'gend-society'), 'url' => admin_url('site-editor.php')];
+    $content_children[] = ['label' => __('Theme Builder', 'gend-society'), 'url' => admin_url('site-editor.php')];
   }
   if (gend_society_plugin_active('blog-manager/blog-manager.php') && current_user_can('edit_posts')) {
     $content_children[] = ['label' => __('Content Campaigns', 'gend-society'), 'url' => admin_url('admin.php?page=' . (defined('BM_ADMIN_SLUG') ? BM_ADMIN_SLUG : 'blog-manager'))];
@@ -667,7 +667,7 @@ function gend_society_build_frontend_nav()
       $store_children[] = ['label' => __('Sales Team', 'gend-society'), 'url' => admin_url('admin.php?page=st_sales_team')];
     }
     if (gend_society_plugin_active('projects/project-service-orders.php') && current_user_can('manage_options')) {
-      $store_children[] = ['label' => __('Project Services', 'gend-society'), 'url' => admin_url('admin.php?page=psoo-projects')];
+      $store_children[] = ['label' => __('Project Management', 'gend-society'), 'url' => admin_url('admin.php?page=psoo-projects')];
     }
 
     $items[] = [

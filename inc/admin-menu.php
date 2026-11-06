@@ -109,7 +109,7 @@ function gend_society_register_admin_menu()
     // — keeps $submenu['gs-content'] populated so later registrations
     // (Content Campaigns, Talk Flows via gs_move_plugin_submenus_to_content)
     // never re-trigger it either.
-    add_submenu_page('gs-content', __('Theme Editor', 'gend-society'), __('Theme Editor', 'gend-society'), 'edit_theme_options', 'site-editor.php', '');
+    add_submenu_page('gs-content', __('Theme Builder', 'gend-society'), __('Theme Builder', 'gend-society'), 'edit_theme_options', 'site-editor.php', '');
     remove_submenu_page('gs-content', 'gs-content');
     // Info Pages used to live here as its own submenu (edit.php?post_type=page).
     // It's now the "Info Pages" tab on Content Campaigns (2nd position, after
@@ -143,7 +143,7 @@ function gend_society_register_admin_menu()
         if ('container' === gend_society_runtime_mode()) {
             foreach (array(
                 'st_sales_team' => array(__('Sales Team', 'gend-society'), 'sales-team/advanced-affiliate-system.php'),
-                'psoo-projects' => array(__('Project Services', 'gend-society'), 'projects/project-service-orders.php'),
+                'psoo-projects' => array(__('Project Management', 'gend-society'), 'projects/project-service-orders.php'),
             ) as $gs_slug => $gs_item) {
                 if (!gend_society_plugin_active($gs_item[1])) {
                     add_submenu_page('gs-store', $gs_item[0], $gs_item[0], 'manage_options', $gs_slug, 'gend_society_store_feature_inactive_page');

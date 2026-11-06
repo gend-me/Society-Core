@@ -17,8 +17,8 @@
  *     Posts, Categories, Tags, Comments -> App > Content Campaigns > Blogging
  *     Pages                             -> App > Content Campaigns > Info Pages
  *     Media                             -> App > Content Campaigns > Media
- *     Users                             -> Social > Social Profiles > Members > Management
- *     Appearance (themes.php and its sub-screens) -> App > Theme Editor / Themes
+ *     Users                             -> Social > Member Management > Members > Management
+ *     Appearance (themes.php and its sub-screens) -> App > Theme Builder / Themes
  *     Plugins, Updates                  -> Dashboard > Hosting > Codebase (links in Code Packages)
  *   Tools and Settings have no home in the dashboard design and stay in the sidebar, at the bottom;
  * - orders the sidebar like gend.me: Dashboard, App, Store, Social, then other plugins' menus with their own icons
@@ -58,7 +58,7 @@ if ( ! function_exists( 'gend_society_sa_menu_gated' ) ) {
 			'email-manager'           => array( 'parent' => 'gs-content', 'label' => __( 'Talk Flows', 'gend-society' ), 'area' => 'app', 'plugin' => 'email-manager/email-manager.php', 'feature' => 'email' ),
 			'gdc-store-settings'      => array( 'parent' => 'gs-store', 'label' => __( 'Store Management', 'gend-society' ), 'area' => 'store', 'plugin' => 'online-store/online-store.php', 'feature' => 'store' ),
 			'st_sales_team'           => array( 'parent' => 'gs-store', 'label' => __( 'Sales Team', 'gend-society' ), 'area' => 'store', 'plugin' => 'sales-team/advanced-affiliate-system.php', 'feature' => 'sales' ),
-			'psoo-projects'           => array( 'parent' => 'gs-store', 'label' => __( 'Project Services', 'gend-society' ), 'area' => 'store', 'plugin' => 'projects/project-service-orders.php', 'feature' => 'projects' ),
+			'psoo-projects'           => array( 'parent' => 'gs-store', 'label' => __( 'Project Management', 'gend-society' ), 'area' => 'store', 'plugin' => 'projects/project-service-orders.php', 'feature' => 'projects' ),
 			'gs-rewards'              => array( 'parent' => 'gs-social', 'label' => __( 'Point Bank', 'gend-society' ), 'area' => 'social', 'plugin' => 'reward-programs/reward-programs.php', 'feature' => 'rewards' ),
 			'gend-contracts-payments' => array( 'parent' => 'gs-social', 'label' => __( 'Contracts & Payments', 'gend-society' ), 'area' => 'social', 'plugin' => 'contracts-and-payments/contracts-and-payments.php', 'feature' => 'membership' ),
 		);
@@ -83,7 +83,7 @@ if ( ! function_exists( 'gend_society_sa_menu_register' ) ) {
 	function gend_society_sa_menu_register(): void {
 		$hooks = array();
 
-		// App: Theme Editor (inc/admin-menu.php), Content Campaigns, Talk Flows, Themes.
+		// App: Theme Builder (inc/admin-menu.php), Content Campaigns, Talk Flows, Themes.
 		if ( ! gend_society_sa_menu_plugin_active( 'blog-manager/blog-manager.php' ) ) {
 			$hooks[] = add_submenu_page( 'gs-content', __( 'Content Campaigns', 'gend-society' ), __( 'Content Campaigns', 'gend-society' ), 'edit_posts', 'content-campaigns', 'gend_society_sa_menu_render_content_campaigns' );
 		}
@@ -108,7 +108,7 @@ if ( ! function_exists( 'gend_society_sa_menu_register' ) ) {
 			}
 		}
 		if ( ! gend_society_sa_menu_plugin_active( 'social-network/social-network.php' ) ) {
-			$hooks[] = add_submenu_page( 'gs-social', __( 'Social Profiles', 'gend-society' ), __( 'Social Profiles', 'gend-society' ), 'list_users', 'gdc-social-network-settings', 'gend_society_sa_menu_render_social_profiles' );
+			$hooks[] = add_submenu_page( 'gs-social', __( 'Member Management', 'gend-society' ), __( 'Member Management', 'gend-society' ), 'list_users', 'gdc-social-network-settings', 'gend_society_sa_menu_render_social_profiles' );
 		}
 		foreach ( array( 'gs-rewards', 'gend-contracts-payments' ) as $slug ) {
 			if ( ! gend_society_sa_menu_plugin_active( $gated[ $slug ]['plugin'] ) ) {
@@ -345,7 +345,7 @@ if ( ! function_exists( 'gend_society_sa_menu_core_items' ) ) {
 
 if ( ! function_exists( 'gend_society_sa_menu_strip' ) ) {
 	/**
-	 * Hub tab strip markup (.gdc-tabs / .gdc-tab, the look of gend.me's Content Campaigns / Social Profiles tabs).
+	 * Hub tab strip markup (.gdc-tabs / .gdc-tab, the look of gend.me's Content Campaigns / Member Management tabs).
 	 *
 	 * @param array  $tabs   Each: label, url, active (bool), icon (optional dashicons class).
 	 * @param string $class  Extra class.
@@ -404,7 +404,7 @@ if ( ! function_exists( 'gend_society_sa_menu_cc_tabs' ) ) {
 
 if ( ! function_exists( 'gend_society_sa_menu_social_tabs' ) ) {
 	/**
-	 * Social Profiles tabs (gend.me order: Settings, Profiles, Members, Groups, Invites, Activity Wall). Members opens the core Users
+	 * Member Management tabs (gend.me order: Settings, Profiles, Members, Groups, Invites, Activity Wall). Members opens the core Users
 	 * screen (Management); the others are gend.me features (plan area 'social').
 	 *
 	 * @param string $active Active tab slug.
@@ -452,7 +452,7 @@ if ( ! function_exists( 'gend_society_sa_menu_render_content_campaigns' ) ) {
 
 if ( ! function_exists( 'gend_society_sa_menu_render_social_profiles' ) ) {
 	/**
-	 * Social > Social Profiles (bundled page). Members opens Users (free); Settings / Profiles / Groups / Invites / Activity Wall are
+	 * Social > Member Management (bundled page). Members opens Users (free); Settings / Profiles / Groups / Invites / Activity Wall are
 	 * gend.me features.
 	 */
 	function gend_society_sa_menu_render_social_profiles(): void {
@@ -466,8 +466,8 @@ if ( ! function_exists( 'gend_society_sa_menu_render_social_profiles' ) ) {
 		$key   = isset( $map[ $tab ] ) ? $tab : 'settings';
 		$label = isset( $map[ $tab ] ) ? $map[ $tab ] : __( 'Social network settings', 'gend-society' );
 		echo '<div class="wrap gdc-admin-dashboard gs-sa-wrap gend-society-plan gend-society-upgrade">';
-		echo gend_society_sa_menu_hero( __( 'Social Profiles', 'gend-society' ), __( 'Members of this site are managed here. Profiles, groups and the activity wall come with your gend.me plan.', 'gend-society' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
-		echo gend_society_sa_menu_strip( gend_society_sa_menu_social_tabs( $key ), 'gs-sa-tabs', __( 'Social Profiles sections', 'gend-society' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+		echo gend_society_sa_menu_hero( __( 'Member Management', 'gend-society' ), __( 'Members of this site are managed here. Profiles, groups and the activity wall come with your gend.me plan.', 'gend-society' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
+		echo gend_society_sa_menu_strip( gend_society_sa_menu_social_tabs( $key ), 'gs-sa-tabs', __( 'Member Management sections', 'gend-society' ) ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
 		echo '<p class="gs-plan-toolbar"><span class="gs-plan-live" role="status" aria-live="polite" data-gs-plan-live="1"></span></p>';
 		echo gend_society_sa_menu_feature_html( $label, 'social' ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- escaped while built.
 		echo '</div>';
@@ -589,14 +589,14 @@ if ( ! function_exists( 'gend_society_sa_menu_core_strip' ) ) {
 				$h .= gend_society_sa_menu_strip( gend_society_sa_menu_sub_tabs( 'upload.php' ), 'gs-sa-subtabs', __( 'Media', 'gend-society' ) );
 			}
 		} elseif ( 'social' === $ctx[0] ) {
-			$h .= '<p class="gs-sa-home__crumb">' . esc_html__( 'Social', 'gend-society' ) . ' &rsaquo; <a href="' . esc_url( admin_url( 'admin.php?page=gdc-social-network-settings' ) ) . '">' . esc_html__( 'Social Profiles', 'gend-society' ) . '</a></p>';
-			$h .= gend_society_sa_menu_strip( gend_society_sa_menu_social_tabs( 'members' ), 'gs-sa-tabs', __( 'Social Profiles sections', 'gend-society' ) );
+			$h .= '<p class="gs-sa-home__crumb">' . esc_html__( 'Social', 'gend-society' ) . ' &rsaquo; <a href="' . esc_url( admin_url( 'admin.php?page=gdc-social-network-settings' ) ) . '">' . esc_html__( 'Member Management', 'gend-society' ) . '</a></p>';
+			$h .= gend_society_sa_menu_strip( gend_society_sa_menu_social_tabs( 'members' ), 'gs-sa-tabs', __( 'Member Management sections', 'gend-society' ) );
 			$h .= gend_society_sa_menu_strip( gend_society_sa_menu_sub_tabs( 'users.php', array( 'users.php' => __( 'Management', 'gend-society' ) ) ), 'gs-sa-subtabs', __( 'Members', 'gend-society' ) );
 		} elseif ( 'themes' === $ctx[0] ) {
 			$tabs = array();
 			if ( function_exists( 'wp_is_block_theme' ) && wp_is_block_theme() && current_user_can( 'edit_theme_options' ) ) {
 				$tabs[] = array(
-					'label'  => __( 'Theme Editor', 'gend-society' ),
+					'label'  => __( 'Theme Builder', 'gend-society' ),
 					'url'    => admin_url( 'site-editor.php' ),
 					'active' => false,
 				);
@@ -606,7 +606,7 @@ if ( ! function_exists( 'gend_society_sa_menu_core_strip' ) ) {
 					$tabs[] = $t;
 				}
 			}
-			$h .= '<p class="gs-sa-home__crumb">' . esc_html__( 'App', 'gend-society' ) . ' &rsaquo; ' . esc_html__( 'Theme Editor', 'gend-society' ) . '</p>';
+			$h .= '<p class="gs-sa-home__crumb">' . esc_html__( 'App', 'gend-society' ) . ' &rsaquo; ' . esc_html__( 'Theme Builder', 'gend-society' ) . '</p>';
 			$h .= gend_society_sa_menu_strip( $tabs, 'gs-sa-tabs', __( 'Theme sections', 'gend-society' ) );
 		} else {
 			$tabs   = gend_society_sa_menu_sub_tabs( 'plugins.php' );
