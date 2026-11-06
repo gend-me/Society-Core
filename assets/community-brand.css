@@ -1,0 +1,115 @@
+/* The community pages of a site set up through the chat: activity, members, groups, profiles. Theme presets only, so they follow the style guide. */
+body.buddypress{ background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; }
+body.buddypress #youzify,body.buddypress #youzify-bp,body.buddypress .youzify,body.buddypress #buddypress,body.buddypress #youzify-wall-nav,body.buddypress .item-list-tabs,body.buddypress #subnav,body.buddypress .youzify-mobile-nav{ background:transparent!important; color:var(--wp--preset--color--contrast)!important; }
+body.buddypress h1,body.buddypress h2,body.buddypress h3,body.buddypress h4{ font-family:var(--gs-font-heading,inherit); color:var(--wp--preset--color--accent-1,inherit)!important; }
+
+/* Cards: the post box, posts, and members and groups in their lists. */
+body.buddypress .youzify-wall-form,body.buddypress .youzify-wall-content,body.buddypress #whats-new-content,body.buddypress .activity-list>li,body.buddypress .activity-list .activity-content,body.buddypress #members-list>li,body.buddypress #groups-list>li,body.buddypress .item-list>li,body.buddypress .youzify-tab-content,body.buddypress .youzify-widget{ border:1px solid var(--wp--preset--color--accent-6,#ddd)!important; border-radius:var(--wp--custom--gs--radius,14px)!important; background:color-mix(in srgb,var(--wp--preset--color--base) 70%,#fff)!important; color:var(--wp--preset--color--contrast)!important; box-shadow:none!important; }
+body.buddypress .activity-list .activity-content{ border:0!important; background:transparent!important; }
+body.buddypress .activity-list>li:hover,body.buddypress #members-list>li:hover,body.buddypress #groups-list>li:hover{ border-color:var(--wp--preset--color--brand-primary)!important; }
+
+/* Words on those cards. */
+body.buddypress #buddypress p,body.buddypress #buddypress span,body.buddypress #buddypress label,body.buddypress #buddypress .activity-inner,body.buddypress .youzify-wall-form textarea,body.buddypress #whats-new,body.buddypress .item-meta,body.buddypress .item-desc{ color:var(--wp--preset--color--contrast)!important; }
+body.buddypress #buddypress a:not(.button):not(.youzify-btn),body.buddypress .item-title a,body.buddypress .activity-header a{ color:var(--wp--preset--color--brand-primary)!important; }
+body.buddypress textarea,body.buddypress input[type=text],body.buddypress input[type=search],body.buddypress select{ border:1px solid var(--wp--preset--color--accent-6,#ddd)!important; border-radius:calc(var(--wp--custom--gs--radius,14px)*.6)!important; background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; }
+
+/* Tabs and post types. */
+body.buddypress .item-list-tabs a,body.buddypress #youzify-wall-nav a,body.buddypress .youzify-wall-options label,body.buddypress .youzify-wall-form .youzify-wall-opts-item label{ border:1px solid var(--wp--preset--color--accent-6,#ddd)!important; border-radius:var(--wp--custom--gs--button-radius,999px)!important; background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; }
+body.buddypress .item-list-tabs .current a,body.buddypress .item-list-tabs .selected a,body.buddypress .youzify-wall-opts-item input:checked+label{ border-color:var(--wp--preset--color--brand-primary)!important; background:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; }
+body.buddypress .item-list-tabs a span{ background:color-mix(in srgb,currentColor 16%,transparent)!important; color:inherit!important; }
+
+/* Buttons. */
+body.buddypress #buddypress .button,body.buddypress #buddypress button:not(.mfp-close),body.buddypress #buddypress input[type=submit],body.buddypress .youzify-wall-post,body.buddypress #aw-whats-new-submit,body.buddypress .generic-button a{ border:0!important; border-radius:var(--wp--custom--gs--button-radius,999px)!important; background:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; font-family:var(--gs-font-body,inherit); font-weight:600; }
+body.buddypress .youzify-activity-show-filter,body.buddypress .youzify-activity-show-search,body.buddypress .youzify-dropdown-area,body.buddypress .youzify-activity-search,body.buddypress .youzify-list-search-container{ border-color:var(--wp--preset--color--accent-6,#ddd)!important; background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; }
+
+/* The strips and widgets that paint themselves dark, and the small colour bars on the tabs. */
+body.buddypress div.item-list-tabs,body.buddypress div.item-list-tabs.activity-type-tabs,body.buddypress #youzify-wall-actions.youzify-wall-actions{ background:transparent!important; border-color:var(--wp--preset--color--accent-6,#ddd)!important; }
+body.buddypress .item-list-tabs a::before,body.buddypress .item-list-tabs li::before{ display:none!important; }
+body.buddypress .widget-content.widget_block{ border:1px solid var(--wp--preset--color--accent-6,#ddd)!important; border-radius:var(--wp--custom--gs--radius,14px)!important; background:color-mix(in srgb,var(--wp--preset--color--base) 70%,#fff)!important; }
+body.buddypress .widget-content.widget_block *{ color:var(--wp--preset--color--contrast)!important; }
+body.buddypress .widget-content.widget_block a{ color:var(--wp--preset--color--brand-primary)!important; }
+body.buddypress .widget-content.widget_block .wp-element-button{ background:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; }
+
+/* Directories: the hero, filter strip, tabs and member and group cards, which carry strong dark rules of their own. */
+html body.buddypress #buddypress div.item-list-tabs,html body.buddypress #youzify div.item-list-tabs,html body.buddypress #youzify-bp div.item-list-tabs,html body.buddypress div.item-list-tabs,html body.buddypress .youzify-directory-filter{ background:transparent!important; border:0!important; box-shadow:none!important; }
+html body.buddypress #buddypress div.item-list-tabs li a,html body.buddypress .youzify-directory-filter li a{ background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; border:1px solid var(--wp--preset--color--accent-6,#ddd)!important; box-shadow:none!important; }
+html body.buddypress #buddypress div.item-list-tabs li.selected a,html body.buddypress #buddypress div.item-list-tabs li.current a,html body.buddypress .youzify-directory-filter li.selected a{ background:var(--wp--preset--color--brand-primary)!important; border-color:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; }
+html body.buddypress #buddypress div.item-list-tabs li.selected a span,html body.buddypress .youzify-directory-filter li.selected a span{ background:rgba(255,255,255,.18)!important; color:inherit!important; }
+html body.buddypress .youzify-search-landing-image-container.youzify-search-landing-image-container.youzify-search-landing-image-container{ background:radial-gradient(90% 130% at 100% 0,color-mix(in srgb,var(--wp--preset--color--brand-secondary,var(--wp--preset--color--brand-primary)) 45%,transparent),transparent 60%),var(--wp--preset--color--brand-primary)!important; }
+html body.buddypress .youzify-search-landing-image-container *{ color:var(--wp--preset--color--base)!important; font-family:var(--gs-font-heading,inherit); }
+html body.buddypress #buddypress li.youzify-show-cover,html body.buddypress #youzify li.youzify-show-cover,html body.buddypress li.youzify-show-cover{ background:color-mix(in srgb,var(--wp--preset--color--base) 70%,#fff)!important; border:1px solid var(--wp--preset--color--accent-6,#ddd)!important; color:var(--wp--preset--color--contrast)!important; box-shadow:none!important; backdrop-filter:none!important; }
+html body.buddypress li.youzify-show-cover:hover{ border-color:var(--wp--preset--color--brand-primary)!important; transform:translateY(-3px); }
+html body.buddypress li.youzify-show-cover .youzify-cover,html body.buddypress li.youzify-show-cover [class*=cover]{ background:var(--wp--preset--color--brand-primary)!important; }
+html body.buddypress .youzify-cover-pattern{ opacity:.12!important; }
+html body.buddypress li.youzify-show-cover .youzify-user-data,html body.buddypress li.youzify-show-cover .youzify-tools{ background:transparent!important; backdrop-filter:none!important; }
+html body.buddypress li.youzify-show-cover .youzify-user-data *,html body.buddypress li.youzify-show-cover .item *{ color:var(--wp--preset--color--contrast)!important; }
+html body.buddypress li.youzify-show-cover .item-title a{ color:var(--wp--preset--color--accent-1,inherit)!important; }
+html body.buddypress li.youzify-show-cover i{ color:var(--wp--preset--color--brand-primary)!important; }
+html body.buddypress li.youzify-show-cover a[class*=button],html body.buddypress li.youzify-show-cover .generic-button a{ background:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; border:0!important; }
+
+/* The network's picture behind the page, and the links that were pale for a dark page. */
+html body.buddypress::before,html body.buddypress::after{ display:none!important; }
+html body.buddypress .youzify .item-list .action a.youzify-manage-group,html body.buddypress a.youzify-manage-group{ color:var(--wp--preset--color--brand-primary)!important; }
+html body.buddypress .youzify-directory-filter a:not(li a),html body.buddypress .youzify-directory-filter label{ color:var(--wp--preset--color--contrast)!important; }
+
+/* A web app's own profile header (inc/hub-boundary.php): cover, photo and name, then the tabs. */
+html body.buddypress .gs-community-profile-header{ max-width:1100px; margin:24px auto 0; padding:0 20px; color:var(--wp--preset--color--contrast); }
+html body.buddypress .gs-community-profile-header>*:first-child{ border-radius:var(--wp--custom--gs--radius,14px); overflow:hidden; min-height:180px; background:linear-gradient(135deg,var(--wp--preset--color--brand-primary),var(--wp--preset--color--brand-secondary,var(--wp--preset--color--brand-primary))); }
+html body.buddypress .gs-cph__id{ display:flex; flex-wrap:wrap; align-items:flex-end; gap:18px; margin-top:-56px; padding:0 22px; position:relative; }
+html body.buddypress .gs-cph__id img,html body.buddypress .gs-cph__id .avatar{ width:112px!important; height:112px!important; border-radius:50%!important; border:4px solid var(--wp--preset--color--base)!important; background:var(--wp--preset--color--base); box-shadow:0 8px 24px color-mix(in srgb,var(--wp--preset--color--contrast) 14%,transparent); }
+html body.buddypress .gs-cph__text{ flex:1 1 260px; min-width:0; padding-bottom:6px; }
+html body.buddypress .gs-cph__text :is(h1,h2,h3,.gs-profile-name){ margin:0!important; font-family:var(--gs-font-heading,inherit); color:var(--wp--preset--color--contrast)!important; }
+html body.buddypress .gs-cph__text :is(p,span,small){ color:color-mix(in srgb,var(--wp--preset--color--contrast) 70%,transparent)!important; }
+html body.buddypress .gs-community-profile-header nav,html body.buddypress .gs-community-profile-header [class*=profile-nav]{ margin-top:20px; display:flex; flex-wrap:wrap; gap:8px; border-bottom:1px solid var(--wp--preset--color--accent-6,#ddd); padding-bottom:12px; background:transparent!important; }
+html body.buddypress .gs-community-profile-header [class*=profile-nav] a{ padding:9px 16px; border-radius:var(--wp--custom--gs--button-radius,999px); border:1px solid var(--wp--preset--color--accent-6,#ddd); background:var(--wp--preset--color--base)!important; color:var(--wp--preset--color--contrast)!important; text-decoration:none; font-weight:600; }
+html body.buddypress .gs-community-profile-header [class*=profile-nav] :is(.current,.is-active,[aria-current]) a,html body.buddypress .gs-community-profile-header [class*=profile-nav] a:is(.current,.is-active,[aria-current]){ background:var(--wp--preset--color--brand-primary)!important; border-color:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; }
+
+/* The Profile tab's About card. */
+html body.buddypress .gs-community-about{ max-width:1100px; margin:20px auto; padding:24px 26px; border:1px solid var(--wp--preset--color--accent-6,#ddd); border-radius:var(--wp--custom--gs--radius,14px); background:color-mix(in srgb,var(--wp--preset--color--base) 70%,#fff); }
+html body.buddypress .gs-community-about h2{ margin:0 0 14px!important; font-size:1.25rem; }
+html body.buddypress .gs-community-about dl{ display:grid; grid-template-columns:minmax(120px,200px) 1fr; gap:10px 18px; margin:0; }
+html body.buddypress .gs-community-about dt{ font-weight:700; color:var(--wp--preset--color--contrast); }
+html body.buddypress .gs-community-about dd{ margin:0; color:color-mix(in srgb,var(--wp--preset--color--contrast) 80%,transparent); }
+@media (max-width:600px){ html body.buddypress .gs-community-about dl{ grid-template-columns:1fr; } }
+
+/* The page inside the site's own header and footer. */
+html body.buddypress .gs-community-main{ display:block; min-height:50vh; }
+html body.buddypress .gs-community-main .youzify-page-main-content,html body.buddypress .gs-community-main #youzify-profile-navmenu{ max-width:1100px; margin-left:auto; margin-right:auto; }
+
+/* The numbers under a designed profile header (points, connections, groups). */
+html body.buddypress .gs-cph__stats{ display:flex; flex-wrap:wrap; gap:12px; margin:16px 22px 0; }
+html body.buddypress .gs-cph__stats>*{ flex:1 1 160px; padding:12px 16px; border:1px solid var(--wp--preset--color--accent-6,#ddd); border-radius:var(--wp--custom--gs--radius,14px); background:color-mix(in srgb,var(--wp--preset--color--base) 70%,#fff); color:var(--wp--preset--color--contrast); }
+html body.buddypress .gs-cph__stats>* *{ color:var(--wp--preset--color--contrast)!important; background:transparent!important; border:0!important; box-shadow:none!important; }
+html body.buddypress .gdc-bp-layout .gs-page{ margin-bottom:24px; }
+
+
+/* A designed profile: the cover takes the brand's colours until the member adds a photo. */
+html body.buddypress .gs-community-profile-header>div:first-child[style*="linear-gradient(rgba(0,0,0"]:not([style*="url("]){ background-image:radial-gradient(120% 140% at 100% 0,color-mix(in srgb,var(--wp--preset--color--brand-secondary,var(--wp--preset--color--brand-primary)) 70%,transparent),transparent 60%),linear-gradient(135deg,var(--wp--preset--color--brand-primary),color-mix(in srgb,var(--wp--preset--color--brand-primary) 60%,#000))!important; }
+html body.buddypress .gs-community-profile-header>div:first-child{ border-radius:var(--wp--custom--gs--radius,18px)!important; }
+html body.buddypress .gs-cph__text .gdc-ps-member-type span{ border-color:color-mix(in srgb,var(--wp--preset--color--brand-primary) 40%,transparent)!important; color:var(--wp--preset--color--brand-primary)!important; background:color-mix(in srgb,var(--wp--preset--color--brand-primary) 8%,transparent)!important; }
+
+/* The numbers: light cards with the number large. */
+html body.buddypress .gs-cph__stats .youzify-widget,html body.buddypress .gs-cph__stats .youzify-widget *{ background:transparent!important; box-shadow:none!important; border:0!important; }
+html body.buddypress .gs-cph__stats .youzify-user-balance-box{ display:flex; flex-direction:column; gap:4px; padding:0!important; }
+html body.buddypress .gs-cph__stats .youzify-user-points{ font-size:1.6rem!important; font-weight:800!important; font-family:var(--gs-font-heading,inherit); color:var(--wp--preset--color--brand-primary)!important; }
+html body.buddypress .gs-cph__stats .youzify-box-head,html body.buddypress .gs-cph__stats .youzify-user-points-title,html body.buddypress .gs-cph__stats .youzify-user-level-title{ font-size:.82rem!important; color:color-mix(in srgb,var(--wp--preset--color--contrast) 65%,transparent)!important; }
+html body.buddypress .gs-cph__stats .youzify-user-points-slash{ display:none!important; }
+
+/* Buttons that carried the social plugin's own red or dark colours, at rest and on hover. */
+html body.buddypress .gs-community-profile-header .wp-block-gend-society-profile-actions a,html body.buddypress .gs-community-profile-header .wp-block-gend-society-profile-actions button,html body.buddypress .gs-community-profile-header [class*=profile-actions] a{ background:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--base)!important; border:0!important; border-radius:var(--wp--custom--gs--button-radius,999px)!important; padding:12px 22px!important; font-weight:700; text-decoration:none!important; }
+html body.buddypress .gs-community-profile-header [class*=profile-actions] a:hover,html body.buddypress #buddypress .button:hover,html body.buddypress #buddypress button:not(.mfp-close):hover,html body.buddypress .generic-button a:hover,html body.buddypress .youzify-wall-post:hover{ background:color-mix(in srgb,var(--wp--preset--color--brand-primary) 82%,#000)!important; color:var(--wp--preset--color--base)!important; }
+html body.buddypress .gs-community-profile-header a.gdc-ps-nav-item:hover{ border-color:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--brand-primary)!important; background:var(--wp--preset--color--base)!important; }
+html body.buddypress .gs-community-profile-header a.gdc-ps-nav-item.is-active:hover{ color:var(--wp--preset--color--base)!important; background:var(--wp--preset--color--brand-primary)!important; }
+
+/* Sub-tabs: the current one readable on its fill. */
+html body.buddypress #subnav li.current a,html body.buddypress #subnav li.selected a,html body.buddypress #subnav li.current a *,html body.buddypress #subnav li.selected a *{ color:var(--wp--preset--color--base)!important; -webkit-text-fill-color:currentColor!important; }
+html body.buddypress #subnav li a:hover{ border-color:var(--wp--preset--color--brand-primary)!important; color:var(--wp--preset--color--brand-primary)!important; background:var(--wp--preset--color--base)!important; }
+html body.buddypress #subnav li.current a:hover,html body.buddypress #subnav li.selected a:hover{ color:var(--wp--preset--color--base)!important; background:var(--wp--preset--color--brand-primary)!important; }
+
+/* A tab opening in place. */
+html body.buddypress main.youzify-page-main-content{ transition:opacity .18s ease; }
+html body.buddypress main.youzify-page-main-content.gs-tab-loading{ opacity:.45; pointer-events:none; }
+
+/* The name starts below the cover; only the photo overlaps it. */
+html body.buddypress .gs-cph__text{ margin-top:64px; }
+@media (max-width:600px){ html body.buddypress .gs-cph__text{ margin-top:0; flex-basis:100%; } }

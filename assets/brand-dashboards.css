@@ -1,0 +1,117 @@
+/*
+ * Web apps: the sales team dashboard ([affiliate_sales_dashboard]) and the wallet in the web app's own style guide
+ * colours, instead of gend.me's dark glass, which turns grey and unreadable on a light site. Loaded only on branded
+ * web apps (setup-brand.php adds body.gs-brand-site), after the plugins' own sheets. The colours are mixed from the
+ * guide's surface and text, so a dark guide works too.
+ */
+body.gs-brand-site .aas-affiliate-dashboard,
+body.gs-brand-site .gend-wallet {
+  --b-surface: var(--wp--preset--color--brand-surface, var(--wp--preset--color--base, #f8f8f8));
+  --b-text: var(--wp--preset--color--brand-on-surface, var(--wp--preset--color--contrast, #333));
+  --b-muted: var(--wp--preset--color--brand-on-surface-muted, #777);
+  --b-primary: var(--wp--preset--color--brand-primary, #6a0dad);
+  --b-secondary: var(--wp--preset--color--brand-secondary, var(--b-primary));
+  --b-card: color-mix(in srgb, var(--b-text) 4%, var(--b-surface));
+  --b-field: var(--b-surface);
+  --b-line: color-mix(in srgb, var(--b-text) 14%, transparent);
+  --b-soft: color-mix(in srgb, var(--b-primary) 12%, transparent);
+  --gd-card: var(--b-card); --gd-card-2: var(--b-field); --gd-line: var(--b-line); --gd-line-2: var(--b-line);
+  --gd-text: var(--b-text); --gd-head: var(--b-text); --gd-dim: var(--b-muted); --gd-mute: var(--b-muted);
+  --gd-mag: var(--b-primary); --gd-mag-2: var(--b-secondary); --gd-blue: var(--b-primary);
+  color: var(--b-text) !important;
+  font-family: var(--gs-font-body, inherit) !important;
+}
+
+/* Type */
+body.gs-brand-site .aas-affiliate-dashboard :is(h1, h2, h3, h4, h5) { color: var(--b-text) !important; font-family: var(--gs-font-heading, inherit) !important; }
+body.gs-brand-site .aas-affiliate-dashboard :is(p, li, label, td, .aas-card > p:only-of-type) { color: var(--b-muted) !important; }
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-kpi-label, .aas-metric-label, th, .aas-affiliate-link-label, .aas-phs-footer, .aas-affiliate-link-hint, small) { color: var(--b-muted) !important; }
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-kpi-value, .aas-metric-value, table td:first-child, strong, .woocommerce-Price-amount) { color: var(--b-text) !important; }
+body.gs-brand-site .aas-affiliate-dashboard a:not(.aas-grow-cta):not([class*="btn"]):not([class*="button"]) { color: var(--b-primary) !important; }
+
+/* Surfaces: flat cards on the page, no glass */
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-card, .aas-projection, .aas-dashboard-tabs, .aas-grow__hero, .aas-phs-card, .aas-projection-hero, .aas-la-card, .aas-la-summary > div) {
+  background: var(--b-card) !important; background-image: none !important; border: 1px solid var(--b-line) !important;
+  box-shadow: 0 10px 30px color-mix(in srgb, var(--b-text) 7%, transparent) !important;
+  backdrop-filter: none !important; -webkit-backdrop-filter: none !important; color: var(--b-text) !important;
+}
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-phs-bg, .aas-grow__hero::before, .aas-grow__hero::after) { display: none !important; }
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-card :is(h3, h4), .aas-tool-section h3) { border-bottom-color: var(--b-line) !important; }
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-kpi, .aas-metric, .aas-projection-field, .aas-projection-input-group, .aas-tier-chip, .aas-la-card dl div) {
+  background: var(--b-field) !important; border-color: var(--b-line) !important; color: var(--b-text) !important;
+}
+
+/* Tabs and pills */
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-dashboard-tab, .aas-dashboard-subtab, .aas-tab-btn) {
+  background: var(--b-field) !important; border: 1px solid var(--b-line) !important; color: var(--b-muted) !important; box-shadow: none !important;
+}
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-dashboard-tab, .aas-dashboard-subtab, .aas-tab-btn):hover { color: var(--b-primary) !important; border-color: var(--b-primary) !important; }
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-dashboard-tab, .aas-dashboard-subtab, .aas-tab-btn).is-active {
+  background: var(--b-primary) !important; border-color: var(--b-primary) !important; color: #fff !important;
+  box-shadow: 0 6px 18px color-mix(in srgb, var(--b-primary) 30%, transparent) !important;
+}
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-dashboard-tab, .aas-dashboard-subtab, .aas-tab-btn).is-active * { color: #fff !important; }
+
+/* Badges and chips */
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-phs-badge, .aas-grow__badge, .aas-grow__pill, .aas-status-chip.is-active, .aas-platform-badge) {
+  background: var(--b-soft) !important; border-color: color-mix(in srgb, var(--b-primary) 35%, transparent) !important; color: var(--b-primary) !important;
+}
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-phs-badge, .aas-grow__badge, .aas-grow__pill) * { color: var(--b-primary) !important; }
+
+/* The invite link and the two big actions */
+body.gs-brand-site .aas-affiliate-dashboard :is(input[type="text"], input[type="email"], input[type="number"], select, textarea) {
+  background: var(--b-field) !important; color: var(--b-text) !important; border: 1px solid var(--b-line) !important;
+}
+body.gs-brand-site .aas-affiliate-dashboard .aas-grow-cta.is-email { background: linear-gradient(135deg, var(--b-primary), var(--b-secondary)) !important; border-color: transparent !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-grow-cta.is-social { background: linear-gradient(135deg, var(--b-secondary), color-mix(in srgb, var(--b-primary) 70%, #000)) !important; border-color: transparent !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-grow-cta :is(*, p, span, small, strong) { color: #fff !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-grow-cta__go,
+body.gs-brand-site .aas-affiliate-dashboard .aas-grow-cta__go * { color: var(--b-primary) !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-grow-cta__meta { background: rgba(0, 0, 0, 0.18) !important; }
+
+/* Buttons */
+body.gs-brand-site .aas-affiliate-dashboard :is(.button-primary, .aas-grow__copy, button[type="submit"]) {
+  background: var(--b-primary) !important; border-color: var(--b-primary) !important; color: #fff !important;
+}
+
+/* Tables */
+body.gs-brand-site .aas-affiliate-dashboard table :is(td, th) { border-bottom-color: var(--b-line) !important; }
+body.gs-brand-site .aas-affiliate-dashboard table tr:hover td { background: color-mix(in srgb, var(--b-text) 3%, transparent) !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-tier-active td { background: var(--b-soft) !important; }
+
+/* Wallet */
+body.gs-brand-site .gend-wallet :is(.gend-wallet__balance-card, [class*="card"]) { background: var(--b-card) !important; border-color: var(--b-line) !important; color: var(--b-text) !important; box-shadow: none !important; }
+body.gs-brand-site .gend-wallet :is(.gend-wallet__action-btn) { background: var(--b-field) !important; border-color: var(--b-line) !important; color: var(--b-text) !important; }
+body.gs-brand-site .gend-wallet :is(h1, h2, h3, h4) { color: var(--b-text) !important; font-family: var(--gs-font-heading, inherit) !important; }
+body.gs-brand-site .gend-wallet :is(p, small, span) { color: var(--b-muted); }
+body.gs-brand-site .gend-wallet .gw-hero { display: none !important; }
+
+/* The grow card's heading and the tab bar, whose own rules are more specific */
+body.gs-brand-site .aas-affiliate-dashboard .aas-card .aas-grow__hero :is(h2, h3),
+body.gs-brand-site .aas-grow__hero :is(h2, h3) { color: var(--b-text) !important; -webkit-text-fill-color: currentColor !important; font-family: var(--gs-font-heading, inherit) !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-dashboard-tabs { border-radius: 20px !important; padding: 8px !important; gap: 8px !important; }
+body.gs-brand-site .aas-affiliate-dashboard .aas-dashboard-tab { border-radius: 14px !important; }
+
+/* The invite popup opens outside the dashboard */
+body.gs-brand-site .aas-grow-modal__box { background: var(--wp--preset--color--brand-surface, #f8f8f8) !important; color: var(--wp--preset--color--brand-on-surface, #333) !important; border-color: color-mix(in srgb, var(--wp--preset--color--brand-on-surface, #333) 14%, transparent) !important; }
+body.gs-brand-site .aas-grow-modal__box > h3 { color: var(--wp--preset--color--brand-on-surface, #333) !important; }
+
+/* The Email invites popup on a web app (gend-society inc/profile-invite.php, framed): the brand's light look. */
+body.gs-brand-site.gs-invite-frame{ --b-surface:var(--wp--preset--color--brand-surface,#f8f8f8); --b-text:var(--wp--preset--color--brand-on-surface,#333); --b-muted:var(--wp--preset--color--brand-on-surface-muted,#777); --b-primary:var(--wp--preset--color--brand-primary,#6a0dad); --b-line:color-mix(in srgb,var(--b-text) 14%,transparent); color:var(--b-text)!important; font-family:var(--gs-font-body,inherit)!important; }
+body.gs-brand-site.gs-invite-frame :is(h1,h2,h3,h4,strong,label){ color:var(--b-text)!important; font-family:var(--gs-font-heading,inherit); }
+body.gs-brand-site.gs-invite-frame :is(p,small,.gs-invite-help,.gs-invite-row-meta,.gs-invite-sent-meta,.gs-invite-empty){ color:var(--b-muted)!important; }
+body.gs-brand-site.gs-invite-frame :is(.gs-invite-card,.gs-invite-step,.gs-invite-sent,.gs-invite-social-row,.gs-invite-test,.gs-invite-reminder__modal){ background:color-mix(in srgb,var(--b-text) 4%,var(--b-surface))!important; border:1px solid var(--b-line)!important; box-shadow:none!important; backdrop-filter:none!important; color:var(--b-text)!important; }
+body.gs-brand-site.gs-invite-frame :is(.gs-invite-tabs){ background:color-mix(in srgb,var(--b-text) 4%,var(--b-surface))!important; border:1px solid var(--b-line)!important; }
+body.gs-brand-site.gs-invite-frame .gs-invite-tab{ background:var(--b-surface)!important; color:var(--b-muted)!important; border:1px solid var(--b-line)!important; box-shadow:none!important; }
+body.gs-brand-site.gs-invite-frame .gs-invite-tab:is(.is-active,[aria-selected="true"]){ background:var(--b-primary)!important; border-color:var(--b-primary)!important; color:#fff!important; }
+body.gs-brand-site.gs-invite-frame :is(input[type=text],input[type=email],textarea,select){ background:var(--b-surface)!important; color:var(--b-text)!important; border:1px solid var(--b-line)!important; }
+body.gs-brand-site.gs-invite-frame :is(.gs-invite-btn,.gs-invite-link-btn,button[type=submit]){ background:var(--b-primary)!important; border-color:var(--b-primary)!important; color:#fff!important; box-shadow:none!important; }
+body.gs-brand-site.gs-invite-frame :is(.gs-invite-btn,.gs-invite-link-btn):hover{ background:color-mix(in srgb,var(--b-primary) 82%,#000)!important; color:#fff!important; }
+body.gs-brand-site.gs-invite-frame .gs-invite-tile{ background:var(--b-surface)!important; border:1px solid var(--b-line)!important; color:var(--b-text)!important; }
+body.gs-brand-site.gs-invite-frame .gs-invite-tile__t{ color:var(--b-text)!important; }
+body.gs-brand-site.gs-invite-frame .gs-invite-step__n{ background:var(--b-primary)!important; color:#fff!important; box-shadow:none!important; }
+body.gs-brand-site.gs-invite-frame .gs-invite-sendbar{ background:color-mix(in srgb,var(--b-text) 6%,var(--b-surface))!important; border:1px solid var(--b-line)!important; backdrop-filter:none!important; }
+body.gs-brand-site.gs-invite-frame code{ background:color-mix(in srgb,var(--b-primary) 10%,transparent)!important; color:var(--b-primary)!important; }
+
+/* gend.me's status lines and pulse badges ("DEEP_LINK_v2", "GROWTH_ENGINE", "Signature Bonding: ACTIVE") read as gend.me, not as the web app. */
+body.gs-brand-site .aas-affiliate-dashboard :is(.aas-phs-footer,.aas-grow__foot,.aas-phs-badge,.aas-grow__badge){ display:none!important; }
