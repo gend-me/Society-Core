@@ -3774,6 +3774,7 @@ function gend_society_hosting_collect_media( $force_rescan = false ) {
         'scanned_at' => time(),
     );
     set_transient( $key, $data, HOUR_IN_SECONDS );
+    delete_transient( 'gend_society_media_added_since_scan' ); // this scan counted them (media-storage-panel.php)
     return $data;
 }
 
