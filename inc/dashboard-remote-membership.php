@@ -67,6 +67,15 @@ add_action( 'wp_ajax_gend_society_compute_gas_devices', function () {
     $owner_ids = array( get_current_user_id() );
     $site = function_exists( 'wu_get_site' ) ? wu_get_site( get_current_blog_id() ) : null;
     $group_id = isset( $_POST['group_id'] ) ? absint( $_POST['group_id'] ) : 0;
+    // Security 2026-11-06 (review finding 5): a group id from the request is only used when the caller runs that
+    // group. A site admin could otherwise list the devices of any group, the network owners' included.
+    if ( $group_id > 0 && ! is_super_admin() ) {
+        $gs_cg_uid  = get_current_user_id();
+        $gs_cg_runs = function_exists( 'groups_is_user_admin' ) && ( groups_is_user_admin( $gs_cg_uid, $group_id ) || ( function_exists( 'groups_is_user_mod' ) && groups_is_user_mod( $gs_cg_uid, $group_id ) ) );
+        if ( ! $gs_cg_runs ) {
+            $group_id = 0;
+        }
+    }
     if ( ! $group_id ) {
         $group_id = $site && method_exists( $site, 'get_meta' ) ? (int) $site->get_meta( 'gdc_bp_group_id', 0 ) : 0;
     }
