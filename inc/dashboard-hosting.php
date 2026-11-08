@@ -4926,10 +4926,16 @@ function gend_society_hosting_gas_earned_summary( $user_id ) {
             $out['awaiting_label']  = number_format( (float) $earned['awaiting'], 2 ) . ' DGEN';
             $out['completed_label'] = number_format( (float) $earned['completed'], 2 ) . ' DGEN';
         }
+        // Compute the owner's own machines, servers or devices did (ledger status 'self'): never billed, shown as the saving.
+        if ( isset( $gas['payload']['saved'] ) && is_array( $gas['payload']['saved'] ) ) {
+            $out['saved_label'] = '' !== (string) ( $gas['payload']['saved']['label'] ?? '' ) ? (string) $gas['payload']['saved']['label'] : number_format( (float) ( $gas['payload']['saved']['total'] ?? 0 ), 6 ) . ' GAS';
+        }
         return $out;
     }
     global $wpdb;
     $ledger = $wpdb->base_prefix . 'gdc_gas_ledger';
+    // Owner's rule 2026-11-06: work done by the owner's own compute is recorded with status 'self' and never billed; its price is the saving.
+    $saved  = (float) $wpdb->get_var( $wpdb->prepare( "SELECT COALESCE(SUM(sales_amount), 0) FROM %i WHERE customer_user_id = %d AND status = 'self'", $ledger, (int) $user_id ) );
     $row    = $wpdb->get_row( $wpdb->prepare(
         "SELECT COUNT(*) AS event_count, COALESCE(SUM(owner_amount), 0) AS total_earned, MAX(created_at) AS last_earned
          FROM %i WHERE station_user_id = %d",
@@ -4941,6 +4947,7 @@ function gend_society_hosting_gas_earned_summary( $user_id ) {
     $payouts = function_exists( '\WP_Ultimo\Integrations\gdc_gas_payout_totals' ) ? (array) \WP_Ultimo\Integrations\gdc_gas_payout_totals( (int) $user_id ) : null;
 
     return array(
+        'saved_label'        => number_format( $saved, 6 ) . ' GAS',
         'awaiting_label'     => null === $payouts ? null : number_format( (float) ( $payouts['awaiting'] ?? 0 ), 2 ) . ' DGEN',
         'completed_label'    => null === $payouts ? null : number_format( (float) ( $payouts['completed'] ?? 0 ), 2 ) . ' DGEN',
         'event_count'        => $row ? (int) $row['event_count'] : 0,
