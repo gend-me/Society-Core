@@ -183,6 +183,10 @@ if ( ! function_exists( 'gend_society_data_sharing_items' ) ) {
 				'label'       => __( 'Share this site\'s active plugin list with gend.me', 'gend-society' ),
 				'description' => __( 'The list of active plugins is sent when a plugin is activated or deactivated and once a day, so gend.me can show which features already run on this site.', 'gend-society' ),
 			),
+			'compute_meter' => array(
+				'label'       => __( 'Report this site\'s compute time to gend.me', 'gend-society' ),
+				'description' => __( 'Once an hour the site sends how many CPU seconds its PHP used in the past hour — a number, nothing about visitors or content. Because this server is yours, gend.me records it as compute you did not have to buy and shows the saving in your dashboard.', 'gend-society' ),
+			),
 		);
 	}
 }

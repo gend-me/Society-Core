@@ -233,6 +233,12 @@ return array(
 			'note'  => 'gend.me mail service, container side: a paired install sends mail through gend.me.',
 		),
 		array(
+			'file'  => 'inc/compute-meter.php',
+			'tier'  => 'customer',
+			'needs' => array( 'paired' ),
+			'note'  => 'Hourly CPU seconds -> hub compute/usage (shared pool billed as T3 gas, own machine = savings). No-op on hub.',
+		),
+		array(
 			'file'  => 'inc/dashboard-hosting.php',
 			'tier'  => 'customer',
 			'needs' => array(),

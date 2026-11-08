@@ -495,6 +495,9 @@ if (!function_exists('gend_society_portal_connect_data_sharing_save')) {
 		} elseif (!$plugin_list_was_on && function_exists('gend_society_feature_state_report_now')) {
 			gend_society_feature_state_report_now();
 		}
+		if (!gend_society_data_sharing_allowed('compute_meter')) {
+			wp_clear_scheduled_hook('gend_society_compute_hourly');
+		}
 		gend_society_portal_connect_standalone_redirect('success', __('Sharing choices saved.', 'gend-society'));
 	}
 }
@@ -1035,7 +1038,7 @@ if (!function_exists('gend_society_portal_connect_render_connected')) {
 <?php /* @build-only-begin wporg */ ?>
 			<?php if (function_exists('gend_society_build_is_wporg') && gend_society_build_is_wporg()) : ?>
 				<h3><?php esc_html_e('Optional sharing with gend.me', 'gend-society'); ?></h3>
-				<p><?php esc_html_e('Both are off unless you turn them on here. Turning one off stops it straight away.', 'gend-society'); ?></p>
+				<p><?php esc_html_e('All of these are off unless you turn them on here. Turning one off stops it straight away.', 'gend-society'); ?></p>
 				<form method="post" action="<?php echo esc_url(admin_url('admin-post.php')); ?>" class="gend-society-connect-sharing">
 					<?php wp_nonce_field('gend_society_data_sharing', 'gend_society_data_sharing_nonce'); ?>
 					<input type="hidden" name="action" value="gend_society_portal_connect_submit" />
