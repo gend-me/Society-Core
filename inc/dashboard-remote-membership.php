@@ -2412,6 +2412,12 @@ function gend_society_render_membership_panel( $payload = null ) {
                                 <span class="dashicons dashicons-money-alt icon"></span>
                                 <div class="k"><?php esc_html_e( 'Owed Balance', 'gend-society' ); ?></div>
                                 <div class="v"><?php echo esc_html( $gs_gas_data['unbilled_gas_label'] ?? '0.000000 GAS' ); ?></div>
+                                <?php if ( ! empty( $gs_gas_earned['saved_label'] ) ) : ?>
+                                    <div style="color: rgba(226,232,240,.5); font-size: 0.7rem; margin-top: 4px;"><?php
+                                        /* translators: %s: gas the owner's own machines, servers or devices did, never billed */
+                                        echo esc_html( sprintf( __( 'Saved by your own compute %s', 'gend-society' ), $gs_gas_earned['saved_label'] ) );
+                                    ?></div>
+                                <?php endif; ?>
                                 <?php if ( $gs_gas_pending_payment ) : ?>
 <?php if ( $gs_sa ) : ?>
                                     <a href="<?php echo esc_url( $gs_gas_pending_payment['pay_url'] ); ?>" class="gs-bcg-btn gs-bcg-btn--cta" style="margin-top: 10px; padding: 6px 14px; font-size: 0.72rem;" data-gs-popup target="_blank" rel="opener">
