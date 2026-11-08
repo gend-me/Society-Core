@@ -2644,6 +2644,18 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 <div style="margin-bottom: 14px;">
                     <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Servers', 'gend-society' ); ?></h4>
                     <p class="gs-hosting__section-sub" style="margin: 0;"><?php esc_html_e( 'Dedicated server resources for your app — pick a plan and attach it to this membership.', 'gend-society' ); ?></p>
+                    <?php $gs_machines = function_exists( 'gend_society_hosting_machines' ) ? gend_society_hosting_machines() : array(); ?>
+                    <?php if ( $gs_machines ) : ?>
+                    <ul class="gs-hosting__machines" style="margin: 10px 0 0; padding: 0; list-style: none; display: grid; gap: 6px;">
+                        <?php foreach ( $gs_machines as $gs_m ) : ?>
+                        <li style="display: flex; gap: 10px; align-items: baseline; color: var(--gs-muted, #94a3b8); font-size: .92rem;">
+                            <strong style="color: #fff;"><?php echo esc_html( sprintf( /* translators: 1: number of machines, 2: plan name */ _n( '%1$d × %2$s', '%1$d × %2$s', (int) $gs_m['count'], 'gend-society' ), (int) $gs_m['count'], (string) $gs_m['label'] ) ); ?></strong>
+                            <span><?php echo esc_html( (string) $gs_m['size'] ); ?></span>
+                            <span><?php echo esc_html( ! empty( $gs_m['ready'] ) ? __( 'ready', 'gend-society' ) : __( 'being created', 'gend-society' ) ); ?></span>
+                        </li>
+                        <?php endforeach; ?>
+                    </ul>
+                    <?php endif; ?>
                     <?php $gs_server_info_url = function_exists( 'gend_society_hosting_info_urls' ) ? (string) ( gend_society_hosting_info_urls()['server'] ?? '' ) : ''; ?>
                     <?php if ( '' !== $gs_server_info_url ) : ?>
                     <p class="gs-hosting__section-sub" style="margin: 6px 0 0;"><a href="<?php echo esc_url( $gs_server_info_url ); ?>" target="_blank" rel="noopener" style="color: inherit; text-decoration: underline;"><?php esc_html_e( 'About Managed Server Hosting', 'gend-society' ); ?></a></p>
@@ -4328,6 +4340,25 @@ if ( ! function_exists( 'gend_society_hosting_container_resource_starting_prices
         }
 
         return $out;
+    }
+}
+
+if ( ! function_exists( 'gend_society_hosting_machines' ) ) {
+    /**
+     * The dedicated machines this web app holds (Server plans): count per type and whether they are ready. On gend.me
+     * from the membership's container claim; on a web app or connected install from the gas answer (servers.machines).
+     *
+     * @return array<int,array{label:string,size:string,count:int,ready:bool}>
+     */
+    function gend_society_hosting_machines(): array {
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            $gas = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
+            $m   = is_array( $gas['payload'] ) ? ( $gas['payload']['servers']['machines'] ?? array() ) : array();
+            return is_array( $m ) ? $m : array();
+        }
+        $membership = function_exists( 'gend_society_dashboard_get_membership' ) ? gend_society_dashboard_get_membership() : null;
+        $fn = '\WP_Ultimo\Integrations\gdc_container_machines_for_membership';
+        return ( $membership && function_exists( $fn ) ) ? (array) $fn( $membership ) : array();
     }
 }
 
