@@ -11,8 +11,10 @@
  * figures here are the measurement.
  *
  * Measurement: in a gend.me container the kernel's own CPU accounting for the container (cgroup v2 cpu.stat
- * usage_usec, or cgroup v1 cpuacct.usage) — the web server and PHP together, sampled on each hourly run and
- * attributed to the hour the slice started in. On a connected install (the member's own server, possibly shared with
+ * usage_usec, or cgroup v1 cpuacct.usage) — the web server and PHP together — and the memory it holds (memory.current),
+ * sampled by each copy of the site on the requests it serves (at most every 5 minutes) and on the hourly run, and
+ * spread over the hours each slice covers. A pooled web app runs several copies: each keeps its own baseline, the hour
+ * counters are shared. On a connected install (the member's own server, possibly shared with
  * other sites) each request's PHP CPU time instead (getrusage delta between plugin load and shutdown). Not measured:
  * the database, static files and cached pages that never reach PHP.
  *
@@ -105,6 +107,51 @@ function gend_society_compute_cgroup_usec() {
 }
 
 /**
+ * The container's memory in use, in bytes (cgroup v2 memory.current, or v1 memory.usage_in_bytes), or null.
+ */
+function gend_society_compute_cgroup_mem_bytes() {
+    $mode = function_exists('gend_society_runtime_mode') ? gend_society_runtime_mode() : 'standalone';
+    if ('container' !== $mode) {
+        return null;
+    }
+    foreach (array('/sys/fs/cgroup/memory.current', '/sys/fs/cgroup/memory/memory.usage_in_bytes') as $f) {
+        if (is_readable($f)) {
+            $v = trim((string) file_get_contents($f));
+            if (ctype_digit($v)) {
+                return (float) $v;
+            }
+        }
+    }
+    return null;
+}
+
+/** This copy of the site (a pooled web app runs several): its own baseline option key. */
+function gend_society_compute_copy_key(): string {
+    $host = function_exists('gethostname') ? (string) gethostname() : '';
+    return GEND_SOCIETY_COMPUTE_OPTION_PREFIX . 'last_' . substr(md5($host), 0, 12);
+}
+
+/**
+ * Spread an amount over the hours between two times, in proportion to the seconds in each hour.
+ *
+ * @param int   $from   Unix time the slice started.
+ * @param int   $to     Unix time it ended.
+ * @param float $amount What to spread.
+ * @param string $kind  own | shared | mem_own | mem_shared.
+ */
+function gend_society_compute_spread(int $from, int $to, float $amount, string $kind): void {
+    if ($amount <= 0 || $to <= $from) {
+        return;
+    }
+    $span = $to - $from;
+    for ($t = $from; $t < $to;) {
+        $next = min($to, (int) (floor($t / 3600) + 1) * 3600);
+        gend_society_compute_add(gmdate('YmdH', $t), $amount * ($next - $t) / $span, $kind);
+        $t = $next;
+    }
+}
+
+/**
  * Add CPU seconds to an hour's counter, atomically (one UPSERT, no read-modify-write), bypassing the options cache on
  * purpose: these rows are only ever read back by gend_society_compute_buckets().
  *
@@ -112,12 +159,17 @@ function gend_society_compute_cgroup_usec() {
  * @param float  $seconds CPU seconds to add.
  * @param bool   $own     Own machine (true) or the shared pool (false).
  */
-function gend_society_compute_add(string $hour, float $seconds, bool $own): void {
+function gend_society_compute_add(string $hour, float $seconds, $own): void {
     global $wpdb;
     if ($seconds <= 0 || !preg_match('/^\d{10}$/', $hour)) {
         return;
     }
-    $name = GEND_SOCIETY_COMPUTE_OPTION_PREFIX . $hour . '_' . ($own ? 'own' : 'shared');
+    // $own: true/false for CPU seconds (the original signature), or a counter kind ('mem_own', 'mem_shared'...).
+    $kind = is_string($own) ? $own : ($own ? 'own' : 'shared');
+    if (!in_array($kind, array('own', 'shared', 'mem_own', 'mem_shared'), true)) {
+        return;
+    }
+    $name = GEND_SOCIETY_COMPUTE_OPTION_PREFIX . $hour . '_' . $kind;
     $wpdb->query($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
         "INSERT INTO {$wpdb->options} (option_name, option_value, autoload) VALUES (%s, %s, 'no')
          ON DUPLICATE KEY UPDATE option_value = option_value + VALUES(option_value)",
@@ -129,7 +181,8 @@ function gend_society_compute_add(string $hour, float $seconds, bool $own): void
 /**
  * Every hour counter this site holds, newest last.
  *
- * @return array<string,array{own:float,shared:float}> keyed by hour (YYYYMMDDHH).
+ * @return array<string,array{own:float,shared:float,mem_own:float,mem_shared:float}> keyed by hour (YYYYMMDDHH);
+ *         own/shared in CPU seconds, mem_* in GiB-seconds.
  */
 function gend_society_compute_buckets(): array {
     global $wpdb;
@@ -139,11 +192,11 @@ function gend_society_compute_buckets(): array {
     ), ARRAY_A);
     $out = array();
     foreach ((array) $rows as $row) {
-        if (!preg_match('/^' . preg_quote(GEND_SOCIETY_COMPUTE_OPTION_PREFIX, '/') . '(\d{10})_(own|shared)$/', (string) $row['option_name'], $m)) {
+        if (!preg_match('/^' . preg_quote(GEND_SOCIETY_COMPUTE_OPTION_PREFIX, '/') . '(\d{10})_(own|shared|mem_own|mem_shared)$/', (string) $row['option_name'], $m)) {
             continue;
         }
         if (!isset($out[$m[1]])) {
-            $out[$m[1]] = array('own' => 0.0, 'shared' => 0.0);
+            $out[$m[1]] = array('own' => 0.0, 'shared' => 0.0, 'mem_own' => 0.0, 'mem_shared' => 0.0);
         }
         $out[$m[1]][$m[2]] = (float) $row['option_value'];
     }
@@ -151,28 +204,48 @@ function gend_society_compute_buckets(): array {
 }
 
 /**
- * Container sampling: the CPU the container used since the last sample goes to the hour that slice started in, under
- * the placement the pod has now. The first sample only records the baseline. A restart (counter went backwards)
- * counts the new counter as the slice: the time between the restart and the last sample is lost, never doubled.
+ * Container sampling, per copy: the CPU this copy's container used since its last sample, and the memory it held
+ * meanwhile (the average of the two readings x the time), spread over the hours of the slice under the placement the
+ * pod has now. The first sample only records the baseline. A restart is a new container, hence a new host name and a
+ * new baseline: the time before its first sample is lost, never doubled.
  */
 function gend_society_compute_sample(): void {
     $usec = gend_society_compute_cgroup_usec();
     if (null === $usec) {
         return;
     }
+    $mem  = gend_society_compute_cgroup_mem_bytes();
     $now  = time();
-    $last = get_option(GEND_SOCIETY_COMPUTE_OPTION_PREFIX . 'last', array());
-    update_option(GEND_SOCIETY_COMPUTE_OPTION_PREFIX . 'last', array('usec' => $usec, 'time' => $now), false);
+    $key  = gend_society_compute_copy_key();
+    $last = get_option($key, array());
+    update_option($key, array('usec' => $usec, 'mem' => $mem, 'time' => $now), false);
     if (!is_array($last) || !isset($last['usec'], $last['time'])) {
         return;
     }
-    $delta = $usec >= (float) $last['usec'] ? $usec - (float) $last['usec'] : $usec;
     $since = (int) $last['time'];
-    if ($delta <= 0 || $since <= 0 || $since > $now) {
+    if ($since <= 0 || $since >= $now) {
         return;
     }
     $placement = gend_society_compute_placement();
-    gend_society_compute_add(gmdate('YmdH', $since), $delta / 1000000.0, $placement['own']);
+    $delta     = $usec >= (float) $last['usec'] ? $usec - (float) $last['usec'] : $usec;
+    gend_society_compute_spread($since, $now, $delta / 1000000.0, $placement['own'] ? 'own' : 'shared');
+    if (null !== $mem && isset($last['mem']) && is_numeric($last['mem'])) {
+        $gib = (((float) $last['mem'] + $mem) / 2) / 1073741824;
+        gend_society_compute_spread($since, $now, $gib * ($now - $since), $placement['own'] ? 'mem_own' : 'mem_shared');
+    }
+}
+
+/** On a request: sample this copy at most every 5 minutes (a local stamp file: each copy has its own). */
+function gend_society_compute_sample_on_request(): void {
+    if (null === gend_society_compute_cgroup_usec()) {
+        return;
+    }
+    $stamp = trailingslashit(sys_get_temp_dir()) . 'gend-compute-sample';
+    if (file_exists($stamp) && time() - (int) @filemtime($stamp) < 5 * MINUTE_IN_SECONDS) {
+        return;
+    }
+    @touch($stamp); // phpcs:ignore WordPress.PHP.NoSilencedErrors
+    gend_society_compute_sample();
 }
 
 /**
@@ -226,7 +299,7 @@ function gend_society_compute_report(): void {
             gend_society_compute_forget($hour);
             continue;
         }
-        if ($b['own'] < 0.001 && $b['shared'] < 0.001) {
+        if ($b['own'] < 0.001 && $b['shared'] < 0.001 && $b['mem_own'] < 0.001 && $b['mem_shared'] < 0.001) {
             gend_society_compute_forget($hour);
             continue;
         }
@@ -238,6 +311,8 @@ function gend_society_compute_report(): void {
             'runtime'             => function_exists('gend_society_runtime_mode') ? gend_society_runtime_mode() : 'standalone',
             'shared_vcpu_seconds' => round($b['shared'], 3),
             'own_vcpu_seconds'    => round($b['own'], 3),
+            'shared_gib_seconds'  => round($b['mem_shared'], 3),
+            'own_gib_seconds'     => round($b['mem_own'], 3),
             'node_known'          => $placement['known'],
         ), 'POST');
         if (is_wp_error($resp)) {
@@ -251,7 +326,7 @@ function gend_society_compute_report(): void {
 }
 
 function gend_society_compute_forget(string $hour): void {
-    foreach (array('own', 'shared') as $kind) {
+    foreach (array('own', 'shared', 'mem_own', 'mem_shared') as $kind) {
         delete_option(GEND_SOCIETY_COMPUTE_OPTION_PREFIX . $hour . '_' . $kind);
     }
 }
@@ -268,4 +343,5 @@ add_action('init', function () {
         wp_schedule_event(time() + 5 * MINUTE_IN_SECONDS, 'hourly', 'gend_society_compute_hourly');
     }
     gend_society_compute_request_start();
+    gend_society_compute_sample_on_request();
 }, 20);
