@@ -775,6 +775,12 @@ return array(
 			'note'  => 'Container-side agent provisioning rail.',
 		),
 		array(
+			'file'  => 'inc/member-access.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Execution Contracts: gend.me grants / revokes the web app role of a specialist (signed; never deletes accounts or touches the owner).',
+		),
+		array(
 			'file'  => 'inc/user-site-credentials.php',
 			'tier'  => 'container',
 			'needs' => array(),
