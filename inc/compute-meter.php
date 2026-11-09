@@ -235,16 +235,15 @@ function gend_society_compute_sample(): void {
     }
 }
 
-/** On a request: sample this copy at most every 5 minutes (a local stamp file: each copy has its own). */
+/** On a request: sample this copy at most every 5 minutes (its own baseline records when it last sampled). */
 function gend_society_compute_sample_on_request(): void {
     if (null === gend_society_compute_cgroup_usec()) {
         return;
     }
-    $stamp = trailingslashit(sys_get_temp_dir()) . 'gend-compute-sample';
-    if (file_exists($stamp) && time() - (int) @filemtime($stamp) < 5 * MINUTE_IN_SECONDS) {
+    $last = get_option(gend_society_compute_copy_key(), array());
+    if (is_array($last) && isset($last['time']) && time() - (int) $last['time'] < 5 * MINUTE_IN_SECONDS) {
         return;
     }
-    @touch($stamp); // phpcs:ignore WordPress.PHP.NoSilencedErrors
     gend_society_compute_sample();
 }
 
