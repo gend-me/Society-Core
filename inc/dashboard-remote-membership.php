@@ -1876,13 +1876,28 @@ function gend_society_render_membership_panel( $payload = null ) {
         .gs-plan-picker { margin-top: 16px; }
         .gs-plan-picker__status { color: var(--gs-muted); font-size: 0.85rem; padding: 8px 2px; }
         .gs-plan-picker__grid { display: flex; flex-direction: column; gap: 10px; }
-        .gs-plan-picker__card { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 14px 16px; border-radius: 12px; background: rgba(255,255,255,0.03); border: 1px solid var(--gs-border, rgba(255,255,255,0.08)); cursor: pointer; text-align: left; width: 100%; color: #fff; font: inherit; transition: border-color .15s ease, background .15s ease; }
-        .gs-plan-picker__card:hover:not([disabled]) { border-color: rgba(182,8,201,0.6); background: rgba(182,8,201,0.08); }
-        .gs-plan-picker__card[disabled] { opacity: 0.5; cursor: wait; }
-        .gs-plan-picker__card.is-current { border-color: rgba(78,230,138,0.4); background: rgba(0,180,80,0.06); }
-        .gs-plan-picker__card-name { font-weight: 700; font-size: 0.95rem; }
-        .gs-plan-picker__card-price { color: #4eaaff; font-size: 0.85rem; font-weight: 600; }
-        .gs-plan-picker__card-badge { font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.05em; color: #4ee68a; font-weight: 700; }
+        /* Plan option cards: thumbnail | name + info + description | price + action. */
+        .gs-plan-picker__card { display: grid; grid-template-columns: auto minmax(0, 1fr) auto; align-items: center; gap: 14px; padding: 14px 16px; border-radius: 16px; background: linear-gradient(180deg, rgba(255,255,255,0.045), rgba(255,255,255,0.02)); border: 1px solid var(--gs-border, rgba(255,255,255,0.09)); cursor: pointer; text-align: left; width: 100%; color: #fff; font: inherit; transition: border-color .18s ease, background .18s ease, transform .18s ease, box-shadow .18s ease; }
+        .gs-plan-picker__card:hover:not([disabled]), .gs-plan-picker__card:focus-visible { border-color: rgba(182,8,201,0.65); background: linear-gradient(180deg, rgba(182,8,201,0.12), rgba(182,8,201,0.04)); transform: translateY(-1px); box-shadow: 0 14px 30px -18px rgba(182,8,201,0.7); outline: none; }
+        .gs-plan-picker__card[disabled] { cursor: default; }
+        .gs-plan-picker__card.is-busy { opacity: 0.55; cursor: wait; }
+        .gs-plan-picker__card.is-current { border-color: rgba(78,230,138,0.45); background: linear-gradient(180deg, rgba(0,180,80,0.10), rgba(0,180,80,0.03)); }
+        .gs-plan-picker__thumb { width: 52px; height: 52px; border-radius: 12px; background: rgba(255,255,255,0.06) center / cover no-repeat; border: 1px solid rgba(255,255,255,0.08); flex: none; display: grid; place-content: center; font-weight: 800; font-size: 1.15rem; color: rgba(255,255,255,0.75); }
+        .gs-plan-picker__body { min-width: 0; display: flex; flex-direction: column; gap: 4px; }
+        .gs-plan-picker__title { display: flex; align-items: center; gap: 8px; min-width: 0; }
+        .gs-plan-picker__card-name { font-weight: 700; font-size: 1rem; line-height: 1.25; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+        .gs-plan-picker__info { flex: none; width: 22px; height: 22px; border-radius: 50%; border: 1px solid rgba(148,163,184,0.45); color: #c4d6ff; font: 700 0.72rem/20px Georgia, serif; font-style: italic; text-align: center; cursor: pointer; transition: border-color .15s ease, color .15s ease, background .15s ease; }
+        .gs-plan-picker__info:hover, .gs-plan-picker__info:focus { border-color: rgba(122,167,255,0.9); background: rgba(122,167,255,0.12); color: #fff; outline: none; }
+        .gs-plan-picker__desc { color: var(--gs-muted, #8b98b0); font-size: 0.8rem; line-height: 1.4; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+        .gs-plan-picker__side { display: flex; flex-direction: column; align-items: flex-end; gap: 6px; text-align: right; white-space: nowrap; }
+        .gs-plan-picker__card-price { color: #fff; font-size: 1.05rem; font-weight: 800; letter-spacing: -0.01em; }
+        .gs-plan-picker__card-price small { display: block; color: var(--gs-muted, #8b98b0); font-size: 0.72rem; font-weight: 500; letter-spacing: 0; }
+        .gs-plan-picker__cta { display: inline-block; padding: 5px 12px; border-radius: 999px; background: linear-gradient(135deg, #b608c9, #7e058a); color: #fff; font-size: 0.68rem; font-weight: 800; letter-spacing: 0.1em; text-transform: uppercase; }
+        .gs-plan-picker__card-badge { display: inline-block; padding: 5px 10px; border-radius: 999px; background: rgba(78,230,138,0.12); border: 1px solid rgba(78,230,138,0.4); font-size: 0.68rem; text-transform: uppercase; letter-spacing: 0.08em; color: #4ee68a; font-weight: 800; }
+        @media (max-width: 480px) {
+            .gs-plan-picker__card { grid-template-columns: auto minmax(0, 1fr); }
+            .gs-plan-picker__side { grid-column: 1 / -1; flex-direction: row; justify-content: space-between; align-items: center; }
+        }
         .gs-mship-tabs { margin-top: 28px; border-top: 1px solid rgba(255,255,255,0.06); padding-top: 22px; }
         .gs-mship-tabs-nav { display: flex; justify-content: center; gap: 14px; border-bottom: 0; margin-bottom: 24px; flex-wrap: wrap; padding-bottom: 4px; }
         /* Glassmorphic, "3D" tab buttons: translucent + blurred glass body,
@@ -3514,39 +3529,82 @@ function gend_society_render_membership_panel( $payload = null ) {
                     card.className = 'gs-plan-picker__card' + (p.is_current ? ' is-current' : '');
                     card.dataset.planId = p.id;
                     if (p.is_current) { card.disabled = true; }
+                    var name = p.name || ('Plan #' + p.id);
+                    // Thumbnail: the plan's image, else its initial.
+                    var thumb = document.createElement('span');
+                    thumb.className = 'gs-plan-picker__thumb';
+                    thumb.setAttribute('aria-hidden', 'true');
+                    if (p.image && /^https?:\/\//i.test(p.image)) {
+                        thumb.style.backgroundImage = 'url("' + String(p.image).replace(/["\\\n]/g, '') + '")';
+                    } else {
+                        thumb.textContent = name.charAt(0).toUpperCase();
+                    }
+                    var body = document.createElement('span');
+                    body.className = 'gs-plan-picker__body';
+                    var title = document.createElement('span');
+                    title.className = 'gs-plan-picker__title';
                     var left = document.createElement('span');
                     left.className = 'gs-plan-picker__card-name';
-                    left.textContent = p.name || ('Plan #' + p.id);
+                    left.textContent = name;
+                    title.appendChild(left);
+                    if (planParams.resource === undefined) {
+                        var info = document.createElement('span');
+                        info.className = 'gs-plan-picker__info';
+                        info.setAttribute('role', 'button');
+                        info.setAttribute('tabindex', '0');
+                        info.setAttribute('data-gs-goto-dashboards', '1');
+                        info.setAttribute('aria-label', 'See what the ' + name + ' dashboard includes');
+                        info.title = 'See what the dashboards include';
+                        info.textContent = 'i';
+                        title.appendChild(info);
+                    }
+                    body.appendChild(title);
+                    if (p.description) {
+                        var desc = document.createElement('span');
+                        desc.className = 'gs-plan-picker__desc';
+                        desc.textContent = p.description;
+                        body.appendChild(desc);
+                    }
+                    // Price "$ 49.99 every month": the amount large, the period small under it.
+                    var side = document.createElement('span');
+                    side.className = 'gs-plan-picker__side';
                     var right = document.createElement('span');
+                    var action = document.createElement('span');
                     if (p.is_current) {
                         right.className = 'gs-plan-picker__card-badge';
                         right.textContent = 'Current plan';
                     } else {
                         right.className = 'gs-plan-picker__card-price';
-                        right.textContent = p.price_label || '';
+                        var label = String(p.price_label || '');
+                        var m = label.match(/^(.*?\d[\d.,]*)\s+(.+)$/);
+                        right.textContent = m ? m[1].replace(/\s+/g, '') : label;
+                        if (m) {
+                            var per = document.createElement('small');
+                            per.textContent = m[2];
+                            right.appendChild(per);
+                        }
+                        action.className = 'gs-plan-picker__cta';
+                        action.textContent = 'Choose';
                     }
-                    var info = document.createElement('span');
-                    info.className = 'gs-unlock__info';
-                    info.setAttribute('role', 'button');
-                    info.setAttribute('tabindex', '0');
-                    info.setAttribute('data-gs-goto-dashboards', '1');
-                    info.title = 'See what the dashboards include';
-                    info.textContent = 'i';
-                    card.appendChild(left);
-                    if (planParams.resource === undefined) { card.appendChild(info); }
-                    card.appendChild(right);
-                    card.addEventListener('click', function () {
-                        if (card.disabled) return;
+                    side.appendChild(right);
+                    if (!p.is_current) { side.appendChild(action); }
+                    card.appendChild(thumb);
+                    card.appendChild(body);
+                    card.appendChild(side);
+                    card.addEventListener('click', function (ev) {
+                        if (card.disabled || (ev.target && ev.target.closest && ev.target.closest('[data-gs-goto-dashboards]'))) return;
                         grid.querySelectorAll('.gs-plan-picker__card').forEach(function (c) { c.disabled = true; });
-                        var origText = right.textContent;
-                        right.textContent = 'Working...';
+                        card.classList.add('is-busy');
+                        var origText = action.textContent;
+                        action.textContent = 'Working...';
                         ajaxAction('gend_society_membership_change_plan', { plan_id: p.id }).then(function (data) {
                             if (!data || !data.checkout_url) { throw new Error('No checkout URL returned.'); }
                             window.location.href = data.checkout_url;
                         }).catch(function (e) {
                             toast(e.message, 'error');
                             grid.querySelectorAll('.gs-plan-picker__card').forEach(function (c) { c.disabled = !!c.classList.contains('is-current'); });
-                            right.textContent = origText;
+                            card.classList.remove('is-busy');
+                            action.textContent = origText;
                         });
                     });
                     grid.appendChild(card);
