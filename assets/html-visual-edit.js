@@ -426,15 +426,27 @@
 			var bh = bar.offsetHeight;
 			var bw = bar.offsetWidth;
 			var vis = shown ? shown() : { top: 0, bottom: win.innerHeight };
+			// A short section (a header) can lend the toolbar room below it, over the editor.
+			var limit = room && vis.max ? Math.max( vis.bottom, vis.max ) : vis.bottom;
 			var top = r.top - bh - 10;
 			if ( top < vis.top + 8 ) {
 				top = r.bottom + 10;
 			}
-			top = Math.max( vis.top + 8, Math.min( top, vis.bottom - bh - 8 ) );
+			top = Math.max( vis.top + 8, Math.min( top, limit - bh - 8 ) );
 			var left = Math.max( 8, Math.min( r.left, win.innerWidth - bw - 8 ) );
 			bar.style.top = ( top + win.scrollY ) + 'px';
 			bar.style.left = ( left + win.scrollX ) + 'px';
+			if ( room ) {
+				room( { l: left, t: top, r: left + bw, b: top + bh } );
+			}
 		};
+		var room = opts && opts.room;
+		if ( room && win.ResizeObserver ) {
+			// Colour and link panels change the toolbar's height.
+			new win.ResizeObserver( function () {
+				place();
+			} ).observe( bar );
+		}
 		// The link the selection is in, inside the text (or the text itself when it is a link).
 		var inLink = function () {
 			if ( ! active ) {
@@ -480,6 +492,9 @@
 			range = null;
 			panel.hidden = true;
 			bar.classList.remove( 'is-open' );
+			if ( room ) {
+				room( null );
+			}
 		};
 		// Back to the text with its selection; with nothing selected, all of the text.
 		var restore = function ( whole ) {
@@ -723,6 +738,7 @@
 		win.addEventListener( 'scroll', place, { passive: true } );
 		return {
 			place: place,
+			bar: bar,
 			destroy: function () {
 				win.removeEventListener( 'scroll', place );
 				bar.remove();
@@ -858,6 +874,9 @@
 				var full = 0;
 				var screenH = 0;
 				var placed = 0;
+				// The open text toolbar's box when it needs room below the section, and the toolbar itself.
+				var room = null;
+				var hold = null;
 				var sync = function () {
 					var top = stage.getBoundingClientRect().top;
 					var at = Math.min( Math.max( -top, 0 ), Math.max( full - screenH, 0 ) );
@@ -870,13 +889,51 @@
 				var fit = function () {
 					screenH = Math.max( 320, Math.round( view.innerHeight || 800 ) );
 					frame.style.height = screenH + 'px';
-					// The page's height without the frame's own screen in it.
+					// The page's height without the frame's own screen in it (nor the toolbar hanging below it).
+					if ( hold ) {
+						hold.style.display = 'none';
+					}
 					var h = Math.max( 60, doc.body.scrollHeight, doc.documentElement.scrollHeight > screenH ? doc.documentElement.scrollHeight : 0 );
+					if ( hold ) {
+						hold.style.display = '';
+					}
 					full = h;
 					screenH = Math.min( screenH, h );
-					frame.style.height = screenH + 'px';
+					// The toolbar overflows the section: the frame grows over the editor below,
+					// showing only the section and the toolbar.
+					var need = room ? Math.ceil( room.b ) + 2 : 0;
+					if ( need > screenH ) {
+						var w = frame.clientWidth;
+						var l = Math.floor( room.l );
+						var t = Math.floor( room.t );
+						var rr = Math.ceil( room.r );
+						var b = Math.ceil( room.b );
+						var c = 12;
+						frame.style.height = need + 'px';
+						frame.style.clipPath = 'path("M0 0H' + w + 'V' + screenH + 'H0Z'
+							+ 'M' + ( l + c ) + ' ' + t + 'H' + ( rr - c ) + 'A' + c + ' ' + c + ' 0 0 1 ' + rr + ' ' + ( t + c )
+							+ 'V' + ( b - c ) + 'A' + c + ' ' + c + ' 0 0 1 ' + ( rr - c ) + ' ' + b
+							+ 'H' + ( l + c ) + 'A' + c + ' ' + c + ' 0 0 1 ' + l + ' ' + ( b - c )
+							+ 'V' + ( t + c ) + 'A' + c + ' ' + c + ' 0 0 1 ' + ( l + c ) + ' ' + t + 'Z")';
+						frame.style.position = 'relative';
+						frame.style.zIndex = '100';
+						stage.style.zIndex = '100';
+					} else {
+						frame.style.height = screenH + 'px';
+						frame.style.clipPath = '';
+						frame.style.position = '';
+						frame.style.zIndex = '';
+						stage.style.zIndex = '';
+					}
 					stage.style.height = full + 'px';
 					sync();
+				};
+				var lend = function ( box ) {
+					var before = JSON.stringify( room );
+					room = box && box.b > screenH ? box : null;
+					if ( JSON.stringify( room ) !== before ) {
+						fit();
+					}
 				};
 				fit();
 				var lis = function ( target, type, fn, opts ) {
@@ -952,7 +1009,8 @@
 				// The part of the frame on screen in the editor, in the frame's own view.
 				var onScreen = function () {
 					var r = frame.getBoundingClientRect();
-					return { top: Math.max( 0, -r.top ), bottom: Math.min( r.height, view.innerHeight - r.top ) };
+					var sh = screenH || r.height;
+					return { top: Math.max( 0, -r.top ), bottom: Math.min( sh, view.innerHeight - r.top ), max: view.innerHeight - r.top };
 				};
 				// Where an element can actually be seen: clipped by its overflow boxes and by the screen.
 				var seen = function ( t ) {
@@ -1067,7 +1125,8 @@
 					}
 				} );
 				// Fonts, sizes, styles, colours, links and alignment for the text being edited.
-				var tb = textToolbar( doc, on, commitText, onScreen );
+				var tb = textToolbar( doc, on, commitText, onScreen, { room: lend } );
+				hold = tb.bar;
 				lis( view, 'scroll', tb.place, { passive: true } );
 				cleanup.push( tb.destroy );
 				on( 'keydown', function ( e ) {
