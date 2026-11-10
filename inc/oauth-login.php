@@ -167,7 +167,29 @@ function gend_society_oauth_render_login_page() {
     // Render the login page chrome via WP's login_header so theme/plugin
     // login_enqueue_scripts hooks fire (login-style.php's CSS still applies).
     login_header( __( 'Sign in', 'gend-society' ), '' );
+    // A member's site shows its own logo (custom logo, else site icon) above the card, or none: never gend.me's.
+    $site_logo = '';
+    if ( ! gend_society_oauth_is_hub_site() ) {
+        $logo_id   = (int) get_theme_mod( 'custom_logo' );
+        $site_logo = $logo_id ? (string) wp_get_attachment_image_url( $logo_id, 'medium' ) : '';
+        if ( '' === $site_logo ) {
+            $site_logo = (string) get_site_icon_url( 192 );
+        }
+    }
     ?>
+    <?php if ( ! gend_society_oauth_is_hub_site() ) : ?>
+    <style>
+        <?php if ( '' !== $site_logo ) : ?>
+        body.login h1 a {
+            background-image: url('<?php echo esc_url( $site_logo ); ?>') !important;
+            background-size: contain !important; background-position: center !important; background-repeat: no-repeat !important;
+            width: 100% !important; height: 72px !important; margin: 0 auto 24px !important; border-radius: 0 !important; filter: none !important;
+        }
+        <?php else : ?>
+        body.login h1 { display: none !important; }
+        <?php endif; ?>
+    </style>
+    <?php endif; ?>
     <style>
         body.login #loginform,
         body.login #login_error,
@@ -244,21 +266,90 @@ function gend_society_oauth_render_login_page() {
     </style>
 
     <style>
-        .gs-site-login { text-align: left; margin: 0; }
-        .gs-site-login label { display: block; margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.75); }
-        .gs-site-login input[type=text], .gs-site-login input[type=password] {
-            box-sizing: border-box; width: 100%; margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; font-size: 15px;
-            background: #fff; color: #111; border: 1px solid rgba(255,255,255,.2);
+        /* Site sign-in. Core login.css paints every ".login form" white, so each rule here is pinned to #login. */
+        body.login #login { box-sizing: border-box; width: 100% !important; max-width: 440px; padding: 24px 20px !important; margin: 0 auto !important; }
+        #login .gs-oauth-shell { padding: 40px 36px 32px !important; }
+        #login .gs-oauth-btn { white-space: nowrap; }
+        #login .gs-oauth-shell h2 { font-size: 22px; letter-spacing: .02em; text-transform: none; margin-bottom: 6px; }
+        #login .gs-oauth-shell p.gs-oauth-sub { margin-bottom: 28px; font-size: 14px; }
+        #login form.gs-site-login {
+            background: transparent !important; border: 0 !important; box-shadow: none !important;
+            padding: 0 !important; margin: 0 !important; overflow: visible; text-align: left;
         }
-        .gs-site-login .gs-remember { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 500; }
-        .gs-site-login .gs-remember input { margin: 0; }
-        .gs-site-submit { background: #fff !important; color: #111 !important; box-shadow: 0 8px 20px -8px rgba(0,0,0,.5) !important; }
-        .gs-site-links { margin: 14px 0 0; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; }
-        .gs-site-links a { color: rgba(255,255,255,.8); text-decoration: none; }
-        .gs-site-links a:hover { color: #fff; text-decoration: underline; }
-        .gs-or { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: rgba(255,255,255,.5); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
-        .gs-or::before, .gs-or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.15); }
-        .gs-site-error { display: block; margin: 0 0 16px; }
+        #login .gs-field { margin: 0 0 18px; }
+        #login form.gs-site-login label.gs-label {
+            display: block; margin: 0 0 8px !important; font-size: 12px !important; font-weight: 600; line-height: 1.3;
+            letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.72) !important;
+        }
+        #login .gs-input-wrap { position: relative; }
+        #login form.gs-site-login input.gs-input {
+            box-sizing: border-box; display: block; width: 100%; min-height: 50px; margin: 0 !important;
+            padding: 13px 16px !important; font-size: 15px !important; line-height: 1.4;
+            background: rgba(255,255,255,.06) !important; color: #fff !important;
+            -webkit-text-fill-color: #fff !important; caret-color: #fff !important;
+            border: 1px solid rgba(255,255,255,.14) !important; border-radius: 14px !important;
+            box-shadow: inset 0 1px 0 rgba(255,255,255,.04) !important;
+            transition: border-color .18s ease, background .18s ease, box-shadow .18s ease;
+        }
+        #login form.gs-site-login input#gs-user-pass { padding-right: 76px !important; }
+        #login form.gs-site-login input.gs-input:hover { border-color: rgba(255,255,255,.26) !important; }
+        #login form.gs-site-login input.gs-input:focus {
+            outline: none; background: rgba(255,255,255,.09) !important;
+            border-color: var(--gs-accent, #b608c9) !important;
+            box-shadow: 0 0 0 4px rgba(182,8,201,.22) !important;
+        }
+        #login form.gs-site-login input.gs-input:-webkit-autofill {
+            -webkit-text-fill-color: #fff; caret-color: #fff;
+            -webkit-box-shadow: 0 0 0 1000px #1d1726 inset !important; transition: background-color 9999s;
+        }
+        #login .gs-pass-toggle {
+            position: absolute; top: 50%; right: 8px; transform: translateY(-50%);
+            padding: 7px 10px; border: 0; border-radius: 10px; cursor: pointer;
+            background: transparent; color: rgba(255,255,255,.65); font-size: 12px; font-weight: 600; letter-spacing: .04em;
+        }
+        #login .gs-pass-toggle:hover, #login .gs-pass-toggle:focus-visible { background: rgba(255,255,255,.08); color: #fff; outline: none; }
+        #login .gs-form-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin: 4px 0 24px; }
+        #login form.gs-site-login label.gs-remember {
+            display: inline-flex; align-items: center; gap: 10px; margin: 0 !important; cursor: pointer;
+            font-size: 13.5px !important; font-weight: 500; letter-spacing: 0; text-transform: none; color: rgba(255,255,255,.8) !important;
+        }
+        #login form.gs-site-login label.gs-remember input[type=checkbox] {
+            -webkit-appearance: none; appearance: none; flex: none; width: 18px !important; height: 18px !important; min-width: 0;
+            margin: 0 !important; padding: 0 !important; border-radius: 6px !important; cursor: pointer;
+            background: rgba(255,255,255,.06) !important; border: 1px solid rgba(255,255,255,.3) !important; box-shadow: none !important;
+            display: grid; place-content: center;
+        }
+        #login form.gs-site-login label.gs-remember input[type=checkbox]::before { content: none !important; }
+        #login form.gs-site-login label.gs-remember input[type=checkbox]:checked {
+            background: var(--gs-accent, #b608c9) !important; border-color: var(--gs-accent, #b608c9) !important;
+        }
+        #login form.gs-site-login label.gs-remember input[type=checkbox]:checked::after {
+            content: ""; width: 9px; height: 5px; margin-top: -2px; border: 2px solid #fff; border-top: 0; border-right: 0; transform: rotate(-45deg);
+        }
+        #login form.gs-site-login label.gs-remember input[type=checkbox]:focus-visible { outline: 2px solid var(--gs-accent, #b608c9); outline-offset: 2px; }
+        #login .gs-form-row a { color: rgba(255,255,255,.75); font-size: 13.5px; text-decoration: none; }
+        #login .gs-form-row a:hover, #login .gs-site-links a:hover { color: #fff; text-decoration: underline; }
+        #login .gs-site-links { margin: 18px 0 0; text-align: center; font-size: 13.5px; color: rgba(255,255,255,.55); }
+        #login .gs-site-links a { color: #fff; font-weight: 600; text-decoration: none; }
+        /* The site's own button leads; Continue with gend.me sits below it as the second choice. */
+        #login .gs-oauth-btn { min-height: 52px; font-size: 14px; border-radius: 14px; }
+        #login .gs-oauth-btn.gs-btn-secondary {
+            background: rgba(255,255,255,.05) !important; color: #fff !important;
+            border: 1px solid rgba(255,255,255,.18) !important; box-shadow: none !important;
+            text-transform: none; letter-spacing: .01em; font-size: 15px;
+        }
+        #login .gs-oauth-btn.gs-btn-secondary:hover { background: rgba(255,255,255,.1) !important; border-color: rgba(255,255,255,.3) !important; }
+        #login .gs-gend-mark {
+            display: inline-grid; place-content: center; width: 22px; height: 22px; border-radius: 7px;
+            background: linear-gradient(135deg, #b608c9, #7e058a); font-size: 12px; font-weight: 800; letter-spacing: 0;
+        }
+        #login .gs-or { display: flex; align-items: center; gap: 14px; margin: 26px 0; color: rgba(255,255,255,.45); font-size: 12px; text-transform: uppercase; letter-spacing: .14em; }
+        #login .gs-or::before, #login .gs-or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.12); }
+        #login .gs-site-error { display: block; margin: 0 0 20px; }
+        @media (max-width: 480px) {
+            #login { padding: 16px !important; }
+            #login .gs-oauth-shell { padding: 30px 20px 24px !important; border-radius: 20px !important; }
+        }
     </style>
 
     <div class="gs-oauth-shell">
@@ -269,24 +360,44 @@ function gend_society_oauth_render_login_page() {
                 <div class="gs-oauth-error gs-site-error" role="alert"><?php echo esc_html( $site_error ); ?></div>
             <?php endif; ?>
             <form class="gs-site-login" id="gs-site-login" action="<?php echo esc_url( site_url( 'wp-login.php', 'login_post' ) ); ?>" method="post">
-                <label for="gs-user-login"><?php esc_html_e( 'Username or email address', 'gend-society' ); ?></label>
-                <input type="text" name="log" id="gs-user-login" value="<?php echo esc_attr( $site_login ); ?>" autocomplete="username" autocapitalize="off" required>
-                <label for="gs-user-pass"><?php esc_html_e( 'Password', 'gend-society' ); ?></label>
-                <input type="password" name="pwd" id="gs-user-pass" value="" autocomplete="current-password" required>
+                <div class="gs-field">
+                    <label class="gs-label" for="gs-user-login"><?php esc_html_e( 'Username or email', 'gend-society' ); ?></label>
+                    <input class="gs-input" type="text" name="log" id="gs-user-login" value="<?php echo esc_attr( $site_login ); ?>" autocomplete="username" autocapitalize="off" spellcheck="false" required>
+                </div>
+                <div class="gs-field">
+                    <label class="gs-label" for="gs-user-pass"><?php esc_html_e( 'Password', 'gend-society' ); ?></label>
+                    <div class="gs-input-wrap">
+                        <input class="gs-input" type="password" name="pwd" id="gs-user-pass" value="" autocomplete="current-password" required>
+                        <button type="button" class="gs-pass-toggle" aria-controls="gs-user-pass" aria-pressed="false" data-show="<?php esc_attr_e( 'Show', 'gend-society' ); ?>" data-hide="<?php esc_attr_e( 'Hide', 'gend-society' ); ?>"><?php esc_html_e( 'Show', 'gend-society' ); ?></button>
+                    </div>
+                </div>
                 <?php
                 // Captcha, two-factor and similar plugins add their fields here, as on the stock form.
                 do_action( 'login_form' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, fired as on the stock form.
                 ?>
-                <label class="gs-remember"><input type="checkbox" name="rememberme" value="forever"> <?php esc_html_e( 'Remember me', 'gend-society' ); ?></label>
+                <div class="gs-form-row">
+                    <label class="gs-remember"><input type="checkbox" name="rememberme" value="forever"> <?php esc_html_e( 'Remember me', 'gend-society' ); ?></label>
+                    <a href="<?php echo esc_url( wp_lostpassword_url( $redirect_to ) ); ?>"><?php esc_html_e( 'Forgot password?', 'gend-society' ); ?></a>
+                </div>
                 <input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect_to ); ?>">
                 <button type="submit" class="gs-oauth-btn gs-site-submit"><?php esc_html_e( 'Sign in', 'gend-society' ); ?></button>
             </form>
-            <p class="gs-site-links">
-                <a href="<?php echo esc_url( wp_lostpassword_url( $redirect_to ) ); ?>"><?php esc_html_e( 'Lost your password?', 'gend-society' ); ?></a>
-                <?php if ( get_option( 'users_can_register' ) ) : ?>
-                    <a href="<?php echo esc_url( wp_registration_url() ); ?>"><?php esc_html_e( 'Create an account', 'gend-society' ); ?></a>
-                <?php endif; ?>
-            </p>
+            <?php if ( get_option( 'users_can_register' ) ) : ?>
+                <p class="gs-site-links"><?php esc_html_e( 'New here?', 'gend-society' ); ?> <a href="<?php echo esc_url( wp_registration_url() ); ?>"><?php esc_html_e( 'Create an account', 'gend-society' ); ?></a></p>
+            <?php endif; ?>
+            <script>
+            (function () {
+                var t = document.querySelector('#gs-site-login .gs-pass-toggle'), f = document.getElementById('gs-user-pass');
+                if (!t || !f) { return; }
+                t.addEventListener('click', function () {
+                    var show = 'password' === f.type;
+                    f.type = show ? 'text' : 'password';
+                    t.textContent = show ? t.getAttribute('data-hide') : t.getAttribute('data-show');
+                    t.setAttribute('aria-pressed', show ? 'true' : 'false');
+                    f.focus();
+                });
+            })();
+            </script>
         <?php endif; ?>
         <?php if ( 'both' === $methods ) : ?>
             <div class="gs-or"><?php esc_html_e( 'or', 'gend-society' ); ?></div>
@@ -295,7 +406,8 @@ function gend_society_oauth_render_login_page() {
             <?php if ( 'gendme' === $methods ) : ?>
                 <p class="gs-oauth-sub"><?php esc_html_e( 'Sign in with your gend.me account to continue.', 'gend-society' ); ?></p>
             <?php endif; ?>
-            <button id="gs-oauth-btn" type="button" class="gs-oauth-btn">
+            <button id="gs-oauth-btn" type="button" class="gs-oauth-btn<?php echo 'both' === $methods ? ' gs-btn-secondary' : ''; ?>">
+                <?php if ( 'both' === $methods ) : ?><span class="gs-gend-mark" aria-hidden="true">g</span><?php endif; ?>
                 <?php echo esc_html( 'both' === $methods ? __( 'Continue with gend.me', 'gend-society' ) : __( 'Sign in with gend.me', 'gend-society' ) ); ?>
                 <span aria-hidden="true">→</span>
             </button>
