@@ -1865,3 +1865,124 @@ select option {
 .youzify-md-modal .ukai-md-header h2 {
     color: #fff !important;
 }
+
+/* ------ NOTICES (every admin screen) ------------------------ */
+/* Core notices keep a white/cream box while the skin makes all text light, so their text vanished
+   ("WordPress X is available", "New theme activated"). Dark glass box, light text, coloured edge. */
+.wp-admin .notice,
+.wp-admin div.updated,
+.wp-admin div.error,
+.wp-admin .update-nag {
+    background: rgba(15, 20, 32, 0.92) !important;
+    color: var(--gs-text) !important;
+    border: 1px solid var(--gs-border) !important;
+    border-left: 4px solid var(--gs-blue) !important;
+    border-radius: 12px !important;
+    box-shadow: 0 10px 30px -14px rgba(0, 0, 0, 0.7) !important;
+}
+.wp-admin .notice p, .wp-admin .notice li, .wp-admin .notice strong,
+.wp-admin div.updated p, .wp-admin div.error p,
+.wp-admin .update-nag, .wp-admin .update-nag p { color: var(--gs-text) !important; }
+.wp-admin .notice a, .wp-admin div.updated a, .wp-admin div.error a, .wp-admin .update-nag a {
+    color: var(--gs-blue) !important; font-weight: 600; text-decoration: underline; text-underline-offset: 2px;
+}
+.wp-admin .notice a:hover, .wp-admin .update-nag a:hover { color: #fff !important; }
+.wp-admin .notice-success, .wp-admin div.updated { border-left-color: #00c96b !important; }
+.wp-admin .notice-warning, .wp-admin .update-nag { border-left-color: #f5b301 !important; }
+.wp-admin .notice-error, .wp-admin div.error { border-left-color: #ff4d4d !important; }
+.wp-admin .notice-info { border-left-color: var(--gs-blue) !important; }
+.wp-admin .notice.notice-alt.notice-warning { background: rgba(245, 179, 1, 0.10) !important; }
+.wp-admin .notice.notice-alt.notice-error { background: rgba(255, 77, 77, 0.10) !important; }
+.wp-admin .notice.notice-alt.notice-success { background: rgba(0, 201, 107, 0.10) !important; }
+.wp-admin .notice-dismiss:before { color: rgba(255, 255, 255, 0.55) !important; }
+.wp-admin .notice-dismiss:hover:before, .wp-admin .notice-dismiss:focus:before { color: #fff !important; }
+.wp-admin .update-nag { display: inline-block; padding: 12px 18px !important; margin: 16px 0 8px !important; font-size: 14px; }
+
+/* ------ HELP / SCREEN OPTIONS TABS --------------------------- */
+.wp-admin #screen-meta, .wp-admin #screen-meta-links .show-settings,
+.wp-admin #contextual-help-wrap, .wp-admin #screen-options-wrap {
+    background: rgba(15, 20, 32, 0.95) !important;
+    color: var(--gs-text) !important;
+    border-color: var(--gs-border) !important;
+}
+.wp-admin #screen-meta-links .show-settings { border-radius: 0 0 10px 10px !important; box-shadow: none !important; }
+.wp-admin #screen-meta-links .show-settings:after { color: rgba(255, 255, 255, 0.6) !important; }
+.wp-admin #contextual-help-columns .contextual-help-tabs, .wp-admin #contextual-help-back { background: transparent !important; border-color: var(--gs-border) !important; }
+.wp-admin .contextual-help-tabs .active { background: rgba(255, 255, 255, 0.06) !important; border-color: var(--gs-border) !important; }
+.wp-admin .contextual-help-tabs a, .wp-admin #contextual-help-wrap p, .wp-admin #contextual-help-wrap h2,
+.wp-admin #screen-options-wrap legend, .wp-admin #screen-options-wrap label { color: var(--gs-text) !important; }
+
+/* ------ THEMES SCREEN ---------------------------------------- */
+.wp-admin .theme-browser .theme {
+    background: rgba(15, 20, 32, 0.92) !important;
+    border: 1px solid var(--gs-border) !important;
+    border-radius: 16px !important;
+    overflow: hidden;
+    box-shadow: 0 18px 40px -22px rgba(0, 0, 0, 0.85) !important;
+    transition: transform .18s ease, border-color .18s ease, box-shadow .18s ease;
+}
+.wp-admin .theme-browser .theme:hover, .wp-admin .theme-browser .theme:focus-within {
+    transform: translateY(-2px);
+    border-color: rgba(110, 193, 228, 0.45) !important;
+    box-shadow: 0 24px 50px -22px rgba(0, 0, 0, 0.9), 0 0 0 1px rgba(110, 193, 228, 0.15) !important;
+}
+.wp-admin .theme-browser .theme .theme-screenshot { background: #0f1420 !important; border-bottom: 1px solid var(--gs-border); }
+.wp-admin .theme-browser .theme .theme-id-container { background: transparent !important; }
+.wp-admin .theme-browser .theme .theme-name {
+    background: rgba(15, 20, 32, 0.96) !important;
+    color: #fff !important;
+    box-shadow: none !important;
+    font-size: 15px; font-weight: 600;
+}
+.wp-admin .theme-browser .theme .theme-actions { background: rgba(15, 20, 32, 0.96) !important; border-left: 0 !important; }
+.wp-admin .theme-browser .theme.active .theme-name,
+.wp-admin .theme-browser .theme.active .theme-actions {
+    background: linear-gradient(135deg, #b608c9 0%, #7e058a 100%) !important;
+    color: #fff !important;
+}
+.wp-admin .theme-browser .theme.active .theme-name span { color: rgba(255, 255, 255, 0.85) !important; font-weight: 800; }
+.wp-admin .theme-browser .theme .more-details {
+    background: rgba(5, 7, 10, 0.78) !important; color: #fff !important;
+    border-radius: 999px; text-shadow: none !important; font-weight: 600; backdrop-filter: blur(4px);
+}
+.wp-admin .theme-browser .theme .theme-actions .button,
+.wp-admin .theme-overlay .theme-actions .button {
+    background: rgba(255, 255, 255, 0.08) !important; color: #fff !important;
+    border: 1px solid rgba(255, 255, 255, 0.2) !important; border-radius: 10px !important; box-shadow: none !important;
+}
+.wp-admin .theme-browser .theme .theme-actions .button-primary,
+.wp-admin .theme-overlay .theme-actions .button-primary {
+    background: linear-gradient(135deg, #b608c9 0%, #7e058a 100%) !important; border-color: transparent !important;
+}
+.wp-admin .theme-browser .theme.active .theme-actions .button-primary {
+    background: rgba(255, 255, 255, 0.16) !important; border-color: rgba(255, 255, 255, 0.35) !important;
+}
+.wp-admin .theme-browser .theme.add-new-theme { background: transparent !important; border: 2px dashed rgba(255, 255, 255, 0.18) !important; box-shadow: none !important; }
+.wp-admin .theme-browser .theme.add-new-theme a:after { background: rgba(255, 255, 255, 0.06) !important; color: #fff !important; }
+.wp-admin .theme-browser .theme.add-new-theme .theme-name { background: transparent !important; color: var(--gs-text) !important; }
+.wp-admin .theme-browser .theme .update-message, .wp-admin .theme-browser .theme .notice { border-radius: 0 !important; margin: 0 !important; }
+.wp-admin .wp-filter-search, .wp-admin.themes-php .search-box input[type="search"] {
+    background: rgba(255, 255, 255, 0.06) !important; color: #fff !important;
+    border: 1px solid var(--gs-border) !important; border-radius: 12px !important;
+}
+.wp-admin.themes-php .search-label { color: var(--gs-text) !important; }
+.wp-admin .theme-count { background: rgba(255, 255, 255, 0.12) !important; color: #fff !important; }
+
+/* Theme details overlay */
+.wp-admin .theme-overlay .theme-backdrop { background: rgba(5, 7, 10, 0.78) !important; backdrop-filter: blur(6px); }
+.wp-admin .theme-overlay .theme-wrap {
+    background: #10131b !important; color: var(--gs-text) !important;
+    border: 1px solid var(--gs-border); border-radius: 20px; box-shadow: 0 40px 100px -30px rgba(0, 0, 0, 0.9) !important;
+}
+.wp-admin .theme-overlay .theme-header, .wp-admin .theme-overlay .theme-actions {
+    background: rgba(15, 20, 32, 0.96) !important; border-color: var(--gs-border) !important;
+}
+.wp-admin .theme-overlay .theme-header .close, .wp-admin .theme-overlay .theme-header .left, .wp-admin .theme-overlay .theme-header .right {
+    color: rgba(255, 255, 255, 0.7) !important; border-color: var(--gs-border) !important; background: transparent !important;
+}
+.wp-admin .theme-overlay .theme-header button:hover, .wp-admin .theme-overlay .theme-header button:focus { color: #fff !important; background: rgba(255, 255, 255, 0.06) !important; }
+.wp-admin .theme-overlay .theme-name, .wp-admin .theme-overlay .theme-author, .wp-admin .theme-overlay .theme-description,
+.wp-admin .theme-overlay .theme-info p { color: var(--gs-text) !important; }
+.wp-admin .theme-overlay .theme-version, .wp-admin .theme-overlay .theme-tags { color: var(--gs-muted) !important; }
+.wp-admin .theme-overlay .current-label { background: linear-gradient(135deg, #b608c9, #7e058a) !important; color: #fff !important; border-radius: 6px; }
+.wp-admin .theme-overlay .screenshot { border-color: var(--gs-border) !important; background: #0f1420 !important; }
