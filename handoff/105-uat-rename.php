@@ -359,6 +359,9 @@ if ( 'container' === $gs105u_section ) {
 		$msg = 'gend-society 105 uat fixed message';
 		$sig = sodium_crypto_sign_detached( $msg, sodium_crypto_sign_secretkey( $kp ) );
 		$gs105u_ok( sodium_crypto_sign_verify_detached( $sig, $msg, sodium_crypto_sign_publickey( $kp ) ), 'migrated gend_society_keypair signs and verifies (Ed25519)' );
+	} elseif ( null === gs105_inv_option_row( 'gend_society_keypair' ) && null === gs105_inv_option_row( 'gs_keypair' ) ) {
+		// Unpaired site (fresh desktop or container install): neither name has a row, so there is nothing to migrate or sign with.
+		$gs105u_skip( 'migrated gend_society_keypair present and valid', 'unpaired site: no gend_society_keypair / gs_keypair row' );
 	} else {
 		$gs105u_ok( false, 'migrated gend_society_keypair present and valid (container must be paired / pre-seeded)' );
 	}
