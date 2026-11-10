@@ -2596,6 +2596,14 @@ function gend_society_render_membership_panel( $payload = null ) {
                             }
                         }
                     }
+                    // A web app (or gend.me's page for one): no hub-only lookups; gend.me reports its backups plan.
+                    $gs_bk_remote = function_exists( 'gend_society_hosting_backups_remote_status' ) ? gend_society_hosting_backups_remote_status() : null;
+                    if ( empty( $gs_backup_current_names ) && $gs_bk_remote ) {
+                        $gs_backup_current_names = $gs_bk_remote['names'];
+                        if ( empty( $gs_backup_current_names ) && $gs_bk_remote['has_plan'] ) {
+                            $gs_backup_current_names = array( __( 'Backup Plan', 'gend-society' ) );
+                        }
+                    }
                     $gs_bk_has_plan     = ! empty( $gs_backup_current_names );
                     $gs_bk_current_name = implode( ' + ', $gs_backup_current_names );
                     // Phase 109-29 (D33): standalone reads GET /install/{id}/backups-status. A Connected install
@@ -2608,7 +2616,7 @@ function gend_society_render_membership_panel( $payload = null ) {
 <?php if ( $gs_sa ) : ?>
                                 <span class="gs-bk-badge is-neutral" data-gs-dash-backups-state="<?php echo esc_attr( (string) ( $gs_sa_bk['state'] ?? '' ) ); ?>"><span class="dashicons dashicons-backup"></span><?php echo esc_html( (string) ( $gs_sa_bk['badge'] ?? '' ) ); ?></span>
 <?php else : ?>
-                            <?php if ( empty( $gs_backup_plans ) ) : ?>
+                            <?php if ( empty( $gs_backup_plans ) && ! $gs_bk_remote ) : ?>
                                 <span class="gs-bk-badge is-neutral"><span class="dashicons dashicons-backup"></span><?php esc_html_e( 'No Backup Plans Configured', 'gend-society' ); ?></span>
                             <?php elseif ( $gs_bk_has_plan ) : ?>
                                 <span class="gs-bk-badge"><span class="dashicons dashicons-backup"></span><?php echo esc_html( sprintf( /* translators: %s: Backup plan name. */ __( 'Active: %s', 'gend-society' ), $gs_bk_current_name ) ); ?></span>
@@ -2628,7 +2636,7 @@ function gend_society_render_membership_panel( $payload = null ) {
                             // ONE button opening the backups plan picker (storage
                             // tiers + frequency add-ons, current plan marked) -
                             // not one button per product.
-                            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
+                            $gs_bk_upgrade_attrs = ( ( ! empty( $gs_backup_plans ) || $gs_bk_remote ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
                                 ? gend_society_hosting_resource_upgrade_data_attrs( 'backups' )
                                 : '';
                             if ( $gs_bk_upgrade_attrs !== '' ) : ?>

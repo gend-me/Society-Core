@@ -159,6 +159,55 @@ if ( ! function_exists( 'gend_society_hosting_render_analytics_hero' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_hosting_backups_remote_status' ) ) {
+    /**
+     * A web app's backups status from gend.me (GET /install/{id}/backups-status): its active backup plan names and the
+     * link that opens its backups plan picker on gend.me. On a container (and on gend.me's membership page for a web
+     * app) the hub-only plan lookups are absent, so the Backups panels read this instead. null on the hub's own sites
+     * or when gend.me does not answer. Cached 5 minutes on the app; per request on gend.me's page.
+     *
+     * @return array|null { names: string[], has_plan: bool, choose_url: string }
+     */
+    function gend_society_hosting_backups_remote_status() {
+        $hub_member = function_exists( 'gend_society_hub_member_context' ) ? gend_society_hub_member_context() : 0;
+        $on_hub     = function_exists( 'gend_society_oauth_is_hub_site' ) && gend_society_oauth_is_hub_site();
+        if ( ( $on_hub && $hub_member <= 0 ) || ! function_exists( 'gend_society_remote_membership_call' ) ) {
+            return null;
+        }
+        static $memo = array();
+        if ( array_key_exists( $hub_member, $memo ) ) {
+            return $memo[ $hub_member ];
+        }
+        $cache_key = 'gend_society_backups_status';
+        $raw       = $hub_member > 0 ? false : get_transient( $cache_key );
+        if ( ! is_array( $raw ) ) {
+            $raw = gend_society_remote_membership_call( 'backups-status', array(), 'GET' );
+            if ( is_wp_error( $raw ) || ! is_array( $raw ) ) {
+                $memo[ $hub_member ] = null;
+                return null;
+            }
+            if ( $hub_member <= 0 ) {
+                set_transient( $cache_key, $raw, 5 * MINUTE_IN_SECONDS );
+            }
+        }
+        $names = array();
+        if ( ! empty( $raw['plan']['names'] ) && is_array( $raw['plan']['names'] ) ) {
+            foreach ( $raw['plan']['names'] as $n ) {
+                if ( is_scalar( $n ) && '' !== trim( (string) $n ) ) {
+                    $names[] = trim( (string) $n );
+                }
+            }
+        }
+        $choose = isset( $raw['choose_url'] ) && is_string( $raw['choose_url'] ) ? esc_url_raw( $raw['choose_url'], array( 'https', 'http' ) ) : '';
+        $memo[ $hub_member ] = array(
+            'names'      => $names,
+            'has_plan'   => ! empty( $raw['plan'] ),
+            'choose_url' => $choose,
+        );
+        return $memo[ $hub_member ];
+    }
+}
+
 if ( ! function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) ) {
     /**
      * data-* attributes for a resource-upgrade button covering a whole
@@ -191,6 +240,13 @@ if ( ! function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) ) {
                 : '';
         }
         $same_origin = function_exists( 'gend_society_oauth_is_hub_site' ) ? gend_society_oauth_is_hub_site() : true;
+        // gend.me's membership page drawing a web app's dashboard: that membership's own backups picker on gend.me.
+        if ( $same_origin && $type === 'backups' && function_exists( 'gend_society_hub_member_context' ) && gend_society_hub_member_context() > 0 ) {
+            $gs_bk_status = gend_society_hosting_backups_remote_status();
+            if ( $gs_bk_status && '' !== $gs_bk_status['choose_url'] ) {
+                return 'data-embed-url="' . esc_attr( $gs_bk_status['choose_url'] ) . '"';
+            }
+        }
         // Backups are two choices, not one list: a storage plan, then how
         // often to back up. The membership page's Backups picker presents
         // exactly that (current plans marked, one checkout, plan swapped on
@@ -1187,6 +1243,16 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
                 }
             }
         }
+        // A web app (or gend.me's page for one): the hub-only lookups above are absent; gend.me reports the plan.
+        $gs_bk_remote = function_exists( 'gend_society_hosting_backups_remote_status' ) ? gend_society_hosting_backups_remote_status() : null;
+        if ( empty( $gs_bk_current ) && $gs_bk_remote ) {
+            foreach ( $gs_bk_remote['names'] as $gs_bk_rn ) {
+                $gs_bk_current[] = array( 'name' => $gs_bk_rn, 'price' => '' );
+            }
+            if ( empty( $gs_bk_current ) && $gs_bk_remote['has_plan'] ) {
+                $gs_bk_current[] = array( 'name' => __( 'Backup Plan', 'gend-society' ), 'price' => '' );
+            }
+        }
 
         // Phase 109-29 (D33): a standalone install reads GET /install/{id}/backups-status; a Connected install
         // (hosted false) has no gend.me backups yet, so the panel says "After migration" instead of offering
@@ -1248,7 +1314,8 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
             <?php
             // ONE button opening the backups plan picker (storage tiers +
             // frequency add-ons, current plan marked) - not one per product.
-            $gs_bk_upgrade_attrs = ( ! empty( $gs_backup_plans ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
+            // A web app has no local plan list: gend.me answering its backups status is enough (the picker loads the plans).
+            $gs_bk_upgrade_attrs = ( ( ! empty( $gs_backup_plans ) || $gs_bk_remote ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
                 ? gend_society_hosting_resource_upgrade_data_attrs( 'backups' )
                 : '';
             if ( $gs_bk_upgrade_attrs !== '' ) : ?>
