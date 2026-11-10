@@ -205,17 +205,9 @@ function gend_society_sb_dash_sections() {
 			'label' => __( 'Payment › Wallet & payment history', 'gend-society' ),
 			'find'  => 'class="aas-pay-section aas-pay-section--wallet"',
 		),
-		'tracking-analytics'  => array(
-			'label' => __( 'Payment › Tracking analytics', 'gend-society' ),
-			'find'  => 'class="aas-pay-section aas-pay-section--tracking"',
-		),
 		'products'            => array(
 			'label' => __( 'Payment › Products', 'gend-society' ),
 			'find'  => 'class="aas-pay-section aas-pay-section--products"',
-		),
-		'earnings-projection' => array(
-			'label' => __( 'Payment › Earnings projection', 'gend-society' ),
-			'find'  => 'class="aas-pay-section aas-pay-section--projection"',
 		),
 	);
 }
