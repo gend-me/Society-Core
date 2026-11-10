@@ -125,7 +125,7 @@ function gend_society_render_feature_upgrade_page() {
         if ( is_array( $rm ) && ! empty( $rm['membership_id'] ) ) $remote_mid = (int) $rm['membership_id'];
     }
     $membership_url = $remote_mid > 0
-        ? rtrim( $hub, '/' ) . '/my-account/membership/' . $remote_mid . '/?ui=embed&group=dashboard'
+        ? rtrim( $hub, '/' ) . '/my-account/membership/' . $remote_mid . '/?ui=embed&plan_only=1&group=dashboard'
         : rtrim( $hub, '/' ) . '/my-account/memberships/';
 
     $tiers = gend_society_feature_upgrade_tiers();
