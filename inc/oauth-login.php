@@ -104,9 +104,18 @@ function gend_society_oauth_render_login_page() {
     if ( ! gend_society_oauth_should_intercept() ) {
         return; // fall through to native form
     }
+    // wp-admin's "Session expired" popup loads this page in a frame with ?interim-login=1 and closes itself when the
+    // framed page's body has the class interim-login-success (core's auth-check.js), so the page must say so.
+    $interim = isset( $_REQUEST['interim-login'] ); // phpcs:ignore WordPress.Security.NonceVerification
     if ( is_user_logged_in() ) {
+        if ( $interim ) {
+            gend_society_oauth_interim_success();
+        }
         wp_safe_redirect( admin_url() );
         exit;
+    }
+    if ( $interim ) {
+        $GLOBALS['interim_login'] = true; // login_header() adds the interim-login body class.
     }
 
     $methods      = gend_society_login_methods();
@@ -127,6 +136,9 @@ function gend_society_oauth_render_login_page() {
             is_ssl()
         );
         if ( ! is_wp_error( $user ) ) {
+            if ( $interim ) {
+                gend_society_oauth_interim_success();
+            }
             $requested = isset( $_REQUEST['redirect_to'] ) ? wp_unslash( (string) $_REQUEST['redirect_to'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- filtered and checked by wp_safe_redirect.
             $to        = apply_filters( 'login_redirect', $redirect_to, $requested, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, applied as wp-login.php does.
             // Members without wp-admin access land on the front page (as wp-login.php does for an empty redirect).
@@ -386,6 +398,7 @@ function gend_society_oauth_render_login_page() {
                     <a href="<?php echo esc_url( wp_lostpassword_url( $redirect_to ) ); ?>"><?php esc_html_e( 'Forgot password?', 'gend-society' ); ?></a>
                 </div>
                 <input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect_to ); ?>">
+                <?php if ( $interim ) : ?><input type="hidden" name="interim-login" value="1"><?php endif; ?>
                 <button type="submit" class="gs-oauth-btn gs-site-submit"><?php esc_html_e( 'Sign in', 'gend-society' ); ?></button>
             </form>
             <?php if ( get_option( 'users_can_register' ) ) : ?>
@@ -440,6 +453,8 @@ function gend_society_oauth_render_login_page() {
         var restLoginUrl = <?php echo wp_json_encode( $rest_login ); ?>;
         var flow         = <?php echo wp_json_encode( $flow ); ?>;
         var redirectTo   = <?php echo wp_json_encode( $redirect_to ); ?>;
+        // In wp-admin's session-expired popup, come back to this page signed in: it then tells the popup to close.
+        var interimUrl   = <?php echo wp_json_encode( $interim ? add_query_arg( 'interim-login', '1', wp_login_url() ) : '' ); ?>;
 
         var btn   = document.getElementById('gs-oauth-btn');
         var errEl = document.getElementById('gs-oauth-error');
@@ -528,7 +543,7 @@ function gend_society_oauth_render_login_page() {
                         return r.json().then(function (j) { return { status: r.status, body: j }; });
                     }).then(function (res) {
                         if (res.status >= 200 && res.status < 300 && res.body && res.body.success) {
-                            window.location.href = res.body.redirect_to || redirectTo;
+                            window.location.href = interimUrl || res.body.redirect_to || redirectTo;
                         } else {
                             showError((res.body && res.body.message) || ('Login failed (HTTP ' + res.status + ')'));
                         }
@@ -560,6 +575,72 @@ function gend_society_oauth_render_login_page() {
     login_footer();
     exit;
 }
+
+/**
+ * The framed sign-in in wp-admin's "Session expired" popup succeeded: render core's interim success page. Its body
+ * class interim-login-success is what auth-check.js waits for to close the popup (as wp-login.php does).
+ */
+function gend_society_oauth_interim_success() {
+    $GLOBALS['interim_login'] = 'success';
+    login_header( '', '<p class="message gs-interim-ok">' . esc_html__( 'You are signed in again.', 'gend-society' ) . '</p>' );
+    echo "</div>\n";
+    do_action( 'login_footer' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, fired as wp-login.php does.
+    echo "</body></html>\n";
+    exit;
+}
+
+/**
+ * The sign-in page inside wp-admin's "Session expired" popup: the popup is the card, so the page drops its logo,
+ * outer padding and the card's own frame.
+ */
+add_action( 'login_head', function () {
+    if ( ! gend_society_oauth_should_intercept() || ! isset( $_REQUEST['interim-login'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification
+        return;
+    }
+    ?>
+    <style>
+        html, body.login.interim-login { background: #10131b !important; min-height: 0 !important; height: auto !important; }
+        body.login.interim-login { display: block !important; padding: 0 !important; }
+        body.interim-login h1, body.interim-login #backtoblog, body.interim-login .language-switcher { display: none !important; }
+        body.interim-login #login { max-width: none !important; padding: 8px 4px 4px !important; }
+        body.interim-login #login .gs-oauth-shell {
+            background: transparent !important; border: 0 !important; box-shadow: none !important; backdrop-filter: none !important;
+            padding: 30px 30px 24px !important;
+        }
+        body.interim-login-success p.gs-interim-ok {
+            margin: 40px 24px; padding: 16px 18px; border: 1px solid rgba(0,255,136,.35); border-radius: 14px;
+            background: rgba(0,255,136,.08); color: #b9ffd9; font-size: 15px; text-align: center; box-shadow: none;
+        }
+    </style>
+    <?php
+} );
+
+/**
+ * wp-admin's "Session expired" popup (core wp-auth-check) restyled to match the sign-in page: a dark card on a
+ * blurred backdrop, tall enough to show the whole form, and a readable fallback for when the frame cannot load.
+ */
+function gend_society_auth_check_styles() {
+    if ( ! gend_society_oauth_should_intercept() || ! wp_style_is( 'wp-auth-check', 'enqueued' ) ) {
+        return;
+    }
+    $css = '
+#wp-auth-check-wrap #wp-auth-check-bg{background:rgba(5,7,10,.72);opacity:1;-webkit-backdrop-filter:blur(6px);backdrop-filter:blur(6px)}
+#wp-auth-check-wrap #wp-auth-check{left:50%;width:min(440px,calc(100vw - 24px));margin:0;transform:translateX(-50%);top:5vh;bottom:auto;height:min(610px,90vh);max-height:none;padding:0;background:#10131b;border:1px solid rgba(255,255,255,.12);border-radius:22px;box-shadow:0 30px 80px -20px rgba(0,0,0,.85),0 0 0 1px rgba(182,8,201,.08)}
+#wp-auth-check-wrap #wp-auth-check-form iframe{height:100%;background:#10131b;color-scheme:dark}
+#wp-auth-check-wrap #wp-auth-check-form.loading:before{filter:invert(1)}
+#wp-auth-check-wrap .wp-auth-check-close{z-index:2;top:14px;right:14px;width:34px;height:34px;border-radius:10px;color:rgba(255,255,255,.65)}
+#wp-auth-check-wrap .wp-auth-check-close:before{font:normal 20px/34px dashicons}
+#wp-auth-check-wrap .wp-auth-check-close:hover,#wp-auth-check-wrap .wp-auth-check-close:focus{color:#fff;background:rgba(255,255,255,.08);box-shadow:none;outline:none}
+#wp-auth-check-wrap.fallback #wp-auth-check{height:auto;max-height:none;overflow:visible}
+#wp-auth-check-wrap .wp-auth-fallback{padding:40px 34px 34px;color:rgba(255,255,255,.7);font-size:14px;line-height:1.6;text-align:center}
+#wp-auth-check-wrap .wp-auth-fallback p{margin:0 0 10px;color:inherit;font-size:inherit}
+#wp-auth-check-wrap .wp-auth-fallback-expired{display:block;color:#fff;font-size:22px;font-weight:700;margin-bottom:4px}
+#wp-auth-check-wrap .wp-auth-fallback a{display:block;margin:18px 0 12px;padding:14px 20px;border-radius:14px;background:linear-gradient(135deg,#b608c9 0%,#7e058a 100%);box-shadow:0 8px 20px -6px rgba(182,8,201,.45);color:#fff;font-size:14px;font-weight:700;letter-spacing:.08em;text-transform:uppercase;text-decoration:none}
+#wp-auth-check-wrap .wp-auth-fallback a:hover,#wp-auth-check-wrap .wp-auth-fallback a:focus{color:#fff;box-shadow:0 12px 28px -6px rgba(182,8,201,.6)}';
+    wp_add_inline_style( 'wp-auth-check', $css );
+}
+add_action( 'admin_enqueue_scripts', 'gend_society_auth_check_styles', 99 );
+add_action( 'wp_enqueue_scripts', 'gend_society_auth_check_styles', 99 );
 
 // ────────────────────────────────────────────────────────────────────────
 // REST endpoint: exchange code → token → log local user in
