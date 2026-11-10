@@ -1549,6 +1549,13 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
     $gs_panel_extra = is_array( $opts['panel_extra'] ) ? $opts['panel_extra'] : array();
     $with_settings    = ! empty( $opts['with_settings'] );
     $with_permalinks  = ! empty( $opts['with_permalinks'] );
+    // gend.me's membership page drawing a web app's dashboard: App settings, Security, Cache, Logs and Permalinks act
+    // on the WordPress they run on - there that is gend.me itself - so they are never shown; the app's own wp-admin has them.
+    $gs_hub_page = function_exists( 'gend_society_hub_member_context' ) && gend_society_hub_member_context() > 0;
+    if ( $gs_hub_page ) {
+        $with_settings   = false;
+        $with_permalinks = false;
+    }
     $with_compute_gas = ! empty( $opts['with_compute_gas'] );
 
     // section_group splits this console's 8 sub-tabs across two separate
@@ -1716,7 +1723,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             <?php if ( $with_compute_gas && $show_hosting_group ) : ?>
             <button type="button" class="gs-hosting__nav<?php echo 'compute-gas' === $active_section ? ' is-active' : ''; ?>" data-section="compute-gas" role="tab"><span class="dashicons dashicons-superhero"></span><?php esc_html_e( 'Compute Gas', 'gend-society' ); ?></button>
             <?php endif; ?>
-            <?php if ( $show_app_group ) : ?>
+            <?php if ( $show_app_group && ! $gs_hub_page ) : ?>
             <button type="button" class="gs-hosting__nav" data-section="logs" role="tab"><span class="dashicons dashicons-warning"></span><?php esc_html_e( 'Logs', 'gend-society' ); ?></button>
             <?php endif; ?>
             <?php if ( $show_hosting_group ) : ?>
@@ -1760,6 +1767,19 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                     gend_society_render_app_settings_form();
                 }
                 ?>
+                <?php elseif ( $gs_hub_page ) : ?>
+                <?php $gs_hub_admin = is_array( $payload ) && ! empty( $payload['app_url'] ) ? trailingslashit( (string) $payload['app_url'] ) . 'wp-admin/' : ''; ?>
+                <div class="gs-hosting__card">
+                    <div class="gs-hosting__card-header">
+                        <div>
+                            <h5 class="gs-hosting__card-title"><?php esc_html_e( 'App settings, security, cache and logs', 'gend-society' ); ?></h5>
+                            <p class="gs-hosting__card-desc"><?php esc_html_e( 'These act on your app itself, so they live in your app’s own dashboard. Domains, plans, storage and backups are all here.', 'gend-society' ); ?></p>
+                        </div>
+                        <?php if ( '' !== $gs_hub_admin ) : ?>
+                        <a class="gs-hosting__btn" href="<?php echo esc_url( $gs_hub_admin ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open app dashboard', 'gend-society' ); ?> &rarr;</a>
+                        <?php endif; ?>
+                    </div>
+                </div>
                 <?php else : ?>
                 <!-- with_settings=false callers (e.g. the BuddyPress group Hosting tab)
                      never showed App Settings here - keep the original flat "Hosting

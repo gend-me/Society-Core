@@ -145,6 +145,17 @@ if ( ! function_exists( 'gend_society_hub_member_render' ) ) {
         try {
             $payload = gend_society_remote_membership_get_cached();
             $html    = is_array( $payload ) ? gend_society_render_membership_panel( $payload ) : '';
+            if ( '' !== $html ) {
+                // The panel was built for wp-admin: on gend.me's front end it needs the dashicons font and the admin
+                // skin's colour tokens (scoped to this wrapper, never the whole page).
+                ob_start();
+                wp_print_styles( 'dashicons' );
+                $html = (string) ob_get_clean()
+                    . '<style>.gs-hub-member-dash{--gs-magenta:#b608c9;--gs-red:#cc0000;--gs-blue:#6ec1e4;--gs-accent:#97e46e;--gs-bg:#0b0e14;--gs-surface:rgba(15,20,32,.95);--gs-glass:rgba(255,255,255,.05);--gs-border:rgba(255,255,255,.10);--gs-text:#e8edf5;--gs-muted:#8b98b0;--gs-radius:14px;color:var(--gs-text);font-family:Inter,"Segoe UI",system-ui,sans-serif;}'
+                    . '.gs-hub-member-dash *,.gs-hub-member-dash *::before,.gs-hub-member-dash *::after{box-sizing:border-box;}'
+                    . '.gs-hub-member-dash input,.gs-hub-member-dash select,.gs-hub-member-dash textarea,.gs-hub-member-dash button{font-family:inherit;}</style>'
+                    . '<div class="gs-hub-member-dash">' . $html . '</div>';
+            }
         } finally {
             remove_filter( 'admin_url', $tag, 10 );
             unset( $GLOBALS['gend_society_hub_member'] );
@@ -861,6 +872,7 @@ if ( ! function_exists( 'gend_society_twoset_picker_assets' ) ) {
                 'blocked'  => __( 'Your browser blocked the checkout window. Allow pop-ups for this site, then try again.', 'gend-society' ),
                 'error'    => __( 'Could not load the plans.', 'gend-society' ),
                 'close'    => __( 'Close', 'gend-society' ),
+                /* translators: %d: Step number (1 or 2) of the two-set plan picker. */
                 'step'     => __( 'Step %d', 'gend-society' ),
             ),
         );
