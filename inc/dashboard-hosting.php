@@ -3374,10 +3374,9 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             if (restore) {
                 var bid = parseInt(restore.dataset.id, 10);
                 if (!bid) return;
-                var msg = 'Restore from ' + (restore.dataset.kind || 'backup') +
-                          ' (' + (restore.dataset.created || '#' + bid) + ')? ' +
-                          'A pre-restore backup runs automatically before the rollback.';
-                if (!confirm(msg)) return;
+                // The restore job drops and re-imports the database from the dump (restore.sh): no backup is taken first.
+                var msg = 'This replaces your site\u2019s database with the backup from ' + (restore.dataset.created || ('backup #' + bid)) + '. Posts, orders, users and settings changed since then are lost. Media files are not changed. Take a backup first if you may need today\u2019s data.';
+                var doRestore = function () {
                 restore.disabled = true;
                 var prevRS = restore.textContent;
                 restore.textContent = 'Restoring…';
@@ -3395,6 +3394,12 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                     restore.textContent = prevRS;
                     feedback('backups', 'Network error.', 'error');
                 });
+                };
+                if (window.gsDialog) {
+                    window.gsDialog.confirm(msg, { title: 'Restore this backup?', ok: 'Restore', danger: true }).then(function (yes) { if (yes) { doRestore(); } });
+                } else if (confirm(msg)) {
+                    doRestore();
+                }
                 return;
             }
 

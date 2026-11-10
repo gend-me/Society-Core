@@ -4083,10 +4083,17 @@ function gend_society_render_membership_panel( $payload = null ) {
                     .then(function () { toast('Backup started. Reload in ~2 minutes.', 'success'); })
                     .catch(function (e) { toast(e.message, 'error'); });
             } else if (act === 'restore-backup') {
-                if (!confirm('Restore this backup? The site will rebuild from this snapshot.')) return;
-                ajaxAction('gend_society_membership_backup_restore', { backup_id: b.dataset.id }, b)
-                    .then(function () { toast('Restore started. Site will rebuild in 1-3 minutes.', 'success'); })
-                    .catch(function (e) { toast(e.message, 'error'); });
+                var rsMsg = 'This replaces your site\u2019s database with the backup from ' + (b.dataset.created || 'this snapshot') + '. Posts, orders, users and settings changed since then are lost. Media files are not changed. Take a backup first if you may need today\u2019s data.';
+                var rsGo = function () {
+                    ajaxAction('gend_society_membership_backup_restore', { backup_id: b.dataset.id }, b)
+                        .then(function () { toast('Restore started. Site will rebuild in 1-3 minutes.', 'success'); })
+                        .catch(function (e) { toast(e.message, 'error'); });
+                };
+                if (window.gsDialog) {
+                    window.gsDialog.confirm(rsMsg, { title: 'Restore this backup?', ok: 'Restore', danger: true }).then(function (yes) { if (yes) { rsGo(); } });
+                } else if (confirm(rsMsg)) {
+                    rsGo();
+                }
             }
         });
     })();
