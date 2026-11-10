@@ -4554,6 +4554,11 @@ function gend_society_hosting_parse_log_line( $line, $source ) {
 
 if ( ! function_exists( 'gend_society_hosting_ajax_authorize' ) ) {
     function gend_society_hosting_ajax_authorize() {
+        // gend.me's membership page draws a web app's dashboard, but these tools act on the WordPress they run on:
+        // there that is gend.me itself, never the member's app. Refused outright (also for a super admin).
+        if ( function_exists( 'gend_society_hub_member_context' ) && gend_society_hub_member_context() > 0 ) {
+            wp_send_json_error( array( 'message' => __( 'Open your app\'s own dashboard to use this tool.', 'gend-society' ) ), 403 );
+        }
         if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
             wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
         }

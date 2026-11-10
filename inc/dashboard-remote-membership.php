@@ -103,7 +103,67 @@ const GEND_SOCIETY_REMOTE_MEMBERSHIP_DEFAULT_TTL          = 5 * MINUTE_IN_SECOND
 // Remote fetch + caching
 // ────────────────────────────────────────────────────────────────────────
 
+if ( ! function_exists( 'gend_society_hub_member_context' ) ) {
+    /**
+     * gend.me's membership page draws this dashboard for one of the signed-in member's web apps (hub only: the hub's
+     * vendor-app-manager defines gdc_member_dashboard_inprocess_request()). Returns that membership id, else 0.
+     * Set while the page renders the panel; on its AJAX calls it comes from the gs_member parameter the page adds to
+     * admin-ajax.php. It only names the membership: the hub checks the signed-in user owns it on every call.
+     */
+    function gend_society_hub_member_context(): int {
+        if ( ! function_exists( 'gdc_member_dashboard_inprocess_request' ) ) {
+            return 0;
+        }
+        if ( ! empty( $GLOBALS['gend_society_hub_member'] ) ) {
+            return (int) $GLOBALS['gend_society_hub_member'];
+        }
+        if ( wp_doing_ajax() && isset( $_REQUEST['gs_member'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification -- names the membership; the AJAX handlers check the nonce and the hub checks ownership.
+            return absint( $_REQUEST['gs_member'] ); // phpcs:ignore WordPress.Security.NonceVerification
+        }
+        return 0;
+    }
+}
+
+if ( ! function_exists( 'gend_society_hub_member_render' ) ) {
+    /**
+     * gend.me's membership page: this dashboard for one of the signed-in member's web apps, with that app's data and
+     * every button acting on that app (as the app's own wp-admin dashboard). '' when the user may not manage it.
+     *
+     * @param int $membership_id Ultimo membership id.
+     * @return string HTML.
+     */
+    function gend_society_hub_member_render( int $membership_id ): string {
+        if ( ! function_exists( 'gdc_member_dashboard_site' ) || ! gdc_member_dashboard_site( $membership_id ) ) {
+            return '';
+        }
+        $GLOBALS['gend_society_hub_member'] = $membership_id;
+        // Every admin-ajax.php URL the panel prints names this membership, so its AJAX calls act on this app.
+        $tag = function ( $url, $path ) use ( $membership_id ) {
+            return 'admin-ajax.php' === ltrim( (string) $path, '/' ) ? add_query_arg( 'gs_member', $membership_id, $url ) : $url;
+        };
+        add_filter( 'admin_url', $tag, 10, 2 );
+        try {
+            $payload = gend_society_remote_membership_get_cached();
+            $html    = is_array( $payload ) ? gend_society_render_membership_panel( $payload ) : '';
+        } finally {
+            remove_filter( 'admin_url', $tag, 10 );
+            unset( $GLOBALS['gend_society_hub_member'] );
+        }
+        return (string) $html;
+    }
+}
+
 function gend_society_remote_membership_get_cached() {
+    // gend.me's membership page: that web app's /membership answer, in-process (never this site's own option cache).
+    $hub_member = gend_society_hub_member_context();
+    if ( $hub_member > 0 ) {
+        static $hub_payloads = array();
+        if ( ! array_key_exists( $hub_member, $hub_payloads ) ) {
+            $r = gdc_member_dashboard_inprocess_request( $hub_member, 'GET', 'membership' );
+            $hub_payloads[ $hub_member ] = is_array( $r ) ? $r : null;
+        }
+        return $hub_payloads[ $hub_member ];
+    }
     $expires = (int) get_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_EXPIRES_OPTION, 0 );
     if ( $expires > time() ) {
         $cached = get_option( GEND_SOCIETY_REMOTE_MEMBERSHIP_CACHE_OPTION, null );
@@ -129,6 +189,11 @@ function gend_society_remote_membership_fetch() {
     if ( $install_id === '' || $install_token === '' || $gend_base === '' ) return null;
 
     $endpoint = trailingslashit( $gend_base ) . 'wp-json/gdc-app-manager/v1/install/' . rawurlencode( $install_id ) . '/membership';
+    // The app's own name and address, so gend.me's membership page heads this same dashboard with them.
+    $endpoint = add_query_arg( array(
+        'site_name' => rawurlencode( wp_strip_all_tags( (string) get_bloginfo( 'name' ) ) ),
+        'site_url'  => rawurlencode( home_url( '/' ) ),
+    ), $endpoint );
     $response = wp_remote_get( $endpoint, array(
         'timeout' => 8,
         'headers' => array(
@@ -1018,6 +1083,11 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_local_payload' ) ) {
  * @return array|\WP_Error
  */
 function gend_society_remote_membership_call( string $path, array $body = array(), string $method = 'POST' ) {
+    // gend.me's membership page: the web app's route in-process, as that app (the hub checks the owner).
+    $hub_member = gend_society_hub_member_context();
+    if ( $hub_member > 0 ) {
+        return gdc_member_dashboard_inprocess_request( $hub_member, $method, $path, $body );
+    }
     // Sub-site launched from gend.me/launch: the hub answers in-process (no token, no HTTP).
     if ( function_exists( 'gend_society_plan_launch_membership_id' ) && gend_society_plan_launch_membership_id() > 0 ) {
         return gdc_launch_inprocess_request( gend_society_plan_launch_membership_id(), $method, $path, $body );
@@ -1066,6 +1136,15 @@ function gend_society_remote_membership_call( string $path, array $body = array(
 }
 
 function gend_society_membership_ajax_authorize() {
+    // gend.me's membership page: the member manages their own web app, not this site (no manage_options); every
+    // call is then checked against the membership's owner by the hub (gdc_member_dashboard_inprocess_request()).
+    if ( gend_society_hub_member_context() > 0 ) {
+        if ( ! is_user_logged_in() || ! function_exists( 'gdc_member_dashboard_site' ) || ! gdc_member_dashboard_site( gend_society_hub_member_context() ) ) {
+            wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
+        }
+        check_ajax_referer( 'gs_membership_action', 'nonce' );
+        return;
+    }
     if ( ! is_user_logged_in() || ! current_user_can( 'manage_options' ) ) {
         wp_send_json_error( array( 'message' => __( 'Forbidden.', 'gend-society' ) ), 403 );
     }
@@ -1628,8 +1707,10 @@ function gend_society_render_membership_panel( $payload = null ) {
     // The panel is drawn on the member's own site, so its own address and name are the truth: the hub's copy is the
     // Ultimo site record, which for an outside migration keeps the source site's domain and title, and lags a domain
     // switch. The hub's values remain the fallback (e.g. a site whose name is empty).
-    $local_title    = (string) get_bloginfo( 'name' );
-    $app_url        = home_url( '/' );
+    // On gend.me's membership page (hub member context) this site is gend.me: the app's own values come from the payload.
+    $on_hub_page    = function_exists( 'gend_society_hub_member_context' ) && gend_society_hub_member_context() > 0;
+    $local_title    = $on_hub_page ? (string) ( $payload['app_title'] ?? '' ) : (string) get_bloginfo( 'name' );
+    $app_url        = $on_hub_page && ! empty( $payload['app_url'] ) ? (string) $payload['app_url'] : home_url( '/' );
     $app_title      = '' !== $local_title ? $local_title : ( isset( $payload['app_title'] ) ? (string) $payload['app_title'] : '' );
     if ( '' === $app_title ) {
         $app_title = (string) wp_parse_url( $app_url, PHP_URL_HOST );
