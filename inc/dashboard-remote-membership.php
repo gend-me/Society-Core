@@ -124,6 +124,106 @@ if ( ! function_exists( 'gend_society_hub_member_context' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_membership_projects_html' ) ) {
+    /**
+     * The membership dashboard's Projects tab: the group's project workspace (Consult / Developers / Proposals /
+     * Projects / ...) and the assets it needs. Rendered inline when the dashboard opens on that tab, else fetched when
+     * the tab is first shown (AJAX gend_society_membership_projects_html): it is most of the dashboard's weight (MBs).
+     *
+     * @param array $group The membership payload's group (id, name, ...).
+     * @return string HTML.
+     */
+    function gend_society_membership_projects_html( $group ): string {
+        $group = is_array( $group ) ? $group : array();
+        ob_start();
+            // See the comment above psoo_render_group_proposals_screen()'s call for why this
+            // is needed: psoo-bp.css/.js normally only load via a wp_enqueue_scripts closure
+            // that never runs on this admin page.
+            if ( defined( 'PSOO_PATH' ) && defined( 'PSOO_URL' ) && defined( 'PSOO_VER' ) && ! wp_style_is( 'psoo-bp', 'enqueued' ) ) {
+                $gs_bp_css = PSOO_PATH . 'assets/psoo-bp.css';
+                $gs_bp_js  = PSOO_PATH . 'assets/psoo-bp.js';
+                if ( file_exists( $gs_bp_css ) || file_exists( $gs_bp_js ) ) {
+                    $gs_bp_ver = PSOO_VER . '-' . max(
+                        file_exists( $gs_bp_css ) ? filemtime( $gs_bp_css ) : 0,
+                        file_exists( $gs_bp_js ) ? filemtime( $gs_bp_js ) : 0,
+                        1
+                    );
+                    wp_enqueue_style( 'psoo-bp', PSOO_URL . 'assets/psoo-bp.css', array(), $gs_bp_ver );
+                    if ( ! wp_style_is( 'psoo-bp-header', 'enqueued' ) && file_exists( PSOO_PATH . 'assets/psoo-bp-header.css' ) ) {
+                        wp_enqueue_style( 'psoo-bp-header', PSOO_URL . 'assets/psoo-bp-header.css', array( 'psoo-bp' ), $gs_bp_ver );
+                    }
+                    wp_enqueue_script( 'psoo-bp', PSOO_URL . 'assets/psoo-bp.js', array( 'jquery' ), $gs_bp_ver, true );
+                    wp_localize_script( 'psoo-bp', 'PSOOBP', array(
+                        'nonce' => wp_create_nonce( 'psoo_bp' ),
+                        'ajax'  => admin_url( 'admin-ajax.php' ),
+                        'i18n'  => array(
+                            'loading_order'   => __( 'Loading order details?', 'gend-society' ),
+                            'order_error'     => __( 'Unable to load order.', 'gend-society' ),
+                            'assign_loading'  => __( 'Loading project managers?', 'gend-society' ),
+                            'assign_none'     => __( 'No matching project managers were found.', 'gend-society' ),
+                            'assign_error'    => __( 'We could not load project managers right now. Please try again.', 'gend-society' ),
+                            'assign_success'  => __( 'Project Manager assigned successfully.', 'gend-society' ),
+                            'assign_confirm'  => __( 'Assign', 'gend-society' ),
+                        ),
+                        'no_perm' => __( 'You must be an Administrator to view this page.', 'gend-society' ),
+                    ) );
+                }
+            }
+            $gs_pm_group_id = isset( $group['id'] ) ? (int) $group['id'] : 0;
+            if ( $gs_pm_group_id > 0 && class_exists( 'PSOO_Project_Manager_Group_Extension' ) ) {
+                // Same guard/assets as psoo_enqueue_applications_assets_on_workspace_tab()
+                // (group-project-manager-tab.php) - that function is hooked to bp_actions,
+                // which (like wp_enqueue_scripts) never fires on this admin page, so the
+                // Applications sub-tab's CSS/JS (email-manager-admin.css, em-app-support,
+                // em-postings, the Inbox SPA) never loaded here, leaving it unstyled.
+                if ( function_exists( 'psoo_enqueue_email_manager_tab_assets' ) && defined( 'EMAIL_MANAGER_URL' ) ) {
+                    $gs_pc_site_id = (int) groups_get_groupmeta( $gs_pm_group_id, 'gdc_site_id', true );
+                    if ( $gs_pc_site_id > 0 ) {
+                        psoo_enqueue_email_manager_tab_assets( $gs_pm_group_id, $gs_pc_site_id );
+                    }
+                }
+
+                $gs_pc_html = PSOO_Project_Manager_Group_Extension::render_legacy_content( $gs_pm_group_id );
+                // Strip the "Dive Into High-Velocity Execution" marketing header - redundant
+                // in this dense admin dashboard (the Integration Hub card above already
+                // gives context). Front-end only, so the real Workspace group tab (which
+                // calls the same function through display(), not through here) keeps it.
+                $gs_pc_html = preg_replace( '#<section class="workspace-header-section">.*?</section>#s', '', $gs_pc_html, 1 );
+                // Its now-orphaned CSS rules (target a class no longer in the DOM, harmless
+                // but dead weight) - strip those too rather than leave inert CSS behind.
+                $gs_pc_html = preg_replace( '#\.workspace-header-section\{[^}]*\}\s*\.workspace-header-section::before\{[^}]*\}#s', '', $gs_pc_html, 1 );
+                echo $gs_pc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Third-party (projects plugin) rendered workspace markup, already escaped internally; kses would strip its inline style/script.
+            } else {
+                echo '<div class="gs-mship-empty">' . esc_html__( 'This site is not linked to a project group yet.', 'gend-society' ) . '</div>';
+            }
+        return (string) ob_get_clean();
+    }
+}
+
+add_action( 'wp_ajax_gend_society_membership_projects_html', function () {
+    gend_society_membership_ajax_authorize();
+    $payload = gend_society_remote_membership_get_cached();
+    $group   = is_array( $payload ) && is_array( $payload['group'] ?? null ) ? $payload['group'] : array();
+    global $wp_scripts, $wp_styles;
+    $before_js  = $wp_scripts instanceof WP_Scripts ? (array) $wp_scripts->queue : array();
+    $before_css = $wp_styles instanceof WP_Styles ? (array) $wp_styles->queue : array();
+    $html = gend_society_membership_projects_html( $group );
+    // Assets the workspace queued (psoo-bp, the Applications inbox): printed with it. The page already has jQuery.
+    $assets = '';
+    if ( $wp_styles instanceof WP_Styles ) {
+        $new_css = array_values( array_diff( (array) $wp_styles->queue, $before_css ) );
+        if ( $new_css ) { ob_start(); $wp_styles->do_items( $new_css ); $assets .= (string) ob_get_clean(); }
+    }
+    if ( $wp_scripts instanceof WP_Scripts ) {
+        $new_js = array_values( array_diff( (array) $wp_scripts->queue, $before_js ) );
+        if ( $new_js ) {
+            $wp_scripts->done = array_merge( (array) $wp_scripts->done, array( 'jquery', 'jquery-core', 'jquery-migrate' ) );
+            ob_start(); $wp_scripts->do_items( $new_js ); $assets .= (string) ob_get_clean();
+        }
+    }
+    wp_send_json_success( array( 'html' => $assets . $html ) );
+} );
+
 if ( ! function_exists( 'gend_society_hub_member_render' ) ) {
     /**
      * gend.me's membership page: this dashboard for one of the signed-in member's web apps, with that app's data and
@@ -3110,68 +3210,43 @@ function gend_society_render_membership_panel( $payload = null ) {
                 }
             </style>
 
-            <?php
-                // See the comment above psoo_render_group_proposals_screen()'s call for why this
-                // is needed: psoo-bp.css/.js normally only load via a wp_enqueue_scripts closure
-                // that never runs on this admin page.
-                if ( defined( 'PSOO_PATH' ) && defined( 'PSOO_URL' ) && defined( 'PSOO_VER' ) && ! wp_style_is( 'psoo-bp', 'enqueued' ) ) {
-                    $gs_bp_css = PSOO_PATH . 'assets/psoo-bp.css';
-                    $gs_bp_js  = PSOO_PATH . 'assets/psoo-bp.js';
-                    if ( file_exists( $gs_bp_css ) || file_exists( $gs_bp_js ) ) {
-                        $gs_bp_ver = PSOO_VER . '-' . max(
-                            file_exists( $gs_bp_css ) ? filemtime( $gs_bp_css ) : 0,
-                            file_exists( $gs_bp_js ) ? filemtime( $gs_bp_js ) : 0,
-                            1
-                        );
-                        wp_enqueue_style( 'psoo-bp', PSOO_URL . 'assets/psoo-bp.css', array(), $gs_bp_ver );
-                        if ( ! wp_style_is( 'psoo-bp-header', 'enqueued' ) && file_exists( PSOO_PATH . 'assets/psoo-bp-header.css' ) ) {
-                            wp_enqueue_style( 'psoo-bp-header', PSOO_URL . 'assets/psoo-bp-header.css', array( 'psoo-bp' ), $gs_bp_ver );
-                        }
-                        wp_enqueue_script( 'psoo-bp', PSOO_URL . 'assets/psoo-bp.js', array( 'jquery' ), $gs_bp_ver, true );
-                        wp_localize_script( 'psoo-bp', 'PSOOBP', array(
-                            'nonce' => wp_create_nonce( 'psoo_bp' ),
-                            'ajax'  => admin_url( 'admin-ajax.php' ),
-                            'i18n'  => array(
-                                'loading_order'   => __( 'Loading order details?', 'gend-society' ),
-                                'order_error'     => __( 'Unable to load order.', 'gend-society' ),
-                                'assign_loading'  => __( 'Loading project managers?', 'gend-society' ),
-                                'assign_none'     => __( 'No matching project managers were found.', 'gend-society' ),
-                                'assign_error'    => __( 'We could not load project managers right now. Please try again.', 'gend-society' ),
-                                'assign_success'  => __( 'Project Manager assigned successfully.', 'gend-society' ),
-                                'assign_confirm'  => __( 'Assign', 'gend-society' ),
-                            ),
-                            'no_perm' => __( 'You must be an Administrator to view this page.', 'gend-society' ),
-                        ) );
-                    }
+            <?php if ( 'project-contracts' === $gs_default_tab ) : ?>
+            <?php echo gend_society_membership_projects_html( is_array( $group ?? null ) ? $group : array() ); // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- the workspace escapes its own markup. ?>
+            <?php else : ?>
+            <!-- Loaded when the tab is first shown (gend_society_membership_projects_html): most of the dashboard's weight. -->
+            <div class="gs-pc-lazy" data-gs-pc-lazy="1"><div class="gs-mship-empty"><?php esc_html_e( 'Loading projects…', 'gend-society' ); ?></div></div>
+            <script>
+            (function () {
+                var box = document.querySelector('[data-gs-pc-lazy]');
+                var panel = box && box.closest('[data-panel="project-contracts"]');
+                if (!panel) { return; }
+                var ajax = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
+                var nonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>;
+                var started = false;
+                function run(container) {
+                    var list = [].slice.call(container.querySelectorAll('script'));
+                    (function next() {
+                        var old = list.shift(); if (!old) { return; }
+                        var s = document.createElement('script');
+                        [].slice.call(old.attributes).forEach(function (a) { s.setAttribute(a.name, a.value); });
+                        if (old.src) { s.onload = s.onerror = next; s.src = old.src; old.parentNode.replaceChild(s, old); }
+                        else { s.text = old.text; old.parentNode.replaceChild(s, old); next(); }
+                    })();
                 }
-                $gs_pm_group_id = isset( $group['id'] ) ? (int) $group['id'] : 0;
-                if ( $gs_pm_group_id > 0 && class_exists( 'PSOO_Project_Manager_Group_Extension' ) ) {
-                    // Same guard/assets as psoo_enqueue_applications_assets_on_workspace_tab()
-                    // (group-project-manager-tab.php) - that function is hooked to bp_actions,
-                    // which (like wp_enqueue_scripts) never fires on this admin page, so the
-                    // Applications sub-tab's CSS/JS (email-manager-admin.css, em-app-support,
-                    // em-postings, the Inbox SPA) never loaded here, leaving it unstyled.
-                    if ( function_exists( 'psoo_enqueue_email_manager_tab_assets' ) && defined( 'EMAIL_MANAGER_URL' ) ) {
-                        $gs_pc_site_id = (int) groups_get_groupmeta( $gs_pm_group_id, 'gdc_site_id', true );
-                        if ( $gs_pc_site_id > 0 ) {
-                            psoo_enqueue_email_manager_tab_assets( $gs_pm_group_id, $gs_pc_site_id );
-                        }
-                    }
-
-                    $gs_pc_html = PSOO_Project_Manager_Group_Extension::render_legacy_content( $gs_pm_group_id );
-                    // Strip the "Dive Into High-Velocity Execution" marketing header - redundant
-                    // in this dense admin dashboard (the Integration Hub card above already
-                    // gives context). Front-end only, so the real Workspace group tab (which
-                    // calls the same function through display(), not through here) keeps it.
-                    $gs_pc_html = preg_replace( '#<section class="workspace-header-section">.*?</section>#s', '', $gs_pc_html, 1 );
-                    // Its now-orphaned CSS rules (target a class no longer in the DOM, harmless
-                    // but dead weight) - strip those too rather than leave inert CSS behind.
-                    $gs_pc_html = preg_replace( '#\.workspace-header-section\{[^}]*\}\s*\.workspace-header-section::before\{[^}]*\}#s', '', $gs_pc_html, 1 );
-                    echo $gs_pc_html; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Third-party (projects plugin) rendered workspace markup, already escaped internally; kses would strip its inline style/script.
-                } else {
-                    echo '<div class="gs-mship-empty">' . esc_html__( 'This site is not linked to a project group yet.', 'gend-society' ) . '</div>';
+                function load() {
+                    if (started || !panel.classList.contains('is-active')) { return; }
+                    started = true;
+                    var fd = new FormData(); fd.append('action', 'gend_society_membership_projects_html'); fd.append('nonce', nonce);
+                    fetch(ajax, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+                        if (!j || !j.success || !j.data) { throw new Error((j && j.data && j.data.message) || 'Could not load projects.'); }
+                        box.innerHTML = j.data.html; run(box);
+                    }).catch(function (e) { started = false; box.innerHTML = '<div class="gs-mship-empty"></div>'; box.firstChild.textContent = e.message || 'Could not load projects.'; });
                 }
-                ?>
+                new MutationObserver(load).observe(panel, { attributes: true, attributeFilter: ['class'] });
+                load();
+            })();
+            </script>
+            <?php endif; ?>
 
             <?php if ( $gs_can_list_users ) : ?>
             <!-- ── User Access, injected as a real sibling of Consult / Developers /

@@ -2158,6 +2158,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             <?php endif; ?>
 
             <?php if ( $show_app_group ) : ?>
+            <?php if ( ! $gs_hub_page ) : // gend.me's page for a web app: this panel reads gend.me itself, so it is never rendered there ?>
             <!-- ── Logs sub-panel ────────────────────────────────── -->
             <section class="gs-hosting__panel" data-panel="logs" role="tabpanel">
                 <h4 class="gs-hosting__section-title"><?php esc_html_e( 'Error Logs', 'gend-society' ); ?></h4>
@@ -2179,9 +2180,11 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 </div>
                 <div class="gs-hosting__feedback" data-gs-hosting-feedback="logs"></div>
             </section>
+            <?php endif; // gend.me page: local-only panel ?>
             <?php endif; // show_app_group (logs) ?>
 
             <?php if ( $show_hosting_group ) : ?>
+            <?php if ( ! $gs_hub_page ) : // gend.me's page for a web app: this panel reads gend.me itself, so it is never rendered there ?>
             <!-- ── Tables sub-panel: "hero" analytics matching the real
                  Media tab (GMO Library Dashboard's ring/stat-pill/bar
                  pattern — see gs_hosting_render_analytics_hero()). ── -->
@@ -2221,7 +2224,17 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                      button + popup. -->
                 <div id="gs-hosting-tables-inline" style="margin-top: 18px;"></div>
             </section>
+            <?php else : ?>
+            <section class="gs-hosting__panel" data-panel="tables" role="tabpanel">
+                <?php $gs_hub_admin = is_array( $payload ) && ! empty( $payload['app_url'] ) ? trailingslashit( (string) $payload['app_url'] ) . 'wp-admin/' : ''; ?>
+                <div class="gs-hosting__card"><div class="gs-hosting__card-header"><div>
+                    <h5 class="gs-hosting__card-title"><?php echo esc_html( __( 'Tables', 'gend-society' ) ); ?></h5>
+                    <p class="gs-hosting__card-desc"><?php esc_html_e( 'This reads your app itself, so it lives in your app’s own dashboard.', 'gend-society' ); ?></p>
+                </div><?php if ( '' !== $gs_hub_admin ) : ?><a class="gs-hosting__btn" href="<?php echo esc_url( $gs_hub_admin ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open app dashboard', 'gend-society' ); ?> &rarr;</a><?php endif; ?></div></div>
+            </section>
+            <?php endif; // gend.me page: local-only panel ?>
 
+            <?php if ( ! $gs_hub_page ) : // gend.me's page for a web app: the explorer would list gend.me's own database tables ?>
             <!-- Tables explorer — rendered INLINE inside the Tables panel
                  (JS moves this node into #gs-hosting-tables-inline on load;
                  .is-inline overrides the old fixed-position popup styling).
@@ -2555,6 +2568,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                     .gs-hosting-tables-modal__tab { padding:12px 14px; font-size:0.8rem; }
                 }
             </style>
+            <?php endif; // gend.me page: the tables explorer lists gend.me's own database ?>
 
             <?php if ( 'hosting' === $section_group ) : ?>
             <!-- ── Backups sub-panel (split out of the old combined Storage
@@ -2575,6 +2589,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             </section>
 <?php endif; ?>
 
+            <?php if ( ! $gs_hub_page ) : // gend.me's page for a web app: this panel reads gend.me itself, so it is never rendered there ?>
             <!-- ── Media sub-panel: the real gend-media-optimizer Media Library
                  tab (admin.php?page=blog-manager&tab=media), rendered natively
                  here via its own real render() methods - not an iframe, not a
@@ -2718,6 +2733,15 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                 </script>
             </section>
             <?php else : ?>
+            <section class="gs-hosting__panel" data-panel="media-library" role="tabpanel">
+                <?php $gs_hub_admin = is_array( $payload ) && ! empty( $payload['app_url'] ) ? trailingslashit( (string) $payload['app_url'] ) . 'wp-admin/' : ''; ?>
+                <div class="gs-hosting__card"><div class="gs-hosting__card-header"><div>
+                    <h5 class="gs-hosting__card-title"><?php echo esc_html( __( 'Media', 'gend-society' ) ); ?></h5>
+                    <p class="gs-hosting__card-desc"><?php esc_html_e( 'This reads your app itself, so it lives in your app’s own dashboard.', 'gend-society' ); ?></p>
+                </div><?php if ( '' !== $gs_hub_admin ) : ?><a class="gs-hosting__btn" href="<?php echo esc_url( $gs_hub_admin ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open app dashboard', 'gend-society' ); ?> &rarr;</a><?php endif; ?></div></div>
+            </section>
+            <?php endif; // gend.me page: local-only panel ?>
+            <?php else : ?>
             <!-- ── Media sub-panel (section_group=all - the BuddyPress group
                  Hosting tab, unchanged: Storage usage cards + Backups
                  together in one sub-tab, exactly as before). ── -->
@@ -2767,6 +2791,7 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
             </section>
             <?php endif; ?>
 
+            <?php if ( ! $gs_hub_page ) : // gend.me's page for a web app: this panel reads gend.me itself, so it is never rendered there ?>
             <!-- ── Codebase sub-panel: "hero" analytics matching the real
                  Media tab (GMO Library Dashboard's ring/stat-pill/bar
                  pattern — see gs_hosting_render_analytics_hero()), for
@@ -2943,6 +2968,15 @@ function gend_society_render_hosting_tab( $payload = array(), $opts = array() ) 
                     </table>
                 </div>
             </section>
+            <?php else : ?>
+            <section class="gs-hosting__panel" data-panel="codebase" role="tabpanel">
+                <?php $gs_hub_admin = is_array( $payload ) && ! empty( $payload['app_url'] ) ? trailingslashit( (string) $payload['app_url'] ) . 'wp-admin/' : ''; ?>
+                <div class="gs-hosting__card"><div class="gs-hosting__card-header"><div>
+                    <h5 class="gs-hosting__card-title"><?php echo esc_html( __( 'Codebase', 'gend-society' ) ); ?></h5>
+                    <p class="gs-hosting__card-desc"><?php esc_html_e( 'This reads your app itself, so it lives in your app’s own dashboard.', 'gend-society' ); ?></p>
+                </div><?php if ( '' !== $gs_hub_admin ) : ?><a class="gs-hosting__btn" href="<?php echo esc_url( $gs_hub_admin ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Open app dashboard', 'gend-society' ); ?> &rarr;</a><?php endif; ?></div></div>
+            </section>
+            <?php endif; // gend.me page: local-only panel ?>
             <?php endif; // show_hosting_group (tables, media/storage, servers) ?>
 
             <?php if ( $with_permalinks && $show_app_group ) : ?>
