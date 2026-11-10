@@ -1625,8 +1625,15 @@ function gend_society_render_membership_panel( $payload = null ) {
 
     $hub_url        = isset( $payload['hub_url'] ) ? rtrim( (string) $payload['hub_url'], '/' ) . '/' : '';
     $membership_url = isset( $payload['membership_url'] ) ? (string) $payload['membership_url'] : '';
-    $app_url        = isset( $payload['app_url'] ) ? (string) $payload['app_url'] : home_url( '/' );
-    $app_title      = isset( $payload['app_title'] ) && $payload['app_title'] !== '' ? (string) $payload['app_title'] : (string) get_bloginfo( 'name' );
+    // The panel is drawn on the member's own site, so its own address and name are the truth: the hub's copy is the
+    // Ultimo site record, which for an outside migration keeps the source site's domain and title, and lags a domain
+    // switch. The hub's values remain the fallback (e.g. a site whose name is empty).
+    $local_title    = (string) get_bloginfo( 'name' );
+    $app_url        = home_url( '/' );
+    $app_title      = '' !== $local_title ? $local_title : ( isset( $payload['app_title'] ) ? (string) $payload['app_title'] : '' );
+    if ( '' === $app_title ) {
+        $app_title = (string) wp_parse_url( $app_url, PHP_URL_HOST );
+    }
 
     $status         = isset( $payload['status'] ) ? (string) $payload['status'] : '';
     $status_label   = isset( $payload['status_label'] ) ? (string) $payload['status_label'] : ucfirst( $status );
