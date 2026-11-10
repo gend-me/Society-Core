@@ -109,7 +109,7 @@ function gend_society_render_feature_upgrade_page() {
         ? preg_replace( '/[^a-z0-9._-]/', '', strtolower( (string) wp_unslash( $_GET['required_child'] ) ) )
         : '';
     $features = function_exists( 'gend_society_features_get_cached' ) ? gend_society_features_get_cached() : null;
-    $current_areas = is_array( $features ) && isset( $features['allowed_areas'] ) ? (array) $features['allowed_areas'] : array();
+    $current_areas = is_array( $features ) && function_exists( 'gend_society_features_allowed_areas' ) ? (array) gend_society_features_allowed_areas( $features ) : array();
     $current_plan  = is_array( $features ) && ! empty( $features['plan_name'] ) ? (string) $features['plan_name'] : '';
     $learn_more_pages = is_array( $features ) && isset( $features['learn_more_pages'] ) ? (array) $features['learn_more_pages'] : array();
     $learn_more_url = function_exists( 'gend_society_features_resolve_learn_more_url' )
