@@ -145,6 +145,17 @@ if ( ! function_exists( 'gend_society_hub_member_render' ) ) {
         try {
             $payload = gend_society_remote_membership_get_cached();
             $html    = is_array( $payload ) ? gend_society_render_membership_panel( $payload ) : '';
+            if ( '' !== $html ) {
+                // The panel was built for wp-admin: on gend.me's front end it needs the dashicons font and the admin
+                // skin's colour tokens (scoped to this wrapper, never the whole page).
+                ob_start();
+                wp_print_styles( 'dashicons' );
+                $html = (string) ob_get_clean()
+                    . '<style>.gs-hub-member-dash{--gs-magenta:#b608c9;--gs-red:#cc0000;--gs-blue:#6ec1e4;--gs-accent:#97e46e;--gs-bg:#0b0e14;--gs-surface:rgba(15,20,32,.95);--gs-glass:rgba(255,255,255,.05);--gs-border:rgba(255,255,255,.10);--gs-text:#e8edf5;--gs-muted:#8b98b0;--gs-radius:14px;color:var(--gs-text);font-family:Inter,"Segoe UI",system-ui,sans-serif;}'
+                    . '.gs-hub-member-dash *,.gs-hub-member-dash *::before,.gs-hub-member-dash *::after{box-sizing:border-box;}'
+                    . '.gs-hub-member-dash input,.gs-hub-member-dash select,.gs-hub-member-dash textarea,.gs-hub-member-dash button{font-family:inherit;}</style>'
+                    . '<div class="gs-hub-member-dash">' . $html . '</div>';
+            }
         } finally {
             remove_filter( 'admin_url', $tag, 10 );
             unset( $GLOBALS['gend_society_hub_member'] );
@@ -798,6 +809,251 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
     }
 }
 
+if ( ! function_exists( 'gend_society_twoset_picker_enabled' ) ) {
+    /**
+     * The two-set plan picker (Emails: storage + sending, Backups: storage + frequency) is used on a web app and on
+     * gend.me's membership page for one; a standalone install keeps its gend.me popup and the hub's own sites keep
+     * their memberships-page picker.
+     */
+    function gend_society_twoset_picker_enabled(): bool {
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            return false;
+        }
+        $on_hub = function_exists( 'gend_society_oauth_is_hub_site' ) && gend_society_oauth_is_hub_site();
+        return ! $on_hub || ( function_exists( 'gend_society_hub_member_context' ) && gend_society_hub_member_context() > 0 );
+    }
+}
+
+if ( ! function_exists( 'gend_society_twoset_picker_assets' ) ) {
+    /**
+     * Prints, once per page, the popup that buttons with data-gs-twoset="emails|backups" open: the plans of both sets
+     * side by side (current plan marked and pre-selected), a summary of what changes, and one checkout for both
+     * choices, opened in a popup window; the dashboard reloads when it closes.
+     */
+    function gend_society_twoset_picker_assets(): void {
+        static $done = false;
+        if ( $done ) {
+            return;
+        }
+        $done = true;
+        $sets = array(
+            'emails'  => array(
+                'title' => __( 'Email plans', 'gend-society' ),
+                'sub'   => __( 'Pick how much mail you keep and how much you send. Change one or both: you only pay for what changes.', 'gend-society' ),
+                'kinds' => array(
+                    'storage' => array( 'label' => __( 'Mailbox storage', 'gend-society' ), 'hint' => __( 'Space for every inbox on your domain', 'gend-society' ), 'icon' => 'dashicons-database' ),
+                    'sending' => array( 'label' => __( 'Sending', 'gend-society' ), 'hint' => __( 'Emails you can send each month', 'gend-society' ), 'icon' => 'dashicons-email-alt' ),
+                ),
+            ),
+            'backups' => array(
+                'title' => __( 'Backup plans', 'gend-society' ),
+                'sub'   => __( 'Pick how much backup history you keep and how often it is taken. Change one or both: you only pay for what changes.', 'gend-society' ),
+                'kinds' => array(
+                    'storage'   => array( 'label' => __( 'Backup storage', 'gend-society' ), 'hint' => __( 'How much backup history is kept', 'gend-society' ), 'icon' => 'dashicons-database' ),
+                    'frequency' => array( 'label' => __( 'Backup frequency', 'gend-society' ), 'hint' => __( 'Daily is included; go more often', 'gend-society' ), 'icon' => 'dashicons-backup' ),
+                ),
+            ),
+        );
+        $cfg = array(
+            'ajax'  => admin_url( 'admin-ajax.php' ),
+            'nonce' => wp_create_nonce( 'gs_membership_action' ),
+            'sets'  => $sets,
+            'i18n'  => array(
+                'loading'  => __( 'Loading plans…', 'gend-society' ),
+                'none'     => __( 'No plans are available yet.', 'gend-society' ),
+                'current'  => __( 'Current', 'gend-society' ),
+                'choose'   => __( 'Choose', 'gend-society' ),
+                'selected' => __( 'Selected', 'gend-society' ),
+                'keep'     => __( 'Keeping your current plans', 'gend-society' ),
+                'pick'     => __( 'Pick a plan in either set', 'gend-society' ),
+                'checkout' => __( 'Continue to checkout', 'gend-society' ),
+                'working'  => __( 'Opening checkout…', 'gend-society' ),
+                'waiting'  => __( 'Finish paying in the checkout window. This page refreshes when you close it.', 'gend-society' ),
+                'blocked'  => __( 'Your browser blocked the checkout window. Allow pop-ups for this site, then try again.', 'gend-society' ),
+                'error'    => __( 'Could not load the plans.', 'gend-society' ),
+                'close'    => __( 'Close', 'gend-society' ),
+                /* translators: %d: Step number (1 or 2) of the two-set plan picker. */
+                'step'     => __( 'Step %d', 'gend-society' ),
+            ),
+        );
+        ?>
+<style id="gs-twoset-css">
+.gs-ts-modal{position:fixed;inset:0;z-index:100050;display:none;align-items:center;justify-content:center;padding:20px;box-sizing:border-box}
+.gs-ts-modal.is-open{display:flex}
+.gs-ts-backdrop{position:absolute;inset:0;background:rgba(5,7,10,.74);-webkit-backdrop-filter:blur(8px);backdrop-filter:blur(8px)}
+.gs-ts-dialog{position:relative;width:min(980px,100%);max-height:calc(100vh - 40px);display:flex;flex-direction:column;border-radius:24px;background:radial-gradient(700px 300px at 0% 0%,rgba(34,211,238,.10),transparent 60%),radial-gradient(600px 300px at 100% 0%,rgba(182,8,201,.12),transparent 60%),#0f131c;border:1px solid rgba(255,255,255,.10);box-shadow:0 40px 100px -30px rgba(0,0,0,.9);color:#e8edf5;font-family:Inter,"Segoe UI",system-ui,sans-serif;overflow:hidden;animation:gsTsIn .28s cubic-bezier(.2,.9,.3,1)}
+@keyframes gsTsIn{from{opacity:0;transform:translateY(14px) scale(.98)}to{opacity:1;transform:none}}
+.gs-ts-head{padding:26px 30px 6px;position:relative}
+.gs-ts-head h2{margin:0 0 6px;font-size:1.45rem;font-weight:800;color:#fff;letter-spacing:-.01em}
+.gs-ts-head p{margin:0;max-width:640px;color:#9aa6bd;font-size:.9rem;line-height:1.5}
+.gs-ts-x{position:absolute;top:18px;right:18px;width:38px;height:38px;border-radius:50%;border:1px solid rgba(255,255,255,.15);background:rgba(255,255,255,.04);color:#fff;font-size:22px;line-height:34px;cursor:pointer;transition:background .15s}
+.gs-ts-x:hover,.gs-ts-x:focus-visible{background:rgba(255,255,255,.12);outline:none}
+.gs-ts-body{padding:18px 30px 8px;overflow:auto;display:grid;grid-template-columns:1fr 1fr;gap:22px}
+.gs-ts-set{min-width:0}
+.gs-ts-set__head{display:flex;align-items:center;gap:12px;margin:0 0 12px}
+.gs-ts-set__icon{width:40px;height:40px;border-radius:12px;display:grid;place-content:center;background:linear-gradient(135deg,rgba(34,211,238,.18),rgba(182,8,201,.18));border:1px solid rgba(255,255,255,.10);color:#7dd3fc}
+.gs-ts-set__icon .dashicons{font-size:20px;width:20px;height:20px}
+.gs-ts-set__step{display:block;color:#7dd3fc;font-size:.66rem;font-weight:800;letter-spacing:.14em;text-transform:uppercase}
+.gs-ts-set__title{display:block;color:#fff;font-size:1rem;font-weight:800}
+.gs-ts-set__hint{display:block;color:#8b98b0;font-size:.78rem}
+.gs-ts-list{display:flex;flex-direction:column;gap:10px}
+.gs-ts-card{position:relative;display:grid;grid-template-columns:22px minmax(0,1fr) auto;align-items:center;gap:12px;width:100%;padding:14px 16px;border-radius:16px;border:1px solid rgba(255,255,255,.09);background:linear-gradient(180deg,rgba(255,255,255,.045),rgba(255,255,255,.015));color:#e8edf5;font:inherit;text-align:left;cursor:pointer;transition:border-color .18s,background .18s,transform .18s,box-shadow .18s}
+.gs-ts-card:hover,.gs-ts-card:focus-visible{border-color:rgba(125,211,252,.5);transform:translateY(-1px);outline:none}
+.gs-ts-card.is-selected{border-color:rgba(182,8,201,.75);background:linear-gradient(180deg,rgba(182,8,201,.16),rgba(182,8,201,.05));box-shadow:0 16px 36px -22px rgba(182,8,201,.9)}
+.gs-ts-card.is-current:not(.is-selected){border-color:rgba(78,230,138,.35)}
+.gs-ts-radio{width:20px;height:20px;border-radius:50%;border:2px solid rgba(255,255,255,.3);display:grid;place-content:center;transition:border-color .15s}
+.gs-ts-card.is-selected .gs-ts-radio{border-color:#e06bff}
+.gs-ts-card.is-selected .gs-ts-radio::after{content:"";width:10px;height:10px;border-radius:50%;background:linear-gradient(135deg,#e06bff,#b608c9)}
+.gs-ts-main{min-width:0;display:flex;flex-direction:column;gap:3px}
+.gs-ts-name{font-weight:700;font-size:.98rem;color:#fff;display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.gs-ts-tag{display:inline-block;padding:2px 8px;border-radius:999px;font-size:.62rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;background:rgba(78,230,138,.12);border:1px solid rgba(78,230,138,.4);color:#4ee68a}
+.gs-ts-desc{color:#8b98b0;font-size:.78rem;line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.gs-ts-price{text-align:right;white-space:nowrap;font-weight:800;color:#fff;font-size:1.02rem}
+.gs-ts-price small{display:block;color:#8b98b0;font-size:.7rem;font-weight:500}
+.gs-ts-empty,.gs-ts-status{padding:16px;border-radius:14px;border:1px dashed rgba(255,255,255,.12);color:#8b98b0;font-size:.85rem;text-align:center}
+.gs-ts-foot{display:flex;align-items:center;justify-content:space-between;gap:16px;flex-wrap:wrap;padding:18px 30px 24px;border-top:1px solid rgba(255,255,255,.07);background:rgba(5,7,10,.35)}
+.gs-ts-summary{display:flex;flex-wrap:wrap;gap:8px;align-items:center;color:#9aa6bd;font-size:.85rem;min-width:0}
+.gs-ts-chip{display:inline-flex;align-items:center;gap:6px;padding:6px 12px;border-radius:999px;background:rgba(182,8,201,.14);border:1px solid rgba(182,8,201,.45);color:#fff;font-weight:700;font-size:.8rem}
+.gs-ts-chip b{color:#e9b8ff;font-weight:800}
+.gs-ts-go{padding:14px 26px;border-radius:14px;border:0;background:linear-gradient(135deg,#b608c9,#7e058a);color:#fff;font-weight:800;font-size:.8rem;letter-spacing:.1em;text-transform:uppercase;cursor:pointer;box-shadow:0 10px 26px -10px rgba(182,8,201,.8);transition:opacity .15s,transform .15s}
+.gs-ts-go:hover:not([disabled]){transform:translateY(-1px)}
+.gs-ts-go[disabled]{opacity:.4;cursor:not-allowed;box-shadow:none}
+.gs-ts-msg{flex:1 1 100%;color:#fcd34d;font-size:.82rem}
+.gs-ts-msg:empty{display:none}
+@media (max-width:760px){.gs-ts-body{grid-template-columns:1fr}.gs-ts-head,.gs-ts-body,.gs-ts-foot{padding-left:18px;padding-right:18px}.gs-ts-go{width:100%}}
+</style>
+<script id="gs-twoset-js">
+(function () {
+    var CFG = <?php echo wp_json_encode( $cfg ); ?>;
+    var T = CFG.i18n, modal = null, state = null;
+    function el(tag, cls, text) { var e = document.createElement(tag); if (cls) { e.className = cls; } if (text !== undefined && text !== null) { e.textContent = text; } return e; }
+    function post(action, data) {
+        var fd = new FormData(); fd.append('action', action); fd.append('nonce', CFG.nonce);
+        Object.keys(data || {}).forEach(function (k) { fd.append(k, data[k]); });
+        return fetch(CFG.ajax, { method: 'POST', body: fd, credentials: 'same-origin' }).then(function (r) { return r.json(); }).then(function (j) {
+            if (!j || !j.success) { throw new Error((j && j.data && j.data.message) || T.error); }
+            return j.data || {};
+        });
+    }
+    function splitPrice(label) {
+        var m = String(label || '').match(/^(.*?\d[\d.,]*)\s+(.+)$/);
+        return m ? { amount: m[1].replace(/\s+/g, ''), per: m[2] } : { amount: String(label || ''), per: '' };
+    }
+    function close() { if (modal) { modal.classList.remove('is-open'); document.body.style.overflow = ''; } }
+    function build() {
+        modal = el('div', 'gs-ts-modal'); modal.setAttribute('role', 'dialog'); modal.setAttribute('aria-modal', 'true');
+        var bd = el('div', 'gs-ts-backdrop'); bd.addEventListener('click', close);
+        var dlg = el('div', 'gs-ts-dialog');
+        var head = el('div', 'gs-ts-head'); var h = el('h2'); var p = el('p');
+        var x = el('button', 'gs-ts-x', '×'); x.type = 'button'; x.setAttribute('aria-label', T.close); x.addEventListener('click', close);
+        head.appendChild(h); head.appendChild(p); head.appendChild(x);
+        var body = el('div', 'gs-ts-body');
+        var foot = el('div', 'gs-ts-foot'); var sum = el('div', 'gs-ts-summary'); var go = el('button', 'gs-ts-go', T.checkout); go.type = 'button';
+        var msg = el('div', 'gs-ts-msg'); msg.setAttribute('aria-live', 'polite');
+        foot.appendChild(sum); foot.appendChild(go); foot.appendChild(msg);
+        dlg.appendChild(head); dlg.appendChild(body); dlg.appendChild(foot);
+        modal.appendChild(bd); modal.appendChild(dlg); document.body.appendChild(modal);
+        document.addEventListener('keydown', function (e) { if (e.key === 'Escape' && modal.classList.contains('is-open')) { close(); } });
+        go.addEventListener('click', checkout);
+        modal._h = h; modal._p = p; modal._body = body; modal._sum = sum; modal._go = go; modal._msg = msg;
+    }
+    function changed() {
+        var out = [];
+        Object.keys(state.sel).forEach(function (k) { if (state.sel[k] && state.sel[k] !== state.cur[k]) { out.push(state.sel[k]); } });
+        return out;
+    }
+    function renderSummary() {
+        var sum = modal._sum; sum.innerHTML = '';
+        var ids = changed();
+        if (!ids.length) { sum.appendChild(el('span', '', Object.keys(state.cur).some(function (k) { return state.cur[k]; }) ? T.keep : T.pick)); }
+        ids.forEach(function (id) {
+            var p = state.byId[id]; var pr = splitPrice(p.price_label);
+            var chip = el('span', 'gs-ts-chip', p.name + ' '); var b = el('b', '', pr.amount + (pr.per ? ' ' + pr.per : '')); chip.appendChild(b); sum.appendChild(chip);
+        });
+        modal._go.disabled = !ids.length;
+    }
+    function renderSets(plans) {
+        var setCfg = CFG.sets[state.type]; var body = modal._body; body.innerHTML = '';
+        var kinds = Object.keys(setCfg.kinds); state.sel = {}; state.cur = {}; state.byId = {};
+        kinds.forEach(function (k, i) {
+            var list = plans.filter(function (p) { return (p.kind || kinds[0]) === k; });
+            var cur = list.filter(function (p) { return p.is_current; })[0];
+            state.cur[k] = cur ? String(cur.id) : ''; state.sel[k] = state.cur[k];
+            var kc = setCfg.kinds[k]; var col = el('section', 'gs-ts-set');
+            var sh = el('div', 'gs-ts-set__head'); var ic = el('span', 'gs-ts-set__icon'); var ii = el('span', 'dashicons ' + kc.icon); ic.appendChild(ii);
+            var tx = el('div'); tx.appendChild(el('span', 'gs-ts-set__step', T.step.replace('%d', i + 1))); tx.appendChild(el('span', 'gs-ts-set__title', kc.label)); tx.appendChild(el('span', 'gs-ts-set__hint', kc.hint));
+            sh.appendChild(ic); sh.appendChild(tx); col.appendChild(sh);
+            var ul = el('div', 'gs-ts-list'); ul.setAttribute('role', 'radiogroup'); ul.setAttribute('aria-label', kc.label);
+            if (!list.length) { ul.appendChild(el('div', 'gs-ts-empty', T.none)); }
+            list.forEach(function (p) {
+                state.byId[String(p.id)] = p;
+                var c = el('button', 'gs-ts-card'); c.type = 'button'; c.setAttribute('role', 'radio'); c.dataset.id = String(p.id); c.dataset.kind = k;
+                if (p.is_current) { c.classList.add('is-current'); }
+                var r = el('span', 'gs-ts-radio'); var m = el('span', 'gs-ts-main'); var n = el('span', 'gs-ts-name', p.name || ('Plan #' + p.id));
+                if (p.is_current) { n.appendChild(el('span', 'gs-ts-tag', T.current)); }
+                m.appendChild(n); if (p.description) { m.appendChild(el('span', 'gs-ts-desc', p.description)); }
+                var pr = splitPrice(p.price_label); var pe = el('span', 'gs-ts-price', pr.amount); if (pr.per) { pe.appendChild(el('small', '', pr.per)); }
+                c.appendChild(r); c.appendChild(m); c.appendChild(pe);
+                c.addEventListener('click', function () {
+                    state.sel[k] = state.sel[k] === String(p.id) && !p.is_current ? state.cur[k] : String(p.id);
+                    paint();
+                });
+                ul.appendChild(c);
+            });
+            col.appendChild(ul); body.appendChild(col);
+        });
+        paint();
+    }
+    function paint() {
+        modal._body.querySelectorAll('.gs-ts-card').forEach(function (c) {
+            var on = state.sel[c.dataset.kind] === c.dataset.id; c.classList.toggle('is-selected', on); c.setAttribute('aria-checked', on ? 'true' : 'false');
+        });
+        renderSummary();
+    }
+    function checkout() {
+        var ids = changed(); if (!ids.length) { return; }
+        var go = modal._go; go.disabled = true; go.textContent = T.working; modal._msg.textContent = '';
+        // Open the window now (in the click) so pop-up blockers allow it, then point it at the checkout.
+        var w = 760, h = 820, win = window.open('', 'gs_plan_checkout', 'width=' + w + ',height=' + h + ',left=' + Math.max(0, (screen.width - w) / 2) + ',top=' + Math.max(0, (screen.height - h) / 2) + ',scrollbars=yes,resizable=yes');
+        post('gend_society_membership_change_plan', ids.length > 1 ? { plan_ids: ids.join(',') } : { plan_id: ids[0] }).then(function (d) {
+            if (!d.checkout_url) { throw new Error(T.error); }
+            if (!win || win.closed) { modal._msg.textContent = T.blocked; go.disabled = false; go.textContent = T.checkout; return; }
+            win.location.href = d.checkout_url; go.textContent = T.waiting;
+            var t = setInterval(function () {
+                if (win.closed) {
+                    clearInterval(t);
+                    post('gend_society_membership_refresh', {}).catch(function () {}).then(function () { window.location.reload(); });
+                }
+            }, 800);
+        }).catch(function (e) {
+            if (win && !win.closed) { win.close(); }
+            modal._msg.textContent = e.message || T.error; go.disabled = false; go.textContent = T.checkout;
+        });
+    }
+    function open(type) {
+        if (!CFG.sets[type]) { return; }
+        if (!modal) { build(); }
+        state = { type: type }; var s = CFG.sets[type];
+        modal._h.textContent = s.title; modal._p.textContent = s.sub; modal._msg.textContent = '';
+        modal._go.disabled = true; modal._go.textContent = T.checkout; modal._sum.innerHTML = '';
+        modal._body.innerHTML = ''; modal._body.appendChild(el('div', 'gs-ts-status', T.loading));
+        modal.classList.add('is-open'); document.body.style.overflow = 'hidden';
+        post('gend_society_membership_plan_options', { resource: type }).then(function (d) {
+            renderSets(Array.isArray(d.plans) ? d.plans : []);
+        }).catch(function (e) { modal._body.innerHTML = ''; modal._body.appendChild(el('div', 'gs-ts-status', e.message || T.error)); });
+    }
+    document.addEventListener('click', function (e) {
+        var b = e.target && e.target.closest ? e.target.closest('[data-gs-twoset]') : null;
+        if (!b) { return; }
+        e.preventDefault(); e.stopPropagation();
+        open(b.getAttribute('data-gs-twoset'));
+    }, true);
+})();
+</script>
+        <?php
+    }
+}
+
 if ( ! function_exists( 'gend_society_render_email_plan_card' ) ) {
     /**
      * The Email hosting card: the Backups card's markup and classes (.gs-bk-hero / .gs-bk-badge / .gs-bk-btn),
@@ -813,6 +1069,11 @@ if ( ! function_exists( 'gend_society_render_email_plan_card' ) ) {
         $context = ( isset( $args['context'] ) && 'talk-flows' === $args['context'] ) ? 'talk-flows' : 'dashboard';
         $v       = isset( $args['view'] ) && is_array( $args['view'] ) ? $args['view'] : gend_society_email_plan_view();
         $cta     = is_array( $v['cta'] ) ? $v['cta'] : null;
+        // A web app (and gend.me's page for one): the two-set picker popup instead of a trip to the memberships page.
+        if ( $cta && function_exists( 'gend_society_twoset_picker_enabled' ) && gend_society_twoset_picker_enabled() ) {
+            $cta = array( 'type' => 'twoset' );
+            gend_society_twoset_picker_assets();
+        }
         $attrs   = '';
         if ( $cta && 'upgrade' === $cta['type'] ) {
             foreach ( (array) $cta['attrs'] as $k => $val ) {
@@ -948,12 +1209,15 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
             if ( $cta && 'upgrade' === $cta['type'] ) {
                 return '<button type="button" class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '" data-gs-upgrade-open data-resource="emails" data-resource-label="' . esc_attr__( 'Email hosting', 'gend-society' ) . '"' . $attrs . '>';
             }
+            if ( $cta && 'twoset' === $cta['type'] ) {
+                return '<button type="button" class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '" data-gs-twoset="emails">';
+            }
             if ( $cta && 'popup' === $cta['type'] ) {
                 return '<a class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '" data-gs-popup href="' . esc_url( $cta['url'] ) . '" target="_blank" rel="opener">';
             }
             return '<div class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '">';
         };
-        $tile_close = ( $cta && 'upgrade' === $cta['type'] ) ? '</button>' : ( ( $cta && 'popup' === $cta['type'] ) ? '</a>' : '</div>' );
+        $tile_close = ( $cta && in_array( $cta['type'], array( 'upgrade', 'twoset' ), true ) ) ? '</button>' : ( ( $cta && 'popup' === $cta['type'] ) ? '</a>' : '</div>' );
         ?>
 <?php if ( 'talk-flows' === $context ) : ?>
 <div class="gs-em-plan gs-em-plan--talk-flows">
@@ -969,6 +1233,8 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
         <div class="gs-bk-actions">
 <?php if ( $cta && 'upgrade' === $cta['type'] ) : ?>
             <button type="button" class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta" data-gs-upgrade-open data-resource="emails" data-resource-label="<?php esc_attr_e( 'Email hosting', 'gend-society' ); ?>"<?php echo $attrs; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()'d. ?>><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( $v['cta_label'] ); ?></button>
+<?php elseif ( $cta && 'twoset' === $cta['type'] ) : ?>
+            <button type="button" class="gs-bk-btn gs-bk-btn--cta" data-gs-twoset="emails"><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( $v['cta_label'] ); ?></button>
 <?php elseif ( $cta && 'popup' === $cta['type'] ) : ?>
             <a class="gs-bk-btn gs-bk-btn--cta" data-gs-popup href="<?php echo esc_url( $cta['url'] ); ?>" target="_blank" rel="opener"><span class="dashicons dashicons-money-alt"></span><?php echo esc_html( $v['cta_label'] ); ?></a>
 <?php endif; ?>
@@ -1217,9 +1483,11 @@ add_action( 'wp_ajax_gend_society_membership_plan_options', function () {
 
 add_action( 'wp_ajax_gend_society_membership_change_plan', function () {
     gend_society_membership_ajax_authorize();
-    $plan_id = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
-    if ( ! $plan_id ) wp_send_json_error( array( 'message' => __( 'Please select a plan.', 'gend-society' ) ) );
-    $r = gend_society_remote_membership_call( 'membership/change-plan', array( 'plan_id' => $plan_id ), 'POST' );
+    // Two-set pickers (Emails, Backups) send plan_ids: one plan per set, checked out together on gend.me.
+    $plan_ids = isset( $_POST['plan_ids'] ) ? array_slice( array_values( array_filter( array_map( 'absint', explode( ',', sanitize_text_field( wp_unslash( (string) $_POST['plan_ids'] ) ) ) ) ) ), 0, 2 ) : array();
+    $plan_id  = isset( $_POST['plan_id'] ) ? absint( $_POST['plan_id'] ) : 0;
+    if ( ! $plan_id && ! $plan_ids ) wp_send_json_error( array( 'message' => __( 'Please select a plan.', 'gend-society' ) ) );
+    $r = gend_society_remote_membership_call( 'membership/change-plan', $plan_ids ? array( 'plan_ids' => implode( ',', $plan_ids ) ) : array( 'plan_id' => $plan_id ), 'POST' );
     if ( is_wp_error( $r ) ) wp_send_json_error( array( 'message' => $r->get_error_message() ) );
     gend_society_remote_membership_invalidate();
     wp_send_json_success( $r );
@@ -2639,9 +2907,15 @@ function gend_society_render_membership_panel( $payload = null ) {
                             $gs_bk_upgrade_attrs = ( ( ! empty( $gs_backup_plans ) || $gs_bk_remote ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
                                 ? gend_society_hosting_resource_upgrade_data_attrs( 'backups' )
                                 : '';
+            // A web app (and gend.me's page for one): the two-set picker (storage + frequency) in a popup.
+            $gs_bk_twoset = function_exists( 'gend_society_twoset_picker_enabled' ) && gend_society_twoset_picker_enabled() && ( ! empty( $gs_backup_plans ) || $gs_bk_remote );
+            if ( $gs_bk_twoset ) {
+                gend_society_twoset_picker_assets();
+                if ( '' === $gs_bk_upgrade_attrs ) { $gs_bk_upgrade_attrs = 'data-resource-type="backups"'; }
+            }
                             if ( $gs_bk_upgrade_attrs !== '' ) : ?>
                                 <button type="button"
-                                        class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta"
+                                        class="gs-bk-btn gs-bk-btn--cta gs-upgrade-cta"<?php echo $gs_bk_twoset ? ' data-gs-twoset="backups"' : ''; ?>
                                         data-gs-upgrade-open
                                         data-resource="backups"
                                         data-resource-label="<?php esc_attr_e( 'Backups', 'gend-society' ); ?>"
