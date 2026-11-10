@@ -1,14 +1,18 @@
 <?php
 /**
- * Replace wp-login.php with a "Sign in with gend.me" OAuth flow.
+ * The site's sign-in page: the site's own accounts plus "Continue with gend.me" (OAuth).
  *
  * Works on every site that has the gend-society plugin active EXCEPT
  * gend.me itself (the hub authenticates users locally).
  *
- * Flow:
+ * 1.9.24: a web app's customers and members sign in with accounts on that site (username or email + password,
+ * the site's own password reset and registration); "Continue with gend.me" is offered alongside. Site option
+ * gend_society_login_methods = both (default) | site | gendme (gend.me only, the earlier page).
+ *
+ * gend.me flow:
  *   1. Customer hits /wp-login.php on their site (e.g. block-migration.gend.me).
- *   2. We render a styled "Sign in with gend.me" button instead of the
- *      stock username/password form.
+ *   2. We render a styled page: the site's own form and a "Continue with gend.me"
+ *      button.
  *   3. Button click opens a popup to gend.me/oauth/authorize with PKCE.
  *   4. User authorizes on gend.me. gend.me redirects to /oauth-bridge/
  *      which postMessages the {code, state} back to the popup opener.
@@ -70,6 +74,20 @@ function gend_society_oauth_should_intercept(): bool {
     return true;
 }
 
+if ( ! function_exists( 'gend_society_login_methods' ) ) {
+    /**
+     * Which sign-ins the site's login page offers: 'both' (default: the site's own accounts first, then "Continue with
+     * gend.me"), 'site' (own accounts only) or 'gendme' (gend.me accounts only, the pre-1.9.24 page). A site's
+     * customers and members sign in with accounts on that site; nobody needs a gend.me profile to use it.
+     * Site option gend_society_login_methods; filter gend_society_login_methods.
+     */
+    function gend_society_login_methods(): string {
+        $m = strtolower( (string) get_option( 'gend_society_login_methods', 'both' ) );
+        $m = (string) apply_filters( 'gend_society_login_methods', $m );
+        return in_array( $m, array( 'both', 'site', 'gendme' ), true ) ? $m : 'both';
+    }
+}
+
 // ────────────────────────────────────────────────────────────────────────
 // Login form replacement
 // ────────────────────────────────────────────────────────────────────────
@@ -91,7 +109,39 @@ function gend_society_oauth_render_login_page() {
         exit;
     }
 
+    $methods      = gend_society_login_methods();
     $redirect_to  = isset( $_REQUEST['redirect_to'] ) ? esc_url_raw( wp_unslash( $_REQUEST['redirect_to'] ) ) : admin_url();
+
+    // The site's own sign-in: a password POST is handled here (same steps as wp-login.php: wp_signon(), so the
+    // authenticate filters, two-factor and lockout plugins all apply) and an error re-renders this page with the form.
+    $site_error = '';
+    $site_login = '';
+    if ( 'gendme' !== $methods && 'POST' === strtoupper( (string) ( $_SERVER['REQUEST_METHOD'] ?? '' ) ) && isset( $_POST['log'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification -- wp-login.php has no nonce on sign-in either.
+        $site_login = sanitize_user( wp_unslash( (string) $_POST['log'] ) ); // phpcs:ignore WordPress.Security.NonceVerification
+        $user       = wp_signon(
+            array(
+                'user_login'    => wp_unslash( (string) $_POST['log'] ), // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- passed to core as wp-login.php does.
+                'user_password' => isset( $_POST['pwd'] ) ? (string) wp_unslash( $_POST['pwd'] ) : '', // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- a password is never sanitized.
+                'remember'      => ! empty( $_POST['rememberme'] ), // phpcs:ignore WordPress.Security.NonceVerification
+            ),
+            is_ssl()
+        );
+        if ( ! is_wp_error( $user ) ) {
+            $requested = isset( $_REQUEST['redirect_to'] ) ? wp_unslash( (string) $_REQUEST['redirect_to'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- filtered and checked by wp_safe_redirect.
+            $to        = apply_filters( 'login_redirect', $redirect_to, $requested, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, applied as wp-login.php does.
+            // Members without wp-admin access land on the front page (as wp-login.php does for an empty redirect).
+            if ( ( empty( $to ) || admin_url() === $to || admin_url( '/' ) === $to ) && ! $user->has_cap( 'edit_posts' ) ) {
+                $to = home_url( '/' );
+            }
+            wp_safe_redirect( $to ?: admin_url() );
+            exit;
+        }
+        $codes      = $user->get_error_codes();
+        // Same wording for an unknown user and a wrong password: the page never says which accounts exist.
+        $site_error = ( array_intersect( $codes, array( 'invalid_username', 'invalid_email', 'incorrect_password' ) ) || ! $codes )
+            ? __( 'That username or password is not right. Try again, or reset your password.', 'gend-society' )
+            : wp_strip_all_tags( $user->get_error_message() );
+    }
     $hub_url      = gend_society_oauth_hub_url();
     $client_id    = gend_society_oauth_login_client_id();
     $rest_login   = esc_url_raw( rest_url( 'gend-society/v1/oauth/login' ) );
@@ -193,19 +243,72 @@ function gend_society_oauth_render_login_page() {
         .gs-oauth-error.is-visible { display: block; }
     </style>
 
+    <style>
+        .gs-site-login { text-align: left; margin: 0; }
+        .gs-site-login label { display: block; margin: 0 0 6px; font-size: 12px; font-weight: 600; letter-spacing: .06em; text-transform: uppercase; color: rgba(255,255,255,.75); }
+        .gs-site-login input[type=text], .gs-site-login input[type=password] {
+            box-sizing: border-box; width: 100%; margin: 0 0 16px; padding: 12px 14px; border-radius: 12px; font-size: 15px;
+            background: #fff; color: #111; border: 1px solid rgba(255,255,255,.2);
+        }
+        .gs-site-login .gs-remember { display: flex; align-items: center; gap: 8px; margin: 0 0 18px; font-size: 13px; text-transform: none; letter-spacing: 0; font-weight: 500; }
+        .gs-site-login .gs-remember input { margin: 0; }
+        .gs-site-submit { background: #fff !important; color: #111 !important; box-shadow: 0 8px 20px -8px rgba(0,0,0,.5) !important; }
+        .gs-site-links { margin: 14px 0 0; display: flex; justify-content: space-between; gap: 12px; flex-wrap: wrap; font-size: 13px; }
+        .gs-site-links a { color: rgba(255,255,255,.8); text-decoration: none; }
+        .gs-site-links a:hover { color: #fff; text-decoration: underline; }
+        .gs-or { display: flex; align-items: center; gap: 12px; margin: 22px 0; color: rgba(255,255,255,.5); font-size: 12px; text-transform: uppercase; letter-spacing: .12em; }
+        .gs-or::before, .gs-or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.15); }
+        .gs-site-error { display: block; margin: 0 0 16px; }
+    </style>
+
     <div class="gs-oauth-shell">
         <h2><?php echo esc_html( get_bloginfo( 'name' ) ); ?></h2>
-        <p class="gs-oauth-sub"><?php esc_html_e( 'Sign in with your gend.me account to continue.', 'gend-society' ); ?></p>
-        <button id="gs-oauth-btn" type="button" class="gs-oauth-btn">
-            <?php esc_html_e( 'Sign in with gend.me', 'gend-society' ); ?>
-            <span aria-hidden="true">→</span>
-        </button>
-        <p class="gs-oauth-foot">
-            <a href="<?php echo esc_url( $hub_url . '/wp-login.php?action=lostpassword' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Forgot your password?', 'gend-society' ); ?></a>
-        </p>
-        <div id="gs-oauth-error" class="gs-oauth-error" role="alert" aria-live="polite"></div>
+        <?php if ( 'gendme' !== $methods ) : ?>
+            <p class="gs-oauth-sub"><?php esc_html_e( 'Sign in to your account.', 'gend-society' ); ?></p>
+            <?php if ( '' !== $site_error ) : ?>
+                <div class="gs-oauth-error gs-site-error" role="alert"><?php echo esc_html( $site_error ); ?></div>
+            <?php endif; ?>
+            <form class="gs-site-login" id="gs-site-login" action="<?php echo esc_url( site_url( 'wp-login.php', 'login_post' ) ); ?>" method="post">
+                <label for="gs-user-login"><?php esc_html_e( 'Username or email address', 'gend-society' ); ?></label>
+                <input type="text" name="log" id="gs-user-login" value="<?php echo esc_attr( $site_login ); ?>" autocomplete="username" autocapitalize="off" required>
+                <label for="gs-user-pass"><?php esc_html_e( 'Password', 'gend-society' ); ?></label>
+                <input type="password" name="pwd" id="gs-user-pass" value="" autocomplete="current-password" required>
+                <?php
+                // Captcha, two-factor and similar plugins add their fields here, as on the stock form.
+                do_action( 'login_form' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, fired as on the stock form.
+                ?>
+                <label class="gs-remember"><input type="checkbox" name="rememberme" value="forever"> <?php esc_html_e( 'Remember me', 'gend-society' ); ?></label>
+                <input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect_to ); ?>">
+                <button type="submit" class="gs-oauth-btn gs-site-submit"><?php esc_html_e( 'Sign in', 'gend-society' ); ?></button>
+            </form>
+            <p class="gs-site-links">
+                <a href="<?php echo esc_url( wp_lostpassword_url( $redirect_to ) ); ?>"><?php esc_html_e( 'Lost your password?', 'gend-society' ); ?></a>
+                <?php if ( get_option( 'users_can_register' ) ) : ?>
+                    <a href="<?php echo esc_url( wp_registration_url() ); ?>"><?php esc_html_e( 'Create an account', 'gend-society' ); ?></a>
+                <?php endif; ?>
+            </p>
+        <?php endif; ?>
+        <?php if ( 'both' === $methods ) : ?>
+            <div class="gs-or"><?php esc_html_e( 'or', 'gend-society' ); ?></div>
+        <?php endif; ?>
+        <?php if ( 'site' !== $methods ) : ?>
+            <?php if ( 'gendme' === $methods ) : ?>
+                <p class="gs-oauth-sub"><?php esc_html_e( 'Sign in with your gend.me account to continue.', 'gend-society' ); ?></p>
+            <?php endif; ?>
+            <button id="gs-oauth-btn" type="button" class="gs-oauth-btn">
+                <?php echo esc_html( 'both' === $methods ? __( 'Continue with gend.me', 'gend-society' ) : __( 'Sign in with gend.me', 'gend-society' ) ); ?>
+                <span aria-hidden="true">→</span>
+            </button>
+            <?php if ( 'gendme' === $methods ) : ?>
+                <p class="gs-oauth-foot">
+                    <a href="<?php echo esc_url( $hub_url . '/wp-login.php?action=lostpassword' ); ?>" target="_blank" rel="noopener"><?php esc_html_e( 'Forgot your password?', 'gend-society' ); ?></a>
+                </p>
+            <?php endif; ?>
+            <div id="gs-oauth-error" class="gs-oauth-error" role="alert" aria-live="polite"></div>
+        <?php endif; ?>
     </div>
 
+    <?php if ( 'site' !== $methods ) : ?>
     <script>
     (function () {
         var hubUrl       = <?php echo wp_json_encode( $hub_url ); ?>;
@@ -325,6 +428,7 @@ function gend_society_oauth_render_login_page() {
         });
     })();
     </script>
+    <?php endif; ?>
     <?php
     login_footer();
     exit;
@@ -716,8 +820,12 @@ if ( ! function_exists( 'gend_society_oauth_maybe_refresh' ) ) {
  * recovery flow where their account actually lives anyway.
  */
 add_action( 'login_form_lostpassword', function () {
-    if ( ! gend_society_oauth_should_intercept() ) return;
-    wp_safe_redirect( gend_society_oauth_hub_url() . '/wp-login.php?action=lostpassword' );
+    // Only a gend.me-only site sends resets to gend.me: with the site's own sign-in its accounts reset here
+    // (web apps send mail through the gend.me relay).
+    if ( ! gend_society_oauth_should_intercept() || 'gendme' !== gend_society_login_methods() ) return;
+    // wp_redirect, not wp_safe_redirect: the target is the configured hub, never visitor input, and the hub host is not
+    // on this site's allowed-redirect list (wp_safe_redirect fell back to wp-admin, so the link never reached gend.me).
+    wp_redirect( gend_society_oauth_hub_url() . '/wp-login.php?action=lostpassword' ); // phpcs:ignore WordPress.Security.SafeRedirect.wp_redirect_wp_redirect -- fixed configured host.
     exit;
 }, 1 );
 
@@ -726,7 +834,7 @@ add_action( 'login_form_lostpassword', function () {
  * other theme/plugin context.
  */
 add_filter( 'lostpassword_url', function ( $url ) {
-    if ( ! gend_society_oauth_should_intercept() ) return $url;
+    if ( ! gend_society_oauth_should_intercept() || 'gendme' !== gend_society_login_methods() ) return $url;
     return gend_society_oauth_hub_url() . '/wp-login.php?action=lostpassword';
 }, 99 );
 
