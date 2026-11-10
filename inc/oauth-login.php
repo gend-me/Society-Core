@@ -128,7 +128,7 @@ function gend_society_oauth_render_login_page() {
         );
         if ( ! is_wp_error( $user ) ) {
             $requested = isset( $_REQUEST['redirect_to'] ) ? wp_unslash( (string) $_REQUEST['redirect_to'] ) : ''; // phpcs:ignore WordPress.Security.NonceVerification, WordPress.Security.ValidatedSanitizedInput.InputNotSanitized -- filtered and checked by wp_safe_redirect.
-            $to        = apply_filters( 'login_redirect', $redirect_to, $requested, $user );
+            $to        = apply_filters( 'login_redirect', $redirect_to, $requested, $user ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, applied as wp-login.php does.
             // Members without wp-admin access land on the front page (as wp-login.php does for an empty redirect).
             if ( ( empty( $to ) || admin_url() === $to || admin_url( '/' ) === $to ) && ! $user->has_cap( 'edit_posts' ) ) {
                 $to = home_url( '/' );
@@ -275,7 +275,7 @@ function gend_society_oauth_render_login_page() {
                 <input type="password" name="pwd" id="gs-user-pass" value="" autocomplete="current-password" required>
                 <?php
                 // Captcha, two-factor and similar plugins add their fields here, as on the stock form.
-                do_action( 'login_form' );
+                do_action( 'login_form' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- core hook, fired as on the stock form.
                 ?>
                 <label class="gs-remember"><input type="checkbox" name="rememberme" value="forever"> <?php esc_html_e( 'Remember me', 'gend-society' ); ?></label>
                 <input type="hidden" name="redirect_to" value="<?php echo esc_attr( $redirect_to ); ?>">
