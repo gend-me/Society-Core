@@ -1318,9 +1318,15 @@ if ( ! function_exists( 'gend_society_hosting_render_backups_section' ) ) {
             $gs_bk_upgrade_attrs = ( ( ! empty( $gs_backup_plans ) || $gs_bk_remote ) && function_exists( 'gend_society_hosting_resource_upgrade_data_attrs' ) )
                 ? gend_society_hosting_resource_upgrade_data_attrs( 'backups' )
                 : '';
+            // A web app (and gend.me's page for one): the two-set picker (storage + frequency) in a popup.
+            $gs_bk_twoset = function_exists( 'gend_society_twoset_picker_enabled' ) && gend_society_twoset_picker_enabled() && ( ! empty( $gs_backup_plans ) || $gs_bk_remote );
+            if ( $gs_bk_twoset ) {
+                gend_society_twoset_picker_assets();
+                if ( '' === $gs_bk_upgrade_attrs ) { $gs_bk_upgrade_attrs = 'data-resource-type="backups"'; }
+            }
             if ( $gs_bk_upgrade_attrs !== '' ) : ?>
                 <button type="button"
-                        class="gs-hosting__btn gs-upgrade-cta"
+                        class="gs-hosting__btn gs-upgrade-cta"<?php echo $gs_bk_twoset ? ' data-gs-twoset="backups"' : ''; ?>
                         data-gs-upgrade-open
                         data-resource="backups"
                         data-resource-label="<?php esc_attr_e( 'Backups', 'gend-society' ); ?>"
