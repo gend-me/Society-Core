@@ -333,16 +333,22 @@ function gend_society_oauth_render_login_page() {
         #login .gs-site-links a { color: #fff; font-weight: 600; text-decoration: none; }
         /* The site's own button leads; Continue with gend.me sits below it as the second choice. */
         #login .gs-oauth-btn { min-height: 52px; font-size: 14px; border-radius: 14px; }
-        #login .gs-oauth-btn.gs-btn-secondary {
-            background: rgba(255,255,255,.05) !important; color: #fff !important;
-            border: 1px solid rgba(255,255,255,.18) !important; box-shadow: none !important;
-            text-transform: none; letter-spacing: .01em; font-size: 15px;
+        /* gend.me button: its own brand (the gradient D mark, the gend.me wordmark, a Signal Blue to Magenta edge). */
+        #login .gs-oauth-btn.gs-btn-gendme {
+            gap: 12px; color: #fff !important; text-transform: none; letter-spacing: .01em; font-size: 15px; font-weight: 600;
+            border: 1px solid transparent !important;
+            background: linear-gradient(#10131b, #10131b) padding-box, linear-gradient(120deg, #6ec1e4 0%, #8a5cf0 50%, #b608c9 100%) border-box !important;
+            box-shadow: 0 8px 24px -10px rgba(110,193,228,.35), 0 8px 24px -12px rgba(182,8,201,.45) !important;
         }
-        #login .gs-oauth-btn.gs-btn-secondary:hover { background: rgba(255,255,255,.1) !important; border-color: rgba(255,255,255,.3) !important; }
-        #login .gs-gend-mark {
-            display: inline-grid; place-content: center; width: 22px; height: 22px; border-radius: 7px;
-            background: linear-gradient(135deg, #b608c9, #7e058a); font-size: 12px; font-weight: 800; letter-spacing: 0;
+        #login .gs-oauth-btn.gs-btn-gendme:hover {
+            background: linear-gradient(#161a24, #161a24) padding-box, linear-gradient(120deg, #6ec1e4 0%, #8a5cf0 50%, #e06bff 100%) border-box !important;
+            box-shadow: 0 10px 28px -8px rgba(110,193,228,.45), 0 10px 28px -10px rgba(182,8,201,.6) !important;
         }
+        #login .gs-gend-mark { flex: none; width: 26px; height: 26px; border-radius: 7px; object-fit: cover; }
+        #login .gs-gendme-word { font-family: Georgia, "Times New Roman", serif; font-weight: 700; font-size: 17px; letter-spacing: 0; }
+        #login .gs-gendme-word b { color: #e06bff; font-weight: 700; }
+        #login .gs-gendme-arrow { color: #6ec1e4; transition: transform .18s ease; }
+        #login .gs-oauth-btn.gs-btn-gendme:hover .gs-gendme-arrow { transform: translateX(3px); }
         #login .gs-or { display: flex; align-items: center; gap: 14px; margin: 26px 0; color: rgba(255,255,255,.45); font-size: 12px; text-transform: uppercase; letter-spacing: .14em; }
         #login .gs-or::before, #login .gs-or::after { content: ""; flex: 1; height: 1px; background: rgba(255,255,255,.12); }
         #login .gs-site-error { display: block; margin: 0 0 20px; }
@@ -406,10 +412,16 @@ function gend_society_oauth_render_login_page() {
             <?php if ( 'gendme' === $methods ) : ?>
                 <p class="gs-oauth-sub"><?php esc_html_e( 'Sign in with your gend.me account to continue.', 'gend-society' ); ?></p>
             <?php endif; ?>
-            <button id="gs-oauth-btn" type="button" class="gs-oauth-btn<?php echo 'both' === $methods ? ' gs-btn-secondary' : ''; ?>">
-                <?php if ( 'both' === $methods ) : ?><span class="gs-gend-mark" aria-hidden="true">g</span><?php endif; ?>
-                <?php echo esc_html( 'both' === $methods ? __( 'Continue with gend.me', 'gend-society' ) : __( 'Sign in with gend.me', 'gend-society' ) ); ?>
-                <span aria-hidden="true">→</span>
+            <?php
+            // gend.me keeps its own branding here: the gend.me mark and the wordmark with its magenta "d".
+            $gendme_word = '<span class="gs-gendme-word">gen<b>d</b>.me</span>';
+            /* translators: %s: the gend.me wordmark. */
+            $gendme_label = 'both' === $methods ? __( 'Continue with %s', 'gend-society' ) : __( 'Sign in with %s', 'gend-society' );
+            ?>
+            <button id="gs-oauth-btn" type="button" class="gs-oauth-btn gs-btn-gendme" aria-label="<?php echo esc_attr( sprintf( $gendme_label, 'gend.me' ) ); ?>">
+                <img class="gs-gend-mark" src="<?php echo esc_url( GEND_SOCIETY_URL . 'assets/images/gendme-mark.gif' ); ?>" width="26" height="26" alt="">
+                <span class="gs-gendme-label"><?php echo wp_kses( sprintf( esc_html( $gendme_label ), $gendme_word ), array( 'span' => array( 'class' => true ), 'b' => array() ) ); ?></span>
+                <span class="gs-gendme-arrow" aria-hidden="true">→</span>
             </button>
             <?php if ( 'gendme' === $methods ) : ?>
                 <p class="gs-oauth-foot">
@@ -431,12 +443,15 @@ function gend_society_oauth_render_login_page() {
 
         var btn   = document.getElementById('gs-oauth-btn');
         var errEl = document.getElementById('gs-oauth-error');
+        // Only the label changes while connecting, so the gend.me mark and wordmark stay on the button.
+        var label = btn.querySelector('.gs-gendme-label') || btn;
+        var labelHtml = label.innerHTML;
 
         function showError(msg) {
             errEl.textContent = msg;
             errEl.classList.add('is-visible');
             btn.disabled = false;
-            btn.textContent = '⚠  Try again';
+            label.innerHTML = labelHtml;
         }
 
         function base64url(bytes) {
@@ -456,7 +471,7 @@ function gend_society_oauth_render_login_page() {
         btn.addEventListener('click', async function () {
             errEl.classList.remove('is-visible');
             btn.disabled = true;
-            btn.textContent = 'Connecting…';
+            label.textContent = 'Connecting…';
 
             try {
                 var p = await pkce();
