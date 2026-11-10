@@ -284,8 +284,8 @@ function gend_society_features_enforce_redirect() {
 
     $features = gend_society_features_get_cached();
     if ( ! is_array( $features ) ) return;
-    $allowed_areas = isset( $features['allowed_areas'] ) ? (array) $features['allowed_areas'] : array();
-    if ( empty( $allowed_areas ) ) return; // empty = allow all
+    $allowed_areas = gend_society_features_allowed_areas( $features );
+    if ( null === $allowed_areas ) return; // a pre-v2 answer with an empty list = allow all
 
     // Resolve current page slug.
     $page = isset( $_GET['page'] ) ? sanitize_key( (string) $_GET['page'] ) : '';
@@ -365,6 +365,30 @@ function gend_society_features_enforce_redirect() {
     ) ), admin_url( 'admin.php' ) );
     wp_safe_redirect( $upgrade_url );
     exit;
+}
+
+/**
+ * The areas (and granular area.child keys) the site's dashboard plan unlocks.
+ *
+ * The hub's v2 `areas` rows are the entitlement: an area is open when its state is 'included' (the plan's tier is at
+ * or above the area's minimum). The legacy `allowed_areas` list adds granular grants on top. Its old meaning of an
+ * EMPTY list ("allow all") only applies to a pre-v2 answer without `areas`: a v2 answer for a site with no dashboard
+ * plan (the free Connected fallback) also sends an empty list, and must show the upgrade pages, not every feature.
+ *
+ * @param array $features gend_society_features_get_cached() payload.
+ * @return array|null Allowed area slugs / child keys; null = allow everything (pre-v2 answer, empty list).
+ */
+function gend_society_features_allowed_areas( array $features ) {
+    $allowed = isset( $features['allowed_areas'] ) ? array_values( array_filter( array_map( 'strval', (array) $features['allowed_areas'] ) ) ) : array();
+    if ( ! isset( $features['areas'] ) || ! is_array( $features['areas'] ) ) {
+        return empty( $allowed ) ? null : $allowed;
+    }
+    foreach ( $features['areas'] as $row ) {
+        if ( is_array( $row ) && ! empty( $row['slug'] ) && 'included' === ( $row['state'] ?? '' ) ) {
+            $allowed[] = (string) $row['slug'];
+        }
+    }
+    return array_values( array_unique( $allowed ) );
 }
 
 /**
