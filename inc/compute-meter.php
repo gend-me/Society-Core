@@ -286,6 +286,7 @@ function gend_society_compute_report(): void {
         return;
     }
     gend_society_compute_sample();
+    gend_society_compute_prune_baselines();
     $current   = gmdate('YmdH');
     $oldest    = gmdate('YmdH', time() - 7 * DAY_IN_SECONDS);
     $placement = gend_society_compute_placement();
@@ -320,6 +321,29 @@ function gend_society_compute_report(): void {
         }
         if (is_array($resp) && isset($resp['hour'])) {
             gend_society_compute_forget($hour);
+        }
+    }
+}
+
+/**
+ * Drop the baselines of copies that no longer run. Each container keeps its own baseline (one option per host name),
+ * and every restart is a new container: their baselines were never cleared (24 on a pooled site after a day of
+ * rollouts). A live copy samples at least hourly, so a baseline untouched for two days belongs to a gone copy.
+ */
+function gend_society_compute_prune_baselines(): void {
+    global $wpdb;
+    $mine  = gend_society_compute_copy_key();
+    $names = $wpdb->get_col($wpdb->prepare( // phpcs:ignore WordPress.DB.DirectDatabaseQuery
+        "SELECT option_name FROM {$wpdb->options} WHERE option_name LIKE %s",
+        $wpdb->esc_like(GEND_SOCIETY_COMPUTE_OPTION_PREFIX . 'last') . '%'
+    ));
+    foreach ((array) $names as $name) {
+        if ($name === $mine) {
+            continue;
+        }
+        $v = get_option($name);
+        if (!is_array($v) || !isset($v['time']) || (int) $v['time'] < time() - 2 * DAY_IN_SECONDS) {
+            delete_option($name);
         }
     }
 }
