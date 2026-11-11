@@ -4811,6 +4811,10 @@ if ( ! function_exists( 'gend_society_hosting_standalone_gas_data' ) ) {
         $pay_url = ( ! empty( $bill['pending'] ) && is_array( $bill['pending'] ) && function_exists( 'gend_society_dashboard_standalone_url' ) )
             ? gend_society_dashboard_standalone_url( $bill['pending']['pay_url'] ?? '' ) // only a page on the paired hub
             : '';
+        // A hosted web app has no plan-access URL check loaded: the same gend.me-only check from the dashboard.
+        if ( '' === $pay_url && ! empty( $bill['pending']['pay_url'] ) && function_exists( 'gend_society_dashboard_hub_link' ) ) {
+            $pay_url = gend_society_dashboard_hub_link( $bill['pending']['pay_url'] );
+        }
         if ( '' !== $pay_url ) {
             $pay[] = array(
                 'id'          => (int) ( $bill['pending']['order_id'] ?? 0 ),
@@ -4861,7 +4865,7 @@ if ( ! function_exists( 'gend_society_hosting_standalone_gas_data' ) ) {
 function gend_society_hosting_compute_gas_real_data() {
     // Phase 109-29: a standalone install has no local gdc_gas_ledger table (the queries below only logged DB
     // errors there); it shows its owner's gas from gend.me's GET /install/{id}/gas instead.
-    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+    if ( function_exists( 'gend_society_gas_from_hub' ) && gend_society_gas_from_hub() ) {
         return gend_society_hosting_standalone_gas_data();
     }
     global $wpdb;
@@ -4977,7 +4981,7 @@ if ( ! function_exists( 'gend_society_hosting_gas_month_over_month' ) ) {
      */
     function gend_society_hosting_gas_month_over_month( $site_id = null ) {
         // Phase 109-29: standalone reads the owner's month-over-month from GET /install/{id}/gas (no local ledger).
-        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+        if ( function_exists( 'gend_society_gas_from_hub' ) && gend_society_gas_from_hub() ) {
             $gas  = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
             $used = is_array( $gas['payload'] ) && isset( $gas['payload']['used'] ) && is_array( $gas['payload']['used'] ) ? $gas['payload']['used'] : array();
             $this_month = (float) ( $used['this_month'] ?? 0 );
@@ -5048,7 +5052,7 @@ if ( ! function_exists( 'gend_society_hosting_gas_month_over_month' ) ) {
  */
 function gend_society_hosting_gas_earned_summary( $user_id ) {
     // Phase 109-29: standalone shows what the gend.me account owner earned (GET /install/{id}/gas "earned").
-    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+    if ( function_exists( 'gend_society_gas_from_hub' ) && gend_society_gas_from_hub() ) {
         $gas    = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
         $earned = is_array( $gas['payload'] ) && isset( $gas['payload']['earned'] ) && is_array( $gas['payload']['earned'] ) ? $gas['payload']['earned'] : array();
         $total  = (float) ( $earned['total'] ?? 0 );
@@ -5112,7 +5116,7 @@ function gend_society_hosting_gas_earned_summary( $user_id ) {
  */
 function gend_society_hosting_gas_history_rows( $limit = 100 ) {
     // Phase 109-29: standalone lists the gend.me account's ledger rows from GET /install/{id}/gas "history".
-    if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+    if ( function_exists( 'gend_society_gas_from_hub' ) && gend_society_gas_from_hub() ) {
         $gas  = function_exists( 'gend_society_dashboard_standalone_gas' ) ? gend_society_dashboard_standalone_gas() : array( 'payload' => null );
         $rows = is_array( $gas['payload'] ) && isset( $gas['payload']['history'] ) && is_array( $gas['payload']['history'] ) ? $gas['payload']['history'] : array();
         $out  = array();
