@@ -235,7 +235,13 @@ function gend_society_dedupe_hub_payment_gateways( $gateways ) {
     // applied via the C&P wallet panel ("Apply your DGEN and/or store credit") that
     // renders above the gateways, so a separate "Pay with DGEN" gateway radio just
     // duplicates it. Store credit is likewise handled by that panel.
-    foreach ( [ 'gend_token', 'gend_paypal', 'gend_btcpay', 'gend_usdc', 'gend_dgen', 'gend_dgen_hub' ] as $remove_id ) {
+    $remove = [ 'gend_token', 'gend_paypal', 'gend_btcpay', 'gend_usdc', 'gend_dgen', 'gend_dgen_hub' ];
+    // 2026-11-10: the wallet panel is part of the block checkout only. A pay-for-order page (gas invoices, Pay Now,
+    // renewals) has none, so dropping gend_dgen_hub there left no way to pay with DGEN: keep it on those pages.
+    if ( function_exists( 'is_wc_endpoint_url' ) && is_wc_endpoint_url( 'order-pay' ) ) {
+        $remove = array_diff( $remove, [ 'gend_dgen_hub' ] );
+    }
+    foreach ( $remove as $remove_id ) {
         unset( $gateways[ $remove_id ] );
     }
     return $gateways;

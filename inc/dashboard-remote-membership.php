@@ -484,7 +484,42 @@ if ( ! function_exists( 'gend_society_dashboard_standalone_gas' ) ) {
      * @return array{state:string,payload:?array}
      */
     function gend_society_dashboard_standalone_gas(): array {
+        // 2026-11-10: a hosted web app (and gend.me's page for one) reads the same route through the install API: the
+        // gas ledger lives on gend.me, and the old local query found nothing there (Compute Gas showed 0 owed, no usage).
+        if ( ! ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) && function_exists( 'gend_society_remote_membership_call' ) ) {
+            $hub_member = function_exists( 'gend_society_hub_member_context' ) ? gend_society_hub_member_context() : 0;
+            static $memo = array();
+            if ( ! array_key_exists( $hub_member, $memo ) ) {
+                $raw = $hub_member > 0 ? false : get_transient( 'gend_society_gas_payload' );
+                if ( ! is_array( $raw ) ) {
+                    $raw = gend_society_remote_membership_call( 'gas', array(), 'GET' );
+                    if ( is_wp_error( $raw ) || ! is_array( $raw ) ) {
+                        $raw = null;
+                    } elseif ( $hub_member <= 0 ) {
+                        set_transient( 'gend_society_gas_payload', $raw, 5 * MINUTE_IN_SECONDS );
+                    }
+                }
+                $memo[ $hub_member ] = array( 'state' => is_array( $raw ) ? 'ok' : 'unreachable', 'payload' => $raw );
+            }
+            return $memo[ $hub_member ];
+        }
         return gend_society_dashboard_standalone_route( 'gas', GEND_SOCIETY_DASHBOARD_GAS_CACHE_OPTION );
+    }
+}
+
+if ( ! function_exists( 'gend_society_gas_from_hub' ) ) {
+    /**
+     * Whether this dashboard's Compute Gas figures come from gend.me's GET /install/{id}/gas: on a standalone install, a
+     * hosted web app, and gend.me's membership page for one - everywhere except gend.me's own sites (local ledger).
+     */
+    function gend_society_gas_from_hub(): bool {
+        if ( function_exists( 'gend_society_hub_member_context' ) && gend_society_hub_member_context() > 0 ) {
+            return true;
+        }
+        if ( function_exists( 'gend_society_dashboard_is_standalone' ) && gend_society_dashboard_is_standalone() ) {
+            return true;
+        }
+        return ! ( function_exists( 'gend_society_oauth_is_hub_site' ) && gend_society_oauth_is_hub_site() );
     }
 }
 
