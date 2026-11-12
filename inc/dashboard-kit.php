@@ -91,7 +91,8 @@ function gend_society_dk_current() {
 	global $pagenow;
 	foreach ( gend_society_dk_screens() as $k => $s ) {
 		if ( '' !== $s['page'] && ( $page === $s['page'] || in_array( $page, isset( $s['alt'] ) ? $s['alt'] : array(), true ) ) ) {
-			$key = $k;
+			// Theme Builder (the Design Studio app) keeps its own layout: no shared header there (owner, 2026-11-12).
+			$key = 'wireframe' === $k ? '' : $k;
 			break;
 		}
 		if ( 'home' === $k && 'index.php' === $pagenow && '' === $page ) {

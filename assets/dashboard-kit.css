@@ -202,3 +202,147 @@ html body.gdk-on #wpbody-content .gdk-head .gdk-works a { background: rgba(255, 
 html body.gdk-on #wpbody-content .gdk-head a.gdk-btn { background: rgba(255, 255, 255, .06) !important; }
 html body.gdk-on #wpbody-content .gdk-head a.gdk-btn--primary { background: linear-gradient(135deg, var(--gdk-cyan), #7dd3fc) !important; }
 html body.gdk-on #wpbody-content .gdk-head .gdk-kicker { background: none !important; }
+
+/* ═══ Tab content polish (review 2026-11-12) ═══ */
+/* Store Management › Orders: filters fit their grid columns; customer name / email / user stack. */
+html body.gdk-store .gdc-orders-toolbar-row--filters .gdc-orders-filter-group { min-width: 0; }
+html body.gdk-store .gdc-orders-toolbar-row--filters select,
+html body.gdk-store .gdc-orders-toolbar-row--filters .nice-select,
+html body.gdk-store .gdc-orders-toolbar-row--filters input { width: 100% !important; max-width: 100% !important; min-width: 0 !important; box-sizing: border-box !important; }
+html body.gdk-store .gdc-order-customer { display: flex; flex-direction: column; gap: 2px; }
+html body.gdk-store .gdc-order-customer-name { color: #f1f5f9; font-weight: 600; }
+html body.gdk-store .gdc-order-customer-email { font-size: 12px; color: #9aa6b5; word-break: break-all; }
+html body.gdk-store .gdc-order-customer-id { font-size: 11px; color: #6b7685; }
+
+/* Every dashboard: dark form fields (the admin skin forces white text inputs). Theme Builder styles its own. */
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=text],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=search],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=email],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=url],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=number],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=password],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=tel],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input[type=date],
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content textarea,
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content select {
+  background-color: rgba(15, 23, 42, .85) !important; color: #f1f5f9 !important;
+  border: 1px solid rgba(255, 255, 255, .14) !important; border-radius: 10px !important; box-shadow: none !important;
+}
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input:focus,
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content textarea:focus,
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content select:focus {
+  outline: none !important; border-color: color-mix(in srgb, var(--gdk-mag) 65%, transparent) !important;
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gdk-mag) 18%, transparent) !important;
+}
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content input::placeholder,
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content textarea::placeholder { color: #7c8796 !important; opacity: 1; }
+html body.gdk-on:not(.gdk-wireframe) #wpbody-content select option { background: #0f172a; color: #f1f5f9; }
+
+/* Second-level tabs: one compact segmented style (Talk Flows › Email: Inbox, Lists, Onboarding Emails…). */
+html body.gdk-email .gdc-subtabs {
+  display: flex !important; flex-wrap: wrap !important; gap: 4px !important; width: fit-content; max-width: 100%;
+  margin: 0 0 18px !important; padding: 5px !important; border-radius: 13px !important; border: 1px solid rgba(255, 255, 255, .08) !important;
+  background: rgba(11, 14, 20, .6) !important;
+}
+html body.gdk-email .gdc-subtabs > .gdc-subtab {
+  margin: 0 !important; padding: 7px 13px !important; border-radius: 9px !important; border: 0 !important; box-shadow: none !important;
+  font: 600 12.5px/1.2 var(--gdk-fb) !important; letter-spacing: 0 !important; text-transform: none !important;
+  color: #aab4bf !important; background: transparent !important; cursor: pointer;
+}
+html body.gdk-email .gdc-subtabs > .gdc-subtab:hover { color: #fff !important; background: rgba(255, 255, 255, .06) !important; }
+html body.gdk-email .gdc-subtabs > .gdc-subtab.active { color: #fff !important; background: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14) !important; }
+html body.gdk-email .gdc-subtabs > .gdc-subtab::after { display: none !important; }
+
+/* Content Campaigns › Pages: the status column had no right padding. */
+html body.gdk-blog .gdc-pages-table th:last-child, html body.gdk-blog .gdc-pages-table td:last-child { padding-right: 18px !important; }
+
+/* Sales Team: the per-tab heroes shrink to a title + one line, and the decorative "HUD" bars (fixed numbers, not data) go. */
+html body.gdk-sales .performance-hud, html body.gdk-sales .mgmt-action-grid,
+html body.gdk-sales .workflow-tracker, html body.gdk-sales .admin-utility-bar { display: none !important; }
+html body.gdk-sales .proposal-hub-engine, html body.gdk-sales .member-mgmt-engine {
+  display: block !important; min-height: 0 !important; margin: 0 0 18px !important; padding: 22px 26px !important; border-radius: 18px !important;
+}
+html body.gdk-sales .prop-title, html body.gdk-sales .mgmt-title { margin: 6px 0 8px !important; font-size: 22px !important; line-height: 1.2 !important; }
+html body.gdk-sales .prop-description, html body.gdk-sales .mgmt-description { margin: 0 !important; max-width: 780px; font-size: 14px !important; line-height: 1.6 !important; }
+
+/* Project Management › Retainers / Execution / Account Manager Contracts: full width like the other tabs, readable notes. */
+html body.gdk-projects .stc-wrap { max-width: none !important; }
+html body.gdk-projects .stc-section > p, html body.gdk-projects .stc-section .stc-help, html body.gdk-projects .stc-section .description { color: #aab4bf !important; }
+
+/* Tab bars: a little tighter so 8 tabs fit one row on a laptop screen. */
+html body.gdk-on .gdc-tabs > .gdc-tab, html body.gdk-on .gs-tabs > .gs-tab, html body.gdk-on .psoo-pm-tabs > .psoo-pm-tab, html body.gdk-on .gdc-tabs--pills > .gdc-sub-tab { padding: 8px 12px !important; font-size: 13px !important; }
+
+/* ═══ Sticky tab bars + phone/tablet (2026-11-12) ═══ */
+/* Every dashboard's main tab bar sticks just below the gend.me header (Store Management used WordPress's 32px admin-bar
+   offset, so it slid under the 59px header). */
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs,
+html body.gdk-email .gdc-tabs.gdc-tabs--pills,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs,
+html body.gdk-projects .psoo-pm-tabs,
+html body.gdk-social .sn-hero-footer > .gdc-tabs,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs {
+  position: sticky !important; top: calc(var(--gs-header-h, 56px) + 10px) !important; z-index: 60 !important;
+  background: rgba(11, 14, 20, .92) !important;
+}
+
+/* Phones: the header compacts; tab bars become one scrolling row with their labels. */
+@media (max-width: 782px) {
+  html body.gdk-on .gdk-head { gap: 16px; }
+  html body.gdk-on .gdk-head h1.gdk-title { font-size: 26px !important; }
+  html body.gdk-on .gdk-head .gdk-lead { font-size: 13.5px !important; margin-bottom: 14px !important; }
+  html body.gdk-on .gdk-head .gdk-works { flex-wrap: nowrap; overflow-x: auto; margin-top: 14px !important; padding: 12px 0 2px; scrollbar-width: none; }
+  html body.gdk-on .gdk-head .gdk-works::-webkit-scrollbar { display: none; }
+  html body.gdk-on .gdk-head .gdk-works a { flex: 0 0 auto; }
+  html body.gdk-on .gdk-stats, html body.gdk-on .gdk-stats--3, html body.gdk-on .gdk-stats--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  html body.gdk-on .gdk-stats--3 .gdk-stat:first-child { grid-column: 1 / -1; }
+  html body.gdk-on .gdk-stat { padding: 12px 14px; }
+  html body.gdk-on .gdk-stat b { font-size: 20px; }
+  html body.gdk-on .gdk-stat small { display: none; }
+
+  html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs,
+  html body.gdk-email .gdc-tabs.gdc-tabs--pills,
+  html body.gdk-store .gdc-tabs.gdc-hub-tabs,
+  html body.gdk-sales .sales-page-tabs-wrap .gs-tabs,
+  html body.gdk-projects .psoo-pm-tabs,
+  html body.gdk-social .sn-hero-footer > .gdc-tabs,
+  html body.gdk-rewards .sn-hero-content > .gdc-tabs {
+    flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; max-width: 100% !important;
+    margin-right: 0 !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+  }
+  html body.gdk-on .gdc-tabs::-webkit-scrollbar, html body.gdk-on .gs-tabs::-webkit-scrollbar, html body.gdk-on .psoo-pm-tabs::-webkit-scrollbar { display: none; }
+  html body.gdk-on .gdc-tabs > *, html body.gdk-on .gs-tabs > *, html body.gdk-on .psoo-pm-tabs > * { flex: 0 0 auto !important; scroll-snap-align: start; white-space: nowrap !important; }
+  html body.gdk-store .gdc-hub-tabs .gdc-hub-tab__label { display: inline !important; }
+  html body.gdk-email .gdc-subtabs { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; }
+  html body.gdk-email .gdc-subtabs > .gdc-subtab { flex: 0 0 auto; white-space: nowrap; }
+  /* wide tables scroll inside their card instead of pushing the page sideways */
+  html body.gdk-on #wpbody-content table { max-width: 100%; }
+  html body.gdk-on #wpbody-content .gdc-table-wrap, html body.gdk-on #wpbody-content .psoo-v13-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+}
+/* Tablets and phones: tables inside a scrolling wrapper keep a readable width (fixed-layout tables squeezed their
+   headers into vertical letters) and their headers stay on one line. */
+@media (max-width: 1100px) {
+  html body.gdk-on #wpbody-content .gdc-table-wrap > table,
+  html body.gdk-on #wpbody-content .psoo-v13-table-wrap > table { table-layout: auto !important; min-width: 720px; }
+  html body.gdk-on #wpbody-content .gdc-table-wrap th,
+  html body.gdk-on #wpbody-content .psoo-v13-table-wrap th { white-space: nowrap !important; }
+}
+/* Phones: the elements that pushed pages sideways (phone scan 2026-11-12). */
+@media (max-width: 782px) {
+  html body.gdk-email .em-inbox-mobile-pickers { flex-wrap: wrap !important; }
+  html body.gdk-email .em-inbox-mobile-pickers select, html body.gdk-email .em-inbox-mobile-pick { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  html body.gdk-sales .stp-header-flex { flex-wrap: wrap !important; gap: 12px !important; }
+  html body.gdk-sales .stp-glass-tabs { flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100% !important; scrollbar-width: none; }
+  html body.gdk-sales .stp-glass-tabs > * { flex: 0 0 auto !important; white-space: nowrap; }
+  html body.gdk-sales .proposal-hub-engine, html body.gdk-sales .member-mgmt-engine { padding: 18px 16px !important; }
+  html body.gdk-social #wpbody-content .sn-hero-section { width: auto !important; max-width: 100% !important; box-sizing: border-box !important; }
+}
+@media (max-width: 782px) {
+  html body.gdk-rewards #wpbody-content .rp-hero-section .sn-hero-content,
+  html body.gdk-social #wpbody-content .sn-hero-section .sn-hero-footer { min-width: 0 !important; width: 100% !important; max-width: 100% !important; }
+  html body.gdk-rewards #wpbody-content .rp-hero-section, html body.gdk-social #wpbody-content .sn-hero-section { min-width: 0 !important; }
+  html body.gdk-home .gs-settings-form-row { display: block !important; }
+  html body.gdk-home .gs-settings-form-row > * { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  html body.gdk-home .gs-settings-input-group { width: 100% !important; max-width: 100% !important; min-width: 0 !important; margin-top: 6px; }
+  html body.gdk-home .gs-settings-input-group input, html body.gdk-home .gs-settings-input-group select { width: 100% !important; max-width: 100% !important; }
+}
