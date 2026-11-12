@@ -205,7 +205,10 @@ function gend_society_dk_stats( $key ) {
 			break;
 		case 'store':
 			$st = function_exists( 'gdc_hub_get_stats' ) ? gdc_hub_get_stats() : array();
-			$add( isset( $st['products'] ) ? $st['products'] : gend_society_dk_count_posts( 'product' ), __( 'Live products', 'gend-society' ), ! empty( $st['drafts'] ) ? sprintf( _n( '%s draft', '%s drafts', (int) $st['drafts'], 'gend-society' ), number_format_i18n( (int) $st['drafts'] ) ) : '' );
+			$drafts = ! empty( $st['drafts'] ) ? (int) $st['drafts'] : 0;
+			/* translators: %s: number of draft products */
+			$drafts_txt = $drafts ? sprintf( _n( '%s draft', '%s drafts', $drafts, 'gend-society' ), number_format_i18n( $drafts ) ) : '';
+			$add( isset( $st['products'] ) ? $st['products'] : gend_society_dk_count_posts( 'product' ), __( 'Live products', 'gend-society' ), $drafts_txt );
 			$add( isset( $st['fulfil'] ) ? $st['fulfil'] : $fulfil(), __( 'Orders to fulfil', 'gend-society' ), __( 'Processing + on hold', 'gend-society' ) );
 			if ( isset( $st['categories'] ) ) {
 				$add( (int) $st['categories'] + (int) $st['tags'], __( 'Catalog terms', 'gend-society' ), __( 'Categories and tags', 'gend-society' ) );
@@ -279,8 +282,7 @@ add_action( 'admin_enqueue_scripts', function () {
 	if ( ! gend_society_dk_current() ) {
 		return;
 	}
-	$f = GEND_SOCIETY_DIR . 'assets/dashboard-kit.css';
-	wp_enqueue_style( 'gend-society-dashboard-kit', GEND_SOCIETY_URL . 'assets/dashboard-kit.css', array(), file_exists( $f ) ? (string) filemtime( $f ) : GEND_SOCIETY_VERSION );
+	wp_enqueue_style( 'gend-society-dashboard-kit', GEND_SOCIETY_URL . 'assets/dashboard-kit.css', array(), GEND_SOCIETY_VERSION );
 }, 99 );
 
 add_action( 'all_admin_notices', 'gend_society_dk_render', 0 );
