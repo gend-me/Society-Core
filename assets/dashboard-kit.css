@@ -1,0 +1,204 @@
+/* gend.me Dashboard Kit (2026-11-12): one header + one tab style across every gend.me dashboard.
+   Scoped to body.gdk-on.gdk-<key> (inc/dashboard-kit.php). Rules use html body + !important where a dashboard's own
+   CSS (printed later or with !important) would otherwise win. */
+
+body.gdk-on {
+  --gdk-mag: var(--wp--preset--color--brand-primary, #b608c9);
+  --gdk-vio: var(--wp--preset--color--brand-highlight, #e06bff);
+  --gdk-blue: var(--wp--preset--color--brand-secondary, #6ec1e4);
+  --gdk-cyan: #22d3ee;
+  --gdk-green: var(--wp--preset--color--brand-success, #00ff88);
+  --gdk-text: #f1f5f9;
+  --gdk-mute: #9aa6b5;
+  --gdk-line: rgba(255, 255, 255, .09);
+  --gdk-fb: var(--gs-font-body, Inter, system-ui, sans-serif);
+  --gdk-fm: var(--gs-font-mono, 'JetBrains Mono', ui-monospace, monospace);
+}
+
+/* ── Header ─────────────────────────────────────────── */
+html body.gdk-on .gdk-head {
+  position: relative; isolation: isolate; overflow: hidden; box-sizing: border-box;
+  display: grid; grid-template-columns: minmax(0, 1fr) minmax(280px, 460px); gap: 28px; align-items: center;
+  margin: 18px 20px 18px 0; padding: 30px 32px; border-radius: 24px;
+  border: 1px solid var(--gdk-line);
+  background:
+    radial-gradient(640px 300px at 0% 0%, color-mix(in srgb, var(--gdk-mag) 22%, transparent), transparent 70%),
+    radial-gradient(520px 280px at 100% 100%, color-mix(in srgb, var(--gdk-blue) 14%, transparent), transparent 70%),
+    rgba(11, 14, 20, .78);
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .05);
+  -webkit-backdrop-filter: blur(14px) saturate(140%); backdrop-filter: blur(14px) saturate(140%);
+  color: var(--gdk-text); font-family: var(--gdk-fb); text-align: left;
+}
+html body.gdk-on .gdk-head *, html body.gdk-on .gdk-head *::before { box-sizing: border-box; }
+html body.gdk-on .gdk-head--nostats { grid-template-columns: minmax(0, 1fr); }
+html body.gdk-on .gdk-head .gdk-ic { width: 15px; height: 15px; flex: 0 0 auto; vertical-align: -2px; }
+
+html body.gdk-on .gdk-kicker {
+  display: inline-flex; align-items: center; gap: 8px; margin: 0 0 12px; padding: 0; background: none !important;
+  font: 700 11px/1.2 var(--gdk-fm); letter-spacing: .18em; text-transform: uppercase; color: var(--gdk-cyan);
+}
+html body.gdk-on .gdk-kicker::before { content: ''; width: 22px; height: 2px; border-radius: 2px; background: linear-gradient(90deg, var(--gdk-mag), var(--gdk-cyan)); }
+html body.gdk-on .gdk-kicker i { font-style: normal; color: rgba(255, 255, 255, .35); }
+html body.gdk-on .gdk-head h1.gdk-title {
+  margin: 0 0 10px !important; padding: 0 !important; display: block !important; background: none !important;
+  font: 800 clamp(28px, 3vw, 40px)/1.05 var(--gdk-fb) !important; letter-spacing: -.02em !important; text-transform: none !important;
+  color: #fff !important; text-shadow: none !important; border: 0 !important;
+}
+html body.gdk-on .gdk-head .gdk-lead { margin: 0 0 18px !important; max-width: 640px; font-size: 14.5px !important; line-height: 1.6 !important; color: #c3cbd6 !important; }
+
+html body.gdk-on .gdk-actions { display: flex; flex-wrap: wrap; align-items: center; gap: 10px; }
+html body.gdk-on .gdk-head a.gdk-btn {
+  display: inline-flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 18px; border-radius: 12px;
+  font: 700 13px/1 var(--gdk-fb); letter-spacing: .01em; text-decoration: none !important; box-shadow: none;
+  color: #e2e8f0 !important; background: rgba(255, 255, 255, .06); border: 1px solid rgba(255, 255, 255, .14);
+  transition: transform .15s ease, background .2s ease, border-color .2s ease, box-shadow .2s ease;
+}
+html body.gdk-on .gdk-head a.gdk-btn:hover { transform: translateY(-1px); background: rgba(255, 255, 255, .1); border-color: rgba(255, 255, 255, .24); }
+html body.gdk-on .gdk-head a.gdk-btn--primary {
+  color: #05070a !important; border-color: transparent; background: linear-gradient(135deg, var(--gdk-cyan), #7dd3fc);
+  box-shadow: 0 10px 26px color-mix(in srgb, var(--gdk-cyan) 30%, transparent);
+}
+html body.gdk-on .gdk-head a.gdk-btn--primary:hover { background: linear-gradient(135deg, #67e8f9, #bae6fd); }
+html body.gdk-on .gdk-head a.gdk-about { display: inline-flex; align-items: center; gap: 6px; margin-left: 4px; font: 600 13px/1 var(--gdk-fb); color: var(--gdk-blue) !important; text-decoration: none !important; }
+html body.gdk-on .gdk-head a.gdk-about:hover { color: #fff !important; }
+
+html body.gdk-on .gdk-head .gdk-works { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 18px 0 0 !important; padding-top: 16px; border-top: 1px dashed rgba(255, 255, 255, .1); font-size: 12.5px; }
+html body.gdk-on .gdk-works > span { display: inline-flex; align-items: center; gap: 6px; margin-right: 4px; font: 700 10.5px/1 var(--gdk-fm); letter-spacing: .14em; text-transform: uppercase; color: var(--gdk-mute); }
+html body.gdk-on .gdk-head .gdk-works a {
+  display: inline-flex; align-items: center; gap: 6px; padding: 6px 12px; border-radius: 999px; text-decoration: none !important;
+  font: 600 12.5px/1 var(--gdk-fb); color: #e2e8f0 !important; background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .1);
+  transition: border-color .2s ease, background .2s ease, color .2s ease;
+}
+html body.gdk-on .gdk-head .gdk-works a .gdk-ic { width: 13px; height: 13px; opacity: .6; transition: transform .2s ease, opacity .2s ease; }
+html body.gdk-on .gdk-head .gdk-works a:hover { color: #fff !important; border-color: color-mix(in srgb, var(--gdk-mag) 55%, transparent); background: color-mix(in srgb, var(--gdk-mag) 14%, transparent); }
+html body.gdk-on .gdk-head .gdk-works a:hover .gdk-ic { opacity: 1; transform: translateX(3px); }
+
+html body.gdk-on .gdk-stats { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; }
+html body.gdk-on .gdk-stats--1 { grid-template-columns: minmax(0, 1fr); }
+html body.gdk-on .gdk-stats--3 .gdk-stat:first-child { grid-column: 1 / -1; }
+html body.gdk-on .gdk-stat {
+  display: grid; gap: 3px; padding: 16px 18px; border-radius: 16px; min-width: 0;
+  background: rgba(255, 255, 255, .04); border: 1px solid rgba(255, 255, 255, .08);
+}
+html body.gdk-on .gdk-stat b { font: 800 26px/1.1 var(--gdk-fb); color: #fff; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+html body.gdk-on .gdk-stat span { font: 700 10.5px/1.3 var(--gdk-fm); letter-spacing: .12em; text-transform: uppercase; color: var(--gdk-cyan); }
+html body.gdk-on .gdk-stat small { font-size: 12px; line-height: 1.35; color: var(--gdk-mute); }
+
+@media (max-width: 1100px) {
+  html body.gdk-on .gdk-head { grid-template-columns: minmax(0, 1fr); }
+  html body.gdk-on .gdk-stats { grid-template-columns: repeat(4, minmax(0, 1fr)); }
+  html body.gdk-on .gdk-stats--3 .gdk-stat:first-child { grid-column: auto; }
+}
+@media (max-width: 782px) {
+  html body.gdk-on .gdk-head { margin: 12px 10px 14px 0; padding: 22px 18px; border-radius: 18px; }
+  html body.gdk-on .gdk-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+/* ── Old heroes give way to the shared header (their tabs stay) ── */
+html body.gdk-blog .blog-manager-hero,
+html body.gdk-email .email-dashboard-intro,
+html body.gdk-store .gdc-hub-hero,
+html body.gdk-sales .sales-header-engine,
+html body.gdk-projects .pm-hero-section,
+html body.gdk-membership .gend-cp-dash-bar { display: none !important; }
+/* Member Management + Point Bank keep their tab bar inside the hero: drop everything else. */
+html body.gdk-social .sn-hero-section > .sn-bg-layer,
+html body.gdk-social .sn-hero-section > .sn-vignette,
+html body.gdk-social .sn-hero-section > .sn-console-box,
+html body.gdk-rewards .rp-hero-section .sn-bg-layer,
+html body.gdk-rewards .rp-hero-section .sn-kicker,
+html body.gdk-rewards .rp-hero-section .sn-main-title,
+html body.gdk-rewards .rp-hero-section .sn-console-box { display: none !important; }
+html body.gdk-social .sn-hero-section,
+html body.gdk-rewards .rp-hero-section,
+html body.gdk-social .sn-hero-section .sn-hero-footer,
+html body.gdk-rewards .rp-hero-section .sn-hero-content {
+  min-height: 0 !important; height: auto !important; margin: 0 !important; padding: 0 !important; border: 0 !important;
+  background: none !important; box-shadow: none !important; overflow: visible !important; -webkit-backdrop-filter: none !important; backdrop-filter: none !important;
+}
+
+/* ── One tab bar style ─────────────────────────────── */
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs,
+html body.gdk-email .gdc-tabs.gdc-tabs--pills,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs,
+html body.gdk-projects .psoo-pm-tabs,
+html body.gdk-social .sn-hero-footer > .gdc-tabs,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs {
+  display: flex !important; flex-wrap: wrap !important; justify-content: flex-start !important; align-items: center !important;
+  gap: 6px !important; width: auto !important; max-width: calc(100% - 20px) !important; box-sizing: border-box !important;
+  margin: 0 20px 20px 0 !important; padding: 6px !important; border-radius: 16px !important;
+  background: rgba(11, 14, 20, .78) !important; border: 1px solid rgba(255, 255, 255, .09) !important; border-bottom: 1px solid rgba(255, 255, 255, .09) !important;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, .3) !important; -webkit-backdrop-filter: blur(12px); backdrop-filter: blur(12px);
+}
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs > .gdc-tab,
+html body.gdk-email .gdc-tabs.gdc-tabs--pills > .gdc-sub-tab,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs > .gdc-tab,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs > .gs-tab,
+html body.gdk-projects .psoo-pm-tabs > .psoo-pm-tab,
+html body.gdk-social .sn-hero-footer > .gdc-tabs > .gdc-tab,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs > .gdc-tab {
+  display: inline-flex !important; align-items: center !important; gap: 8px !important; flex: 0 0 auto !important;
+  min-height: 40px !important; height: auto !important; margin: 0 !important; padding: 9px 15px !important; border-radius: 11px !important;
+  font: 600 13.5px/1.1 var(--gdk-fb) !important; letter-spacing: 0 !important; text-transform: none !important; text-decoration: none !important;
+  color: #cbd5e1 !important; background: transparent !important; border: 1px solid transparent !important; box-shadow: none !important; transform: none !important;
+  cursor: pointer; transition: color .18s ease, background .18s ease, border-color .18s ease !important;
+}
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs > .gdc-tab:hover,
+html body.gdk-email .gdc-tabs.gdc-tabs--pills > .gdc-sub-tab:hover,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs > .gdc-tab:hover,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs > .gs-tab:hover,
+html body.gdk-projects .psoo-pm-tabs > .psoo-pm-tab:hover,
+html body.gdk-social .sn-hero-footer > .gdc-tabs > .gdc-tab:hover,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs > .gdc-tab:hover { color: #fff !important; background: rgba(255, 255, 255, .06) !important; border-color: rgba(255, 255, 255, .1) !important; }
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs > .gdc-tab.active,
+html body.gdk-email .gdc-tabs.gdc-tabs--pills > .gdc-sub-tab.active,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs > .gdc-tab.active,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs > .gs-tab.active,
+html body.gdk-projects .psoo-pm-tabs > .psoo-pm-tab--active,
+html body.gdk-social .sn-hero-footer > .gdc-tabs > .gdc-tab.active,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs > .gdc-tab.active {
+  color: #fff !important; border-color: color-mix(in srgb, var(--gdk-mag) 55%, transparent) !important;
+  background: linear-gradient(135deg, color-mix(in srgb, var(--gdk-mag) 60%, #1a1030), color-mix(in srgb, #3b82f6 48%, #0d1428)) !important;
+  box-shadow: 0 8px 22px color-mix(in srgb, var(--gdk-mag) 28%, transparent), inset 0 1px 0 rgba(255, 255, 255, .16) !important;
+}
+/* icons inside tabs follow the text colour; underline/indicator pseudo-elements are not needed in a pill bar */
+html body.gdk-on .gdc-tab svg, html body.gdk-on .gs-tab svg, html body.gdk-on .psoo-pm-tab svg, html body.gdk-on .gdc-sub-tab svg { color: currentColor; opacity: .9; }
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs > .gdc-tab::after,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs > .gdc-tab::after,
+html body.gdk-projects .psoo-pm-tabs > .psoo-pm-tab::after,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs > .gs-tab::after,
+html body.gdk-social .sn-hero-footer > .gdc-tabs > .gdc-tab::after,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs > .gdc-tab::after { display: none !important; }
+
+@media (max-width: 782px) {
+  html body.gdk-on .gdc-tabs, html body.gdk-on .gs-tabs, html body.gdk-on .psoo-pm-tabs { flex-wrap: nowrap !important; overflow-x: auto !important; max-width: calc(100% - 10px) !important; margin-right: 10px !important; }
+}
+
+/* Header moved inside the dashboard's own wrapper (inline script in dashboard-kit.php). */
+html body.gdk-on .gdk-head.is-in { margin: 0 0 18px; }
+/* Theme Builder: leave room for the studio's right-hand tool rail. */
+html body.gdk-wireframe .gdk-head { margin-right: 84px; }
+/* Point Bank / Member Management heroes: stronger reset (their own rules carry ids + !important). */
+html body.gdk-rewards #wpbody-content .rp-hero-section,
+html body.gdk-rewards #wpbody-content .rp-hero-section .sn-hero-content,
+html body.gdk-social #wpbody-content .sn-hero-section,
+html body.gdk-social #wpbody-content .sn-hero-section .sn-hero-footer {
+  min-height: 0 !important; margin: 0 !important; padding: 0 !important; border: 0 !important; background: none !important; box-shadow: none !important;
+}
+html body.gdk-rewards #wpbody-content .rp-hero-section::before, html body.gdk-rewards #wpbody-content .rp-hero-section::after,
+html body.gdk-social #wpbody-content .sn-hero-section::before, html body.gdk-social #wpbody-content .sn-hero-section::after { display: none !important; }
+/* Some dashboards reset every div background inside their wrapper (Member Management): the kit's fills win. */
+html body.gdk-on #wpbody-content .gdk-head {
+  background:
+    radial-gradient(640px 300px at 0% 0%, color-mix(in srgb, var(--gdk-mag) 22%, transparent), transparent 70%),
+    radial-gradient(520px 280px at 100% 100%, color-mix(in srgb, var(--gdk-blue) 14%, transparent), transparent 70%),
+    rgba(11, 14, 20, .78) !important;
+  box-shadow: 0 24px 60px rgba(0, 0, 0, .35), inset 0 1px 0 rgba(255, 255, 255, .05) !important;
+  border: 1px solid var(--gdk-line) !important; border-radius: 24px !important;
+}
+html body.gdk-on #wpbody-content .gdk-head .gdk-stat { background: rgba(255, 255, 255, .04) !important; border: 1px solid rgba(255, 255, 255, .08) !important; border-radius: 16px !important; }
+html body.gdk-on #wpbody-content .gdk-head .gdk-works a { background: rgba(255, 255, 255, .04) !important; }
+html body.gdk-on #wpbody-content .gdk-head a.gdk-btn { background: rgba(255, 255, 255, .06) !important; }
+html body.gdk-on #wpbody-content .gdk-head a.gdk-btn--primary { background: linear-gradient(135deg, var(--gdk-cyan), #7dd3fc) !important; }
+html body.gdk-on #wpbody-content .gdk-head .gdk-kicker { background: none !important; }

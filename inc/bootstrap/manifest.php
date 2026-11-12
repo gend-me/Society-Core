@@ -267,6 +267,12 @@ return array(
 			'needs' => array( 'skin' ),
 		),
 		array(
+			'file'  => 'inc/dashboard-kit.php',
+			'tier'  => 'customer',
+			'needs' => array( 'skin' ),
+			'note'  => '2026-11-12: shared header + tab style for every gend.me dashboard; uses feature-cards.php definitions.',
+		),
+		array(
 			'file'  => 'inc/pages/dashboard.php',
 			'tier'  => 'customer',
 			'needs' => array( 'skin' ),
