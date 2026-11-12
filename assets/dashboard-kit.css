@@ -271,3 +271,78 @@ html body.gdk-projects .stc-section > p, html body.gdk-projects .stc-section .st
 
 /* Tab bars: a little tighter so 8 tabs fit one row on a laptop screen. */
 html body.gdk-on .gdc-tabs > .gdc-tab, html body.gdk-on .gs-tabs > .gs-tab, html body.gdk-on .psoo-pm-tabs > .psoo-pm-tab, html body.gdk-on .gdc-tabs--pills > .gdc-sub-tab { padding: 8px 12px !important; font-size: 13px !important; }
+
+/* ═══ Sticky tab bars + phone/tablet (2026-11-12) ═══ */
+/* Every dashboard's main tab bar sticks just below the gend.me header (Store Management used WordPress's 32px admin-bar
+   offset, so it slid under the 59px header). */
+html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs,
+html body.gdk-email .gdc-tabs.gdc-tabs--pills,
+html body.gdk-store .gdc-tabs.gdc-hub-tabs,
+html body.gdk-sales .sales-page-tabs-wrap .gs-tabs,
+html body.gdk-projects .psoo-pm-tabs,
+html body.gdk-social .sn-hero-footer > .gdc-tabs,
+html body.gdk-rewards .sn-hero-content > .gdc-tabs {
+  position: sticky !important; top: calc(var(--gs-header-h, 56px) + 10px) !important; z-index: 60 !important;
+  background: rgba(11, 14, 20, .92) !important;
+}
+
+/* Phones: the header compacts; tab bars become one scrolling row with their labels. */
+@media (max-width: 782px) {
+  html body.gdk-on .gdk-head { gap: 16px; }
+  html body.gdk-on .gdk-head h1.gdk-title { font-size: 26px !important; }
+  html body.gdk-on .gdk-head .gdk-lead { font-size: 13.5px !important; margin-bottom: 14px !important; }
+  html body.gdk-on .gdk-head .gdk-works { flex-wrap: nowrap; overflow-x: auto; margin-top: 14px !important; padding: 12px 0 2px; scrollbar-width: none; }
+  html body.gdk-on .gdk-head .gdk-works::-webkit-scrollbar { display: none; }
+  html body.gdk-on .gdk-head .gdk-works a { flex: 0 0 auto; }
+  html body.gdk-on .gdk-stats, html body.gdk-on .gdk-stats--3, html body.gdk-on .gdk-stats--4 { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px; }
+  html body.gdk-on .gdk-stats--3 .gdk-stat:first-child { grid-column: 1 / -1; }
+  html body.gdk-on .gdk-stat { padding: 12px 14px; }
+  html body.gdk-on .gdk-stat b { font-size: 20px; }
+  html body.gdk-on .gdk-stat small { display: none; }
+
+  html body.gdk-blog .gdc-admin-dashboard > .gdc-tabs,
+  html body.gdk-email .gdc-tabs.gdc-tabs--pills,
+  html body.gdk-store .gdc-tabs.gdc-hub-tabs,
+  html body.gdk-sales .sales-page-tabs-wrap .gs-tabs,
+  html body.gdk-projects .psoo-pm-tabs,
+  html body.gdk-social .sn-hero-footer > .gdc-tabs,
+  html body.gdk-rewards .sn-hero-content > .gdc-tabs {
+    flex-wrap: nowrap !important; overflow-x: auto !important; overflow-y: hidden !important; max-width: 100% !important;
+    margin-right: 0 !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; scroll-snap-type: x proximity;
+  }
+  html body.gdk-on .gdc-tabs::-webkit-scrollbar, html body.gdk-on .gs-tabs::-webkit-scrollbar, html body.gdk-on .psoo-pm-tabs::-webkit-scrollbar { display: none; }
+  html body.gdk-on .gdc-tabs > *, html body.gdk-on .gs-tabs > *, html body.gdk-on .psoo-pm-tabs > * { flex: 0 0 auto !important; scroll-snap-align: start; white-space: nowrap !important; }
+  html body.gdk-store .gdc-hub-tabs .gdc-hub-tab__label { display: inline !important; }
+  html body.gdk-email .gdc-subtabs { flex-wrap: nowrap !important; overflow-x: auto !important; scrollbar-width: none; }
+  html body.gdk-email .gdc-subtabs > .gdc-subtab { flex: 0 0 auto; white-space: nowrap; }
+  /* wide tables scroll inside their card instead of pushing the page sideways */
+  html body.gdk-on #wpbody-content table { max-width: 100%; }
+  html body.gdk-on #wpbody-content .gdc-table-wrap, html body.gdk-on #wpbody-content .psoo-v13-table-wrap { overflow-x: auto !important; -webkit-overflow-scrolling: touch; }
+}
+/* Tablets and phones: tables inside a scrolling wrapper keep a readable width (fixed-layout tables squeezed their
+   headers into vertical letters) and their headers stay on one line. */
+@media (max-width: 1100px) {
+  html body.gdk-on #wpbody-content .gdc-table-wrap > table,
+  html body.gdk-on #wpbody-content .psoo-v13-table-wrap > table { table-layout: auto !important; min-width: 720px; }
+  html body.gdk-on #wpbody-content .gdc-table-wrap th,
+  html body.gdk-on #wpbody-content .psoo-v13-table-wrap th { white-space: nowrap !important; }
+}
+/* Phones: the elements that pushed pages sideways (phone scan 2026-11-12). */
+@media (max-width: 782px) {
+  html body.gdk-email .em-inbox-mobile-pickers { flex-wrap: wrap !important; }
+  html body.gdk-email .em-inbox-mobile-pickers select, html body.gdk-email .em-inbox-mobile-pick { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  html body.gdk-sales .stp-header-flex { flex-wrap: wrap !important; gap: 12px !important; }
+  html body.gdk-sales .stp-glass-tabs { flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100% !important; scrollbar-width: none; }
+  html body.gdk-sales .stp-glass-tabs > * { flex: 0 0 auto !important; white-space: nowrap; }
+  html body.gdk-sales .proposal-hub-engine, html body.gdk-sales .member-mgmt-engine { padding: 18px 16px !important; }
+  html body.gdk-social #wpbody-content .sn-hero-section { width: auto !important; max-width: 100% !important; box-sizing: border-box !important; }
+}
+@media (max-width: 782px) {
+  html body.gdk-rewards #wpbody-content .rp-hero-section .sn-hero-content,
+  html body.gdk-social #wpbody-content .sn-hero-section .sn-hero-footer { min-width: 0 !important; width: 100% !important; max-width: 100% !important; }
+  html body.gdk-rewards #wpbody-content .rp-hero-section, html body.gdk-social #wpbody-content .sn-hero-section { min-width: 0 !important; }
+  html body.gdk-home .gs-settings-form-row { display: block !important; }
+  html body.gdk-home .gs-settings-form-row > * { width: 100% !important; max-width: 100% !important; min-width: 0 !important; }
+  html body.gdk-home .gs-settings-input-group { width: 100% !important; max-width: 100% !important; min-width: 0 !important; margin-top: 6px; }
+  html body.gdk-home .gs-settings-input-group input, html body.gdk-home .gs-settings-input-group select { width: 100% !important; max-width: 100% !important; }
+}
