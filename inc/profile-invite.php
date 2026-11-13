@@ -2430,7 +2430,7 @@ function gend_society_invite_ajax_frame() {
     echo '</head><body class="gs-invite-frame">';
     gend_society_invite_render_panel( $share, array( 'embedded' => ! empty( $_REQUEST['embedded'] ) ) );
     if ( is_admin() ) {
-        do_action( 'admin_print_footer_scripts' );
+        do_action( 'admin_print_footer_scripts' ); // phpcs:ignore WordPress.NamingConventions.PrefixAllGlobals.NonPrefixedHooknameFound -- WordPress core hook.
     } else {
         wp_print_footer_scripts();
     }
