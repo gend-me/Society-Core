@@ -403,6 +403,13 @@ function gend_society_chat_prune_threads_by_tab( $has_threads, $messages_templat
 	}
 	$viewer = (int) bp_displayed_user_id();
 
+	// 2026-11-13 (owner): the Members / Agents / Projects tabs are no longer
+	// shown, so without an explicit ?gs_chat_tab= the list shows EVERY
+	// conversation (agent chats included) instead of defaulting to Members.
+	if ( ! isset( $_GET['gs_chat_tab'] ) ) { // phpcs:ignore WordPress.Security.NonceVerification.Recommended -- read-only view switch.
+		return $has_threads;
+	}
+
 	$tab = gend_society_chat_active_tab();
 
 	if ( 'projects' === $tab ) {
@@ -657,8 +664,14 @@ function gend_society_chat_tabs_footer() {
 		'projects' => array_values( $gs_projects ),
 	);
 	$gs_chat_cfg_json = function_exists( 'wp_json_encode' ) ? wp_json_encode( $gs_chat_cfg ) : json_encode( $gs_chat_cfg );
+
+	// 2026-11-13 (owner): member Messages pages show only their content — the
+	// Members / Agents / Projects pill nav is off unless this filter returns
+	// true. Without the template the JS below never injects the nav.
+	$gs_show_nav = function_exists( 'apply_filters' ) ? (bool) apply_filters( 'gend_society_chat_tabs_nav', false ) : false;
 	?>
 	<script>window.GS_CHAT = <?php echo $gs_chat_cfg_json; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- JSON-encoded config. ?>;</script>
+	<?php if ( $gs_show_nav ) : ?>
 	<template id="gs-chat-tabs-template">
 	  <nav class="gs-chat-tabs" aria-label="<?php echo $esc_attr( __( 'Chat section', 'gend-society' ) ); ?>">
 		<?php foreach ( $tabs as $slug => $meta ) : ?>
@@ -701,6 +714,7 @@ function gend_society_chat_tabs_footer() {
 		</select>
 	  </form>
 	</template>
+	<?php endif; ?>
 	<?php /* Plan 43-01 (v8.2 redesign 2): the agent-create popup - a single
 		scrollable, futuristic "agent builder" dashboard (NO two-step group
 		picker, NO run-target multiselect pool). The agent belongs to a SINGLE
