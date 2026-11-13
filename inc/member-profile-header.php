@@ -426,7 +426,9 @@ function gend_society_topup_autocomplete( $status, $order_id, $order ) {
         if ( (int) get_post_meta( (int) ( $item->get_variation_id() ?: $pid ), '_aipa_token_package_amount', true ) > 0 ) {
             return 'completed';
         }
-        if ( 'aipa-credits' === $sku || 'gend-dgen-topup' === $sku || ( $extra_pid && $pid === $extra_pid ) ) {
+        // Extra credits may be a variation of the retainer product (sales-team 2026-11-13).
+        $vid = (int) $item->get_variation_id();
+        if ( 'aipa-credits' === $sku || 'gend-dgen-topup' === $sku || ( $extra_pid && ( $pid === $extra_pid || $vid === $extra_pid ) ) ) {
             return 'completed';
         }
     }
