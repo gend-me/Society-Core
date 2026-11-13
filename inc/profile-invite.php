@@ -383,12 +383,12 @@ function gend_society_invite_render_panel( $share = array(), $opts = array() ) {
                 <div class="gs-invite-import" role="group" aria-label="<?php esc_attr_e( 'Import contacts', 'gend-society' ); ?>">
                     <span class="gs-invite-import__lbl"><?php esc_html_e( 'Or import your list', 'gend-society' ); ?></span>
                     <div class="gs-invite-import__tiles">
-                        <label class="gs-invite-tile">
-                            <input type="file" accept=".csv" data-gs-csv hidden />
+                        <label class="gs-invite-tile" title="<?php esc_attr_e( 'Upload a contacts export from Outlook, Gmail, LinkedIn or any spreadsheet saved as CSV. In Outlook: Settings → People → Export contacts (or File → Open & Export → Import/Export → Export to a file → CSV).', 'gend-society' ); ?>">
+                            <input type="file" accept=".csv,text/csv" data-gs-csv hidden />
                             <span class="gs-invite-tile__ico" aria-hidden="true">&#128196;</span><span class="gs-invite-tile__t"><?php esc_html_e( 'CSV file', 'gend-society' ); ?></span>
                         </label>
                         <button type="button" class="gs-invite-tile" data-gs-oauth="google"><span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Google', 'gend-society' ); ?></span></button>
-                        <button type="button" class="gs-invite-tile" data-gs-oauth="microsoft"><span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="8" y="3.5" width="15" height="17" rx="2.2" fill="#28A8EA"/><path d="M8 8.2l7.5 5.1L23 8.2" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="1" y="6" width="12.5" height="12.5" rx="2.2" fill="#0364B8"/><ellipse cx="7.25" cy="12.25" rx="3" ry="3.6" fill="none" stroke="#fff" stroke-width="1.9"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Outlook', 'gend-society' ); ?></span></button>
+                        <button type="button" class="gs-invite-tile" data-gs-oauth="microsoft" title="<?php esc_attr_e( 'Works with personal Outlook.com, Hotmail and Live accounts. Using a work or school Microsoft 365 account? Export your contacts from Outlook as CSV and use CSV file.', 'gend-society' ); ?>"><span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="8" y="3.5" width="15" height="17" rx="2.2" fill="#28A8EA"/><path d="M8 8.2l7.5 5.1L23 8.2" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="1" y="6" width="12.5" height="12.5" rx="2.2" fill="#0364B8"/><ellipse cx="7.25" cy="12.25" rx="3" ry="3.6" fill="none" stroke="#fff" stroke-width="1.9"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Outlook', 'gend-society' ); ?></span></button>
                         <label class="gs-invite-tile" title="<?php esc_attr_e( 'Apple has no public Contacts API. Export Contacts.app via File → Export → Export vCard, then upload the .vcf here.', 'gend-society' ); ?>">
                             <input type="file" accept=".vcf,text/vcard" data-gs-vcf hidden />
                             <span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#111" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Apple (.vcf)', 'gend-society' ); ?></span>
@@ -1328,54 +1328,107 @@ function gend_society_invite_render_panel( $share = array(), $opts = array() ) {
             setStatus( '' );
         });
 
-        // CSV parser — assumes first row is headers OR a list of emails. Looks
-        // for an "email" column; falls back to scanning every cell. XLSX is
-        // accepted by the file picker but parsing it requires a library — we
-        // tell the user to convert to CSV for now.
+        // CSV import (2026-11-12) — reads contact exports from Outlook (classic + new/Outlook.com),
+        // Gmail / Google Contacts, LinkedIn, Apple (via spreadsheet), or any sheet with an email column.
+        // Real CSV parsing (quoted fields, commas/newlines inside quotes, ; or tab separators, BOM),
+        // finds the header row even after preamble lines, joins First + Last names, and reads every
+        // email column (E-mail 2 / E-mail 3 …). Contacts open in the same picker as Google / Outlook.
+        function gsParseCsv( text ) {
+            text = String( text || '' ).replace( /^﻿/, '' );
+            var firstLine = text.split( /\r?\n/, 1 )[0] || '';
+            var count = function ( ch ) { return firstLine.split( ch ).length - 1; };
+            var sep = ',';
+            if ( count( ';' ) > count( sep ) ) sep = ';';
+            if ( count( '\t' ) > count( sep ) ) sep = '\t';
+            var rows = [], row = [], cell = '', q = false, i, c;
+            for ( i = 0; i < text.length; i++ ) {
+                c = text.charAt( i );
+                if ( q ) {
+                    if ( c === '"' ) {
+                        if ( text.charAt( i + 1 ) === '"' ) { cell += '"'; i++; }
+                        else q = false;
+                    } else cell += c;
+                } else if ( c === '"' ) q = true;
+                else if ( c === sep ) { row.push( cell ); cell = ''; }
+                else if ( c === '\n' || c === '\r' ) {
+                    if ( c === '\r' && text.charAt( i + 1 ) === '\n' ) i++;
+                    row.push( cell ); rows.push( row ); row = []; cell = '';
+                } else cell += c;
+            }
+            if ( cell !== '' || row.length ) { row.push( cell ); rows.push( row ); }
+            return rows.map(function ( r ) { return r.map(function ( x ) { return String( x ).trim(); }); })
+                       .filter(function ( r ) { return r.some(function ( x ) { return x !== ''; }); });
+        }
+
+        function gsCsvContacts( rows ) {
+            var norm = function ( h ) { return String( h || '' ).toLowerCase().replace( /[^a-z0-9]+/g, ' ' ).trim(); };
+            // Header row = first of the first 10 rows with an email-ish column title.
+            var hi = -1;
+            for ( var r = 0; r < Math.min( rows.length, 10 ); r++ ) {
+                if ( rows[ r ].some(function ( h ) { var n = norm( h ); return /\be ?mail\b/.test( n ) && ! /@/.test( h ); }) ) { hi = r; break; }
+            }
+            var out = [];
+            if ( hi === -1 ) {
+                // No header: every cell that looks like an email; a non-email cell next to it is the name.
+                rows.forEach(function ( cells ) {
+                    var name = '';
+                    cells.forEach(function ( x ) { if ( ! name && x && x.indexOf( '@' ) === -1 && ! /^\d/.test( x ) ) name = x; });
+                    cells.forEach(function ( x ) { if ( isValidEmail( x.toLowerCase() ) ) out.push({ email: x, name: name }); });
+                });
+                return out;
+            }
+            var H = rows[ hi ].map( norm );
+            var emailCols = [], first = -1, last = -1, middle = -1, full = -1, display = -1;
+            H.forEach(function ( h, k ) {
+                if ( /\be ?mail\b/.test( h ) && ! /\b(type|display name|label|kind)\b/.test( h ) ) emailCols.push( k );
+                else if ( h === 'first name' || h === 'given name' || h === 'firstname' ) first = k;
+                else if ( h === 'last name' || h === 'family name' || h === 'surname' || h === 'lastname' ) last = k;
+                else if ( h === 'middle name' || h === 'additional name' ) middle = k;
+                else if ( h === 'name' || h === 'full name' ) full = k;
+                else if ( h === 'display name' || h === 'e mail display name' ) display = k;
+            });
+            rows.slice( hi + 1 ).forEach(function ( cells ) {
+                var at = function ( k ) { return k > -1 && cells[ k ] ? cells[ k ] : ''; };
+                var name = at( full ) || [ at( first ), at( middle ), at( last ) ].filter( Boolean ).join( ' ' ) || at( display );
+                var seen = {};
+                emailCols.forEach(function ( k ) {
+                    // A cell can hold several addresses ("a@x.com ::: b@y.com" in Google exports).
+                    ( at( k ).match( /[^\s<>"'(),;:]+@[^\s<>"'(),;:]+\.[^\s<>"'(),;:]+/g ) || [] ).forEach(function ( e ) {
+                        e = e.toLowerCase();
+                        if ( seen[ e ] || ! isValidEmail( e ) ) return;
+                        seen[ e ] = 1;
+                        out.push({ email: e, name: name });
+                    });
+                });
+            });
+            return out;
+        }
+
         csvInput.addEventListener('change', function () {
             var file = csvInput.files && csvInput.files[0];
             if ( ! file ) return;
-            var name = file.name.toLowerCase();
-            if ( name.endsWith('.xlsx') || name.endsWith('.xls') ) {
-                setStatus( 'XLSX parsing isn\'t built in yet — please save as CSV and try again.', 'error' );
+            var fname = file.name.toLowerCase();
+            if ( /\.(xlsx|xls|numbers)$/.test( fname ) ) {
+                setStatus( 'Please save the spreadsheet as CSV (File → Save As / Export → CSV) and upload that.', 'error' );
                 csvInput.value = '';
                 return;
             }
             var reader = new FileReader();
             reader.onload = function ( ev ) {
-                var text = String( ev.target.result || '' );
-                var lines = text.split(/\r?\n/).filter(Boolean);
-                if ( ! lines.length ) { setStatus( 'CSV file is empty.', 'error' ); return; }
-
-                // Detect header row
-                var first = lines[0].toLowerCase();
-                var emailCol = -1, nameCol = -1;
-                if ( first.indexOf('email') !== -1 ) {
-                    var headers = lines[0].split(',').map(function(h){ return h.trim().toLowerCase().replace(/^"|"$/g,''); });
-                    emailCol = headers.indexOf('email');
-                    nameCol  = headers.indexOf('name');
-                    lines.shift();
-                }
-
-                var added = 0;
-                lines.forEach(function ( line ) {
-                    var cells = line.split(',').map(function(c){ return c.trim().replace(/^"|"$/g,''); });
-                    var email = '', personName = '';
-                    if ( emailCol !== -1 && cells[ emailCol ] ) {
-                        email = cells[ emailCol ];
-                        if ( nameCol !== -1 && cells[ nameCol ] ) personName = cells[ nameCol ];
-                    } else {
-                        // No header: take the first cell that looks like an email
-                        for ( var i = 0; i < cells.length; i++ ) {
-                            if ( isValidEmail( cells[i] ) ) { email = cells[i]; break; }
-                        }
-                    }
-                    if ( email && addEmail( email, personName ) ) added++;
-                });
-
-                setStatus( 'Imported ' + added + ' email' + ( added === 1 ? '' : 's' ) + ' from CSV.', added ? 'success' : 'error' );
                 csvInput.value = '';
+                var rows = gsParseCsv( ev.target.result );
+                if ( ! rows.length ) { setStatus( 'That CSV file is empty.', 'error' ); return; }
+                var contacts = gsCsvContacts( rows );
+                if ( ! contacts.length ) { setStatus( 'No email addresses found in that file.', 'error' ); return; }
+                if ( contacts.length === 1 ) {
+                    var ok = addEmail( contacts[0].email, contacts[0].name );
+                    setStatus( ok ? 'Imported 1 contact from CSV.' : 'Already in your list.', ok ? 'success' : 'error' );
+                    return;
+                }
+                setStatus( '' );
+                openContactPicker( 'imported', contacts );
             };
+            reader.onerror = function () { setStatus( 'Could not read that file.', 'error' ); csvInput.value = ''; };
             reader.readAsText( file );
         });
 
