@@ -1839,3 +1839,191 @@ td.gs-thread-group {
     opacity: 0.55;
     cursor: not-allowed;
 }
+
+/* ============================================================
+ * 2026-11-13 (owner) — member Messages pages show only their
+ * content. The Email / Chat / Direct Messages strip and the
+ * Members / Agents / Projects nav are no longer printed (see
+ * em_inbox_messages_tab_strip / gend_society_chat_tabs_nav).
+ * The BuddyPress sub-links (Inbox / Starred / Sent / Compose /
+ * Notices) become one compact glass tray, the same for every
+ * member. Selectors carry html + #subnav so they outrank the
+ * email-manager pill rules and the profile header phone rules.
+ * ============================================================ */
+
+/* Leftovers from the removed rows, in case a cached page has them. */
+html body.messages.bp-user .em-inbox-messages-tabs,
+html body.messages.bp-user .gs-chat-tabs,
+html body.messages.bp-user .gs-chat-project-filter,
+html body.messages.bp-user #subnav li#messages-email-personal-li,
+html body.messages.bp-user #subnav li#messages-dm-personal-li {
+    display: none !important;
+}
+
+html body.messages.bp-user div.item-list-tabs#subnav {
+    display: flex !important;
+    justify-content: center !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    padding: 0 !important;
+    margin: 4px 0 22px !important;
+    height: auto !important;
+    overflow: visible !important;
+}
+
+html body.messages.bp-user div.item-list-tabs#subnav ul {
+    display: inline-flex !important;
+    flex-wrap: nowrap !important;
+    align-items: center !important;
+    gap: 4px !important;
+    max-width: 100% !important;
+    margin: 0 !important;
+    padding: 5px !important;
+    list-style: none !important;
+    background: rgba(255, 255, 255, 0.03) !important;
+    border: 1px solid rgba(255, 255, 255, 0.08) !important;
+    border-radius: 14px !important;
+    box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.04) !important;
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    height: auto !important;
+    overflow-x: auto !important;
+    overflow-y: hidden !important;
+    scrollbar-width: none;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul::-webkit-scrollbar {
+    display: none;
+}
+
+html body.messages.bp-user div.item-list-tabs#subnav ul li {
+    float: none !important;
+    display: block !important;
+    flex: 0 0 auto !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    background: transparent !important;
+    list-style: none !important;
+    height: auto !important;
+    width: auto !important;
+}
+
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a {
+    position: relative !important;
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    gap: 8px !important;
+    width: auto !important;
+    height: auto !important;
+    min-height: 0 !important;
+    padding: 8px 14px !important;
+    margin: 0 !important;
+    border-radius: 10px !important;
+    border: 1px solid transparent !important;
+    background: transparent !important;
+    box-shadow: none !important;
+    color: rgba(226, 232, 240, 0.68) !important;
+    font-size: 13px !important;
+    font-weight: 600 !important;
+    letter-spacing: 0.01em !important;
+    text-transform: none !important;
+    line-height: 1.2 !important;
+    white-space: nowrap !important;
+    text-decoration: none !important;
+    transform: none !important;
+    backdrop-filter: none !important;
+    -webkit-backdrop-filter: none !important;
+    transition: color 0.18s ease, background 0.18s ease, border-color 0.18s ease !important;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a::before,
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a::after {
+    display: none !important;
+    content: none !important;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a > i {
+    display: none !important;
+}
+
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a:hover,
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a:focus-visible {
+    color: #fff !important;
+    background: rgba(255, 255, 255, 0.06) !important;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a:focus-visible {
+    outline: 2px solid rgba(110, 193, 228, 0.7) !important;
+    outline-offset: 1px !important;
+}
+
+html body.messages.bp-user div.item-list-tabs#subnav ul li.current > a,
+html body.messages.bp-user div.item-list-tabs#subnav ul li.selected > a {
+    color: #fff !important;
+    background: linear-gradient(135deg, rgba(182, 8, 201, 0.30) 0%, rgba(110, 193, 228, 0.22) 100%) !important;
+    border-color: rgba(182, 8, 201, 0.45) !important;
+    box-shadow: 0 2px 12px rgba(182, 8, 201, 0.22) !important;
+}
+
+/* Icon chips (injected by the profile header) — smaller and calmer
+   inside the tray. */
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a .gdc-subnav-icon {
+    width: 20px !important;
+    height: 20px !important;
+    border-radius: 6px !important;
+    background: transparent !important;
+    border: 0 !important;
+    box-shadow: none !important;
+    transform: none !important;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a .gdc-subnav-icon svg {
+    width: 15px !important;
+    height: 15px !important;
+    filter: none !important;
+    opacity: 0.85;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a .gdc-subnav-icon::before,
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a .gdc-subnav-icon::after {
+    display: none !important;
+}
+html body.messages.bp-user div.item-list-tabs#subnav ul li.current > a .gdc-subnav-icon,
+html body.messages.bp-user div.item-list-tabs#subnav ul li.selected > a .gdc-subnav-icon {
+    color: #e9a6f2 !important;
+}
+
+/* Unread count on Inbox. */
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a .count,
+html body.messages.bp-user div.item-list-tabs#subnav ul li > a span.count {
+    display: inline-flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    min-width: 18px !important;
+    height: 18px !important;
+    padding: 0 6px !important;
+    margin: 0 !important;
+    border-radius: 999px !important;
+    background: #b608c9 !important;
+    color: #fff !important;
+    font-size: 11px !important;
+    font-weight: 700 !important;
+    line-height: 1 !important;
+    border: 0 !important;
+}
+
+/* Phones: one row that scrolls sideways instead of wrapping. */
+@media (max-width: 720px) {
+    html body.messages.bp-user div.item-list-tabs#subnav {
+        justify-content: flex-start !important;
+        margin: 0 0 16px !important;
+    }
+    html body.messages.bp-user div.item-list-tabs#subnav ul {
+        display: flex !important;
+        width: 100% !important;
+        flex-wrap: nowrap !important;
+        padding: 4px !important;
+    }
+    html body.messages.bp-user div.item-list-tabs#subnav ul li > a {
+        padding: 8px 12px !important;
+        font-size: 12.5px !important;
+        width: auto !important;
+    }
+}
