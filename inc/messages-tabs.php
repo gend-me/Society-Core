@@ -2568,8 +2568,21 @@ function gend_society_chat_tabs_footer() {
 							var urlInput = seqStepRow.querySelector('[data-gs-seq-ctx-gdrive]');
 							var link = urlInput ? (urlInput.value || '').trim() : '';
 							if (!link) { return; }
+							// 2026-11-13 (drive.file): when Drive is connected, a pasted link opens the
+							// picker on that file so the member confirms it — that grants gend.me
+							// access to just that file. Otherwise the link is kept as before.
+							if (gdriveStatus && gdriveStatus.connected && gdriveStatus.picker) {
+								openGdrivePicker(seqStepRow, curStep, link);
+								if (urlInput) { urlInput.value = ''; }
+								return;
+							}
 							addGdriveContextFile(seqStepRow, curStep, '', 'Google Drive doc', link);
 							if (urlInput) { urlInput.value = ''; }
+							return;
+						}
+						// Context Files: "Choose from Google Drive" → Google's picker (drive.file).
+						if (t.closest('[data-gs-seq-ctx-gdrive-choose]')) {
+							openGdrivePicker(seqStepRow, curStep, '');
 							return;
 						}
 						// Context Files: Google Drive "Connect" → open the consent popup +
@@ -2889,7 +2902,8 @@ function gend_society_chat_tabs_footer() {
 					.then(function (data) {
 						gdriveStatus = {
 							configured: !!(data && data.configured),
-							connected: !!(data && data.connected)
+							connected: !!(data && data.connected),
+							picker: (data && data.picker) || null
 						};
 					})
 					.catch(function () { gdriveStatus = null; })
@@ -2943,13 +2957,43 @@ function gend_society_chat_tabs_footer() {
 					return;
 				}
 
-				// Connected → search picker + results list + small paste-link fallback.
+				// Connected → "Choose from Google Drive" (Google's picker, drive.file) + search of
+				// files already shared with gend.me + small paste-link fallback. 2026-11-13.
 				wrap.innerHTML = ''
 					+ '<div class="gs-agent-ctx-gdrive-picker">'
-					+ '<input type="search" class="gs-agent-ctx-gdrive-search" data-gs-seq-ctx-gdrive-search placeholder="' + escAttr('Search your Google Drive…') + '" autocomplete="off" />'
+					+ (st.picker ? '<button type="button" class="gs-agent-ctx-btn gs-agent-gdrive-connect" data-gs-seq-ctx-gdrive-choose><span aria-hidden="true">📁</span> ' + escHtml('Choose from Google Drive') + '</button>' : '')
+					+ '<input type="search" class="gs-agent-ctx-gdrive-search" data-gs-seq-ctx-gdrive-search placeholder="' + escAttr('Search files you’ve already picked…') + '" autocomplete="off" />'
 					+ '<div class="gs-agent-ctx-gdrive-results" data-gs-seq-ctx-gdrive-results aria-live="polite"></div>'
 					+ '</div>'
-					+ pasteHtml;
+					+ pasteHtml
+					+ '<p class="gs-agent-help gs-agent-gdrive-note">' + escHtml('gend.me only sees the Drive files you pick here.') + '</p>';
+			}
+
+			// 2026-11-13: open Google's picker (assets/gs-drive-picker.js, loaded on first use) and add
+			// each picked file as a gdrive chip. `link` = a pasted Drive link to confirm (optional).
+			function openGdrivePicker(row, step, link) {
+				var st = gdriveStatus;
+				var pk = st && st.picker;
+				var status = seqPopupEl ? seqPopupEl.querySelector('[data-gs-seq-status]') : null;
+				if (!pk || !pk.js) { if (link) { addGdriveContextFile(row, step, '', 'Google Drive doc', link); } return; }
+				var go = function () {
+					var fid = link ? window.gsDrivePicker.idFromUrl(link) : '';
+					if (link && !fid) { setStatus(status, 'That doesn’t look like a Google Drive link.', 'warning'); return; }
+					window.gsDrivePicker.pick({ config: pk, fileId: fid })
+						.then(function (docs) {
+							for (var i = 0; i < docs.length; i++) {
+								addGdriveContextFile(row, step, docs[i].id, docs[i].name || 'Google Drive doc', docs[i].url || '');
+							}
+							setStatus(status, '', '');
+						})
+						.catch(function (e) { setStatus(status, (e && e.message) || 'Could not open Google Drive.', 'error'); });
+				};
+				if (window.gsDrivePicker) { go(); return; }
+				var s = document.createElement('script');
+				s.src = pk.js;
+				s.onload = go;
+				s.onerror = function () { setStatus(status, 'Could not load Google Drive.', 'error'); };
+				document.head.appendChild(s);
 			}
 
 			// Open the Google consent popup window and install a ONE-TIME message
@@ -4171,7 +4215,7 @@ function gend_society_rest_chat_projects() {
  *   client_secret : getenv('GS_GDRIVE_CLIENT_SECRET') ?: option gs_gdrive_client_secret
  *   redirect_uri  : option gs_gdrive_redirect_uri     ?: rest_url('gs/v1/gdrive/callback')
  *
- * Scope: https://www.googleapis.com/auth/drive.readonly (read-only).
+ * Scope: https://www.googleapis.com/auth/drive.file (only files the member picks in Google's picker; 2026-11-13).
  * ========================================================================= */
 
 /**
@@ -4411,11 +4455,38 @@ function gend_society_gdrive_fetch_text( $file_id, $uid ) {
  */
 function gend_society_rest_gdrive_status() {
 	$uid = function_exists( 'get_current_user_id' ) ? (int) get_current_user_id() : 0;
+	$configured = gend_society_gdrive_is_configured();
 	return rest_ensure_response( array(
 		'ok'         => true,
-		'configured' => gend_society_gdrive_is_configured(),
+		'configured' => $configured,
 		'connected'  => gend_society_gdrive_user_connected( $uid ),
+		'picker'     => $configured ? gend_society_gdrive_picker_config() : null,
 	) );
+}
+
+/**
+ * 2026-11-13: public settings for Google's Drive picker (assets/gs-drive-picker.js). The OAuth
+ * client id, the browser API key and the Cloud project number are all public by design (Google
+ * loads them in the visitor's browser); no token is included — the browser gets its own from
+ * Google. Null when the picker API key (option gs_gdrive_picker_api_key) is missing.
+ *
+ * @return array|null { clientId, apiKey, appId, js }
+ */
+function gend_society_gdrive_picker_config() {
+	$creds = gend_society_gdrive_creds();
+	$key   = function_exists( 'get_option' ) ? trim( (string) get_option( 'gs_gdrive_picker_api_key', '' ) ) : '';
+	// A Google OAuth client id starts with the Cloud project number ("968775684997-….apps.googleusercontent.com").
+	$app_id = preg_match( '/^(\d+)-/', (string) $creds['client_id'], $m ) ? $m[1] : '';
+	if ( '' === $key || '' === $app_id || ! defined( 'GEND_SOCIETY_URL' ) ) {
+		return null;
+	}
+	$ver = defined( 'GEND_SOCIETY_VERSION' ) ? GEND_SOCIETY_VERSION : '1';
+	return array(
+		'clientId' => (string) $creds['client_id'],
+		'apiKey'   => $key,
+		'appId'    => $app_id,
+		'js'       => GEND_SOCIETY_URL . 'assets/gs-drive-picker.js?ver=' . rawurlencode( $ver . '-20261113' ),
+	);
 }
 
 /**
@@ -4468,7 +4539,9 @@ function gend_society_rest_gdrive_connect() {
 		'include_granted_scopes' => 'true',
 		'client_id'             => $creds['client_id'],
 		'redirect_uri'          => $creds['redirect_uri'],
-		'scope'                 => 'https://www.googleapis.com/auth/drive.readonly',
+		// 2026-11-13: drive.file (only files the member picks in Google's picker) instead of the
+		// restricted drive.readonly, which would need a yearly CASA security assessment.
+		'scope'                 => 'https://www.googleapis.com/auth/drive.file',
 		'state'                 => $state,
 	);
 	$auth_url = 'https://accounts.google.com/o/oauth2/v2/auth?' . http_build_query( $params );
