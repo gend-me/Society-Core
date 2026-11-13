@@ -35,6 +35,37 @@ function gend_society_invite_get_affiliate_url( $user_id, $base_url = '' ) {
 }
 
 /**
+ * Add the sender's affiliate tracking parameter to EVERY link in an invite email that points at this
+ * site (or one of its sub-domains), so whatever the sender typed into the message — the button, a
+ * "learn more" link, a store URL — is attributed to them. Links that already carry the parameter,
+ * mailto:/tel:/anchor links and off-site links are left alone.
+ */
+function gend_society_invite_add_tracking_to_links( $html, $sender_id ) {
+    $home = wp_parse_url( home_url( '/' ), PHP_URL_HOST );
+    if ( ! $home || ! is_string( $html ) || $html === '' ) return $html;
+    $home  = strtolower( $home );
+    $param = (string) get_option( 'aas_tracking_url_param', 'ref' );
+    return preg_replace_callback(
+        '/(<a\b[^>]*?\shref\s*=\s*)(["\'])(.*?)\2/is',
+        function ( $m ) use ( $home, $param, $sender_id ) {
+            $href = html_entity_decode( trim( $m[3] ), ENT_QUOTES );
+            if ( $href === '' || preg_match( '#^(mailto:|tel:|sms:|\#|javascript:)#i', $href ) ) return $m[0];
+            $host = wp_parse_url( $href, PHP_URL_HOST );
+            if ( ! $host ) return $m[0];
+            $host = strtolower( $host );
+            if ( $host !== $home && substr( $host, -strlen( '.' . $home ) ) !== '.' . $home ) return $m[0];
+            $query = (string) wp_parse_url( $href, PHP_URL_QUERY );
+            parse_str( $query, $qs );
+            if ( isset( $qs[ $param ] ) ) return $m[0];
+            $frag = '';
+            if ( strpos( $href, '#' ) !== false ) { list( $href, $frag ) = explode( '#', $href, 2 ); $frag = '#' . $frag; }
+            return $m[1] . $m[2] . esc_url( gend_society_invite_get_affiliate_url( $sender_id, $href ) . $frag ) . $m[2];
+        },
+        $html
+    );
+}
+
+/**
  * Default invite email template. Placeholders are replaced per-recipient in
  * gs_invite_render_template(). Stored as user meta when the sender edits it.
  */
@@ -154,13 +185,32 @@ function gend_society_invite_index_add( $email, $sender_id, $log_id ) {
  * On registration, mark every log entry pointing at the new user's email
  * as registered, then drop them from the pending index.
  */
-add_action( 'user_register', 'gend_society_invite_handle_user_register' );
+add_action( 'user_register', 'gend_society_invite_handle_user_register', 30 );   // after the Sales Team cookie attribution (10)
 function gend_society_invite_handle_user_register( $user_id ) {
     $user = get_userdata( $user_id );
     if ( ! $user || empty( $user->user_email ) ) return;
     $email = strtolower( trim( $user->user_email ) );
     $index = get_option( 'gend_society_invite_pending', array() );
     if ( empty( $index[ $email ] ) ) return;
+
+    // Add the new member to the team of whoever invited them. The ?ref link normally does this through the
+    // Sales Team cookie; this covers invitees who sign up from a different browser/device or after the
+    // cookie expired. An attribution that already exists (cookie, checkout) is never overwritten.
+    if ( function_exists( 'aas_umk' ) && ! get_user_meta( $user_id, aas_umk( 'referrer_id' ), true ) ) {
+        $last = end( $index[ $email ] );
+        $sid  = is_array( $last ) ? (int) $last['u'] : 0;
+        if ( $sid && $sid !== (int) $user_id && get_userdata( $sid ) ) {
+            $prog = function_exists( 'aas_get_user_referral_program' ) ? aas_get_user_referral_program( $sid ) : null;
+            $cond = is_array( $prog ) ? ( $prog['tracking_condition'] ?? 'registration' ) : 'registration';
+            if ( in_array( $cond, array( 'registration', 'both' ), true ) ) {
+                update_user_meta( $user_id, aas_umk( 'referrer_id' ), $sid );
+                if ( is_array( $prog ) && ! empty( $prog['id'] ) ) {
+                    update_user_meta( $user_id, aas_umk( 'referrer_program_id' ), $prog['id'] );
+                }
+            }
+        }
+    }
+    reset( $index[ $email ] );
     foreach ( $index[ $email ] as $ref ) {
         $log = get_user_meta( $ref['u'], 'gend_society_invite_log', true );
         if ( ! is_array( $log ) ) continue;
@@ -208,7 +258,8 @@ function gend_society_invite_enqueue_editor_assets() {
  * Render the Invite panel HTML. Called from the connections-tabs close hook
  * inside member-profile-pages.php.
  */
-function gend_society_invite_render_panel( $share = array() ) {
+function gend_society_invite_render_panel( $share = array(), $opts = array() ) {
+    $embedded = ! empty( $opts['embedded'] );
     if ( ! is_user_logged_in() ) {
         echo '<p class="psoo-pm-empty">' . esc_html__( 'Please log in to invite members.', 'gend-society' ) . '</p>';
         return;
@@ -276,7 +327,7 @@ function gend_society_invite_render_panel( $share = array() ) {
         $gs_cc_manage = BM_Member_App::return_url( $user_id );
     }
     ?>
-    <div id="<?php echo esc_attr( $wrap_id ); ?>" class="gs-invite-wrap" data-gs-invite
+    <div id="<?php echo esc_attr( $wrap_id ); ?>" class="gs-invite-wrap<?php echo $embedded ? ' is-embedded' : ''; ?>" data-gs-invite
          data-rest-root="<?php echo esc_attr( $rest_root ); ?>"
          data-rest-nonce="<?php echo esc_attr( $rest_nonce ); ?>"
          data-invite-link="<?php echo esc_attr( $invite_url ); ?>"
@@ -309,68 +360,64 @@ function gend_society_invite_render_panel( $share = array() ) {
         </div>
 
         <div class="gs-invite-tabpanel is-active" data-gs-tab-panel="email" role="tabpanel">
-        <div class="gs-invite-grid">
-            <section class="gs-invite-card">
-                <h3><?php esc_html_e( 'Recipients', 'gend-society' ); ?></h3>
+        <div class="gs-invite-compose">
 
-                <!-- Email sub-tabs: Individual Invite / Bulk Invite -->
-                <div class="gs-invite-subtabs" role="tablist" data-gs-invite-subtabs>
-                    <button type="button" class="gs-invite-subtab is-active" data-gs-subtab="individual" role="tab" aria-selected="true"><?php esc_html_e( 'Individual Invite', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-invite-subtab" data-gs-subtab="bulk" role="tab" aria-selected="false"><?php esc_html_e( 'Bulk Invite', 'gend-society' ); ?></button>
+            <!-- Step 1 — who: type / paste / import, all on one screen -->
+            <section class="gs-invite-card gs-invite-who">
+                <header class="gs-invite-step">
+                    <span class="gs-invite-step__n">1</span>
+                    <div>
+                        <h3><?php esc_html_e( 'Who are you inviting?', 'gend-society' ); ?></h3>
+                        <p><?php esc_html_e( 'Type or paste one email or a whole list — commas, spaces or new lines all work.', 'gend-society' ); ?></p>
+                    </div>
+                </header>
+
+                <div class="gs-invite-entry">
+                    <input type="text" data-gs-email inputmode="email" autocomplete="off" spellcheck="false"
+                           placeholder="<?php esc_attr_e( 'name@example.com — or paste a whole list', 'gend-society' ); ?>" aria-label="<?php esc_attr_e( 'Email addresses', 'gend-society' ); ?>" />
+                    <input type="text" data-gs-name autocomplete="off" class="gs-invite-entry__name"
+                           placeholder="<?php esc_attr_e( 'Name (optional)', 'gend-society' ); ?>" aria-label="<?php esc_attr_e( 'Name', 'gend-society' ); ?>" />
+                    <button type="button" class="gs-invite-btn gs-invite-btn--primary" data-gs-add-email><?php esc_html_e( 'Add', 'gend-society' ); ?></button>
                 </div>
 
-                <div class="gs-invite-subpanel is-active" data-gs-subtab-panel="individual">
-                    <div class="gs-invite-row">
-                        <div>
-                            <label><?php esc_html_e( 'Email', 'gend-society' ); ?></label>
-                            <input type="email" data-gs-email placeholder="name@example.com" autocomplete="off" />
-                        </div>
-                        <div>
-                            <label><?php esc_html_e( 'Name', 'gend-society' ); ?></label>
-                            <input type="text" data-gs-name placeholder="<?php esc_attr_e( 'Add an optional name', 'gend-society' ); ?>" autocomplete="off" />
-                        </div>
-                    </div>
-                    <div class="gs-invite-actions">
-                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-add-email><?php esc_html_e( 'Add Email', 'gend-society' ); ?></button>
-                    </div>
-                </div>
-
-                <div class="gs-invite-subpanel" data-gs-subtab-panel="bulk">
-                    <p class="gs-invite-help" style="margin:0 0 10px !important;"><?php esc_html_e( 'Import many people at once — upload a CSV, or pull straight from your contacts.', 'gend-society' ); ?></p>
-                    <div class="gs-invite-actions">
-                        <label class="gs-invite-csv">
+                <div class="gs-invite-import" role="group" aria-label="<?php esc_attr_e( 'Import contacts', 'gend-society' ); ?>">
+                    <span class="gs-invite-import__lbl"><?php esc_html_e( 'Or import your list', 'gend-society' ); ?></span>
+                    <div class="gs-invite-import__tiles">
+                        <label class="gs-invite-tile">
                             <input type="file" accept=".csv" data-gs-csv hidden />
-                            <span class="gs-invite-btn gs-invite-btn--ghost"><?php esc_html_e( 'Upload CSV', 'gend-society' ); ?></span>
+                            <span class="gs-invite-tile__ico" aria-hidden="true">&#128196;</span><span class="gs-invite-tile__t"><?php esc_html_e( 'CSV file', 'gend-society' ); ?></span>
                         </label>
-                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-oauth="google"><?php esc_html_e( 'Google Contacts', 'gend-society' ); ?></button>
-                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-oauth="microsoft"><?php esc_html_e( 'Outlook Contacts', 'gend-society' ); ?></button>
-                        <label class="gs-invite-csv">
+                        <button type="button" class="gs-invite-tile" data-gs-oauth="google"><span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Google', 'gend-society' ); ?></span></button>
+                        <button type="button" class="gs-invite-tile" data-gs-oauth="microsoft"><span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><rect x="8" y="3.5" width="15" height="17" rx="2.2" fill="#28A8EA"/><path d="M8 8.2l7.5 5.1L23 8.2" fill="none" stroke="#fff" stroke-width="1.5" stroke-linejoin="round"/><rect x="1" y="6" width="12.5" height="12.5" rx="2.2" fill="#0364B8"/><ellipse cx="7.25" cy="12.25" rx="3" ry="3.6" fill="none" stroke="#fff" stroke-width="1.9"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Outlook', 'gend-society' ); ?></span></button>
+                        <label class="gs-invite-tile" title="<?php esc_attr_e( 'Apple has no public Contacts API. Export Contacts.app via File → Export → Export vCard, then upload the .vcf here.', 'gend-society' ); ?>">
                             <input type="file" accept=".vcf,text/vcard" data-gs-vcf hidden />
-                            <span class="gs-invite-btn gs-invite-btn--ghost" title="<?php esc_attr_e( 'Apple has no public Contacts API. Export Contacts.app via File → Export → Export vCard, then upload the .vcf here.', 'gend-society' ); ?>"><?php esc_html_e( 'Apple Contacts (.vcf)', 'gend-society' ); ?></span>
+                            <span class="gs-invite-tile__ico gs-invite-tile__ico--logo" aria-hidden="true"><svg viewBox="0 0 24 24" width="22" height="22" aria-hidden="true"><path fill="#111" d="M12.152 6.896c-.948 0-2.415-1.078-3.96-1.04-2.04.027-3.91 1.183-4.961 3.014-2.117 3.675-.546 9.103 1.519 12.09 1.013 1.454 2.208 3.09 3.792 3.039 1.52-.065 2.09-.987 3.935-.987 1.831 0 2.35.987 3.96.948 1.637-.026 2.676-1.48 3.676-2.948 1.156-1.688 1.636-3.325 1.662-3.415-.039-.013-3.182-1.221-3.22-4.857-.026-3.04 2.48-4.494 2.597-4.559-1.429-2.09-3.623-2.324-4.39-2.376-2-.156-3.675 1.09-4.61 1.09zM15.53 3.83c.843-1.012 1.4-2.427 1.245-3.83-1.207.052-2.662.805-3.532 1.818-.78.896-1.454 2.338-1.273 3.714 1.338.104 2.715-.688 3.559-1.701"/></svg></span><span class="gs-invite-tile__t"><?php esc_html_e( 'Apple (.vcf)', 'gend-society' ); ?></span>
                         </label>
                     </div>
                 </div>
 
                 <div class="gs-invite-list" data-gs-list>
                     <div class="gs-invite-list-header">
-                        <span><?php esc_html_e( 'Staged invitees', 'gend-society' ); ?></span>
-                        <button type="button" class="gs-invite-link-btn" data-gs-clear><?php esc_html_e( 'Clear', 'gend-society' ); ?></button>
+                        <span><?php esc_html_e( 'Ready to invite', 'gend-society' ); ?> <b class="gs-invite-count" data-gs-count>0</b></span>
+                        <button type="button" class="gs-invite-link-btn" data-gs-clear><?php esc_html_e( 'Clear all', 'gend-society' ); ?></button>
                     </div>
                     <div class="gs-invite-list-body" data-gs-list-body>
                         <p class="gs-invite-empty"><?php esc_html_e( 'Add emails or upload a CSV to stage recipients.', 'gend-society' ); ?></p>
                     </div>
                 </div>
-
-                <div class="gs-invite-send-inline">
-                    <div class="gs-invite-status" data-gs-status aria-live="polite"></div>
-                    <button type="button" class="gs-invite-btn gs-invite-btn--primary gs-invite-btn--full" data-gs-send><?php esc_html_e( 'Send Invites', 'gend-society' ); ?></button>
-                </div>
             </section>
 
-            <section class="gs-invite-card">
-                <h3><?php esc_html_e( 'Email Template', 'gend-society' ); ?></h3>
+            <!-- Step 2 — the message -->
+            <section class="gs-invite-card gs-invite-msg">
+                <header class="gs-invite-step">
+                    <span class="gs-invite-step__n">2</span>
+                    <div>
+                        <h3><?php esc_html_e( 'Your message', 'gend-society' ); ?></h3>
+                        <p><?php esc_html_e( 'Personalised for each person. Every gend.me link in it — your button included — automatically carries your affiliate link, so anyone who joins is added to your team.', 'gend-society' ); ?></p>
+                    </div>
+                </header>
                 <p class="gs-invite-help">
-                    <?php esc_html_e( 'Available placeholders:', 'gend-society' ); ?>
+                    <?php esc_html_e( 'Placeholders:', 'gend-society' ); ?>
                     <code>{name}</code> <code>{sender_name}</code> <code>{sender_email}</code> <code>{invite_link}</code>
                 </p>
 
@@ -379,7 +426,7 @@ function gend_society_invite_render_panel( $share = array() ) {
 
                 <label><?php esc_html_e( 'Body', 'gend-society' ); ?></label>
                 <?php
-                // wp_editor renders Visual + Text tabs natively. The unique
+                // wp_editor renders Visual + Code tabs natively. The unique
                 // $editor_id is computed at the top of this function so the
                 // wrap data-editor-id attribute references it.
                 wp_editor(
@@ -389,7 +436,7 @@ function gend_society_invite_render_panel( $share = array() ) {
                         'media_buttons' => true,   // "Add Media" upload button above toolbar
                         'textarea_name' => 'gs_invite_body',
                         'textarea_rows' => 22,     // taller default (Text-mode height)
-                        'editor_height' => 480,    // hard min-height in pixels for Visual mode
+                        'editor_height' => 420,    // hard min-height in pixels for Visual mode
                         'tinymce'       => array(
                             'toolbar1' => 'formatselect,bold,italic,underline,strikethrough,forecolor,backcolor,bullist,numlist,blockquote,alignleft,aligncenter,alignright,link,unlink',
                             'toolbar2' => 'fontselect,fontsizeselect,outdent,indent,undo,redo,removeformat,fullscreen',
@@ -402,20 +449,28 @@ function gend_society_invite_render_panel( $share = array() ) {
 
                 <?php if ( ! $is_share ) : ?>
                 <div class="gs-invite-tpl-actions">
-                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-tpl-save><?php esc_html_e( 'Save Template', 'gend-society' ); ?></button>
-                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-tpl-reset><?php esc_html_e( 'Reset to Default', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-tpl-save><?php esc_html_e( 'Save as my default', 'gend-society' ); ?></button>
+                    <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-tpl-reset><?php esc_html_e( 'Reset to default', 'gend-society' ); ?></button>
                 </div>
                 <?php endif; ?>
 
                 <div class="gs-invite-test">
-                    <label><?php esc_html_e( 'Send a test email', 'gend-society' ); ?></label>
+                    <label><?php esc_html_e( 'Send yourself a test first', 'gend-society' ); ?></label>
                     <div class="gs-invite-test-row">
                         <input type="email" data-gs-test-email placeholder="<?php esc_attr_e( 'name@example.com', 'gend-society' ); ?>" />
-                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-test-send><?php esc_html_e( 'Send Test', 'gend-society' ); ?></button>
+                        <button type="button" class="gs-invite-btn gs-invite-btn--ghost" data-gs-test-send><?php esc_html_e( 'Send test', 'gend-society' ); ?></button>
                     </div>
-                    <p class="gs-invite-help"><?php esc_html_e( 'Sends the current Subject + Body (with placeholders rendered as if the test recipient were the invitee).', 'gend-society' ); ?></p>
                 </div>
             </section>
+        </div>
+
+        <!-- Send bar -->
+        <div class="gs-invite-sendbar">
+            <div class="gs-invite-sendbar__info">
+                <div class="gs-invite-status" data-gs-status aria-live="polite"></div>
+                <div class="gs-invite-progress" data-gs-progress hidden><span></span></div>
+            </div>
+            <button type="button" class="gs-invite-btn gs-invite-btn--primary gs-invite-btn--send" data-gs-send disabled><?php esc_html_e( 'Send invites', 'gend-society' ); ?></button>
         </div>
         </div><!-- /tabpanel:email -->
 
@@ -1025,6 +1080,88 @@ function gend_society_invite_render_panel( $share = array() ) {
     }
     </style>
 
+    <style>
+    /* ═══ Invite studio — glass restyle (one-screen email composer) ═══════════════════════════════ */
+    .gs-invite-wrap { --gi-line: rgba(255,255,255,.12); --gi-glass: rgba(255,255,255,.055); --gi-glass-hi: rgba(255,255,255,.1);
+        --gi-mag: #b608c9; --gi-blue: #6ec1e4; --gi-ok: #34d399; --gi-bad: #f87171; }
+    .gs-invite-wrap.is-embedded { padding: 0; }
+    .gs-invite-wrap.is-embedded .gs-invite-hero, .gs-invite-wrap.is-embedded .gs-invite-tabs { display: none !important; }
+
+    .gs-invite-wrap .gs-invite-hero { background: radial-gradient(700px 240px at 0% 0%, rgba(182,8,201,.28), transparent 60%), radial-gradient(600px 260px at 100% 100%, rgba(110,193,228,.2), transparent 60%), var(--gi-glass);
+        border: 1px solid var(--gi-line); border-radius: 22px; backdrop-filter: blur(22px) saturate(160%); -webkit-backdrop-filter: blur(22px) saturate(160%);
+        box-shadow: 0 18px 50px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.14); }
+    .gs-invite-wrap .gs-invite-tabs { background: var(--gi-glass); border: 1px solid var(--gi-line); border-radius: 999px; padding: 5px; backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px); }
+    .gs-invite-wrap .gs-invite-tab { border-radius: 999px; }
+    .gs-invite-wrap .gs-invite-tab.is-active { background: linear-gradient(135deg, rgba(182,8,201,.55), rgba(110,193,228,.4)); border-color: transparent; color: #fff; box-shadow: 0 8px 22px rgba(182,8,201,.28); }
+
+    .gs-invite-compose { display: grid; grid-template-columns: minmax(0, 5fr) minmax(0, 6fr); gap: 18px; align-items: start; }
+    @media (max-width: 980px) { .gs-invite-compose { grid-template-columns: 1fr; } }
+    .gs-invite-wrap .gs-invite-card { background: linear-gradient(160deg, rgba(255,255,255,.09), rgba(255,255,255,.03)); border: 1px solid var(--gi-line); border-radius: 22px; padding: 22px;
+        backdrop-filter: blur(24px) saturate(160%); -webkit-backdrop-filter: blur(24px) saturate(160%); box-shadow: 0 16px 44px rgba(0,0,0,.3), inset 0 1px 0 rgba(255,255,255,.14); opacity: 1; animation: none; }
+    .gs-invite-wrap .gs-invite-card > *, .gs-invite-wrap .gs-invite-card .wp-editor-wrap { opacity: 1 !important; animation: none !important; }
+    .gs-invite-step { display: flex; gap: 14px; align-items: flex-start; margin-bottom: 18px; }
+    .gs-invite-step h3 { margin: 0 0 4px !important; font-size: 1.05rem !important; letter-spacing: 0 !important; text-transform: none !important; color: #fff !important; }
+    .gs-invite-step p { margin: 0; color: #a7b4c9; font-size: .84rem; line-height: 1.5; }
+    .gs-invite-step__n { flex: 0 0 auto; width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-weight: 800; color: #fff;
+        background: linear-gradient(135deg, var(--gi-mag), var(--gi-blue)); box-shadow: 0 8px 20px rgba(182,8,201,.4); }
+
+    .gs-invite-entry { display: grid; grid-template-columns: minmax(0, 1fr) 150px auto; gap: 8px; margin-bottom: 14px; }
+    @media (max-width: 640px) { .gs-invite-entry { grid-template-columns: 1fr 1fr; } .gs-invite-entry [data-gs-email] { grid-column: 1 / -1; } }
+    .gs-invite-wrap .gs-invite-card input[type="text"], .gs-invite-wrap .gs-invite-card input[type="email"] { background: rgba(8,11,20,.55); border: 1px solid var(--gi-line); border-radius: 14px; padding: 13px 15px; font-size: .92rem; color: #f8fafc; transition: border-color .2s, box-shadow .2s, background .2s; }
+    .gs-invite-wrap .gs-invite-card input:focus, .gs-invite-wrap .gs-invite-card textarea:focus { outline: none; background: rgba(8,11,20,.75); border-color: rgba(182,8,201,.65); box-shadow: 0 0 0 4px rgba(182,8,201,.18); }
+    .gs-invite-wrap .gs-invite-card > label { margin-top: 14px; }
+
+    .gs-invite-wrap .gs-invite-btn { border-radius: 14px; padding: 11px 18px; font-size: .84rem; border: 1px solid var(--gi-line); background: var(--gi-glass); transition: transform .16s, box-shadow .2s, background .2s; }
+    .gs-invite-wrap .gs-invite-btn:hover:not([disabled]) { transform: translateY(-1px); background: var(--gi-glass-hi); border-color: rgba(182,8,201,.5); }
+    .gs-invite-wrap .gs-invite-btn--primary { background: linear-gradient(135deg, var(--gi-mag), #7a6cf0 60%, var(--gi-blue)); border-color: transparent; box-shadow: 0 10px 26px rgba(182,8,201,.35); }
+    .gs-invite-wrap .gs-invite-btn--primary:hover:not([disabled]) { background: linear-gradient(135deg, #cc1ee1, #8a7cff 60%, #7fd0f0); box-shadow: 0 14px 32px rgba(182,8,201,.5); }
+
+    .gs-invite-import { margin: 4px 0 16px; padding: 14px; border: 1px dashed rgba(255,255,255,.22); border-radius: 18px; background: rgba(255,255,255,.03); }
+    .gs-invite-import__lbl { display: block; margin-bottom: 10px; font-size: .7rem; letter-spacing: .14em; text-transform: uppercase; color: #94a3b8; }
+    .gs-invite-import__tiles { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 8px; }
+    @media (max-width: 520px) { .gs-invite-import__tiles { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+    .gs-invite-wrap .gs-invite-card label.gs-invite-tile { display: flex !important; flex-direction: column !important; align-items: center !important; justify-content: center !important; gap: 6px; margin: 0 !important; padding: 12px 6px !important; text-transform: none !important; letter-spacing: 0 !important; font-size: .78rem; font-weight: 600; color: #e2e8f0 !important; text-align: center; }
+    .gs-invite-wrap .gs-invite-tile .gs-invite-tile__t { color: #e2e8f0 !important; }
+    .gs-invite-wrap .gs-invite-tile__t { text-transform: none; letter-spacing: 0; font-size: .78rem; font-weight: 600; line-height: 1.2; }
+    .gs-invite-wrap .gs-invite-step h3 { border: 0 !important; padding: 0 !important; }
+    .gs-invite-tile { all: unset; box-sizing: border-box; cursor: pointer; display: flex; flex-direction: column; align-items: center; gap: 6px; padding: 12px 6px; border-radius: 14px; text-align: center;
+        background: var(--gi-glass); border: 1px solid var(--gi-line); color: #e2e8f0; font-size: .78rem; font-weight: 600; transition: transform .16s, background .2s, border-color .2s, box-shadow .2s; }
+    .gs-invite-tile:hover { transform: translateY(-2px); background: var(--gi-glass-hi); border-color: rgba(110,193,228,.55); box-shadow: 0 10px 24px rgba(0,0,0,.3); }
+    .gs-invite-tile__ico--logo { background: #fff !important; box-shadow: 0 4px 12px rgba(0,0,0,.35); }
+    .gs-invite-tile__ico { width: 34px; height: 34px; border-radius: 50%; display: grid; place-items: center; font-size: 1rem; font-weight: 800; background: rgba(110,193,228,.16); color: #bfe6f7; }
+
+    .gs-invite-wrap .gs-invite-list { background: rgba(8,11,20,.4); border: 1px solid var(--gi-line); border-radius: 18px; overflow: hidden; }
+    .gs-invite-count { display: inline-grid; place-items: center; min-width: 22px; height: 22px; padding: 0 7px; margin-left: 6px; border-radius: 999px; background: linear-gradient(135deg, var(--gi-mag), var(--gi-blue)); color: #fff; font-size: .72rem; }
+    .gs-invite-wrap .gs-invite-list-body { display: flex; flex-wrap: wrap; gap: 6px; padding: 10px; max-height: 190px; }
+    .gs-invite-wrap .gs-invite-empty { flex: 1 1 100%; }
+    .gs-invite-wrap .gs-invite-row-item { gap: 8px; padding: 5px 6px 5px 12px; border-radius: 999px; background: var(--gi-glass-hi); border: 1px solid var(--gi-line); max-width: 100%; animation: gs-i-rise .25s ease-out both; }
+    .gs-invite-wrap .gs-invite-row-item .gs-invite-row-meta { flex-direction: row; align-items: baseline; gap: 6px; min-width: 0; }
+    .gs-invite-wrap .gs-invite-row-item .gs-invite-row-meta strong { font-size: .8rem; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+    .gs-invite-wrap .gs-invite-row-item .gs-invite-row-meta span { font-size: .72rem; }
+    .gs-invite-wrap .gs-invite-row-item .gs-invite-row-remove { width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center; font-size: 1rem; color: #fca5a5; }
+    .gs-invite-wrap .gs-invite-row-item .gs-invite-row-remove:hover { background: rgba(248,113,113,.2); }
+
+    .gs-invite-wrap .gs-invite-msg .wp-editor-wrap { border-radius: 16px; overflow: hidden; }
+    .gs-invite-wrap .gs-invite-msg .wp-switch-editor { border-radius: 10px 10px 0 0; }
+    .gs-invite-wrap .gs-invite-tpl-actions { margin-top: 14px; }
+
+    .gs-invite-sendbar { position: sticky; bottom: 0; z-index: 5; display: flex; align-items: center; justify-content: space-between; gap: 16px; margin-top: 18px; padding: 14px 18px;
+        background: linear-gradient(160deg, rgba(20,24,42,.82), rgba(12,15,28,.82)); border: 1px solid var(--gi-line); border-radius: 22px;
+        backdrop-filter: blur(24px) saturate(170%); -webkit-backdrop-filter: blur(24px) saturate(170%); box-shadow: 0 -10px 40px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.14); }
+    .gs-invite-sendbar__info { flex: 1; min-width: 0; }
+    .gs-invite-wrap .gs-invite-status { min-height: 1.2em; font-size: .88rem; }
+    .gs-invite-progress { height: 6px; margin-top: 8px; border-radius: 999px; background: rgba(255,255,255,.1); overflow: hidden; }
+    .gs-invite-progress[hidden] { display: none; }
+    .gs-invite-progress span { display: block; height: 100%; width: 0; border-radius: inherit; background: linear-gradient(90deg, var(--gi-mag), var(--gi-blue)); transition: width .3s ease; }
+    .gs-invite-wrap .gs-invite-btn--send { padding: 15px 30px; font-size: .95rem; font-weight: 800; letter-spacing: .02em; white-space: nowrap; }
+    .gs-invite-wrap .gs-invite-btn--send[disabled] { opacity: .4; box-shadow: none; }
+    @media (max-width: 560px) { .gs-invite-sendbar { flex-direction: column; align-items: stretch; } }
+
+    /* Sent invitations — glass rows */
+    .gs-invite-wrap .gs-invite-sent { border-top: 0; margin-top: 0; padding-top: 0; }
+    .gs-invite-wrap .gs-invite-sent-row { background: var(--gi-glass); border: 1px solid var(--gi-line); border-radius: 16px; backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); }
+    </style>
+
     <script>
     (function () {
         var WRAP_ID = <?php echo wp_json_encode( $wrap_id ); ?>;
@@ -1076,6 +1213,7 @@ function gend_society_invite_render_panel( $share = array() ) {
         }
 
         var staged = []; // { email, name }
+        if ( sendBtn ) sendBtn.disabled = true;
 
         function setStatus( msg, type ) {
             statusEl.textContent = msg || '';
@@ -1087,7 +1225,24 @@ function gend_society_invite_render_panel( $share = array() ) {
             return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test( String(e || '').trim() );
         }
 
+        var countEl     = wrap.querySelector('[data-gs-count]');
+        var progressEl  = wrap.querySelector('[data-gs-progress]');
+        function syncSendState() {
+            if ( countEl ) countEl.textContent = staged.length;
+            if ( sendBtn ) {
+                sendBtn.disabled = ! staged.length;
+                sendBtn.textContent = staged.length ? 'Send ' + staged.length + ' invite' + ( staged.length === 1 ? '' : 's' ) : 'Send invites';
+            }
+        }
+        function setProgress( done, total ) {
+            if ( ! progressEl ) return;
+            progressEl.hidden = ! total;
+            var bar = progressEl.firstElementChild;
+            if ( bar ) bar.style.width = ( total ? Math.round( done / total * 100 ) : 0 ) + '%';
+        }
+
         function renderList() {
+            syncSendState();
             if ( ! staged.length ) {
                 listBody.innerHTML = '<p class="gs-invite-empty">Add emails or upload a CSV to stage recipients.</p>';
                 return;
@@ -1112,27 +1267,59 @@ function gend_society_invite_render_panel( $share = array() ) {
             });
         }
 
-        function addEmail( email, name ) {
+        function addEmail( email, name, quiet ) {
             email = String(email || '').trim().toLowerCase();
             name  = String(name  || '').trim();
             if ( ! isValidEmail( email ) ) return false;
             if ( staged.some(function(r){ return r.email === email; }) ) return false;
             staged.push({ email: email, name: name });
-            renderList();
+            if ( ! quiet ) renderList();
             return true;
         }
 
+        // One box for one person or a whole list: "a@x.com, Sam Lee <sam@x.com>\nb@y.com c@z.com".
+        function parseEntries( text ) {
+            var out = [];
+            String( text || '' ).split(/[\n\r,;]+/).forEach(function ( piece ) {
+                piece = piece.trim();
+                if ( ! piece ) return;
+                var found = ( piece.match(/[^\s<>"'(),;:]+@[^\s<>"'(),;:]+\.[^\s<>"'(),;:]+/g) || [] ).map(function ( e ) { return e.replace(/[.\-_]+$/, ''); });
+                if ( found.length === 1 ) {
+                    out.push({ email: found[0], name: piece.replace( found[0], '' ).replace(/[<>"'()]/g, '').trim() });
+                } else {
+                    found.forEach(function ( e ) { out.push({ email: e, name: '' }); });
+                }
+            });
+            return out;
+        }
+        function addMany( text, fallbackName ) {
+            var items = parseEntries( text ), added = 0, dup = 0;
+            if ( items.length === 1 && ! items[0].name && fallbackName ) items[0].name = fallbackName;
+            items.forEach(function ( it ) { if ( addEmail( it.email, it.name, true ) ) added++; else dup++; });
+            renderList();
+            return { found: items.length, added: added, dup: dup };
+        }
+        function reportAdded( r ) {
+            if ( ! r.found ) { setStatus( 'Enter a valid email address.', 'error' ); return; }
+            if ( ! r.added ) { setStatus( 'Already in your list.', 'error' ); return; }
+            setStatus( 'Added ' + r.added + ( r.dup ? ' · ' + r.dup + ' already in the list' : '' ) + '.', 'success' );
+        }
+
         addBtn.addEventListener('click', function () {
-            var email = emailInput.value;
-            var name  = nameInput.value;
-            if ( ! isValidEmail( email ) ) {
-                setStatus( 'Enter a valid email address.', 'error' );
-                return;
+            var r = addMany( emailInput.value, nameInput.value );
+            reportAdded( r );
+            if ( r.added ) { emailInput.value = ''; nameInput.value = ''; }
+            emailInput.focus();
+        });
+        emailInput.addEventListener('keydown', function ( e ) {
+            if ( e.key === 'Enter' ) { e.preventDefault(); addBtn.click(); }
+        });
+        emailInput.addEventListener('paste', function ( e ) {
+            var t = ( e.clipboardData || window.clipboardData ).getData('text') || '';
+            if ( ( t.match(/@/g) || [] ).length > 1 || /[\n\r]/.test( t.trim() ) ) {
+                e.preventDefault();
+                reportAdded( addMany( t, '' ) );
             }
-            addEmail( email, name );
-            emailInput.value = '';
-            nameInput.value  = '';
-            setStatus( 'Added.', 'success' );
         });
 
         clearBtn.addEventListener('click', function () {
@@ -1223,34 +1410,52 @@ function gend_society_invite_render_panel( $share = array() ) {
             }).catch(function(){ setStatus( 'Network error.', 'error' ); });
         });
 
+        // Sent in batches of 20 so a long list never times out, with a live progress bar.
         sendBtn.addEventListener('click', function () {
             if ( ! staged.length ) { setStatus( 'No recipients staged.', 'error' ); return; }
+            var queue = staged.slice(), total = queue.length, done = 0, sent = 0, failed = [], skipped = [];
+            var subject = subjectInput.value, body = getBody();
             sendBtn.disabled = true;
-            setStatus( 'Sending ' + staged.length + ' invite' + ( staged.length === 1 ? '' : 's' ) + '…' );
-            fetch( REST_ROOT + '/send', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': REST_NONCE },
-                body: JSON.stringify({
-                    recipients: staged,
-                    subject: subjectInput.value,
-                    body:    getBody()
-                })
-            }).then(function(r){ return r.json(); }).then(function(d){
-                sendBtn.disabled = false;
-                if ( d && d.ok ) {
-                    setStatus( 'Sent ' + d.sent + ' / ' + d.total + ' invites.' + ( d.failed && d.failed.length ? ' Failed: ' + d.failed.join(', ') : '' ), d.failed && d.failed.length ? 'error' : 'success' );
-                    if ( ! d.failed || ! d.failed.length ) {
-                        staged = [];
-                        renderList();
+            setStatus( 'Sending ' + total + ' invite' + ( total === 1 ? '' : 's' ) + '…' );
+            setProgress( 0, total );
+            function next() {
+                if ( ! queue.length ) return finish();
+                var chunk = queue.splice( 0, 20 );
+                return fetch( REST_ROOT + '/send', {
+                    method: 'POST',
+                    credentials: 'same-origin',
+                    headers: { 'Content-Type': 'application/json', 'X-WP-Nonce': REST_NONCE },
+                    body: JSON.stringify({ recipients: chunk, subject: subject, body: body })
+                }).then(function ( r ) { return r.json(); }).then(function ( d ) {
+                    if ( d && d.ok ) {
+                        sent += d.sent || 0;
+                        failed = failed.concat( d.failed || [] );
+                        skipped = skipped.concat( d.skipped || [] );
+                    } else {
+                        failed = failed.concat( chunk.map(function ( c ) { return c.email; }) );
                     }
-                } else {
-                    setStatus( ( d && d.message ) || 'Send failed.', 'error' );
-                }
-            }).catch(function(){
-                sendBtn.disabled = false;
-                setStatus( 'Network error.', 'error' );
-            });
+                }).catch(function () {
+                    failed = failed.concat( chunk.map(function ( c ) { return c.email; }) );
+                }).then(function () {
+                    done += chunk.length;
+                    setProgress( done, total );
+                    setStatus( 'Sending… ' + done + ' of ' + total );
+                    return next();
+                });
+            }
+            function finish() {
+                var done_emails = {};
+                failed.forEach(function ( e ) { done_emails[ e ] = 1; });
+                staged = staged.filter(function ( r ) { return done_emails[ r.email ]; });
+                renderList();
+                var msg = 'Sent ' + sent + ' invite' + ( sent === 1 ? '' : 's' ) + '.';
+                if ( skipped.length ) msg += ' ' + skipped.length + ' already on gend.me (skipped).';
+                if ( failed.length ) msg += ' Could not send to: ' + failed.join(', ');
+                setStatus( msg, failed.length || ! sent ? 'error' : 'success' );
+                setTimeout(function () { setProgress( 0, 0 ); }, 1500 );
+                if ( sent && typeof refreshSent === 'function' ) { try { refreshSent(); } catch ( e ) {} }
+            }
+            next();
         });
 
         // ── OAuth contacts (Google / Microsoft) ─────────────────────────
@@ -1707,7 +1912,14 @@ function gend_society_invite_render_panel( $share = array() ) {
                 });
             });
 
-            // ── Email sub-tabs (Individual / Bulk) ───────────────────
+            // The Grow-your-network popup hosts this panel in an iframe and drives its tabs by message.
+            window.addEventListener('message', function ( e ) {
+                if ( e.origin !== location.origin || ! e.data || ! e.data.gsInviteTab ) return;
+                var t = wrap.querySelector('.gs-invite-tab[data-gs-tab="' + e.data.gsInviteTab + '"]');
+                if ( t ) t.click();
+            });
+
+            // ── Email sub-tabs (retired: single + bulk are one screen now) ───
             var subtabs   = wrap.querySelectorAll('.gs-invite-subtab');
             var subpanels = wrap.querySelectorAll('.gs-invite-subpanel');
             subtabs.forEach(function ( tab ) {
@@ -1926,6 +2138,7 @@ function gend_society_invite_send_one( $sender, $email, $name, $subject_tpl, $bo
     );
     $subject = gend_society_invite_render_template( $subject_tpl, $vars );
     $body    = gend_society_invite_render_template( $body_tpl,    $vars );
+    $body    = gend_society_invite_add_tracking_to_links( $body, $sender->ID );
     $body    = gend_society_invite_inject_tracking( $body, $sender->ID, $log_id );
 
     $headers = array(
@@ -2130,5 +2343,44 @@ function gend_society_invite_ajax_panel_fragment() {
     }
     header( 'Content-Type: text/html; charset=utf-8' );
     gend_society_invite_render_panel( $share );
+    exit;
+}
+
+/**
+ * The invite panel as its own document, for iframes (Grow-your-network popup, chat widget). Its email body is a
+ * wp_editor(), whose TinyMCE assets only exist on pages that enqueue them — grafting the bare fragment into an
+ * arbitrary page (or a PJAX-swapped one) left a raw textarea. A real document always loads them.
+ * admin-ajax counts as is_admin(), so the editor registers its init on the ADMIN footer action.
+ */
+add_action( 'wp_ajax_gend_society_invite_frame', 'gend_society_invite_ajax_frame' );
+function gend_society_invite_ajax_frame() {
+    if ( ! is_user_logged_in() ) {
+        status_header( 403 );
+        exit;
+    }
+    $share = array();
+    if ( ! empty( $_REQUEST['share_url'] ) ) {
+        $u = esc_url_raw( (string) wp_unslash( $_REQUEST['share_url'] ) );
+        if ( $u && wp_parse_url( $u, PHP_URL_HOST ) === wp_parse_url( home_url(), PHP_URL_HOST ) ) {
+            $share = array( 'url' => $u, 'title' => sanitize_text_field( (string) wp_unslash( $_REQUEST['share_title'] ?? '' ) ) );
+        }
+    }
+    if ( function_exists( 'wp_enqueue_editor' ) ) wp_enqueue_editor();
+    wp_enqueue_style( 'dashicons' );
+    wp_enqueue_style( 'buttons' );
+    wp_enqueue_style( 'editor-buttons' );
+    header( 'Content-Type: text/html; charset=utf-8' );
+    echo '<!doctype html><html><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">';
+    echo '<style>html,body{margin:0;padding:0;background:transparent;color:#e8edf5;font-family:Inter,"Segoe UI",system-ui,sans-serif}body{padding:2px 2px 18px}</style>';
+    wp_print_styles();
+    wp_print_head_scripts();
+    echo '</head><body class="gs-invite-frame">';
+    gend_society_invite_render_panel( $share, array( 'embedded' => ! empty( $_REQUEST['embedded'] ) ) );
+    if ( is_admin() ) {
+        do_action( 'admin_print_footer_scripts' );
+    } else {
+        wp_print_footer_scripts();
+    }
+    echo '</body></html>';
     exit;
 }
