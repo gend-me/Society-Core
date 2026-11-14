@@ -372,7 +372,10 @@ add_filter(
 			return gend_society_chat_tools_pick( array( $rest( 'POST', '/wc/v3/products', $body ) ), array( 'id', 'name', 'status', 'error' ) )[0];
 		} );
 		$add( 'store_product_update', 'Update a product. Changing its price or status needs the member\'s confirmation.', array( 'id' => $num, 'name' => $str, 'description' => $str, 'short_description' => $str, 'sku' => $str, 'regular_price' => $str, 'sale_price' => $str, 'status' => $str, 'stock_quantity' => $num, 'stock_status' => $str, 'manage_stock' => array( 'type' => 'boolean' ), 'image_id' => $num, 'categories' => array( 'type' => 'array', 'items' => $obj ) ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
-			$body = array_diff_key( $a, array( 'id' => 1, 'image_id' => 1 ) );
+			// Security 2026-11-14 (Incident #7517): only the declared fields go to WooCommerce. Every key the AI sent
+			// used to be forwarded, so meta_data, downloads or sale dates could change without the Confirm that
+			// prices and status need.
+			$body = array_intersect_key( $a, array_flip( array( 'name', 'description', 'short_description', 'sku', 'regular_price', 'sale_price', 'status', 'stock_quantity', 'stock_status', 'manage_stock', 'categories' ) ) );
 			if ( ! empty( $a['image_id'] ) ) {
 				$body['images'] = array( array( 'id' => (int) $a['image_id'] ) );
 			}
@@ -383,14 +386,14 @@ add_filter(
 		} );
 		$add( 'store_variation_save', 'Create a variation of a product, or update one when variation_id is given. Prices need the member\'s confirmation.', array( 'product_id' => $num, 'variation_id' => $num, 'regular_price' => $str, 'sale_price' => $str, 'sku' => $str, 'stock_quantity' => $num, 'status' => $str, 'attributes' => array( 'type' => 'array', 'items' => $obj ) ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
 			$base = '/wc/v3/products/' . (int) ( $a['product_id'] ?? 0 ) . '/variations';
-			$body = array_diff_key( $a, array( 'product_id' => 1, 'variation_id' => 1 ) );
+			$body = array_intersect_key( $a, array_flip( array( 'regular_price', 'sale_price', 'sku', 'stock_quantity', 'status', 'attributes' ) ) ); // declared fields only (security 2026-11-14)
 			$r    = ! empty( $a['variation_id'] ) ? $rest( 'PUT', $base . '/' . (int) $a['variation_id'], $body ) : $rest( 'POST', $base, $body );
 			return isset( $r['error'] ) ? $r : array_intersect_key( $r, array_flip( array( 'id', 'status', 'price', 'regular_price', 'sale_price', 'stock_quantity' ) ) );
 		}, static function ( $a ) use ( $prices ) {
 			return gend_society_chat_tools_has_key( $a, $prices ) ? 'confirm' : 'write';
 		} );
 		$add( 'store_category_save', 'Create a product category, or edit one when id is given.', array( 'id' => $num, 'name' => $str, 'parent' => $num, 'description' => $str ), 'store.store_management', $store, 'write', '', static function ( $a ) use ( $rest ) {
-			$body = array_diff_key( $a, array( 'id' => 1 ) );
+			$body = array_intersect_key( $a, array_flip( array( 'name', 'parent', 'description' ) ) ); // declared fields only (security 2026-11-14)
 			$r    = ! empty( $a['id'] ) ? $rest( 'PUT', '/wc/v3/products/categories/' . (int) $a['id'], $body ) : $rest( 'POST', '/wc/v3/products/categories', $body );
 			return isset( $r['error'] ) ? $r : array_intersect_key( $r, array_flip( array( 'id', 'name', 'slug', 'parent' ) ) );
 		} );

@@ -8,6 +8,21 @@
 
 defined( 'ABSPATH' ) || exit;
 
+if ( ! function_exists( 'gend_society_sb_trust_raw_html' ) ) {
+	/**
+	 * Is the markup a setup save receives stored as sent? Never (security 2026-11-14, Incident #7517).
+	 *
+	 * These saves are called by chat tools, with markup an AI wrote. They used to skip cleaning when the acting user
+	 * could post unfiltered HTML, and on a web app in its own container the tool acts as the site's first
+	 * administrator, who can: an event handler or javascript: link the AI was talked into writing went straight into
+	 * a header, layout, tab or dashboard that every visitor loads. Sub-sites of the network were always cleaned (their
+	 * admins cannot post unfiltered HTML), so this makes containers behave the same.
+	 */
+	function gend_society_sb_trust_raw_html() {
+		return false;
+	}
+}
+
 const GEND_SOCIETY_SB_OPTION = 'gend_society_setup_brand';
 
 /** The saved colours, or nothing when this site wasn't set up through the chat. */
@@ -1031,7 +1046,7 @@ function gend_society_sb_dashboard_save( array $a ) {
 			$id = $base . '-' . $n;
 		}
 	}
-	$raw  = current_user_can( 'unfiltered_html' );
+	$raw  = gend_society_sb_trust_raw_html();
 	$list = array();
 	foreach ( array_slice( (array) ( $a['sections'] ?? array() ), 0, 20 ) as $i => $s ) {
 		if ( ! is_array( $s ) ) {
@@ -1579,7 +1594,7 @@ function gend_society_sb_social_header_save( array $a ) {
 		return array( 'error' => 'groups' === $scope ? 'Group headers need the Projects app.' : 'Profile headers are not available on this web app.' );
 	}
 	$content = (string) ( $a['content'] ?? '' );
-	$content = current_user_can( 'unfiltered_html' ) ? $content : wp_kses_post( $content );
+	$content = gend_society_sb_trust_raw_html() ? $content : wp_kses_post( $content );
 	if ( '' === trim( $content ) ) {
 		return array( 'error' => 'content is required.' );
 	}
@@ -1644,7 +1659,7 @@ function gend_society_sb_social_layout_save( array $a ) {
 		return array( 'error' => 'slug is one of: ' . implode( ', ', GEND_SOCIETY_SB_TOP_LAYOUTS ) . '.' );
 	}
 	$top = (string) ( $a['top'] ?? '' );
-	$top = current_user_can( 'unfiltered_html' ) ? $top : wp_kses_post( $top );
+	$top = gend_society_sb_trust_raw_html() ? $top : wp_kses_post( $top );
 	if ( '' === trim( $top ) ) {
 		return array( 'error' => 'top is required.' );
 	}
@@ -1712,7 +1727,7 @@ function gend_society_sb_studio_template_save( array $a ) {
 		$base    = function_exists( 'get_block_template' ) ? get_block_template( get_stylesheet() . '//' . ( $defs[ $slug ]['base'] ?? 'page' ) ) : null;
 		$content = $base ? (string) $base->content : '';
 	}
-	$content = current_user_can( 'unfiltered_html' ) ? $content : wp_kses_post( $content );
+	$content = gend_society_sb_trust_raw_html() ? $content : wp_kses_post( $content );
 	if ( '' === trim( $content ) ) {
 		return array( 'error' => 'The theme has no layout to start from; send content.' );
 	}
@@ -1799,7 +1814,7 @@ function gend_society_sb_social_tab_content_save( array $a ) {
 		return array( 'error' => $t->get_error_message() );
 	}
 	$content = (string) ( $a['content'] ?? '' );
-	$content = current_user_can( 'unfiltered_html' ) ? $content : wp_kses_post( $content );
+	$content = gend_society_sb_trust_raw_html() ? $content : wp_kses_post( $content );
 	if ( '' === trim( $content ) ) {
 		return array( 'error' => 'content is required.' );
 	}
@@ -1878,7 +1893,7 @@ function gend_society_sb_proposal_template_save( array $a ) {
 		return array( 'error' => 'title is required.' );
 	}
 	$kses    = static function ( $html ) {
-		return current_user_can( 'unfiltered_html' ) ? (string) $html : wp_kses_post( (string) $html );
+		return gend_society_sb_trust_raw_html() ? (string) $html : wp_kses_post( (string) $html );
 	};
 	$product = static function ( $pid ) {
 		$pid = absint( $pid );

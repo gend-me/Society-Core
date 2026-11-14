@@ -271,11 +271,50 @@ function gend_society_bust_profile_page_render_cache( $post_id, $post ) {
 
 // ─── Auto-create a profile page for new users ─────────────────────────────────
 
+/**
+ * Is $post_id this member's profile page on the current site? A bare get_post()
+ * also matched other posts with the same ID (e.g. a subsite ID stored by mistake).
+ */
+function gend_society_is_own_profile_page( $post_id, $user_id ) {
+    $post = $post_id ? get_post( (int) $post_id ) : null;
+    return $post && 'gdc_profile_page' === $post->post_type && (int) $post->post_author === (int) $user_id
+        && ! in_array( $post->post_status, [ 'trash', 'auto-draft' ], true );
+}
+
+/** The member's existing profile page on this site: newest one with content, else newest. */
+function gend_society_find_own_profile_page( $user_id ) {
+    global $wpdb;
+    $id = (int) $wpdb->get_var( $wpdb->prepare(
+        "SELECT ID FROM {$wpdb->posts} WHERE post_type = 'gdc_profile_page' AND post_author = %d AND post_status NOT IN ('trash','auto-draft','inherit')
+         ORDER BY (TRIM(post_content) <> '') DESC, post_modified_gmt DESC, ID DESC LIMIT 1",
+        (int) $user_id
+    ) );
+    return $id;
+}
+
 add_action( 'user_register', 'gend_society_create_user_profile_page', 20 );
 function gend_society_create_user_profile_page( $user_id ) {
+    // The pointer is network-wide user meta, so the page always lives on the main
+    // site. Created from a subsite (a member's profile viewed on a web app), it used
+    // to land in that subsite's table and overwrite the pointer, so the next main-site
+    // view made yet another blank page.
+    if ( is_multisite() && ! is_main_site() ) {
+        switch_to_blog( get_main_site_id() );
+        gend_society_create_user_profile_page( $user_id );
+        restore_current_blog();
+        return;
+    }
+
     // Bail if the user already has a valid post
-    $existing_id = get_user_meta( $user_id, '_gend_society_profile_page_id', true );
-    if ( $existing_id && get_post( (int) $existing_id ) ) return;
+    $existing_id = (int) get_user_meta( $user_id, '_gend_society_profile_page_id', true );
+    if ( gend_society_is_own_profile_page( $existing_id, $user_id ) ) return;
+
+    // Re-point at a page they already have instead of starting a blank one.
+    $found = gend_society_find_own_profile_page( $user_id );
+    if ( $found ) {
+        update_user_meta( $user_id, '_gend_society_profile_page_id', $found );
+        return;
+    }
 
     $user = get_user_by( 'id', $user_id );
     if ( ! $user ) return;
@@ -289,7 +328,7 @@ function gend_society_create_user_profile_page( $user_id ) {
         'meta_input'   => [ '_gdc_owner_user_id' => $user_id ],
     ] );
 
-    if ( ! is_wp_error( $post_id ) ) {
+    if ( $post_id && ! is_wp_error( $post_id ) ) {
         update_user_meta( $user_id, '_gend_society_profile_page_id', $post_id );
     }
 }
@@ -302,9 +341,15 @@ function gend_society_create_user_profile_page( $user_id ) {
 // ─── Helper: get (or lazily create) a user's profile page post ID ─────────────
 
 function gend_society_get_user_profile_page_id( $user_id ) {
+    // The page lives on the main site; on a subsite its ID means nothing in this
+    // site's posts table, so there is nothing to show (and nothing to create).
+    if ( is_multisite() && ! is_main_site() ) {
+        return 0;
+    }
+
     $post_id = (int) get_user_meta( $user_id, '_gend_society_profile_page_id', true );
 
-    if ( $post_id && get_post( $post_id ) ) {
+    if ( gend_society_is_own_profile_page( $post_id, $user_id ) ) {
         return $post_id;
     }
 
