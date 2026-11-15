@@ -34,7 +34,7 @@ function gend_society_da_dashboards()
         'theme_builder'      => array(__('Theme Builder', 'gend-society'), __('App', 'gend-society'), 'gs-content', array('site-editor.php', 'gs-design-studio'), array('edit_theme_options'), array('edit_theme_options'), false),
         'content_campaigns'  => array(__('Content Campaigns', 'gend-society'), __('App', 'gend-society'), 'gs-content', array('content-campaigns', 'blog-manager'), array('edit_posts', 'upload_files'), array('edit_posts', 'upload_files', 'edit_others_posts', 'publish_posts'), false),
         'talk_flows'         => array(__('Talk Flows', 'gend-society'), __('App', 'gend-society'), 'gs-content', array('talk-flows'), array(), array(), false),
-        'store_management'   => array(__('Store Management', 'gend-society'), __('Store', 'gend-society'), 'gs-store', array('gdc-store-settings', 'gdc-store-reports'), array(), array(), false),
+        'store_management'   => array(__('Store Management', 'gend-society'), __('Store', 'gend-society'), 'gs-store', array('gdc-store-settings', 'gdc-store-reports'), array('read_product', 'edit_products', 'edit_published_products', 'edit_others_products', 'publish_products', 'read_private_products', 'assign_product_terms', 'upload_files', 'read_shop_order', 'edit_shop_orders', 'edit_others_shop_orders', 'edit_published_shop_orders', 'read_private_shop_orders', 'view_woocommerce_reports'), array('manage_woocommerce', 'manage_product_terms', 'edit_product_terms', 'delete_products', 'delete_published_products', 'delete_others_products', 'edit_shop_coupons', 'edit_others_shop_coupons', 'publish_shop_coupons', 'read_private_shop_coupons'), false),
         'sales_team'         => array(__('Sales Team', 'gend-society'), __('Store', 'gend-society'), 'gs-store', array('st_sales_team'), array(), array(), false),
         'project_services'   => array(__('Project Services', 'gend-society'), __('Store', 'gend-society'), 'gs-store', array('psoo-projects'), array(), array(), false),
         'social_profiles'    => array(__('Member Management', 'gend-society'), __('Social', 'gend-society'), 'gs-social', array('gdc-social-network-settings'), array(), array(), false),
@@ -288,7 +288,7 @@ add_filter('rest_authentication_errors', function ($result) {
 /** Pages that already check the dashboard capabilities (each plugin adds its own as it is converted). */
 add_filter('gend_society_da_page_converted', function ($ok, $slug) {
     // WordPress's Site Editor only needs edit_theme_options, which a Theme Builder level grants.
-    return $ok || in_array($slug, array('site-editor.php', 'content-campaigns', 'blog-manager', 'talk-flows'), true);
+    return $ok || in_array($slug, array('site-editor.php', 'content-campaigns', 'blog-manager', 'talk-flows', 'gdc-store-settings', 'gdc-store-reports'), true);
 }, 10, 2);
 
 /** Content Campaigns (blog-manager): a Content Campaigns level opens the workspace (BM_Access::can_admin). */
