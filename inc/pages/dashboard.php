@@ -19,10 +19,11 @@ function gend_society_dashboard_save_app_settings()
     check_admin_referer('gs_app_settings_action', 'gs_app_settings_nonce');
 
     if (isset($_POST['gs_app_title'])) {
-        update_option('blogname', sanitize_text_field($_POST['gs_app_title']));
+        update_option('blogname', sanitize_text_field(wp_unslash($_POST['gs_app_title'])));
     }
     if (isset($_POST['gs_app_tagline'])) {
-        update_option('blogdescription', sanitize_text_field($_POST['gs_app_tagline']));
+        // wp_unslash: without it every save added a backslash before ' and " (tagline showed "don\'t").
+        update_option('blogdescription', sanitize_text_field(wp_unslash($_POST['gs_app_tagline'])));
     }
     if (isset($_POST['gs_app_icon'])) {
         update_option('site_icon', absint($_POST['gs_app_icon']));
