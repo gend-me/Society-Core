@@ -420,6 +420,10 @@
         scrim.setAttribute('aria-hidden', 'true');
         document.body.appendChild(scrim);
 
+        // Nav mode = the media query OR html.gs-nav-compact: wider screens whose header links do not fit
+        // (narrow desktop windows, browser zoom, more/longer group links) switch to the menu button + drawer
+        // instead of clipping the last links (2026-11-15).
+        function navMode() { return mq.matches || root.classList.contains('gs-nav-compact'); }
         function isOpen() { return root.classList.contains('gs-nav-open'); }
         function setOpen(on) {
             root.classList.toggle('gs-nav-open', !!on);
@@ -435,7 +439,7 @@
         document.addEventListener('keydown', function (e) {
             if (e.key === 'Escape' && isOpen()) { setOpen(false); btn.focus(); }
         });
-        var onChange = function () { if (!mq.matches) { setOpen(false); } };
+        var onChange = function () { checkFit(); if (!navMode()) { setOpen(false); } };
         if (mq.addEventListener) { mq.addEventListener('change', onChange); } else if (mq.addListener) { mq.addListener(onChange); }
         // Back/forward cache restores the page with the drawer still open.
         window.addEventListener('pageshow', function (e) { if (e.persisted) { setOpen(false); } });
@@ -449,7 +453,7 @@
             li.classList.toggle('gs-sub-open', open);
             a.setAttribute('aria-expanded', open ? 'true' : 'false');
             a.addEventListener('click', function (e) {
-                if (!mq.matches) { return; }
+                if (!navMode()) { return; }
                 e.preventDefault();
                 var willOpen = !li.classList.contains('gs-sub-open');
                 li.classList.toggle('gs-sub-open', willOpen);
@@ -457,8 +461,8 @@
             });
         });
 
-        // Phones have no room for the header's connected-group links, so the
-        // drawer repeats them at the top (CSS shows this block only <=600px).
+        // In nav mode the header's connected-group links move to the top of the drawer
+        // (CSS shows this block only in nav mode).
         var groupLinks = header.querySelectorAll('.nav-central--group .gs-group-nav-item');
         if (groupLinks.length) {
             var data = window.gsAdminData || {};
@@ -474,6 +478,43 @@
             li.innerHTML = html + '</div>';
             menu.insertBefore(li, menu.firstChild);
         }
+
+        // Fit check (desktop sizes): if the group links overflow their slot, run into the profile button or push
+        // the header wider than the window, switch to compact nav mode. Remember the width that was needed and
+        // switch back only once the window is that wide again (the links are hidden while compact).
+        var nav = header.querySelector('.nav-central--group');
+        var needW = 0;
+        function overflowBy() {
+            if (!nav) { return 0; }
+            var nr = nav.getBoundingClientRect();
+            var over = Math.max(0, nav.scrollWidth - nav.clientWidth, header.scrollWidth - header.clientWidth);
+            var items = nav.querySelectorAll('.gs-group-nav-item');
+            if (items.length) { over = Math.max(over, items[items.length - 1].getBoundingClientRect().right - nr.right); }
+            var next = nav.nextElementSibling;
+            while (next && !next.getBoundingClientRect().width) { next = next.nextElementSibling; }
+            if (next) { over = Math.max(over, nr.right + 12 - next.getBoundingClientRect().left); }
+            items.forEach(function (it) { if (it.scrollWidth > it.clientWidth + 2) { over = Math.max(over, it.scrollWidth - it.clientWidth); } });
+            return Math.ceil(over);
+        }
+        function checkFit() {
+            if (!nav || mq.matches) { root.classList.remove('gs-nav-compact'); return; }
+            if (root.classList.contains('gs-nav-compact')) {
+                if (needW && window.innerWidth >= needW) {
+                    root.classList.remove('gs-nav-compact');
+                    setOpen(false);
+                    var o = overflowBy();
+                    if (o > 0) { needW = window.innerWidth + o + 24; root.classList.add('gs-nav-compact'); }
+                }
+                return;
+            }
+            var over = overflowBy();
+            if (over > 0) { needW = window.innerWidth + over + 24; root.classList.add('gs-nav-compact'); }
+        }
+        var fitT = 0;
+        window.addEventListener('resize', function () { clearTimeout(fitT); fitT = setTimeout(checkFit, 80); });
+        if (document.fonts && document.fonts.ready) { document.fonts.ready.then(checkFit); }
+        window.addEventListener('load', checkFit);
+        checkFit();
     }
 
     document.addEventListener('DOMContentLoaded', function () {
