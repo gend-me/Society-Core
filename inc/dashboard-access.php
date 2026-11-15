@@ -288,7 +288,7 @@ add_filter('rest_authentication_errors', function ($result) {
 /** Pages that already check the dashboard capabilities (each plugin adds its own as it is converted). */
 add_filter('gend_society_da_page_converted', function ($ok, $slug) {
     // WordPress's Site Editor only needs edit_theme_options, which a Theme Builder level grants.
-    return $ok || in_array($slug, array('site-editor.php', 'content-campaigns', 'blog-manager'), true);
+    return $ok || in_array($slug, array('site-editor.php', 'content-campaigns', 'blog-manager', 'talk-flows'), true);
 }, 10, 2);
 
 /** Content Campaigns (blog-manager): a Content Campaigns level opens the workspace (BM_Access::can_admin). */
