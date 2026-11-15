@@ -78,7 +78,8 @@ function gend_society_da_user_levels($uid)
     static $cache = array();
     $uid = (int) $uid;
     if ($uid <= 0) return array();
-    if (isset($cache[$uid])) return $cache[$uid];
+    $ck = $uid . '@' . get_current_blog_id(); // 2026-11-15: per site (switch_to_blog)
+    if (isset($cache[$ck])) return $cache[$ck];
     $lv = gend_society_da_levels();
     $out = array();
     $take = function ($map) use (&$out, $lv) {
@@ -95,9 +96,21 @@ function gend_society_da_user_levels($uid)
     if (isset($c['users'][$uid])) $take($c['users'][$uid]);
     $grants = get_user_meta($uid, 'gend_society_member_grants', true);
     foreach (is_array($grants) ? $grants : array() as $g) {
+        if (!gend_society_da_grant_here($g)) continue;
         if (!empty($g['access'])) $take($g['access']);
     }
-    return $cache[$uid] = $out;
+    return $cache[$ck] = $out;
+}
+
+/**
+ * 2026-11-15: user meta is network-wide on multisite, so a task grant only counts on the site it was given for
+ * (its 'site'). Single sites (containers) take every grant.
+ */
+function gend_society_da_grant_here($g)
+{
+    if (!is_array($g)) return false;
+    if (!is_multisite()) return true;
+    return (int) ($g['site'] ?? 0) === (int) get_current_blog_id();
 }
 
 function gend_society_da_level($uid, $key)
@@ -223,7 +236,7 @@ function gend_society_da_snapshot($search = '')
     foreach (get_users(array('meta_key' => 'gend_society_member_grants', 'number' => 200, 'fields' => array('ID', 'display_name'))) as $u) {
         $g = get_user_meta($u->ID, 'gend_society_member_grants', true);
         foreach (is_array($g) ? $g : array() as $ref => $row) {
-            if (!empty($row['access'])) $grants[] = array('user' => (int) $u->ID, 'name' => $u->display_name, 'ref' => (string) $ref, 'access' => $row['access']);
+            if (!empty($row['access']) && gend_society_da_grant_here($row)) $grants[] = array('user' => (int) $u->ID, 'name' => $u->display_name, 'ref' => (string) $ref, 'access' => $row['access']);
         }
     }
     return array('dashboards' => $dash, 'types' => $types, 'people' => $people, 'config' => gend_society_da_config(), 'grants' => $grants);
