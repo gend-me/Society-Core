@@ -102,7 +102,10 @@
             groupNav +
             cluster +
             '<div class="visit-site-slot">' +
-                '<a href="' + escapeHtml(data.viewSiteUrl || '/') + '" class="btn-visit-site" target="_blank" rel="noopener">View Site</a>' +
+                '<a href="' + escapeHtml(data.viewSiteUrl || '/') + '" class="btn-visit-site" target="_blank" rel="noopener" aria-label="View Site">' +
+                    '<span class="dashicons dashicons-external gs-vs-icon" aria-hidden="true"></span>' +
+                    '<span class="gs-vs-label">View Site</span>' +
+                '</a>' +
             '</div>';
     }
 
@@ -386,6 +389,93 @@
         });
     }
 
+    // ── Touch / tablet / phone navigation ──────────────────────────
+    // The rail above opens on hover, which touch screens don't have, and WP
+    // core hides #adminmenuwrap at <=782px expecting the admin-bar toggle
+    // (hidden on gend.me). In this mode (same query as the CSS section
+    // "TOUCH / TABLET / PHONE NAV") the header gets a menu button, the rail
+    // becomes an off-canvas drawer with full labels, and a parent row with a
+    // submenu expands it in place instead of navigating.
+    var NAV_MQ = '(max-width: 1024px), (hover: none) and (pointer: coarse)';
+
+    function setupTouchNav() {
+        var menuMain = document.getElementById('adminmenumain');
+        var menu = document.getElementById('adminmenu');
+        var header = document.getElementById('main-3d-header');
+        if (!menuMain || !menu || !header || !window.matchMedia) { return; }
+        var mq = window.matchMedia(NAV_MQ);
+        var root = document.documentElement;
+
+        var btn = document.createElement('button');
+        btn.type = 'button';
+        btn.className = 'gs-nav-toggle';
+        btn.setAttribute('aria-controls', 'adminmenumain');
+        btn.setAttribute('aria-expanded', 'false');
+        btn.setAttribute('aria-label', 'Open menu');
+        btn.innerHTML = '<span class="gs-nav-toggle-bars" aria-hidden="true"><span></span><span></span><span></span></span>';
+        header.insertBefore(btn, header.firstChild);
+
+        var scrim = document.createElement('div');
+        scrim.className = 'gs-nav-scrim';
+        scrim.setAttribute('aria-hidden', 'true');
+        document.body.appendChild(scrim);
+
+        function isOpen() { return root.classList.contains('gs-nav-open'); }
+        function setOpen(on) {
+            root.classList.toggle('gs-nav-open', !!on);
+            btn.setAttribute('aria-expanded', on ? 'true' : 'false');
+            btn.setAttribute('aria-label', on ? 'Close menu' : 'Open menu');
+            if (on) {
+                var cur = menu.querySelector('li.gs-sub-open, li.current, li.wp-has-current-submenu');
+                if (cur && cur.scrollIntoView) { cur.scrollIntoView({ block: 'nearest' }); }
+            }
+        }
+        btn.addEventListener('click', function (e) { e.stopPropagation(); setOpen(!isOpen()); });
+        scrim.addEventListener('click', function () { setOpen(false); });
+        document.addEventListener('keydown', function (e) {
+            if (e.key === 'Escape' && isOpen()) { setOpen(false); btn.focus(); }
+        });
+        var onChange = function () { if (!mq.matches) { setOpen(false); } };
+        if (mq.addEventListener) { mq.addEventListener('change', onChange); } else if (mq.addListener) { mq.addListener(onChange); }
+        // Back/forward cache restores the page with the drawer still open.
+        window.addEventListener('pageshow', function (e) { if (e.persisted) { setOpen(false); } });
+
+        // Accordion: the current section starts open; tapping a parent row
+        // toggles its own submenu (the submenu's first row is the parent page).
+        menu.querySelectorAll('li.wp-has-submenu').forEach(function (li) {
+            var a = li.querySelector(':scope > a');
+            if (!a || !li.querySelector(':scope > .wp-submenu')) { return; }
+            var open = li.classList.contains('wp-has-current-submenu') || li.classList.contains('wp-menu-open');
+            li.classList.toggle('gs-sub-open', open);
+            a.setAttribute('aria-expanded', open ? 'true' : 'false');
+            a.addEventListener('click', function (e) {
+                if (!mq.matches) { return; }
+                e.preventDefault();
+                var willOpen = !li.classList.contains('gs-sub-open');
+                li.classList.toggle('gs-sub-open', willOpen);
+                a.setAttribute('aria-expanded', willOpen ? 'true' : 'false');
+            });
+        });
+
+        // Phones have no room for the header's connected-group links, so the
+        // drawer repeats them at the top (CSS shows this block only <=600px).
+        var groupLinks = header.querySelectorAll('.nav-central--group .gs-group-nav-item');
+        if (groupLinks.length) {
+            var data = window.gsAdminData || {};
+            var li = document.createElement('li');
+            li.className = 'gs-drawer-group';
+            var html = '<span class="gs-drawer-group-title">' + escapeHtml(data.gendGroupName || 'gend.me group') + '</span><div class="gs-drawer-group-links">';
+            groupLinks.forEach(function (g) {
+                var icon = g.querySelector('.dashicons');
+                html += '<a href="' + escapeHtml(g.getAttribute('href')) + '" target="_blank" rel="noopener">' +
+                    (icon ? '<span class="dashicons ' + escapeHtml(icon.className.replace('gs-group-nav-icon', '')) + '" aria-hidden="true"></span>' : '') +
+                    '<span>' + escapeHtml(g.textContent.trim()) + '</span></a>';
+            });
+            li.innerHTML = html + '</div>';
+            menu.insertBefore(li, menu.firstChild);
+        }
+    }
+
     document.addEventListener('DOMContentLoaded', function () {
         injectHeader();
         bindProfileDropdown();
@@ -394,5 +484,6 @@
         enhanceSubmenus();
         normalizeMenuLabels();
         scrollHoveredItemIntoView();
+        setupTouchNav();
     });
 })();
