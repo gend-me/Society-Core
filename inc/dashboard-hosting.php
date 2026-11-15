@@ -4613,13 +4613,18 @@ function gend_society_hosting_read_logs( $limit = 200 ) {
         $sources[] = array( 'path' => trailingslashit( WP_CONTENT_DIR ) . 'debug.log', 'label' => 'debug.log' );
     }
     $php_log = ini_get( 'error_log' );
-    if ( $php_log && $php_log !== 'syslog' && $php_log !== '' ) {
+    if ( $php_log && 0 === strpos( $php_log, '/dev/' ) ) {
+        // Containers send PHP errors to the pod log (stderr): there is no file to tail here.
+        $warnings[] = 'PHP errors go to the server (container) log, not a file, so they are not shown here.';
+    } elseif ( $php_log && $php_log !== 'syslog' && $php_log !== '' ) {
         $sources[] = array( 'path' => $php_log, 'label' => 'php' );
     }
 
     foreach ( $sources as $s ) {
         if ( ! is_readable( $s['path'] ) ) {
-            $warnings[] = sprintf( 'Could not read %s (does not exist or unreadable).', $s['label'] );
+            $warnings[] = ( 'debug.log' === $s['label'] && ! file_exists( $s['path'] ) )
+                ? 'No debug.log yet: WordPress debug logging is off on this site.'
+                : sprintf( 'Could not read %s (does not exist or unreadable).', $s['label'] );
             continue;
         }
         $size = @filesize( $s['path'] );

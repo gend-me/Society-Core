@@ -316,7 +316,7 @@ function gend_society_dk_render() {
 	$plan = gend_society_dk_plan_label( isset( $info['plan'] ) ? $info['plan'] : '' );
 	// Each dashboard pads its own wrapper differently: the header moves inside it so both line up.
 	$targets = array(
-		'home'       => '#wpbody-content .wrap.gs-page',
+		'home'       => '#wpbody-content > .gs-dashboard-wrap', // .wrap.gs-page is the Feature Access page parked in a hidden PROJECTS source
 		'blog'       => '#wpbody-content .gdc-admin-dashboard',
 		'email'      => '#wpbody-content .gdc-admin-dashboard',
 		'store'      => '#wpbody-content .gdc-admin-dashboard',
@@ -362,7 +362,7 @@ function gend_society_dk_render() {
 		h = h && h.closest('.gdk-head');
 		function move() {
 			var t = document.querySelector(<?php echo wp_json_encode( $targets[ $key ] ); ?>);
-			if (!h || !t || t.contains(h)) return;
+			if (!h || !t || t.contains(h) || t.closest('[hidden]')) return;
 			t.insertBefore(h, t.firstChild);
 			h.classList.add('is-in');
 		}
