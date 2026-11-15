@@ -4000,6 +4000,8 @@ add_action( 'wp_footer', 'gend_society_tab_only_share_modal', 20 );
 function gend_society_tab_only_share_modal() {
     if ( empty( $_GET['gdc_tab_only'] ) || ! is_user_logged_in() ) return;
     if ( ! function_exists( 'bp_is_activity_component' ) || ! bp_is_activity_component() ) return;
+    // 2026-11-14: Social Profiles ships one Share popup for every feed (share to a feed + this send panel inside it).
+    if ( function_exists( 'gend_cm_share_assets' ) ) return;
     ?>
     <div class="gdc-act-share" data-gdc-share hidden>
         <div class="gdc-act-share__backdrop" data-gdc-share-close></div>
