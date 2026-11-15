@@ -38,7 +38,7 @@ function gend_society_da_dashboards()
         'sales_team'         => array(__('Sales Team', 'gend-society'), __('Store', 'gend-society'), 'gs-store', array('st_sales_team'), array(), array(), false),
         'project_services'   => array(__('Project Services', 'gend-society'), __('Store', 'gend-society'), 'gs-store', array('psoo-projects'), array(), array(), false),
         'social_profiles'    => array(__('Member Management', 'gend-society'), __('Social', 'gend-society'), 'gs-social', array('gdc-social-network-settings'), array(), array(), false),
-        'point_bank'         => array(__('Point Bank', 'gend-society'), __('Social', 'gend-society'), 'gs-social', array('gs-rewards', 'gdc-reward-point-bank'), array(), array(), false),
+        'point_bank'         => array(__('Point Bank', 'gend-society'), __('Social', 'gend-society'), 'gs-social', array('gs-rewards', 'gdc-reward-point-bank', 'gdc-reward-member-wallets'), array(), array(), false),
         'contracts_payments' => array(__('Contracts & Payments', 'gend-society'), __('Social', 'gend-society'), 'gs-social', array('gend-contracts-payments'), array(), array(), false),
         'features'           => array(__('Features', 'gend-society'), __('Features', 'gend-society'), 'gs-features', array('gs-features', 'gs-shortcodes', 'plugins.php', 'update-core.php'), array(), array(), true),
     ));
@@ -288,7 +288,7 @@ add_filter('rest_authentication_errors', function ($result) {
 /** Pages that already check the dashboard capabilities (each plugin adds its own as it is converted). */
 add_filter('gend_society_da_page_converted', function ($ok, $slug) {
     // WordPress's Site Editor only needs edit_theme_options, which a Theme Builder level grants.
-    return $ok || in_array($slug, array('site-editor.php', 'content-campaigns', 'blog-manager', 'talk-flows', 'gdc-store-settings', 'gdc-store-reports'), true);
+    return $ok || in_array($slug, array('site-editor.php', 'content-campaigns', 'blog-manager', 'talk-flows', 'gdc-store-settings', 'gdc-store-reports', 'gs-rewards', 'gdc-reward-point-bank', 'gdc-reward-member-wallets'), true);
 }, 10, 2);
 
 /** Content Campaigns (blog-manager): a Content Campaigns level opens the workspace (BM_Access::can_admin). */
