@@ -787,6 +787,12 @@ return array(
 			'note'  => 'Execution Contracts: gend.me grants / revokes the web app role of a specialist (signed; never deletes accounts or touches the owner).',
 		),
 		array(
+			'file'  => 'inc/dashboard-access.php',
+			'tier'  => 'container',
+			'needs' => array(),
+			'note'  => 'Dashboard access (2026-11-14): None / Use / Manage per wp-admin dashboard by member type, person or service-task grant; gs_dash_* capabilities; signed get/save for gend.me Organization > Access.',
+		),
+		array(
 			'file'  => 'inc/user-site-credentials.php',
 			'tier'  => 'container',
 			'needs' => array(),

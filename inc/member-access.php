@@ -100,6 +100,10 @@ function gend_society_member_access_grant(\WP_REST_Request $request)
     $grants = is_array($grants) ? $grants : array();
     $had = in_array($role, (array) $user->roles, true) && !in_array($role, array_column($grants, 'role'), true);
     $grants[$p['ref']] = array('role' => $role, 'had' => $had ? 1 : 0, 'at' => time());
+    // 2026-11-14: the task's dashboard levels (dashboard-access.php), accepted by the buyer at checkout.
+    if (!empty($p['access']) && function_exists('gend_society_da_clean_map')) {
+        $grants[$p['ref']]['access'] = gend_society_da_clean_map((array) $p['access'], true);
+    }
     update_user_meta($user->ID, 'gend_society_member_grants', $grants);
     if ($created) {
         update_user_meta($user->ID, 'gend_society_member_created_by_grant', 1);
