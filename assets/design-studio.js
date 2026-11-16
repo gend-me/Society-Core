@@ -551,6 +551,36 @@
 				onRoute();
 			}
 		} );
+		// Touch has no hover: the first tap on a section opens the rail (labels + items) instead of collapsing the section.
+		nav.addEventListener( 'click', function ( e ) {
+			if ( noHover.matches && ! nav.classList.contains( 'is-open' ) && e.target.closest( '.gs-st-nav-section' ) ) {
+				e.preventDefault();
+				e.stopImmediatePropagation();
+				setRailOpen( true );
+			}
+		}, true );
+		document.addEventListener( 'click', function ( e ) {
+			if ( nav.classList.contains( 'is-open' ) && ! nav.contains( e.target ) ) {
+				setRailOpen( false );
+			}
+		} );
+		[ 'mouseenter', 'mouseleave', 'focusin', 'focusout' ].forEach( function ( ev ) {
+			nav.addEventListener( ev, function () {
+				setTimeout( syncNavAria, 0 );
+			} );
+		} );
+	}
+	var noHover = window.matchMedia( '(hover: none)' );
+	function setRailOpen( on ) {
+		nav.classList.toggle( 'is-open', !! on );
+		syncNavAria();
+	}
+	// aria-expanded = the section's items are actually on screen (section open AND the rail expanded).
+	function syncNavAria() {
+		var shown = nav.classList.contains( 'is-open' ) || nav.matches( ':hover' ) || nav.matches( ':focus-within' );
+		nav.querySelectorAll( '.gs-st-nav-section' ).forEach( function ( b ) {
+			b.setAttribute( 'aria-expanded', shown && b.getAttribute( 'data-open' ) === '1' ? 'true' : 'false' );
+		} );
 	}
 
 	function renderNav() {
@@ -567,7 +597,7 @@
 			var open = ! collapsed[ section.id ];
 			var head = h(
 				'button',
-				{ type: 'button', title: section.label, class: 'gs-st-nav-section' + ( current.section === section.id ? ' is-current' : '' ), 'aria-expanded': open ? 'true' : 'false', onclick: function () {
+				{ type: 'button', title: section.label, class: 'gs-st-nav-section' + ( current.section === section.id ? ' is-current' : '' ), 'aria-expanded': open ? 'true' : 'false', 'data-open': open ? '1' : '0', onclick: function () {
 					collapsed[ section.id ] = open;
 					try {
 						window.localStorage.setItem( 'gsStudioCollapsed', JSON.stringify( collapsed ) );
@@ -603,6 +633,7 @@
 			} );
 			nav.appendChild( locked );
 		}
+		syncNavAria();
 	}
 
 	/* ── Router ────────────────────────────────────────────────────────── */
@@ -612,6 +643,9 @@
 	}
 	var lastView = '';
 	function onRoute() {
+		if ( nav.classList.contains( 'is-open' ) ) {
+			setRailOpen( false );
+		}
 		var raw = ( location.hash || '' ).replace( /^#\/?/, '' ).split( '/' );
 		if ( raw[ 0 ] === 'edit' && raw[ 1 ] && raw[ 2 ] ) {
 			current = { section: 'edit', item: '' };

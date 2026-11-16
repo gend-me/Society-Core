@@ -71,6 +71,23 @@ function gend_society_studio_register_page() {
 	);
 }
 
+add_filter( 'admin_title', 'gend_society_studio_admin_title', 10, 2 );
+/**
+ * Browser tab title for the studio. Hidden pages (no parent menu) get an empty
+ * title from core, which left "‹ GEND.ME — WordPress".
+ *
+ * @param string $admin_title Full admin title.
+ * @param string $title       Page title (empty for hidden pages).
+ * @return string
+ */
+function gend_society_studio_admin_title( $admin_title, $title ) {
+	// phpcs:ignore WordPress.Security.NonceVerification.Recommended -- page routing.
+	if ( '' !== trim( (string) $title ) || ! isset( $_GET['page'] ) || GEND_SOCIETY_STUDIO_PAGE !== $_GET['page'] ) {
+		return $admin_title;
+	}
+	return __( 'Theme Builder', 'gend-society' ) . ' ' . ltrim( (string) $admin_title );
+}
+
 add_action( 'admin_menu', 'gend_society_studio_register_group_styling_page', 20 );
 /**
  * Hidden page that shows the existing Group Styling builder (Social Profiles'
@@ -682,6 +699,31 @@ function gend_society_studio_enqueue( $hook ) {
 	$theme      = wp_get_theme();
 	$sections   = gend_society_studio_sections();
 	$gs_post_id = class_exists( 'WP_Theme_JSON_Resolver' ) ? WP_Theme_JSON_Resolver::get_user_global_styles_post_id() : 0;
+
+	// Preload the boot requests (the block editor pattern): the studio renders without
+	// waiting on 6-8 REST round trips. Paths match assets/design-studio.js exactly; each
+	// response runs the route's own permission check for the current user.
+	$fields  = 'id,slug,title,description,source,origin,has_theme_file,is_custom,modified,plugin,theme,type,area';
+	$sheet   = rawurlencode( get_stylesheet() );
+	$preload = array(
+		'/wp/v2/templates?context=edit&per_page=100&_fields=' . $fields,
+		'/wp/v2/template-parts?context=edit&per_page=100&_fields=' . $fields,
+		'/wp/v2/settings',
+	);
+	if ( $gs_post_id ) {
+		$preload[] = '/wp/v2/global-styles/' . (int) $gs_post_id . '?context=edit';
+		$preload[] = '/wp/v2/global-styles/themes/' . $sheet . '?context=edit';
+		$preload[] = '/wp/v2/global-styles/themes/' . $sheet . '/variations?context=edit';
+	}
+	if ( current_user_can( 'manage_options' ) ) {
+		foreach ( array_filter( array( (int) get_option( 'site_logo' ), (int) get_option( 'site_icon' ) ) ) as $media_id ) {
+			$preload[] = '/wp/v2/media/' . $media_id . '?_fields=id,source_url,media_details,alt_text';
+		}
+	}
+	$preloaded = array_reduce( $preload, 'rest_preload_api_request', array() );
+	if ( $preloaded ) {
+		wp_add_inline_script( 'wp-api-fetch', sprintf( 'wp.apiFetch.use( wp.apiFetch.createPreloadingMiddleware( %s ) );', wp_json_encode( $preloaded ) ), 'after' );
+	}
 
 	wp_localize_script(
 		'gs-design-studio',

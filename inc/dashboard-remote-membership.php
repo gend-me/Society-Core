@@ -747,6 +747,11 @@ if ( ! function_exists( 'gend_society_email_plan_env' ) ) {
         // Usage this month.
         if ( function_exists( 'gend_mail_state' ) && function_exists( 'gend_mail_current_site_key' ) ) {
             $st = gend_mail_state( gend_mail_current_site_key() );
+            // Exact bytes for the storage meter (gend_mail_state() rounds to 0.001 GB, so small mailboxes read 0.00).
+            if ( is_array( $st ) && ! isset( $st['storage_bytes'] ) && function_exists( 'gend_mail_usage' ) ) {
+                $em_use              = gend_mail_usage( gend_mail_current_site_key() );
+                $st['storage_bytes'] = (int) ( $em_use['storage_bytes'] ?? 0 );
+            }
             $env['mail_state'] = is_array( $st ) ? $st : null;
         } else {
             $st = get_option( 'gend_society_mail_service_state', null );
@@ -919,24 +924,50 @@ if ( ! function_exists( 'gend_society_email_plan_view' ) ) {
             $used  = max( 0, (int) ( $st['used'] ?? 0 ) );
             $gb    = max( 0.0, (float) ( $st['storage_gb'] ?? 0 ) );
             $ugb   = max( 0.0, (float) ( $st['storage_used_gb'] ?? 0 ) );
+            $ubytes = isset( $st['storage_bytes'] ) ? max( 0, (int) $st['storage_bytes'] ) : (int) round( $ugb * GB_IN_BYTES );
+            // Used storage carries its own unit (KB / MB / GB) so a small mailbox does not read "0.00 / 1 GB".
+            if ( $ubytes < MB_IN_BYTES ) {
+                $s_val = $ubytes / KB_IN_BYTES; $s_dec = 0; $s_unit = __( 'KB', 'gend-society' );
+            } elseif ( $ubytes < GB_IN_BYTES ) {
+                $s_val = $ubytes / MB_IN_BYTES; $s_dec = 1; $s_unit = __( 'MB', 'gend-society' );
+            } else {
+                $s_val = $ubytes / GB_IN_BYTES; $s_dec = 2; $s_unit = __( 'GB', 'gend-society' );
+            }
+            $s_val = round( $s_val, $s_dec );
+            $over_send = $limit > 0 && $used > $limit;
+            if ( $over_send ) {
+                $send_note = ( 'hub' === $mode && is_main_site() )
+                    /* translators: 1: emails sent this month, 2: monthly allowance. */
+                    ? sprintf( __( 'Over the free allowance: %1$s of %2$s emails sent this month. The gend.me site itself is not held, so its mail keeps going out.', 'gend-society' ), number_format_i18n( $used ), number_format_i18n( $limit ) )
+                    /* translators: 1: emails sent this month, 2: monthly allowance. */
+                    : sprintf( __( 'Over your allowance: %1$s of %2$s emails sent this month. New mail from your agents and Talk Flows inboxes now waits in the outbox until you choose a bigger plan or the allowance renews next month. Account emails such as password resets still go out.', 'gend-society' ), number_format_i18n( $used ), number_format_i18n( $limit ) );
+            } elseif ( $limit > 0 && $used >= $limit ) {
+                $send_note = __( 'You have used this month\'s allowance. Further mail from your agents and Talk Flows inboxes waits in the outbox until you choose a bigger plan or the allowance renews next month.', 'gend-society' );
+            } else {
+                $send_note = '';
+            }
             $v['meters'] = array(
                 'sending' => array(
                     'label'    => __( 'Sent this month', 'gend-society' ),
                     'value'    => $used,
                     'decimals' => 0,
+                    'unit'     => '',
                     /* translators: %s: Monthly sending allowance. */
                     'of'       => sprintf( __( '/ %s', 'gend-society' ), number_format_i18n( $limit ) ),
                     'pct'      => $limit > 0 ? (int) min( 100, round( $used * 100 / $limit ) ) : 100,
                     'over'     => $used >= $limit,
+                    'note'     => $send_note,
                 ),
                 'storage' => array(
                     'label'    => __( 'Mailbox storage', 'gend-society' ),
-                    'value'    => $ugb,
-                    'decimals' => 2,
+                    'value'    => $s_val,
+                    'decimals' => $s_dec,
+                    'unit'     => $s_unit,
                     /* translators: %s: Storage allowance in GB. */
                     'of'       => sprintf( __( '/ %s GB', 'gend-society' ), number_format_i18n( $gb, $gb === floor( $gb ) ? 0 : 2 ) ),
-                    'pct'      => $gb > 0 ? (int) min( 100, round( $ugb * 100 / $gb ) ) : 0,
-                    'over'     => $gb > 0 && $ugb > $gb,
+                    'pct'      => $gb > 0 ? (int) min( 100, round( $ubytes * 100 / ( $gb * GB_IN_BYTES ) ) ) : 0,
+                    'over'     => $gb > 0 && $ubytes > $gb * GB_IN_BYTES,
+                    'note'     => ( $gb > 0 && $ubytes > $gb * GB_IN_BYTES ) ? __( 'Mailbox storage is over this plan. Choose a bigger storage plan.', 'gend-society' ) : '',
                 ),
             );
         }
@@ -1253,6 +1284,9 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
 .gs-em-meter__bar > span { display: block; height: 100%; border-radius: inherit; background: linear-gradient(90deg, #10b981, #22d3ee); transition: width .9s cubic-bezier(.2,.9,.3,1); }
 .gs-em-meter.is-over .gs-em-meter__bar > span { background: linear-gradient(90deg, #f59e0b, #ef4444); }
 .gs-em-meter.is-over .gs-em-meter__v { color: #fcd34d; }
+.gs-em-over { margin: 0; padding: 10px 12px; border-radius: 10px; background: rgba(245,158,11,.10); border: 1px solid rgba(245,158,11,.32); color: #fde68a; font-size: 0.8rem; line-height: 1.45; }
+.gs-em-over__link { display: inline; margin: 0; padding: 0; border: 0; background: none; color: #7dd3fc; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.gs-em-over__link:hover, .gs-em-over__link:focus-visible { color: #fff; }
 @media (max-width: 640px) { .gs-bk-hero.gs-em-hero { padding: 20px 18px; align-items: stretch; } .gs-em-hero > .gs-bk-main, .gs-em-hero > .gs-em-sels { flex: 0 0 auto; min-width: 0; } .gs-em-sels { grid-template-columns: 1fr; } }
 @media (prefers-reduced-motion: reduce) { .gs-em-sel, .gs-em-sel > .dashicons, .gs-em-meter__bar > span { transition: none; } }
 </style>
@@ -1353,6 +1387,16 @@ button.gs-em-sel:hover > .dashicons, a.gs-em-sel:hover > .dashicons { transform:
             return '<div class="' . esc_attr( $cls ) . '" data-gs-em-kind="' . esc_attr( $kind ) . '">';
         };
         $tile_close = ( $cta && in_array( $cta['type'], array( 'upgrade', 'twoset' ), true ) ) ? '</button>' : ( ( $cta && 'popup' === $cta['type'] ) ? '</a>' : '</div>' );
+        // Over-quota note link: the same picker as the plan button (kept outside the tile, which is itself a button).
+        $note_cta   = '';
+        $note_label = esc_html__( 'Choose a plan', 'gend-society' );
+        if ( $cta && 'upgrade' === $cta['type'] ) {
+            $note_cta = ' <button type="button" class="gs-em-over__link" data-gs-upgrade-open data-resource="emails" data-resource-label="' . esc_attr__( 'Email hosting', 'gend-society' ) . '"' . $attrs . '>' . $note_label . '</button>';
+        } elseif ( $cta && 'twoset' === $cta['type'] ) {
+            $note_cta = ' <button type="button" class="gs-em-over__link" data-gs-twoset="emails">' . $note_label . '</button>';
+        } elseif ( $cta && 'popup' === $cta['type'] ) {
+            $note_cta = ' <a class="gs-em-over__link" data-gs-popup href="' . esc_url( $cta['url'] ) . '" target="_blank" rel="opener">' . $note_label . '</a>';
+        }
         ?>
 <?php if ( 'talk-flows' === $context ) : ?>
 <div class="gs-em-plan gs-em-plan--talk-flows">
@@ -1397,7 +1441,7 @@ $em_meter = '';
 if ( isset( $v['meters'][ $kind ] ) ) {
     $mt       = $v['meters'][ $kind ];
     $em_meter = '<span class="gs-em-meter' . ( ! empty( $mt['over'] ) ? ' is-over' : '' ) . '" data-gs-em-meter="' . esc_attr( $kind ) . '">'
-        . '<span class="gs-em-meter__head"><span class="gs-em-meter__k">' . esc_html( $mt['label'] ) . '</span><span class="gs-em-meter__v"><span data-gs-em-count data-value="' . esc_attr( (string) $mt['value'] ) . '" data-decimals="' . (int) $mt['decimals'] . '">' . esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ) . '</span> <small>' . esc_html( $mt['of'] ) . '</small></span></span>'
+        . '<span class="gs-em-meter__head"><span class="gs-em-meter__k">' . esc_html( $mt['label'] ) . '</span><span class="gs-em-meter__v"><span data-gs-em-count data-value="' . esc_attr( (string) $mt['value'] ) . '" data-decimals="' . (int) $mt['decimals'] . '">' . esc_html( number_format_i18n( $mt['value'], (int) $mt['decimals'] ) ) . '</span>' . ( ! empty( $mt['unit'] ) ? ' ' . esc_html( $mt['unit'] ) : '' ) . ' <small>' . esc_html( $mt['of'] ) . '</small></span></span>'
         . '<span class="gs-em-meter__bar"><span data-gs-em-bar data-pct="' . (int) $mt['pct'] . '" style="width: ' . (int) $mt['pct'] . '%;"></span></span>'
         . '</span>';
 }
@@ -1408,6 +1452,9 @@ if ( isset( $v['meters'][ $kind ] ) ) {
 <?php elseif ( '' !== $em_meter ) : ?>
                 <?php echo $em_meter; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_html()'d or cast. ?>
 
+<?php endif; ?>
+<?php if ( ! empty( $v['meters'][ $kind ]['note'] ) ) : ?>
+                <p class="gs-em-over" role="status"><?php echo esc_html( $v['meters'][ $kind ]['note'] ); ?><?php echo $note_cta; // phpcs:ignore WordPress.Security.EscapeOutput.OutputNotEscaped -- Built above; every value esc_attr()/esc_url()/esc_html()'d. ?></p>
 <?php endif; ?>
             </div>
 <?php endforeach; ?>
