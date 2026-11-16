@@ -232,6 +232,15 @@
 			n.createNotice( type || 'success', msg, { type: 'snackbar', isDismissible: true } );
 		}
 	}
+	/**
+	 * A Custom HTML block holding this markup. WordPress 7.1 keeps the markup as the block's inner content (its
+	 * 'content' attribute is deprecated and not saved); older versions keep it in the attribute. 2026-11-15.
+	 */
+	function htmlBlock( html ) {
+		var t = wp.blocks.getBlockType( 'core/html' );
+		var inner = !! ( t && t.attributes && t.attributes.content && t.attributes.content.role === 'local' );
+		return inner ? wp.blocks.createBlock( 'core/html', {}, [], [ html ] ) : wp.blocks.createBlock( 'core/html', { content: html } );
+	}
 	function convertBlocks( blocks, thenMode ) {
 		var back = editorMode();
 		if ( ! blocks.length ) {
@@ -252,7 +261,7 @@
 				var r = res[ i ];
 				if ( r && r.html ) {
 					live += r.live ? 1 : 0;
-					be.replaceBlock( b.clientId, wp.blocks.createBlock( 'core/html', { content: r.html } ) );
+					be.replaceBlock( b.clientId, htmlBlock( r.html ) );
 				}
 			} );
 			switchMode( thenMode || back );
