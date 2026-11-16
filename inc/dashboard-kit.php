@@ -198,7 +198,9 @@ function gend_society_dk_stats( $key ) {
 			$add( gend_society_dk_count_posts( 'post', 'draft' ), __( 'Drafts', 'gend-society' ) );
 			break;
 		case 'email':
-			$add( gend_society_dk_count_posts( 'chat_form' ), __( 'Forms & chatflows', 'gend-society' ), __( 'Published', 'gend-society' ) );
+			// chat_form is the Chatflows tab; the Forms tab lists basic_form (it said "No forms yet" under a "42 Forms & chatflows" tile).
+			$basic = gend_society_dk_count_posts( 'basic_form' );
+			$add( gend_society_dk_count_posts( 'chat_form' ), __( 'Chatflows', 'gend-society' ), $basic ? sprintf( _n( 'Published, plus %s form', 'Published, plus %s forms', (int) $basic, 'gend-society' ), number_format_i18n( (int) $basic ) ) : __( 'Published', 'gend-society' ) );
 			$subs = $wpdb->prefix . 'gdc_email_subscribers';
 			$add( gend_society_dk_table_exists( $subs ) ? (int) $wpdb->get_var( "SELECT COUNT(*) FROM `{$subs}`" ) : null, __( 'Subscribers', 'gend-society' ), __( 'On your email lists', 'gend-society' ) ); // phpcs:ignore
 			$add( gend_society_dk_count_posts( 'em_posting' ), __( 'Open postings', 'gend-society' ), __( 'Roles taking applications', 'gend-society' ) );

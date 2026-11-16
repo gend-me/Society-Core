@@ -441,6 +441,16 @@ if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
             .gs-upgrade-modal__picker-card.is-current { border-color: rgba(78,230,138,.4); background: rgba(0,180,80,.06); }
             .gs-upgrade-modal__picker-name { font-weight: 700; font-size: 0.95rem; }
             .gs-upgrade-modal__picker-price { color: #7dd3fc; font-size: 0.85rem; font-weight: 600; }
+            /* Loading + slow/failed fallback over the checkout iframe (it stayed a blank card while the
+               memberships page rendered, and for good when its picker never opened). */
+            .gs-upgrade-modal__loading { position: absolute; inset: 0; z-index: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 14px; padding: 32px; text-align: center; color: #cbd5e1; font-size: 0.9rem; background: #0b0e14; }
+            .gs-upgrade-modal__loading[hidden] { display: none; }
+            .gs-upgrade-modal__spin { width: 34px; height: 34px; border-radius: 50%; border: 3px solid rgba(125,211,252,.18); border-top-color: #22d3ee; animation: gs-upg-spin .8s linear infinite; }
+            .gs-upgrade-modal__loading.is-slow .gs-upgrade-modal__spin { display: none; }
+            .gs-upgrade-modal__direct { display: inline-flex; align-items: center; min-height: 40px; padding: 0 18px; border-radius: 12px; background: linear-gradient(135deg, #22d3ee, #7dd3fc); color: #0b0e14 !important; font-weight: 700; font-size: 13px; text-decoration: none; }
+            .gs-upgrade-modal__direct[hidden] { display: none; }
+            @keyframes gs-upg-spin { to { transform: rotate(360deg); } }
+            @media (prefers-reduced-motion: reduce) { .gs-upgrade-modal__spin { animation-duration: 2.4s; } }
         </style>
         <div class="gs-upgrade-modal" data-gs-upgrade-modal aria-hidden="true" role="dialog" aria-modal="true">
             <div class="gs-upgrade-modal__backdrop" data-gs-upgrade-close></div>
@@ -450,6 +460,11 @@ if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
                 <div class="gs-upgrade-modal__frame" data-gs-upg-iframe hidden></div>
 <?php else : ?>
                 <iframe class="gs-upgrade-modal__frame" data-gs-upg-iframe src="about:blank" title="<?php esc_attr_e( 'Upgrade checkout', 'gend-society' ); ?>" loading="lazy"></iframe>
+                <div class="gs-upgrade-modal__loading" data-gs-upg-loading role="status" aria-live="polite" hidden>
+                    <span class="gs-upgrade-modal__spin" aria-hidden="true"></span>
+                    <span data-gs-upg-loading-text><?php esc_html_e( 'Loading plans…', 'gend-society' ); ?></span>
+                    <a class="gs-upgrade-modal__direct" data-gs-upg-direct href="#" target="_blank" rel="noopener" hidden><?php esc_html_e( 'Open plans in a new tab', 'gend-society' ); ?></a>
+                </div>
 <?php endif; ?>
                 <div class="gs-upgrade-modal__picker" data-gs-upg-picker hidden></div>
             </div>
@@ -469,11 +484,59 @@ if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
             var ajaxUrl = <?php echo wp_json_encode( admin_url( 'admin-ajax.php' ) ); ?>;
             var ajaxNonce = <?php echo wp_json_encode( wp_create_nonce( 'gs_membership_action' ) ); ?>;
 
+            var loading = modal.querySelector('[data-gs-upg-loading]');
+            var loadingText = loading ? loading.querySelector('[data-gs-upg-loading-text]') : null;
+            var direct = loading ? loading.querySelector('[data-gs-upg-direct]') : null;
+            var watch = null;
+
+            function stopLoading() {
+                if (watch) { clearInterval(watch); watch = null; }
+                if (loading) { loading.hidden = true; }
+            }
+
+            // The memberships page inside the frame hides its own chrome and opens the picker by script, so it is
+            // blank until that picker is open: keep a loading state up until then, and a direct link if it is slow.
+            function frameReady() {
+                try {
+                    var d = iframe.contentDocument;
+                    if (!d || !d.location || d.location.href === 'about:blank') { return false; }
+                    if (d.querySelector('.gdc-modal.open, #gdc-checkout-iframe-modal')) { return true; }
+                    return d.readyState === 'complete' && !d.documentElement.classList.contains('gdc-modal-only');
+                } catch (err) {
+                    return false; // cross-origin: the load event below hides the overlay
+                }
+            }
+
+            function startLoading(url) {
+                if (!loading) { return; }
+                stopLoading();
+                loading.hidden = false;
+                loading.classList.remove('is-slow');
+                if (loadingText) { loadingText.textContent = <?php echo wp_json_encode( __( 'Loading plans…', 'gend-society' ) ); ?>; }
+                if (direct) { direct.hidden = true; direct.setAttribute('href', url); }
+                var t0 = Date.now();
+                watch = setInterval(function () {
+                    if (frameReady()) { stopLoading(); return; }
+                    if (Date.now() - t0 > 15000 && !loading.classList.contains('is-slow')) {
+                        loading.classList.add('is-slow');
+                        if (loadingText) { loadingText.textContent = <?php echo wp_json_encode( __( 'The plan picker is taking longer than usual to open.', 'gend-society' ) ); ?>; }
+                        if (direct) { direct.hidden = false; }
+                    }
+                }, 400);
+            }
+
+            iframe.addEventListener('load', function () {
+                var cross = false;
+                try { void iframe.contentDocument.location.href; } catch (err) { cross = true; }
+                if (cross) { stopLoading(); }
+            });
+
             function showIframe(url) {
                 picker.hidden = true;
                 picker.innerHTML = '';
                 iframe.hidden = false;
                 iframe.src = url;
+                if (iframe.tagName === 'IFRAME') { startLoading(url); }
                 modal.classList.add('is-open');
                 modal.setAttribute('aria-hidden', 'false');
                 document.body.style.overflow = 'hidden';
@@ -484,6 +547,7 @@ if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
             }
 
             function openPicker() {
+                stopLoading();
                 iframe.hidden = true;
                 iframe.src = 'about:blank';
                 picker.hidden = false;
@@ -577,6 +641,7 @@ if ( ! function_exists( 'gend_society_hosting_render_upgrade_modal' ) ) {
                 if (resourceType) { proxyShowResourcePicker(resourceType); return; }
             }
             function close() {
+                stopLoading();
                 modal.classList.remove('is-open');
                 modal.setAttribute('aria-hidden', 'true');
                 document.body.style.overflow = '';
