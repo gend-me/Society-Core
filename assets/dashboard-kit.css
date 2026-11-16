@@ -598,25 +598,24 @@ html body.gdk-home #gs-mship-root .gs-mship-tabs-nav > [aria-selected=true] {
   background: linear-gradient(135deg, color-mix(in srgb, var(--gdk-mag) 60%, #1a1030), color-mix(in srgb, #3b82f6 48%, #0d1428)) !important;
 }
 /* Second-level navs (APP sections, STORAGE, COMPUTE GAS) share the kit segmented control. */
-html body.gdk-home #gs-mship-root .gs-hosting__sidebar, html body.gdk-home #gs-mship-root .gs-hosting__nav {
+html body.gdk-home #gs-mship-root .gs-hosting__sidebar {
   display: flex !important; flex-wrap: wrap; gap: 4px !important; width: fit-content; max-width: 100%; box-sizing: border-box;
   padding: 5px !important; border: 1px solid rgba(255, 255, 255, .08) !important; border-radius: 13px !important; background: rgba(11, 14, 20, .6) !important;
 }
-html body.gdk-home #gs-mship-root .gs-hosting__sidebar > *, html body.gdk-home #gs-mship-root .gs-hosting__nav > * {
+html body.gdk-home #gs-mship-root .gs-hosting__sidebar > * {
   flex: 0 0 auto; min-height: 36px; margin: 0 !important; padding: 7px 13px !important; border-radius: 9px !important; border: 0 !important;
   box-shadow: none !important; color: #aab4bf !important; background: transparent !important; font: 600 12.5px/1.2 var(--gdk-fb) !important; white-space: nowrap;
   display: inline-flex !important; flex-direction: row !important; align-items: center; gap: 8px;
 }
-html body.gdk-home #gs-mship-root .gs-hosting__sidebar > *::after, html body.gdk-home #gs-mship-root .gs-hosting__nav > *::after { display: none !important; }
-html body.gdk-home #gs-mship-root .gs-hosting__sidebar > .is-active, html body.gdk-home #gs-mship-root .gs-hosting__sidebar > .active,
-html body.gdk-home #gs-mship-root .gs-hosting__nav > .is-active, html body.gdk-home #gs-mship-root .gs-hosting__nav > .active {
+html body.gdk-home #gs-mship-root .gs-hosting__sidebar > *::after { display: none !important; }
+html body.gdk-home #gs-mship-root .gs-hosting__sidebar > * > .dashicons { font: normal 18px/1 dashicons !important; width: 18px; height: 18px; flex: none; }
+html body.gdk-home #gs-mship-root .gs-hosting__sidebar > .is-active, html body.gdk-home #gs-mship-root .gs-hosting__sidebar > .active {
   color: #fff !important; background: rgba(255, 255, 255, .12) !important; box-shadow: inset 0 0 0 1px rgba(255, 255, 255, .14) !important;
 }
 @media (max-width: 1024px) {
   html body.gdk-home #gs-mship-root .gs-mship-tabs-nav,
-  html body.gdk-home #gs-mship-root .gs-hosting__sidebar,
-  html body.gdk-home #gs-mship-root .gs-hosting__nav { flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100% !important; width: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; justify-content: flex-start !important; }
-  html body.gdk-home #gs-mship-root .gs-mship-tabs-nav > *, html body.gdk-home #gs-mship-root .gs-hosting__sidebar > *, html body.gdk-home #gs-mship-root .gs-hosting__nav > * { flex: 0 0 auto !important; min-height: 40px; }
+  html body.gdk-home #gs-mship-root .gs-hosting__sidebar { flex-wrap: nowrap !important; overflow-x: auto !important; max-width: 100% !important; width: auto !important; scrollbar-width: none; -webkit-overflow-scrolling: touch; justify-content: flex-start !important; }
+  html body.gdk-home #gs-mship-root .gs-mship-tabs-nav > *, html body.gdk-home #gs-mship-root .gs-hosting__sidebar > * { flex: 0 0 auto !important; min-height: 40px; }
 }
 /* App settings buttons: kit primary / glass; Remove links get a real tap area. */
 html body.gdk-home #wpbody-content .gs-btn:not(.gs-btn-secondary) {
