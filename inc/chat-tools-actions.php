@@ -457,7 +457,7 @@ add_filter(
 		$add( 'store_policy_pages_save', 'Create the store\'s Privacy Policy and Terms of Service pages from the business details, and link them at checkout, in emails and in the footer. A page the member edited is kept.', array( 'business_name' => $str, 'contact_email' => $str ), 'store.store_management', $store, 'write', 'manage_options', static function ( $a ) {
 			return gend_society_sb_policy_pages( $a );
 		} );
-		$add( 'store_settings_save', 'Set the store\'s currency and country, and open it to customers.', array( 'currency' => $str, 'country' => $str ), 'store.store_management', $store, 'confirm', 'manage_woocommerce', static function ( $a ) {
+		$add( 'store_settings_save', 'Set the store\'s currency and country, and open it to customers (open false leaves it behind its coming soon page).', array( 'currency' => $str, 'country' => $str, 'open' => array( 'type' => 'boolean' ) ), 'store.store_management', $store, 'confirm', 'manage_woocommerce', static function ( $a ) {
 			$currency = strtoupper( (string) ( $a['currency'] ?? '' ) );
 			$country  = strtoupper( (string) ( $a['country'] ?? '' ) );
 			if ( '' !== $currency ) {
@@ -472,9 +472,17 @@ add_filter(
 				}
 				update_option( 'woocommerce_default_country', $country );
 			}
-			// The member has just approved selling these, so the shop can't stay behind a coming soon page.
-			update_option( 'woocommerce_coming_soon', 'no' );
-			return array( 'currency' => get_option( 'woocommerce_currency' ), 'country' => get_option( 'woocommerce_default_country' ) );
+			// The member has just approved selling these, so the shop can't stay behind a coming soon page. 2026-11-15:
+			// during setup the hub sends open false with the shop's approval and open true once payments are decided,
+			// so nobody can reach a checkout that has no way to pay yet. Without the field it opens, as before.
+			if ( ! array_key_exists( 'open', $a ) || ! empty( $a['open'] ) ) {
+				update_option( 'woocommerce_coming_soon', 'no' );
+			} else {
+				// Only the store's own pages wait; the rest of the site stays visible. Shop managers still see the store.
+				update_option( 'woocommerce_coming_soon', 'yes' );
+				update_option( 'woocommerce_store_pages_only', 'yes' );
+			}
+			return array( 'currency' => get_option( 'woocommerce_currency' ), 'country' => get_option( 'woocommerce_default_country' ), 'open' => 'no' === get_option( 'woocommerce_coming_soon' ) );
 		} );
 
 		// ---- Store: Sales Team ----
